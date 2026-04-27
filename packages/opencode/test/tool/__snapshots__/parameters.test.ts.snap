@@ -41,6 +41,10 @@ Output: Creates directory 'foo'"
 ,
       "type": "string",
     },
+    "run_in_background": {
+      "description": "Set true to start long-running command and return immediately with process id for later bash_read/bash_stop calls.",
+      "type": "boolean",
+    },
     "timeout": {
       "description": "Optional timeout in milliseconds",
       "type": "number",
@@ -53,6 +57,57 @@ Output: Creates directory 'foo'"
   "required": [
     "command",
     "description",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`tool parameters JSON Schema (wire shape) bash_read 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "limit": {
+      "description": "Maximum number of lines to read",
+      "type": "number",
+    },
+    "offset": {
+      "description": "The line number to start reading from (1-indexed)",
+      "type": "number",
+    },
+    "process_id": {
+      "description": "Background process id returned by bash tool",
+      "pattern": "^tool.*",
+      "type": "string",
+    },
+    "stream": {
+      "description": "Which stream to read: "stdout", "stderr", or "all". Defaults to "stdout".",
+      "enum": [
+        "stdout",
+        "stderr",
+        "all",
+      ],
+      "type": "string",
+    },
+  },
+  "required": [
+    "process_id",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`tool parameters JSON Schema (wire shape) bash_stop 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "process_id": {
+      "description": "Background process id returned by bash tool",
+      "pattern": "^tool.*",
+      "type": "string",
+    },
+  },
+  "required": [
+    "process_id",
   ],
   "type": "object",
 }
@@ -223,7 +278,6 @@ exports[`tool parameters JSON Schema (wire shape) lsp 1`] = `
   "type": "object",
 }
 `;
-
 
 exports[`tool parameters JSON Schema (wire shape) plan 1`] = `
 {

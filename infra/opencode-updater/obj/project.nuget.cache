@@ -1,0 +1,24 @@
+{
+  "version": 2,
+  "dgSpecHash": "pEI121rqLRk=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\Klaus\\Desktop\\PFH\\opencode\\infra\\opencode-updater\\OpenCode.UpdaterServer.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Klaus\\.nuget\\packages\\asp.versioning.abstractions\\8.1.0\\asp.versioning.abstractions.8.1.0.nupkg.sha512",
+    "C:\\Users\\Klaus\\.nuget\\packages\\gridify\\2.18.0\\gridify.2.18.0.nupkg.sha512",
+    "C:\\Users\\Klaus\\.nuget\\packages\\gridify.entityframework\\2.18.0\\gridify.entityframework.2.18.0.nupkg.sha512",
+    "C:\\Users\\Klaus\\.nuget\\packages\\klausmd5.autocontroller\\0.4.0\\klausmd5.autocontroller.0.4.0.nupkg.sha512",
+    "C:\\Users\\Klaus\\.nuget\\packages\\klausmd5.automapperlegacy\\14.2.0\\klausmd5.automapperlegacy.14.2.0.nupkg.sha512",
+    "C:\\Users\\Klaus\\.nuget\\packages\\microsoft.entityframeworkcore\\10.0.3\\microsoft.entityframeworkcore.10.0.3.nupkg.sha512",
+    "C:\\Users\\Klaus\\.nuget\\packages\\microsoft.entityframeworkcore.abstractions\\10.0.3\\microsoft.entityframeworkcore.abstractions.10.0.3.nupkg.sha512",
+    "C:\\Users\\Klaus\\.nuget\\packages\\microsoft.entityframeworkcore.analyzers\\10.0.3\\microsoft.entityframeworkcore.analyzers.10.0.3.nupkg.sha512",
+    "C:\\Users\\Klaus\\.nuget\\packages\\microsoft.extensions.apidescription.server\\10.0.0\\microsoft.extensions.apidescription.server.10.0.0.nupkg.sha512",
+    "C:\\Users\\Klaus\\.nuget\\packages\\microsoft.openapi\\2.4.1\\microsoft.openapi.2.4.1.nupkg.sha512",
+    "C:\\Users\\Klaus\\.nuget\\packages\\swashbuckle.aspnetcore\\10.1.4\\swashbuckle.aspnetcore.10.1.4.nupkg.sha512",
+    "C:\\Users\\Klaus\\.nuget\\packages\\swashbuckle.aspnetcore.annotations\\10.1.4\\swashbuckle.aspnetcore.annotations.10.1.4.nupkg.sha512",
+    "C:\\Users\\Klaus\\.nuget\\packages\\swashbuckle.aspnetcore.swagger\\10.1.4\\swashbuckle.aspnetcore.swagger.10.1.4.nupkg.sha512",
+    "C:\\Users\\Klaus\\.nuget\\packages\\swashbuckle.aspnetcore.swaggergen\\10.1.4\\swashbuckle.aspnetcore.swaggergen.10.1.4.nupkg.sha512",
+    "C:\\Users\\Klaus\\.nuget\\packages\\swashbuckle.aspnetcore.swaggerui\\10.1.4\\swashbuckle.aspnetcore.swaggerui.10.1.4.nupkg.sha512"
+  ],
+  "logs": []
+}

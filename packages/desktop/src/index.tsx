@@ -31,6 +31,7 @@ import { render } from "solid-js/web"
 import pkg from "../package.json"
 import { initI18n, t } from "./i18n"
 import { UPDATER_ENABLED } from "./updater"
+import { updateServer } from "./update-server"
 import { webviewZoom } from "./webview-zoom"
 import "./styles.css"
 import { Channel } from "@tauri-apps/api/core"
@@ -286,6 +287,9 @@ const createPlatform = (): Platform => {
 
     checkUpdate: async () => {
       if (!UPDATER_ENABLED) return { updateAvailable: false }
+      const remote = await updateServer.fetch()
+      if (!remote) return { updateAvailable: false }
+      if (updateServer.compareVersions(pkg.version, remote.version) <= 0) return { updateAvailable: false }
       const next = await check().catch(() => null)
       if (!next) return { updateAvailable: false }
       const ok = await next
