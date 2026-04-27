@@ -32,6 +32,7 @@ import { ModelID, ProviderID } from "./schema"
 const log = Log.create({ service: "provider" })
 const AIFACTORY_ID = ProviderID.make("aifactory")
 const AIFACTORY_BASE_URL = "http://10.53.7.23/v1"
+const AIFACTORY_BYPASS = new URL(AIFACTORY_BASE_URL).host
 const REQUIRED_PROVIDER_IDS = [ProviderID.githubCopilot, ProviderID.aifactory]
 
 export function normalizeEnabledProviders(providerIDs: string[] | undefined) {
@@ -109,16 +110,16 @@ function buildAiFactoryModel(modelID: string, created?: number | string): Model 
   }
 }
 
-async function discoverAiFactoryModels(token: string) {
-  const payload = (await fetch(`${AIFACTORY_BASE_URL}/models`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      signal: AbortSignal.timeout(5000),
-    }).then((res) => {
-      if (!res.ok) throw new Error(`Ai-Factory model discovery failed: ${res.status}`)
-      return res.json()
-    })) as {
+async function discoverAiFactoryModels(token: string, fetchFn: FetchLike = fetch) {
+  const payload = (await fetchFn(`${AIFACTORY_BASE_URL}/models`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    signal: AbortSignal.timeout(5000),
+  }).then((res) => {
+    if (!res.ok) throw new Error(`Ai-Factory model discovery failed: ${res.status}`)
+    return res.json()
+  })) as {
     data?: Array<{
       id?: string
       created?: number | string
@@ -134,6 +135,38 @@ async function discoverAiFactoryModels(token: string) {
       .filter((item) => item.id)
       .map((item) => [item.id, buildAiFactoryModel(item.id, item.created)] as const),
   )
+}
+
+function mergeNoProxyEntry(value: string | undefined, entry: string) {
+  if (!value) return entry
+  if (
+    value
+      .split(",")
+      .map((item) => item.trim())
+      .includes(entry)
+  )
+    return value
+  return `${value},${entry}`
+}
+
+function applyProviderProxyConfig(config: Config.Info) {
+  process.env.NO_PROXY = mergeNoProxyEntry(process.env.NO_PROXY, AIFACTORY_BYPASS)
+  process.env.no_proxy = mergeNoProxyEntry(process.env.no_proxy, AIFACTORY_BYPASS)
+  if (!config.http_proxy) return
+  process.env.HTTP_PROXY = config.http_proxy
+  process.env.HTTPS_PROXY = config.http_proxy
+  process.env.http_proxy = config.http_proxy
+  process.env.https_proxy = config.http_proxy
+}
+
+function providerFetch(providerID: ProviderID, proxy: string | undefined, fetchFn: FetchLike = fetch): FetchLike {
+  if (!proxy || providerID === AIFACTORY_ID) return fetchFn
+  if (typeof Bun === "undefined") return fetchFn
+  return (input: RequestInfo | URL, init?: RequestInit) =>
+    Bun.fetch(input, {
+      ...init,
+      proxy,
+    })
 }
 
 function shouldUseCopilotResponsesApi(modelID: string): boolean {
@@ -194,6 +227,8 @@ type BundledSDK = {
   languageModel(modelId: string): LanguageModelV3
 }
 
+type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+
 const BUNDLED_PROVIDERS: Record<string, () => Promise<(opts: any) => BundledSDK>> = {
   "@ai-sdk/amazon-bedrock": () => import("@ai-sdk/amazon-bedrock").then((m) => m.createAmazonBedrock),
   "@ai-sdk/anthropic": () => import("@ai-sdk/anthropic").then((m) => m.createAnthropic),
@@ -236,6 +271,7 @@ type CustomDep = {
   auth: (id: string) => Effect.Effect<Auth.Info | undefined>
   config: () => Effect.Effect<Config.Info>
   env: () => Effect.Effect<Record<string, string | undefined>>
+  fetch: (providerID: ProviderID, input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
   get: (key: string) => Effect.Effect<string | undefined>
 }
 
@@ -319,7 +355,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         },
         async discoverModels() {
           if (!token) return {}
-          return discoverAiFactoryModels(token)
+          return discoverAiFactoryModels(token, (input, init) => dep.fetch(AIFACTORY_ID, input, init))
         },
       }
     }),
@@ -593,7 +629,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
             const headers = new Headers(init?.headers)
             headers.set("Authorization", `Bearer ${token.token}`)
 
-            return fetch(input, { ...init, headers })
+            return dep.fetch(ProviderID.googleVertex, input, { ...init, headers })
           },
         },
         async getModel(sdk: any, modelID: string) {
@@ -1069,6 +1105,7 @@ export interface Interface {
 interface State {
   models: Map<string, LanguageModelV3>
   providers: Record<ProviderID, Info>
+  proxy: string | undefined
   sdk: Map<string, BundledSDK>
   modelLoaders: Record<string, CustomModelLoader>
   varsLoaders: Record<string, CustomVarsLoader>
@@ -1201,6 +1238,7 @@ const layer: Layer.Layer<
         using _ = log.time("state")
         const bridge = yield* EffectBridge.make()
         const cfg = yield* config.get()
+        applyProviderProxyConfig(cfg)
         const modelsDev = yield* Effect.promise(() => ModelsDev.get())
         const database = mapValues(modelsDev, fromModelsDevProvider)
 
@@ -1220,6 +1258,8 @@ const layer: Layer.Layer<
           auth: (id: string) => auth.get(id).pipe(Effect.orDie),
           config: () => config.get(),
           env: () => env.all(),
+          fetch: (providerID: ProviderID, input: RequestInfo | URL, init?: RequestInit) =>
+            providerFetch(providerID, cfg.http_proxy)(input, init),
           get: (key: string) => env.get(key),
         }
 
@@ -1390,10 +1430,7 @@ const layer: Layer.Layer<
           }
 
           const options = yield* Effect.promise(() =>
-            plugin.auth!.loader!(
-              () => bridge.promise(auth.get(providerID).pipe(Effect.orDie)) as any,
-              pluginProvider,
-            ),
+            plugin.auth!.loader!(() => bridge.promise(auth.get(providerID).pipe(Effect.orDie)) as any, pluginProvider),
           )
           const opts = options ?? {}
           const patch: Partial<Info> = providers[providerID] ? { options: opts } : { source: "custom", options: opts }
@@ -1519,6 +1556,7 @@ const layer: Layer.Layer<
         return {
           models: languages,
           providers,
+          proxy: cfg.http_proxy,
           sdk,
           modelLoaders,
           varsLoaders,
@@ -1585,10 +1623,10 @@ const layer: Layer.Layer<
 
         const customFetch = options["fetch"]
         const chunkTimeout = options["chunkTimeout"]
+        const proxiedFetch = providerFetch(model.providerID, s.proxy, customFetch ?? fetch)
         delete options["chunkTimeout"]
 
         options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
-          const fetchFn = customFetch ?? fetch
           const opts = init ?? {}
           const chunkAbortCtl = typeof chunkTimeout === "number" && chunkTimeout > 0 ? new AbortController() : undefined
           const signals: AbortSignal[] = []
@@ -1616,7 +1654,7 @@ const layer: Layer.Layer<
             }
           }
 
-          const res = await fetchFn(input, {
+          const res = await proxiedFetch(input, {
             ...opts,
             // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
             timeout: false,

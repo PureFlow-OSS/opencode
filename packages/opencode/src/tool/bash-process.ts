@@ -122,7 +122,12 @@ export interface ReadResult {
 }
 
 export interface Interface {
-  readonly start: (input: { shell: string; command: string; cwd: string; env: NodeJS.ProcessEnv }) => Effect.Effect<Info>
+  readonly start: (input: {
+    shell: string
+    command: string
+    cwd: string
+    env: NodeJS.ProcessEnv
+  }) => Effect.Effect<Info>
   readonly get: (id: BashProcessID) => Effect.Effect<Info | undefined>
   readonly read: (input: {
     id: BashProcessID
@@ -180,9 +185,10 @@ export const layer = Layer.effect(
         stdin: "ignore",
         stdout: "pipe",
         stderr: "pipe",
-        shell: process.platform === "win32" && /(?:^|[\\/])(pwsh|powershell)(?:\.exe)?$/i.test(input.shell)
-          ? false
-          : input.shell,
+        shell:
+          process.platform === "win32" && /(?:^|[\\/])(pwsh|powershell)(?:\.exe)?$/i.test(input.shell)
+            ? false
+            : input.shell,
       })
       const info: Info = {
         id,
@@ -273,9 +279,7 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer.pipe(
-  Layer.provide(AppFileSystem.defaultLayer),
-)
+export const defaultLayer = layer.pipe(Layer.provide(AppFileSystem.defaultLayer))
 
 export const formatRead = (result: Awaited<ReadResult>, label = "process") => {
   const parts = [
@@ -295,7 +299,9 @@ export const formatRead = (result: Awaited<ReadResult>, label = "process") => {
       file.raw.map((line, i) => `${i + file.offset}: ${line}`).join("\n"),
     ]
     if (file.cut) {
-      output.push(`\n(Output capped at ${MAX_BYTES_LABEL}. Showing lines ${file.offset}-${last}. Use offset=${next} to continue.)`)
+      output.push(
+        `\n(Output capped at ${MAX_BYTES_LABEL}. Showing lines ${file.offset}-${last}. Use offset=${next} to continue.)`,
+      )
     } else if (file.more) {
       output.push(`\n(Showing lines ${file.offset}-${last} of ${file.count}. Use offset=${next} to continue.)`)
     } else {
