@@ -72,6 +72,7 @@ export async function bootstrapGlobal(input: {
   translate: (key: string, vars?: Record<string, string | number>) => string
   formatMoreCount: (count: number) => string
   setGlobalStore: SetStoreFunction<GlobalStore>
+  setProviderCache: SetStoreFunction<ProviderListResponse>
   queryClient: QueryClient
 }) {
   const fast = [
@@ -90,7 +91,9 @@ export async function bootstrapGlobal(input: {
         queryFn: () =>
           retry(() =>
             input.globalSDK.provider.list().then((x) => {
-              input.setGlobalStore("provider", normalizeProviderList(x.data!))
+              const normalized = normalizeProviderList(x.data!)
+              input.setGlobalStore("provider", normalized)
+              input.setProviderCache(reconcile(normalized, { merge: false }))
               return null
             }),
           ),
@@ -234,6 +237,7 @@ export async function bootstrapDirectory(input: {
     project: Project[]
     provider: ProviderListResponse
   }
+  setGlobalProvider: SetStoreFunction<ProviderListResponse>
   queryClient: QueryClient
 }) {
   const loading = input.store.status !== "complete"
@@ -354,7 +358,9 @@ export async function bootstrapDirectory(input: {
             retry(() => input.sdk.provider.list())
               .then((x) => {
                 if (providerRev.get(input.directory) !== rev) return
-                input.setStore("provider", normalizeProviderList(x.data!))
+                const normalized = normalizeProviderList(x.data!)
+                input.setStore("provider", normalized)
+                input.setGlobalProvider(reconcile(normalized, { merge: false }))
                 input.setStore("provider_ready", true)
               })
               .catch((err) => {

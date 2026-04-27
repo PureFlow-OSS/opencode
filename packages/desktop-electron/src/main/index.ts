@@ -42,6 +42,7 @@ import { initLogging } from "./logging"
 import { parseMarkdown } from "./markdown"
 import { createMenu } from "./menu"
 import { getDefaultServerUrl, getWslConfig, setDefaultServerUrl, setWslConfig, spawnLocalServer } from "./server"
+import { updateServer } from "./update-server"
 import {
   createLoadingWindow,
   createMainWindow,
@@ -347,8 +348,24 @@ async function checkUpdate() {
     })
     return { updateAvailable: true, version: downloadedUpdateVersion }
   }
+  const remote = await updateServer.fetch()
+  if (!remote) {
+    logger.log("update server unreachable")
+    return { updateAvailable: false }
+  }
+  if (updateServer.compareVersions(app.getVersion(), remote.version) <= 0) {
+    logger.log("no update available", {
+      reason: "custom server version not newer",
+      currentVersion: app.getVersion(),
+      remoteVersion: remote.version,
+    })
+    return { updateAvailable: false }
+  }
+  autoUpdater.setFeedURL(remote.url)
   logger.log("checking for updates", {
     currentVersion: app.getVersion(),
+    remoteVersion: remote.version,
+    feedUrl: remote.url,
     channel: autoUpdater.channel,
     allowPrerelease: autoUpdater.allowPrerelease,
     allowDowngrade: autoUpdater.allowDowngrade,
@@ -401,12 +418,6 @@ async function checkForUpdates(alertOnFail: boolean) {
   if (!result.updateAvailable) {
     if (result.failed) {
       logger.log("no update decision", { reason: "update check failed" })
-      if (!alertOnFail) return
-      await dialog.showMessageBox({
-        type: "error",
-        message: "Update check failed.",
-        title: "Update Error",
-      })
       return
     }
 

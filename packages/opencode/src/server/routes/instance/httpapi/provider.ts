@@ -81,7 +81,7 @@ export const providerHandlers = Layer.unwrap(
       const config = yield* cfg.get()
       const all = yield* Effect.promise(() => ModelsDev.get())
       const disabled = new Set(config.disabled_providers ?? [])
-      const enabled = config.enabled_providers ? new Set(config.enabled_providers) : undefined
+      const enabled = Provider.normalizeEnabledProviders(config.enabled_providers)
       const filtered: Record<string, (typeof all)[string]> = {}
       for (const [key, value] of Object.entries(all)) {
         if ((enabled ? enabled.has(key) : true) && !disabled.has(key)) {

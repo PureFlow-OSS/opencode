@@ -17,7 +17,7 @@ export const DialogSelectProvider: Component = () => {
   const otherGroup = () => language.t("dialog.provider.group.other")
   const note = (id: string) => {
     if (id.startsWith("github-copilot")) return language.t("dialog.provider.copilot.note")
-    if (id === "aifactory") return "OpenAI-compatible models from Ai-Factory"
+    if (id === "aifactory") return "AI Modelle der RRZ-AiFactory"
   }
 
   return (

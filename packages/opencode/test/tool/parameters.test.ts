@@ -11,6 +11,8 @@ import { toJsonSchema } from "../../src/util/effect-zod"
 
 import { Parameters as ApplyPatch } from "../../src/tool/apply_patch"
 import { Parameters as Bash } from "../../src/tool/bash"
+import { Parameters as BashRead } from "../../src/tool/bash_read"
+import { Parameters as BashStop } from "../../src/tool/bash_stop"
 import { Parameters as CodeSearch } from "../../src/tool/codesearch"
 import { Parameters as Edit } from "../../src/tool/edit"
 import { Parameters as Glob } from "../../src/tool/glob"
@@ -37,6 +39,8 @@ describe("tool parameters", () => {
   describe("JSON Schema (wire shape)", () => {
     test("apply_patch", () => expect(toJsonSchema(ApplyPatch)).toMatchSnapshot())
     test("bash", () => expect(toJsonSchema(Bash)).toMatchSnapshot())
+    test("bash_read", () => expect(toJsonSchema(BashRead)).toMatchSnapshot())
+    test("bash_stop", () => expect(toJsonSchema(BashStop)).toMatchSnapshot())
     test("codesearch", () => expect(toJsonSchema(CodeSearch)).toMatchSnapshot())
     test("edit", () => expect(toJsonSchema(Edit)).toMatchSnapshot())
     test("glob", () => expect(toJsonSchema(Glob)).toMatchSnapshot())
@@ -77,11 +81,36 @@ describe("tool parameters", () => {
       expect(parsed.timeout).toBe(5000)
       expect(parsed.workdir).toBe("/tmp")
     })
+    test("accepts run_in_background", () => {
+      const parsed = parse(Bash, { command: "ls", description: "list", run_in_background: true })
+      expect(parsed.run_in_background).toBe(true)
+    })
     test("rejects missing description (required by zod)", () => {
       expect(accepts(Bash, { command: "ls" })).toBe(false)
     })
     test("rejects missing command", () => {
       expect(accepts(Bash, { description: "list" })).toBe(false)
+    })
+  })
+
+  describe("bash_read", () => {
+    test("accepts process_id only", () => {
+      expect(parse(BashRead, { process_id: "tool_123" }).process_id).toBe("tool_123")
+    })
+    test("accepts optional stream, offset, limit", () => {
+      const parsed = parse(BashRead, { process_id: "tool_123", stream: "stderr", offset: 2, limit: 10 })
+      expect(parsed.stream).toBe("stderr")
+      expect(parsed.offset).toBe(2)
+      expect(parsed.limit).toBe(10)
+    })
+  })
+
+  describe("bash_stop", () => {
+    test("accepts process_id", () => {
+      expect(parse(BashStop, { process_id: "tool_123" }).process_id).toBe("tool_123")
+    })
+    test("rejects missing process_id", () => {
+      expect(accepts(BashStop, {})).toBe(false)
     })
   })
 

@@ -5,23 +5,30 @@ import { type as ostype } from "@tauri-apps/plugin-os"
 
 import { initI18n, t } from "./i18n"
 import { commands } from "./bindings"
+import pkg from "../package.json"
+import { updateServer } from "./update-server"
 
 export const UPDATER_ENABLED = window.__OPENCODE__?.updaterEnabled ?? false
 
 export async function runUpdater({ alertOnFail }: { alertOnFail: boolean }) {
   await initI18n()
 
+  const remote = await updateServer.fetch()
+  if (!remote) return
+
+  if (updateServer.compareVersions(pkg.version, remote.version) <= 0) {
+    if (alertOnFail) await message(t("desktop.updater.none.message"), { title: t("desktop.updater.none.title") })
+    return
+  }
+
   let update
   try {
     update = await check()
   } catch {
-    if (alertOnFail)
-      await message(t("desktop.updater.checkFailed.message"), { title: t("desktop.updater.checkFailed.title") })
     return
   }
 
   if (!update) {
-    if (alertOnFail) await message(t("desktop.updater.none.message"), { title: t("desktop.updater.none.title") })
     return
   }
 

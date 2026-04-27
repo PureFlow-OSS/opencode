@@ -31,3 +31,13 @@ logs/
 tsconfig.tsbuildinfo
 litellm_config.yaml
 H:/Development/opencode/.env
+
+# Local updater and packaging artifacts
+.tmp/
+infra/opencode-updater/feed/*
+!infra/opencode-updater/feed/.gitkeep
+!infra/opencode-updater/feed/latest.example.yml
+infra/opencode-updater/bin/
+infra/opencode-updater/obj/
+packages/desktop-electron/dist-localhost*/
+packages/desktop/src-tauri/*.generated.conf.json

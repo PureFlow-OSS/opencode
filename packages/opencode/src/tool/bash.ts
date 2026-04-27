@@ -22,6 +22,7 @@ import { Effect, Stream } from "effect"
 import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { InstanceState } from "@/effect"
+import * as BashProcess from "./bash-process"
 
 const MAX_METADATA_LENGTH = 30_000
 const DEFAULT_TIMEOUT = Flag.OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS || 2 * 60 * 1000
@@ -54,6 +55,10 @@ const SWITCHES = new Set(["-confirm", "-debug", "-force", "-nonewline", "-recurs
 export const Parameters = Schema.Struct({
   command: Schema.String.annotate({ description: "The command to execute" }),
   timeout: Schema.optional(Schema.Number).annotate({ description: "Optional timeout in milliseconds" }),
+  run_in_background: Schema.optional(Schema.Boolean).annotate({
+    description:
+      "Set true to start long-running command and return immediately with process id for later bash_read/bash_stop calls.",
+  }),
   workdir: Schema.optional(Schema.String).annotate({
     description: `The working directory to run the command in. Defaults to the current directory. Use this instead of 'cd' commands.`,
   }),
@@ -332,6 +337,7 @@ export const BashTool = Tool.define(
     const fs = yield* AppFileSystem.Service
     const trunc = yield* Truncate.Service
     const plugin = yield* Plugin.Service
+    const background = yield* BashProcess.Service
 
     const cygpath = Effect.fn("BashTool.cygpath")(function* (shell: string, text: string) {
       const lines = yield* spawner
@@ -600,6 +606,37 @@ export const BashTool = Tool.define(
               const scan = yield* collect(root, cwd, ps, shell)
               if (!Instance.containsPath(cwd)) scan.dirs.add(cwd)
               yield* ask(ctx, scan)
+
+              if (params.run_in_background) {
+                const info = yield* background.start({
+                  shell,
+                  command: params.command,
+                  cwd,
+                  env: yield* shellEnv(ctx, cwd),
+                })
+                return {
+                  title: params.description,
+                  output: [
+                    `Background command started.`,
+                    `process_id: ${info.id}`,
+                    `pid: ${info.pid}`,
+                    `status: ${info.status}`,
+                    `stdout: ${info.stdout_path}`,
+                    `stderr: ${info.stderr_path}`,
+                    `Use bash_read with this process_id to inspect logs.`,
+                    `Use bash_stop with this process_id to stop process.`,
+                  ].join("\n"),
+                  metadata: {
+                    output: "",
+                    exit: null,
+                    description: params.description,
+                    process_id: info.id,
+                    pid: info.pid,
+                    status: info.status,
+                    truncated: false,
+                  },
+                }
+              }
 
               return yield* run(
                 {
