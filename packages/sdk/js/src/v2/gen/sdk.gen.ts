@@ -320,6 +320,7 @@ export class Auth extends HeyApiClient {
             { in: "body", key: "litellm_url" },
             { in: "body", key: "keycloak_url" },
             { in: "body", key: "client_id" },
+            { in: "body", key: "kes_url" },
           ],
         },
       ],

@@ -22,6 +22,7 @@ const EnterpriseSection: Component = () => {
   const [litellmUrl, setLitellmUrl] = createSignal("")
   const [keycloakUrl, setKeycloakUrl] = createSignal("")
   const [clientId, setClientId] = createSignal("")
+  const [kesUrl, setKesUrl] = createSignal("")
   const [connecting, setConnecting] = createSignal(false)
 
   const [status, { refetch }] = createResource(async () => {
@@ -40,6 +41,7 @@ const EnterpriseSection: Component = () => {
         litellm_url: litellmUrl(),
         keycloak_url: keycloakUrl(),
         client_id: clientId() || undefined,
+        kes_url: kesUrl() || undefined,
       }, { throwOnError: true })
       await globalSDK.client.global.dispose()
       await refetch()
@@ -92,6 +94,15 @@ const EnterpriseSection: Component = () => {
                   placeholder="opencode"
                   value={clientId()}
                   onInput={(e) => setClientId(e.currentTarget.value)}
+                />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-12-regular text-text-weak">Key Exchange Server URL (optional)</label>
+                <input
+                  class="rounded border border-border-weak-base bg-surface-base px-3 py-2 text-14-regular text-text-strong focus:outline-none focus:ring-1 focus:ring-border-base"
+                  placeholder="http://kes.corp.com"
+                  value={kesUrl()}
+                  onInput={(e) => setKesUrl(e.currentTarget.value)}
                 />
               </div>
               <Button

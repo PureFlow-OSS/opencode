@@ -336,6 +336,7 @@ export const GlobalRoutes = lazy(() =>
           litellm_url: z.string().url(),
           keycloak_url: z.string().url(),
           client_id: z.string().optional(),
+          kes_url: z.string().url().optional(),
         }),
       ),
       async (c) => {
@@ -347,6 +348,7 @@ export const GlobalRoutes = lazy(() =>
               litellm_url: body.litellm_url,
               keycloak_url: body.keycloak_url,
               client_id: body.client_id,
+              kes_url: body.kes_url,
             }),
           ),
         )

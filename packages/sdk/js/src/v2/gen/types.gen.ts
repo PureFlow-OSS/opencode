@@ -2358,6 +2358,7 @@ export type GlobalEnterpriseAuthConnectData = {
     litellm_url: string
     keycloak_url: string
     client_id?: string
+    kes_url?: string
   }
   path?: never
   query?: never
