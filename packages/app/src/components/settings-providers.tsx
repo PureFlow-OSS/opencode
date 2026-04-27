@@ -56,7 +56,7 @@ export const SettingsProviders: Component = () => {
   const canDisconnect = (item: ProviderItem) => source(item) !== "env"
 
   const note = (id: string) =>
-    id === "aifactory" ? "OpenAI-compatible models from Ai-Factory" : PROVIDER_NOTES.find((item) => item.match(id))?.key
+    id === "aifactory" ? "AI Modelle der RRZ-AiFactory" : PROVIDER_NOTES.find((item) => item.match(id))?.key
 
   const disconnect = async (providerID: string, name: string) => {
     await globalSDK.client.auth
