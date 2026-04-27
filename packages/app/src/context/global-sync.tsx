@@ -25,6 +25,7 @@ import type { ProjectMeta } from "./global-sync/types"
 import { SESSION_RECENT_LIMIT } from "./global-sync/types"
 import { formatServerError } from "@/utils/server-errors"
 import { queryOptions, skipToken, useQueryClient } from "@tanstack/solid-query"
+import { Persist, persisted } from "@/utils/persist"
 
 type GlobalStore = {
   ready: boolean
@@ -53,13 +54,17 @@ function createGlobalSync() {
   const booting = new Map<string, Promise<void>>()
   const sessionLoads = new Map<string, Promise<void>>()
   const sessionMeta = new Map<string, { limit: number }>()
+  const [providerCache, setProviderCache] = persisted(
+    Persist.global("provider-cache", ["provider-cache.v1"]),
+    createStore<ProviderListResponse>({ all: [], connected: [], default: {} }),
+  )
 
   const [globalStore, setGlobalStore] = createStore<GlobalStore>({
     ready: false,
     path: { state: "", config: "", worktree: "", directory: "", home: "" },
     project: [],
     session_todo: {},
-    provider: { all: [], connected: [], default: {} },
+    provider: providerCache,
     provider_auth: {},
     config: {},
     reload: undefined,
@@ -247,6 +252,7 @@ function createGlobalSync() {
         vcsCache: cache,
         loadSessions,
         translate: language.t,
+        setGlobalProvider: setProviderCache,
         queryClient,
       })
     })
@@ -338,6 +344,7 @@ function createGlobalSync() {
         translate: language.t,
         formatMoreCount: (count) => language.t("common.moreCountSuffix", { count }),
         setGlobalStore: setBootStore,
+        setProviderCache,
         queryClient,
       })
       bootedAt = Date.now()

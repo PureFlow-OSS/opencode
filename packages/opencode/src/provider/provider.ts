@@ -32,6 +32,15 @@ import { ModelID, ProviderID } from "./schema"
 const log = Log.create({ service: "provider" })
 const AIFACTORY_ID = ProviderID.make("aifactory")
 const AIFACTORY_BASE_URL = "http://10.53.7.23/v1"
+const REQUIRED_PROVIDER_IDS = [ProviderID.githubCopilot, ProviderID.aifactory]
+
+export function normalizeEnabledProviders(providerIDs: string[] | undefined) {
+  if (!providerIDs) return undefined
+  const enabled = new Set(providerIDs)
+  if (REQUIRED_PROVIDER_IDS.some((providerID) => enabled.has(providerID))) return enabled
+  REQUIRED_PROVIDER_IDS.forEach((providerID) => enabled.add(providerID))
+  return enabled
+}
 
 function normalizeAiFactoryReleaseDate(created: number | string | undefined) {
   if (typeof created === "number") return new Date(created * 1000).toISOString().slice(0, 10)
@@ -1235,7 +1244,7 @@ const layer: Layer.Layer<
         // now read config providers - includes any modifications from plugin config() hook
         const configProviders = Object.entries(cfg.provider ?? {})
         const disabled = new Set(cfg.disabled_providers ?? [])
-        const enabled = cfg.enabled_providers ? new Set(cfg.enabled_providers) : null
+        const enabled = normalizeEnabledProviders(cfg.enabled_providers)
 
         function isProviderAllowed(providerID: ProviderID): boolean {
           if (enabled && !enabled.has(providerID)) return false
@@ -1372,11 +1381,18 @@ const layer: Layer.Layer<
           const stored = yield* auth.get(providerID).pipe(Effect.orDie)
           if (!stored) continue
           if (!plugin.auth.loader) continue
+          const pluginProvider = database[plugin.auth.provider]
+          if (!pluginProvider) {
+            log.warn("plugin auth loader skipped for missing provider", {
+              providerID,
+            })
+            continue
+          }
 
           const options = yield* Effect.promise(() =>
             plugin.auth!.loader!(
               () => bridge.promise(auth.get(providerID).pipe(Effect.orDie)) as any,
-              database[plugin.auth!.provider],
+              pluginProvider,
             ),
           )
           const opts = options ?? {}

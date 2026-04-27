@@ -26,6 +26,8 @@ const channel = (() => {
   return "dev"
 })()
 
+const skipWinSigntool = process.env.OPENCODE_SKIP_WIN_SIGNTOOLS === "true"
+
 const getBase = (): Configuration => ({
   artifactName: "opencode-electron-${os}-${arch}.${ext}",
   directories: {
@@ -59,6 +61,7 @@ const getBase = (): Configuration => ({
   },
   win: {
     icon: `resources/icons/icon.ico`,
+    signAndEditExecutable: !skipWinSigntool,
     signtoolOptions: {
       sign: signWindows,
     },
