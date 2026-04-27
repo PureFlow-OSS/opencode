@@ -5,6 +5,8 @@ import path from "path"
 import { Config } from "../../src/config"
 import { Shell } from "../../src/shell/shell"
 import { BashTool } from "../../src/tool/bash"
+import { BashReadTool } from "../../src/tool/bash_read"
+import { BashStopTool } from "../../src/tool/bash_stop"
 import { Instance } from "../../src/project/instance"
 import { Filesystem } from "../../src/util"
 import { tmpdir } from "../fixture/fixture"
@@ -12,9 +14,11 @@ import type { Permission } from "../../src/permission"
 import { Agent } from "../../src/agent/agent"
 import { Truncate } from "../../src/tool"
 import { SessionID, MessageID } from "../../src/session/schema"
+import { ToolID } from "../../src/tool/schema"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Plugin } from "../../src/plugin"
+import * as BashProcess from "../../src/tool/bash-process"
 
 const runtime = ManagedRuntime.make(
   Layer.mergeAll(
@@ -24,11 +28,20 @@ const runtime = ManagedRuntime.make(
     Truncate.defaultLayer,
     Config.defaultLayer,
     Agent.defaultLayer,
+    BashProcess.defaultLayer,
   ),
 )
 
 function initBash() {
   return runtime.runPromise(BashTool.pipe(Effect.flatMap((info) => info.init())))
+}
+
+function initBashRead() {
+  return runtime.runPromise(BashReadTool.pipe(Effect.flatMap((info) => info.init())))
+}
+
+function initBashStop() {
+  return runtime.runPromise(BashStopTool.pipe(Effect.flatMap((info) => info.init())))
 }
 
 const ctx = {
@@ -78,6 +91,11 @@ const fill = (mode: "lines" | "bytes", n: number) => {
       ? "console.log(Array.from({length:Number(Bun.argv[1])},(_,i)=>i+1).join(String.fromCharCode(10)))"
       : "process.stdout.write(String.fromCharCode(97).repeat(Number(Bun.argv[1])))"
   const text = `${bin} -e ${evalarg(code)} ${n}`
+  if (PS.has(sh())) return `& ${text}`
+  return text
+}
+const background = (code: string) => {
+  const text = `${bin} -e ${evalarg(code)}`
   if (PS.has(sh())) return `& ${text}`
   return text
 }
@@ -179,6 +197,57 @@ describe("tool.bash", () => {
         )
         expect(result.metadata.exit).toBe(0)
         expect(result.output).toContain("fallback")
+      },
+    })
+  })
+
+  each("runs long-lived command in background", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const bash = await initBash()
+        const read = await initBashRead()
+        const stop = await initBashStop()
+        const code = [
+          "console.log('ready')",
+          "setInterval(()=>console.log('tick'),100)",
+          "setInterval(()=>{},1000)",
+        ].join(";")
+        const started = await Effect.runPromise(
+          bash.execute(
+            {
+              command: background(code),
+              description: "Start background logger",
+              run_in_background: true,
+            },
+            ctx,
+          ),
+        )
+        const processID = started.metadata.process_id as string
+        expect(processID).toBeTruthy()
+
+        let output = ""
+        for (let i = 0; i < 20; i++) {
+          const result = await Effect.runPromise(read.execute({ process_id: ToolID.make(processID) }, ctx))
+          output = result.output
+          if (output.includes("ready")) break
+          await Bun.sleep(100)
+        }
+        expect(output).toContain("ready")
+
+        await Effect.runPromise(stop.execute({ process_id: ToolID.make(processID) }, ctx))
+
+        let stopped = false
+        for (let i = 0; i < 20; i++) {
+          const result = await Effect.runPromise(read.execute({ process_id: ToolID.make(processID) }, ctx))
+          if (result.metadata.status === "stopped") {
+            stopped = true
+            break
+          }
+          await Bun.sleep(100)
+        }
+        expect(stopped).toBe(true)
       },
     })
   })

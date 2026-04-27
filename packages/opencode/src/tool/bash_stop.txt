@@ -1,0 +1,3 @@
+Stops long-running background bash process started with `bash` using `run_in_background: true`.
+
+Use this when dev server or backend should be terminated after debugging or test run.

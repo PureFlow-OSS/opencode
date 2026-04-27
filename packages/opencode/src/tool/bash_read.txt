@@ -1,0 +1,8 @@
+Reads buffered output from long-running background bash process started with `bash` using `run_in_background: true`.
+
+Use this to inspect `stdout`, `stderr`, or both for debugging long-running commands like `npm start`, dev servers, or backend processes.
+
+Notes:
+- Pass returned `process_id` from background `bash` call.
+- Use `stream: "stderr"` when checking failures.
+- Use `offset` to continue reading later log lines.
