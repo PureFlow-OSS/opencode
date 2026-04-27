@@ -1,4 +1,3 @@
-import { Button } from "@opencode-ai/ui/button"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { Dialog } from "@opencode-ai/ui/dialog"
 import { List, type ListRef } from "@opencode-ai/ui/list"
@@ -22,12 +21,6 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
   const connect = (provider: string) => {
     void import("./dialog-connect-provider").then((x) => {
       dialog.show(() => <x.DialogConnectProvider provider={provider} />)
-    })
-  }
-
-  const all = () => {
-    void import("./dialog-select-provider").then((x) => {
-      dialog.show(() => <x.DialogSelectProvider />)
     })
   }
 
@@ -108,34 +101,18 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
                   <div class="w-full flex items-center gap-x-3">
                     <ProviderIcon data-slot="list-item-extra-icon" id={i.id} />
                     <span>{i.name}</span>
-                    <Show when={i.id === "opencode"}>
-                      <div class="text-14-regular text-text-weak">{language.t("dialog.provider.opencode.tagline")}</div>
+                    <Show when={i.id === "aifactory"}>
+                      <div class="text-14-regular text-text-weak">OpenAI-compatible models from Ai-Factory</div>
                     </Show>
-                    <Show when={i.id === "opencode"}>
+                    <Show when={popularProviders.includes(i.id)}>
                       <Tag>{language.t("dialog.provider.tag.recommended")}</Tag>
                     </Show>
-                    <Show when={i.id === "opencode-go"}>
-                      <>
-                        <div class="text-14-regular text-text-weak">
-                          {language.t("dialog.provider.opencodeGo.tagline")}
-                        </div>
-                        <Tag>{language.t("dialog.provider.tag.recommended")}</Tag>
-                      </>
-                    </Show>
-                    <Show when={i.id === "anthropic"}>
-                      <div class="text-14-regular text-text-weak">{language.t("dialog.provider.anthropic.note")}</div>
+                    <Show when={i.id.startsWith("github-copilot")}>
+                      <div class="text-14-regular text-text-weak">{language.t("dialog.provider.copilot.note")}</div>
                     </Show>
                   </div>
                 )}
               </List>
-              <Button
-                variant="ghost"
-                class="w-full justify-start px-[11px] py-3.5 gap-4.5 text-14-medium"
-                icon="dot-grid"
-                onClick={all}
-              >
-                {language.t("dialog.provider.viewAll")}
-              </Button>
             </div>
           </div>
         </div>
