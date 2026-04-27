@@ -153,7 +153,7 @@ export function DialogConnectProvider(props: { provider: string }) {
     return fallback
   }
 
-  function newestAiFactoryModel(models: Record<string, { id: string; release_date?: string }>) {
+  function newestAiFactoryModel(models: Record<string, { id: string; name?: string; release_date?: string }>) {
     return Object.values(models).sort((a, b) => {
       const aDate = a.release_date ?? ""
       const bDate = b.release_date ?? ""

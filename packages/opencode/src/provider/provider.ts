@@ -33,15 +33,6 @@ const log = Log.create({ service: "provider" })
 const AIFACTORY_ID = ProviderID.make("aifactory")
 const AIFACTORY_BASE_URL = "http://10.53.7.23/v1"
 
-const OpenAICompatibleModelsResponse = Schema.Struct({
-  data: Schema.Array(
-    Schema.Struct({
-      id: Schema.String,
-      created: Schema.optional(Schema.Union(Schema.Number, Schema.String)),
-    }),
-  ),
-})
-
 function normalizeAiFactoryReleaseDate(created: number | string | undefined) {
   if (typeof created === "number") return new Date(created * 1000).toISOString().slice(0, 10)
   if (typeof created === "string" && created) {
@@ -110,8 +101,7 @@ function buildAiFactoryModel(modelID: string, created?: number | string): Model 
 }
 
 async function discoverAiFactoryModels(token: string) {
-  const payload = Schema.decodeUnknownSync(OpenAICompatibleModelsResponse)(
-    await fetch(`${AIFACTORY_BASE_URL}/models`, {
+  const payload = (await fetch(`${AIFACTORY_BASE_URL}/models`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -119,12 +109,19 @@ async function discoverAiFactoryModels(token: string) {
     }).then((res) => {
       if (!res.ok) throw new Error(`Ai-Factory model discovery failed: ${res.status}`)
       return res.json()
-    }),
-  )
+    })) as {
+    data?: Array<{
+      id?: string
+      created?: number | string
+    }>
+  }
 
   return Object.fromEntries(
-    payload.data
-      .map((item) => ({ id: item.id.trim(), created: item.created }))
+    (payload.data ?? [])
+      .flatMap((item) => {
+        if (typeof item.id !== "string") return []
+        return [{ id: item.id.trim(), created: item.created }]
+      })
       .filter((item) => item.id)
       .map((item) => [item.id, buildAiFactoryModel(item.id, item.created)] as const),
   )

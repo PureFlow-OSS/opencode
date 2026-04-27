@@ -83,7 +83,7 @@ export type Provider = Schema.Schema.Type<typeof Provider>
 const COPILOT_API = "https://api.githubcopilot.com"
 const AIFACTORY_API = "http://10.53.7.23/v1"
 
-const providers = {
+const providers: Record<string, Provider> = {
   "github-copilot": {
     id: "github-copilot",
     name: "GitHub Copilot",
@@ -100,10 +100,10 @@ const providers = {
     env: [],
     models: {},
   },
-} satisfies Record<string, Provider>
+}
 
 export async function get() {
-  return providers
+  return providers as Record<string, Provider>
 }
 
 export async function refresh(_force = false) {}
