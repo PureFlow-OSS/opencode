@@ -99,6 +99,18 @@ const background = (code: string) => {
   if (PS.has(sh())) return `& ${text}`
   return text
 }
+const chain = (...commands: string[]) => {
+  if (PS.has(sh())) {
+    const [first, ...rest] = commands
+    return rest.reduce((acc, item) => `${acc}; if ($?) { ${item} }`, first)
+  }
+  return commands.join(" && ")
+}
+const sleepCmd = (seconds: number) => {
+  if (PS.has(sh())) return `Start-Sleep -Seconds ${seconds}`
+  if (sh() === "cmd") return `timeout /t ${seconds} /nobreak >nul`
+  return `sleep ${seconds}`
+}
 const glob = (p: string) =>
   process.platform === "win32" ? Filesystem.normalizePathPattern(p) : p.replaceAll("\\", "/")
 
@@ -1113,7 +1125,7 @@ describe("tool.bash abort", () => {
         const result = await Effect.runPromise(
           bash.execute(
             {
-              command: `echo started && sleep 60`,
+              command: chain("echo started", sleepCmd(60)),
               description: "Timeout test",
               timeout: 500,
             },
@@ -1176,7 +1188,7 @@ describe("tool.bash abort", () => {
         const result = await Effect.runPromise(
           bash.execute(
             {
-              command: `echo first && sleep 0.1 && echo second`,
+              command: chain("echo first", process.platform === "win32" ? sleepCmd(1) : "sleep 0.1", "echo second"),
               description: "Streaming test",
             },
             {
