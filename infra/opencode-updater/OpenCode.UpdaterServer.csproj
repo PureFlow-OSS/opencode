@@ -7,4 +7,10 @@
   <ItemGroup>
     <PackageReference Include="Klausmd5.AutoController" Version="0.4.0" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="feed\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

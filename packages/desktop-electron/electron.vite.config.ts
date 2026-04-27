@@ -8,6 +8,8 @@ const channel = (() => {
   return "dev"
 })()
 
+const updateBaseUrl = process.env.OPENCODE_UPDATE_BASE_URL
+
 const OPENCODE_SERVER_DIST = "../opencode/dist/node"
 
 const nodePtyPkg = `@lydell/node-pty-${process.platform}-${process.arch}`
@@ -16,6 +18,7 @@ export default defineConfig({
   main: {
     define: {
       "import.meta.env.OPENCODE_CHANNEL": JSON.stringify(channel),
+      "import.meta.env.OPENCODE_UPDATE_BASE_URL": JSON.stringify(updateBaseUrl),
     },
     build: {
       rollupOptions: {
@@ -66,6 +69,7 @@ export default defineConfig({
     root: "src/renderer",
     define: {
       "import.meta.env.VITE_OPENCODE_CHANNEL": JSON.stringify(channel),
+      "import.meta.env.VITE_OPENCODE_UPDATE_BASE_URL": JSON.stringify(updateBaseUrl),
     },
     build: {
       rollupOptions: {

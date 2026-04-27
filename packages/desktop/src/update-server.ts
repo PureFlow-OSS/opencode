@@ -1,4 +1,4 @@
-const UPDATE_SERVER_BASE_URL = "http://10.53.7.23/opencode"
+const UPDATE_SERVER_BASE_URL = import.meta.env.VITE_OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode"
 
 const parseVersion = (value: string) =>
   value
@@ -14,7 +14,10 @@ export const updateServer = {
   compareVersions(current: string, next: string) {
     const left = parseVersion(current)
     const right = parseVersion(next)
-    const delta = Array.from({ length: Math.max(left.length, right.length) }, (_, index) => (right[index] ?? 0) - (left[index] ?? 0)).find((value) => value !== 0)
+    const delta = Array.from(
+      { length: Math.max(left.length, right.length) },
+      (_, index) => (right[index] ?? 0) - (left[index] ?? 0),
+    ).find((value) => value !== 0)
     if (!delta) return 0
     return delta > 0 ? 1 : -1
   },

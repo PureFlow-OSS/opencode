@@ -4,6 +4,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<UpdaterOptions>(builder.Configuration.GetSection("Updater"));
 builder.Services.AddHttpClient();
+builder.Services.AddSingleton(new LocalFeed(Path.Combine(builder.Environment.ContentRootPath, "feed")));
 
 var app = builder.Build();
 
@@ -22,17 +23,19 @@ app.MapGet("/opencode/url", (HttpRequest request, IOptions<UpdaterOptions> optio
   );
 });
 
-app.MapGet("/opencode/latest.json", async (HttpContext context, IHttpClientFactory clientFactory, IOptions<UpdaterOptions> options) =>
+app.MapGet("/opencode/latest.json", async (HttpContext context, IHttpClientFactory clientFactory, IOptions<UpdaterOptions> options, LocalFeed feed) =>
 {
+  if (feed.TryGet("latest.json", out var local)) return await LocalFileAsync(context, local);
   return await ProxyAsync(context, clientFactory, BuildUpstreamUrl(options.Value, "latest.json"));
 });
 
-app.MapGet("/opencode/feed/{**asset}", async (HttpContext context, IHttpClientFactory clientFactory, IOptions<UpdaterOptions> options, string? asset) =>
+app.MapGet("/opencode/feed/{**asset}", async (HttpContext context, IHttpClientFactory clientFactory, IOptions<UpdaterOptions> options, LocalFeed feed, string? asset) =>
 {
   var resolvedAsset = (asset ?? "").TrimStart('/');
   if (string.IsNullOrWhiteSpace(resolvedAsset) || resolvedAsset.Contains("..", StringComparison.Ordinal))
     return Results.BadRequest();
 
+  if (feed.TryGet(resolvedAsset, out var local)) return await LocalFileAsync(context, local);
   return await ProxyAsync(context, clientFactory, BuildUpstreamUrl(options.Value, resolvedAsset));
 });
 
@@ -75,9 +78,38 @@ static async Task<IResult> ProxyAsync(HttpContext context, IHttpClientFactory cl
   return Results.Empty;
 }
 
+static async Task<IResult> LocalFileAsync(HttpContext context, string path)
+{
+  var extension = Path.GetExtension(path).ToLowerInvariant();
+  context.Response.StatusCode = StatusCodes.Status200OK;
+  context.Response.ContentType = extension switch
+  {
+    ".yml" => "text/yaml; charset=utf-8",
+    ".json" => "application/json; charset=utf-8",
+    ".blockmap" => "application/octet-stream",
+    ".exe" => "application/octet-stream",
+    _ => "application/octet-stream",
+  };
+  context.Response.ContentLength = new FileInfo(path).Length;
+
+  await using var stream = File.OpenRead(path);
+  await stream.CopyToAsync(context.Response.Body, context.RequestAborted);
+
+  return Results.Empty;
+}
+
 sealed class UpdaterOptions
 {
   public string Version { get; set; } = "1.14.28";
   public string PublicBaseUrl { get; set; } = "http://10.53.7.23";
   public string ReleaseBaseUrlTemplate { get; set; } = "https://github.com/anomalyco/opencode/releases/download/v{{version}}";
+}
+
+sealed class LocalFeed(string root)
+{
+  public bool TryGet(string relativePath, out string file)
+  {
+    file = Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar));
+    return File.Exists(file);
+  }
 }
