@@ -8,7 +8,7 @@ import type {
   AppLogErrors,
   AppLogResponses,
   AppSkillsResponses,
-  Auth as Auth3,
+  Auth as Auth4,
   AuthRemoveErrors,
   AuthRemoveResponses,
   AuthSetErrors,
@@ -51,6 +51,10 @@ import type {
   GlobalConfigUpdateErrors,
   GlobalConfigUpdateResponses,
   GlobalDisposeResponses,
+  GlobalEnterpriseAuthConnectErrors,
+  GlobalEnterpriseAuthConnectResponses,
+  GlobalEnterpriseAuthDeleteResponses,
+  GlobalEnterpriseAuthStatusResponses,
   GlobalEventResponses,
   GlobalHealthResponses,
   GlobalUpgradeErrors,
@@ -282,6 +286,80 @@ export class Config extends HeyApiClient {
   }
 }
 
+export class Auth extends HeyApiClient {
+  /**
+   * Get enterprise auth status
+   *
+   * Check whether the user is connected to an enterprise LiteLLM instance via Keycloak SSO.
+   */
+  public status<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<GlobalEnterpriseAuthStatusResponses, unknown, ThrowOnError>({
+      url: "/global/enterprise/auth/status",
+      ...options,
+    })
+  }
+
+  /**
+   * Connect to enterprise LiteLLM via Keycloak SSO
+   *
+   * Start PKCE OAuth flow against Keycloak to authenticate and auto-discover available models.
+   */
+  public connect<ThrowOnError extends boolean = false>(
+    parameters?: {
+      litellm_url?: string
+      keycloak_url?: string
+      client_id?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "body", key: "litellm_url" },
+            { in: "body", key: "keycloak_url" },
+            { in: "body", key: "client_id" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      GlobalEnterpriseAuthConnectResponses,
+      GlobalEnterpriseAuthConnectErrors,
+      ThrowOnError
+    >({
+      url: "/global/enterprise/auth/connect",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Disconnect enterprise auth
+   *
+   * Remove stored enterprise tokens and clear the cached model list.
+   */
+  public delete<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).delete<GlobalEnterpriseAuthDeleteResponses, unknown, ThrowOnError>({
+      url: "/global/enterprise/auth",
+      ...options,
+    })
+  }
+}
+
+export class Enterprise extends HeyApiClient {
+  private _auth?: Auth
+  get auth(): Auth {
+    return (this._auth ??= new Auth({ client: this.client }))
+  }
+}
+
 export class Global extends HeyApiClient {
   /**
    * Get health
@@ -347,9 +425,14 @@ export class Global extends HeyApiClient {
   get config(): Config {
     return (this._config ??= new Config({ client: this.client }))
   }
+
+  private _enterprise?: Enterprise
+  get enterprise(): Enterprise {
+    return (this._enterprise ??= new Enterprise({ client: this.client }))
+  }
 }
 
-export class Auth extends HeyApiClient {
+export class Auth2 extends HeyApiClient {
   /**
    * Remove auth credentials
    *
@@ -377,7 +460,7 @@ export class Auth extends HeyApiClient {
   public set<ThrowOnError extends boolean = false>(
     parameters: {
       providerID: string
-      auth?: Auth3
+      auth?: Auth4
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3407,7 +3490,7 @@ export class Event extends HeyApiClient {
   }
 }
 
-export class Auth2 extends HeyApiClient {
+export class Auth3 extends HeyApiClient {
   /**
    * Remove MCP OAuth
    *
@@ -3676,9 +3759,9 @@ export class Mcp extends HeyApiClient {
     })
   }
 
-  private _auth?: Auth2
-  get auth(): Auth2 {
-    return (this._auth ??= new Auth2({ client: this.client }))
+  private _auth?: Auth3
+  get auth(): Auth3 {
+    return (this._auth ??= new Auth3({ client: this.client }))
   }
 }
 
@@ -4366,9 +4449,9 @@ export class OpencodeClient extends HeyApiClient {
     return (this._global ??= new Global({ client: this.client }))
   }
 
-  private _auth?: Auth
-  get auth(): Auth {
-    return (this._auth ??= new Auth({ client: this.client }))
+  private _auth?: Auth2
+  get auth(): Auth2 {
+    return (this._auth ??= new Auth2({ client: this.client }))
   }
 
   private _app?: App

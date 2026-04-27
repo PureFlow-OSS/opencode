@@ -283,5 +283,97 @@ export const GlobalRoutes = lazy(() =>
         })
         return c.json({ success: true, version: target })
       },
+    )
+    .get(
+      "/enterprise/auth/status",
+      describeRoute({
+        summary: "Get enterprise auth status",
+        description: "Check whether the user is connected to an enterprise LiteLLM instance via Keycloak SSO.",
+        operationId: "global.enterprise.auth.status",
+        responses: {
+          200: {
+            description: "Enterprise auth status",
+            content: {
+              "application/json": {
+                schema: resolver(
+                  z.object({
+                    connected: z.boolean(),
+                    models: z.array(z.object({ id: z.string() })).optional(),
+                  }),
+                ),
+              },
+            },
+          },
+        },
+      }),
+      async (c) => {
+        const { EnterpriseAuth } = await import("../../enterprise/auth")
+        const result = await AppRuntime.runPromise(EnterpriseAuth.Service.use((svc) => svc.status()))
+        return c.json(result)
+      },
+    )
+    .post(
+      "/enterprise/auth/connect",
+      describeRoute({
+        summary: "Connect to enterprise LiteLLM via Keycloak SSO",
+        description: "Start PKCE OAuth flow against Keycloak to authenticate and auto-discover available models.",
+        operationId: "global.enterprise.auth.connect",
+        responses: {
+          200: {
+            description: "Connection initiated successfully",
+            content: {
+              "application/json": {
+                schema: resolver(z.boolean()),
+              },
+            },
+          },
+          ...errors(400),
+        },
+      }),
+      validator(
+        "json",
+        z.object({
+          litellm_url: z.string().url(),
+          keycloak_url: z.string().url(),
+          client_id: z.string().optional(),
+        }),
+      ),
+      async (c) => {
+        const body = c.req.valid("json")
+        const { EnterpriseAuth } = await import("../../enterprise/auth")
+        await AppRuntime.runPromise(
+          EnterpriseAuth.Service.use((svc) =>
+            svc.connect({
+              litellm_url: body.litellm_url,
+              keycloak_url: body.keycloak_url,
+              client_id: body.client_id,
+            }),
+          ),
+        )
+        return c.json(true)
+      },
+    )
+    .delete(
+      "/enterprise/auth",
+      describeRoute({
+        summary: "Disconnect enterprise auth",
+        description: "Remove stored enterprise tokens and clear the cached model list.",
+        operationId: "global.enterprise.auth.delete",
+        responses: {
+          200: {
+            description: "Disconnected successfully",
+            content: {
+              "application/json": {
+                schema: resolver(z.boolean()),
+              },
+            },
+          },
+        },
+      }),
+      async (c) => {
+        const { EnterpriseAuth } = await import("../../enterprise/auth")
+        await AppRuntime.runPromise(EnterpriseAuth.Service.use((svc) => svc.disconnect()))
+        return c.json(true)
+      },
     ),
 )

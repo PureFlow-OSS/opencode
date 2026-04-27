@@ -234,6 +234,132 @@
         ]
       }
     },
+    "/global/enterprise/auth/status": {
+      "get": {
+        "operationId": "global.enterprise.auth.status",
+        "summary": "Get enterprise auth status",
+        "description": "Check whether the user is connected to an enterprise LiteLLM instance via Keycloak SSO.",
+        "responses": {
+          "200": {
+            "description": "Enterprise auth status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["id"]
+                      }
+                    }
+                  },
+                  "required": ["connected"]
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.global.enterprise.auth.status({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/global/enterprise/auth/connect": {
+      "post": {
+        "operationId": "global.enterprise.auth.connect",
+        "summary": "Connect to enterprise LiteLLM via Keycloak SSO",
+        "description": "Start PKCE OAuth flow against Keycloak to authenticate and auto-discover available models.",
+        "responses": {
+          "200": {
+            "description": "Connection initiated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "litellm_url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "keycloak_url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "client_id": {
+                    "type": "string"
+                  }
+                },
+                "required": ["litellm_url", "keycloak_url"]
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.global.enterprise.auth.connect({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/global/enterprise/auth": {
+      "delete": {
+        "operationId": "global.enterprise.auth.delete",
+        "summary": "Disconnect enterprise auth",
+        "description": "Remove stored enterprise tokens and clear the cached model list.",
+        "responses": {
+          "200": {
+            "description": "Disconnected successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.global.enterprise.auth.delete({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/auth/{providerID}": {
       "put": {
         "operationId": "auth.set",
@@ -11877,6 +12003,14 @@
             "properties": {
               "url": {
                 "description": "Enterprise URL",
+                "type": "string"
+              },
+              "keycloak_url": {
+                "description": "Keycloak realm URL, e.g. https://keycloak.corp.com/realms/corp",
+                "type": "string"
+              },
+              "client_id": {
+                "description": "OIDC client ID registered in Keycloak (default: opencode)",
                 "type": "string"
               }
             }

@@ -1,7 +1,12 @@
 import { createConnection } from "net"
 import { createServer } from "http"
 import { Log } from "../util"
-import { OAUTH_CALLBACK_PORT, OAUTH_CALLBACK_PATH, parseRedirectUri } from "./oauth-provider"
+import {
+  OAUTH_CALLBACK_PORT,
+  OAUTH_CALLBACK_PATH,
+  ENTERPRISE_OAUTH_CALLBACK_PATH,
+  parseRedirectUri,
+} from "./oauth-provider"
 
 const log = Log.create({ service: "mcp.oauth-callback" })
 
@@ -76,7 +81,7 @@ function cleanupStateIndex(oauthState: string) {
 function handleRequest(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
   const url = new URL(req.url || "/", `http://localhost:${currentPort}`)
 
-  if (url.pathname !== currentPath) {
+  if (url.pathname !== currentPath && url.pathname !== ENTERPRISE_OAUTH_CALLBACK_PATH) {
     res.writeHead(404)
     res.end("Not found")
     return

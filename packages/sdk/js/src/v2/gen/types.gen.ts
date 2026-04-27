@@ -1636,6 +1636,14 @@ export type Config = {
      * Enterprise URL
      */
     url?: string
+    /**
+     * Keycloak realm URL, e.g. https://keycloak.corp.com/realms/corp
+     */
+    keycloak_url?: string
+    /**
+     * OIDC client ID registered in Keycloak (default: opencode)
+     */
+    client_id?: string
   }
   /**
    * Thresholds for truncating tool output. When output exceeds either limit, the full text is written to the truncation directory and a preview is returned.
@@ -2322,6 +2330,76 @@ export type GlobalUpgradeResponses = {
 }
 
 export type GlobalUpgradeResponse = GlobalUpgradeResponses[keyof GlobalUpgradeResponses]
+
+export type GlobalEnterpriseAuthStatusData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/global/enterprise/auth/status"
+}
+
+export type GlobalEnterpriseAuthStatusResponses = {
+  /**
+   * Enterprise auth status
+   */
+  200: {
+    connected: boolean
+    models?: Array<{
+      id: string
+    }>
+  }
+}
+
+export type GlobalEnterpriseAuthStatusResponse =
+  GlobalEnterpriseAuthStatusResponses[keyof GlobalEnterpriseAuthStatusResponses]
+
+export type GlobalEnterpriseAuthConnectData = {
+  body?: {
+    litellm_url: string
+    keycloak_url: string
+    client_id?: string
+  }
+  path?: never
+  query?: never
+  url: "/global/enterprise/auth/connect"
+}
+
+export type GlobalEnterpriseAuthConnectErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type GlobalEnterpriseAuthConnectError =
+  GlobalEnterpriseAuthConnectErrors[keyof GlobalEnterpriseAuthConnectErrors]
+
+export type GlobalEnterpriseAuthConnectResponses = {
+  /**
+   * Connection initiated successfully
+   */
+  200: boolean
+}
+
+export type GlobalEnterpriseAuthConnectResponse =
+  GlobalEnterpriseAuthConnectResponses[keyof GlobalEnterpriseAuthConnectResponses]
+
+export type GlobalEnterpriseAuthDeleteData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/global/enterprise/auth"
+}
+
+export type GlobalEnterpriseAuthDeleteResponses = {
+  /**
+   * Disconnected successfully
+   */
+  200: boolean
+}
+
+export type GlobalEnterpriseAuthDeleteResponse =
+  GlobalEnterpriseAuthDeleteResponses[keyof GlobalEnterpriseAuthDeleteResponses]
 
 export type AuthRemoveData = {
   body?: never
