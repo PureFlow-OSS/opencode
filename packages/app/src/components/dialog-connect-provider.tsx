@@ -497,7 +497,9 @@ export function DialogConnectProvider(props: { provider: string }) {
             autofocus
             type="text"
             label={tokenLabel()}
-            placeholder={provider().id === "aifactory" ? "User token" : language.t("provider.connect.apiKey.placeholder")}
+            placeholder={
+              provider().id === "aifactory" ? "User token" : language.t("provider.connect.apiKey.placeholder")
+            }
             name="apiKey"
             value={formStore.value}
             onChange={(v) => setFormStore("value", v)}

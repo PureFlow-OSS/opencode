@@ -558,6 +558,24 @@ test("validates config schema and throws on invalid fields", async () => {
   })
 })
 
+test("accepts http_proxy config", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await writeConfig(dir, {
+        $schema: "https://opencode.ai/config.json",
+        http_proxy: "http://proxy.internal:8080",
+      })
+    },
+  })
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const config = await load()
+      expect(config.http_proxy).toBe("http://proxy.internal:8080")
+    },
+  })
+})
+
 test("throws error for invalid JSON", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {

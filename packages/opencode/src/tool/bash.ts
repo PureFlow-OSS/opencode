@@ -56,7 +56,8 @@ export const Parameters = Schema.Struct({
   command: Schema.String.annotate({ description: "The command to execute" }),
   timeout: Schema.optional(Schema.Number).annotate({ description: "Optional timeout in milliseconds" }),
   run_in_background: Schema.optional(Schema.Boolean).annotate({
-    description: "Set true to start long-running command and return immediately with process id for later bash_read/bash_stop calls.",
+    description:
+      "Set true to start long-running command and return immediately with process id for later bash_read/bash_stop calls.",
   }),
   workdir: Schema.optional(Schema.String).annotate({
     description: `The working directory to run the command in. Defaults to the current directory. Use this instead of 'cd' commands.`,
