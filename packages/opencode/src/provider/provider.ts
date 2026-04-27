@@ -30,6 +30,105 @@ import * as ProviderTransform from "./transform"
 import { ModelID, ProviderID } from "./schema"
 
 const log = Log.create({ service: "provider" })
+const AIFACTORY_ID = ProviderID.make("aifactory")
+const AIFACTORY_BASE_URL = "http://10.53.7.23/v1"
+
+const OpenAICompatibleModelsResponse = Schema.Struct({
+  data: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      created: Schema.optional(Schema.Union(Schema.Number, Schema.String)),
+    }),
+  ),
+})
+
+function normalizeAiFactoryReleaseDate(created: number | string | undefined) {
+  if (typeof created === "number") return new Date(created * 1000).toISOString().slice(0, 10)
+  if (typeof created === "string" && created) {
+    const parsed = Number(created)
+    if (!Number.isNaN(parsed)) return new Date(parsed * 1000).toISOString().slice(0, 10)
+  }
+  return ""
+}
+
+function buildAiFactoryModel(modelID: string, created?: number | string): Model {
+  const reasoning = /(^o[134]\b)|(^gpt-5\b)|claude|reason|r1|deepseek|gemini/i.test(modelID)
+  const base: Model = {
+    id: ModelID.make(modelID),
+    providerID: AIFACTORY_ID,
+    name: modelID,
+    family: modelID.split(/[-/]/)[0],
+    api: {
+      id: modelID,
+      url: AIFACTORY_BASE_URL,
+      npm: "@ai-sdk/openai-compatible",
+    },
+    status: "active",
+    headers: {},
+    options: {},
+    cost: {
+      input: 0,
+      output: 0,
+      cache: {
+        read: 0,
+        write: 0,
+      },
+    },
+    limit: {
+      context: 256_000,
+      output: 32_000,
+    },
+    capabilities: {
+      temperature: true,
+      reasoning,
+      attachment: false,
+      toolcall: true,
+      input: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        pdf: false,
+      },
+      output: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        pdf: false,
+      },
+      interleaved: false,
+    },
+    release_date: normalizeAiFactoryReleaseDate(created),
+    variants: {},
+  }
+
+  return {
+    ...base,
+    variants: mapValues(ProviderTransform.variants(base), (value) => value),
+  }
+}
+
+async function discoverAiFactoryModels(token: string) {
+  const payload = Schema.decodeUnknownSync(OpenAICompatibleModelsResponse)(
+    await fetch(`${AIFACTORY_BASE_URL}/models`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      signal: AbortSignal.timeout(5000),
+    }).then((res) => {
+      if (!res.ok) throw new Error(`Ai-Factory model discovery failed: ${res.status}`)
+      return res.json()
+    }),
+  )
+
+  return Object.fromEntries(
+    payload.data
+      .map((item) => ({ id: item.id.trim(), created: item.created }))
+      .filter((item) => item.id)
+      .map((item) => [item.id, buildAiFactoryModel(item.id, item.created)] as const),
+  )
+}
 
 function shouldUseCopilotResponsesApi(modelID: string): boolean {
   const match = /^gpt-(\d+)/.exec(modelID)
@@ -197,6 +296,27 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         },
         options: {},
       }),
+    aifactory: Effect.fnUntraced(function* () {
+      const config = yield* dep.config()
+      const auth = yield* dep.auth("aifactory")
+      const token =
+        auth?.type === "api"
+          ? auth.key
+          : typeof config.provider?.["aifactory"]?.options?.apiKey === "string"
+            ? config.provider["aifactory"].options.apiKey
+            : undefined
+
+      return {
+        autoload: Boolean(token),
+        options: {
+          baseURL: AIFACTORY_BASE_URL,
+        },
+        async discoverModels() {
+          if (!token) return {}
+          return discoverAiFactoryModels(token)
+        },
+      }
+    }),
     azure: Effect.fnUntraced(function* (provider: Info) {
       const env = yield* dep.env()
       const resource = iife(() => {
@@ -919,7 +1039,12 @@ export const ConfigProvidersResult = Schema.Struct({
 export type ConfigProvidersResult = Types.DeepMutable<Schema.Schema.Type<typeof ConfigProvidersResult>>
 
 export function defaultModelIDs<T extends { models: Record<string, { id: string }> }>(providers: Record<string, T>) {
-  return mapValues(providers, (item) => sort(Object.values(item.models))[0].id)
+  return Object.fromEntries(
+    Object.entries(providers).flatMap(([providerID, item]) => {
+      const first = sort(Object.values(item.models))[0]
+      return first ? [[providerID, first.id] as const] : []
+    }),
+  )
 }
 
 export interface Interface {
@@ -1291,18 +1416,18 @@ const layer: Layer.Layer<
           mergeProvider(providerID, partial)
         }
 
-        const gitlab = ProviderID.make("gitlab")
-        if (discoveryLoaders[gitlab] && providers[gitlab] && isProviderAllowed(gitlab)) {
+        for (const [id, discoverModels] of Object.entries(discoveryLoaders)) {
+          const providerID = ProviderID.make(id)
+          if (!providers[providerID] || !isProviderAllowed(providerID)) continue
+
           yield* Effect.promise(async () => {
             try {
-              const discovered = await discoveryLoaders[gitlab]()
-              for (const [modelID, model] of Object.entries(discovered)) {
-                if (!providers[gitlab].models[modelID]) {
-                  providers[gitlab].models[modelID] = model
-                }
+              providers[providerID].models = {
+                ...providers[providerID].models,
+                ...(await discoverModels()),
               }
             } catch (e) {
-              log.warn("state discovery error", { id: "gitlab", error: e })
+              log.warn("state discovery error", { id: providerID, error: e })
             }
           })
         }

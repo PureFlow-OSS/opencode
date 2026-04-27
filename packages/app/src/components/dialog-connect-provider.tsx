@@ -126,6 +126,15 @@ export function DialogConnectProvider(props: { provider: string }) {
     return value.label ?? ""
   }
 
+  const tokenLabel = () =>
+    provider().id === "aifactory"
+      ? "User token"
+      : language.t("provider.connect.apiKey.label", { provider: provider().name })
+  const tokenDescription = () =>
+    provider().id === "aifactory"
+      ? "Enter your Ai-Factory user token to connect and load models from Ai-Factory."
+      : language.t("provider.connect.apiKey.description", { provider: provider().name })
+
   function formatError(value: unknown, fallback: string): string {
     if (value && typeof value === "object" && "data" in value) {
       const data = (value as { data?: { message?: unknown } }).data
@@ -142,6 +151,17 @@ export function DialogConnectProvider(props: { provider: string }) {
     if (value instanceof Error && value.message) return value.message
     if (typeof value === "string" && value) return value
     return fallback
+  }
+
+  function newestAiFactoryModel(models: Record<string, { id: string; release_date?: string }>) {
+    return Object.values(models).sort((a, b) => {
+      const aDate = a.release_date ?? ""
+      const bDate = b.release_date ?? ""
+      if (aDate !== bDate) return bDate.localeCompare(aDate)
+      if (a.id.includes("latest") && !b.id.includes("latest")) return -1
+      if (!a.id.includes("latest") && b.id.includes("latest")) return 1
+      return b.id.localeCompare(a.id)
+    })[0]
   }
 
   async function selectMethod(index: number, inputs?: Record<string, string>) {
@@ -333,6 +353,38 @@ export function DialogConnectProvider(props: { provider: string }) {
 
   async function complete() {
     await globalSDK.client.global.dispose()
+
+    if (props.provider === "aifactory") {
+      const refreshed = await globalSDK.client.provider.list().catch(() => undefined)
+      const connected = refreshed?.data?.all.find((item) => item.id === "aifactory")
+      if (!connected || Object.keys(connected.models ?? {}).length === 0) {
+        showToast({
+          title: "Ai-Factory token required",
+          description: "No Ai-Factory models were loaded. Please check your user token and try again.",
+        })
+        return false
+      }
+
+      const newest = newestAiFactoryModel(connected.models ?? {})
+      if (newest) {
+        await globalSync.updateConfig({
+          ...globalSync.data.config,
+          model: `aifactory/${newest.id}`,
+        })
+      }
+
+      dialog.close()
+      showToast({
+        variant: "success",
+        icon: "circle-check",
+        title: "Ai-Factory models discovered",
+        description: newest
+          ? `${Object.keys(connected.models).length} models loaded. Default model set to ${newest.name ?? newest.id}.`
+          : `${Object.keys(connected.models).length} models loaded from Ai-Factory.`,
+      })
+      return true
+    }
+
     dialog.close()
     showToast({
       variant: "success",
@@ -340,6 +392,7 @@ export function DialogConnectProvider(props: { provider: string }) {
       title: language.t("provider.connect.toast.connected.title", { provider: provider().name }),
       description: language.t("provider.connect.toast.connected.description", { provider: provider().name }),
     })
+    return true
   }
 
   function goBack() {
@@ -436,17 +489,15 @@ export function DialogConnectProvider(props: { provider: string }) {
             </div>
           </Match>
           <Match when={true}>
-            <div class="text-14-regular text-text-base">
-              {language.t("provider.connect.apiKey.description", { provider: provider().name })}
-            </div>
+            <div class="text-14-regular text-text-base">{tokenDescription()}</div>
           </Match>
         </Switch>
         <form onSubmit={handleSubmit} class="flex flex-col items-start gap-4">
           <TextField
             autofocus
             type="text"
-            label={language.t("provider.connect.apiKey.label", { provider: provider().name })}
-            placeholder={language.t("provider.connect.apiKey.placeholder")}
+            label={tokenLabel()}
+            placeholder={provider().id === "aifactory" ? "User token" : language.t("provider.connect.apiKey.placeholder")}
             name="apiKey"
             value={formStore.value}
             onChange={(v) => setFormStore("value", v)}

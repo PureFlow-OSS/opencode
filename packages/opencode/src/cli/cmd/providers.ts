@@ -348,13 +348,8 @@ export const ProvidersLoginCommand = cmd({
         )
 
         const priority: Record<string, number> = {
-          opencode: 0,
-          openai: 1,
-          "github-copilot": 2,
-          google: 3,
-          anthropic: 4,
-          openrouter: 5,
-          vercel: 6,
+          "github-copilot": 0,
+          aifactory: 1,
         }
         const pluginProviders = resolvePluginProviders({
           hooks,
@@ -375,8 +370,8 @@ export const ProvidersLoginCommand = cmd({
               label: x.name,
               value: x.id,
               hint: {
-                opencode: "recommended",
-                openai: "ChatGPT Plus/Pro or API key",
+                "github-copilot": "GitHub Copilot models",
+                aifactory: "Ai-Factory user token",
               }[x.id],
             })),
           ),
@@ -402,13 +397,7 @@ export const ProvidersLoginCommand = cmd({
           const selected = await prompts.autocomplete({
             message: "Select provider",
             maxItems: 8,
-            options: [
-              ...options,
-              {
-                value: "other",
-                label: "Other",
-              },
-            ],
+            options,
           })
           if (prompts.isCancel(selected)) throw new UI.CancelledError()
           provider = selected as string
@@ -418,25 +407,6 @@ export const ProvidersLoginCommand = cmd({
         if (plugin && plugin.auth) {
           const handled = await handlePluginAuth({ auth: plugin.auth }, provider, args.method)
           if (handled) return
-        }
-
-        if (provider === "other") {
-          const custom = await prompts.text({
-            message: "Enter provider id",
-            validate: (x) => (x && x.match(/^[0-9a-z-]+$/) ? undefined : "a-z, 0-9 and hyphens only"),
-          })
-          if (prompts.isCancel(custom)) throw new UI.CancelledError()
-          provider = custom.replace(/^@ai-sdk\//, "")
-
-          const customPlugin = hooks.findLast((x) => x.auth?.provider === provider)
-          if (customPlugin && customPlugin.auth) {
-            const handled = await handlePluginAuth({ auth: customPlugin.auth }, provider, args.method)
-            if (handled) return
-          }
-
-          prompts.log.warn(
-            `This only stores a credential for ${provider} - you will need configure it in opencode.json, check the docs for examples.`,
-          )
         }
 
         if (provider === "amazon-bedrock") {
@@ -449,22 +419,8 @@ export const ProvidersLoginCommand = cmd({
           )
         }
 
-        if (provider === "opencode") {
-          prompts.log.info("Create an api key at https://opencode.ai/auth")
-        }
-
-        if (provider === "vercel") {
-          prompts.log.info("You can create an api key at https://vercel.link/ai-gateway-token")
-        }
-
-        if (["cloudflare", "cloudflare-ai-gateway"].includes(provider)) {
-          prompts.log.info(
-            "Cloudflare AI Gateway can be configured with CLOUDFLARE_GATEWAY_ID, CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_API_TOKEN environment variables. Read more: https://opencode.ai/docs/providers/#cloudflare-ai-gateway",
-          )
-        }
-
         const key = await prompts.password({
-          message: "Enter your API key",
+          message: provider === "aifactory" ? "Enter your Ai-Factory user token" : "Enter your API key",
           validate: (x) => (x && x.length > 0 ? undefined : "Required"),
         })
         if (prompts.isCancel(key)) throw new UI.CancelledError()

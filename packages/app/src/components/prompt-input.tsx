@@ -257,6 +257,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     draggingType: "image" | "@mention" | null
     mode: "normal" | "shell"
     applyingHistory: boolean
+    promptedAiFactory: boolean
   }>({
     popover: null,
     historyIndex: -1,
@@ -265,6 +266,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     draggingType: null,
     mode: "normal",
     applyingHistory: false,
+    promptedAiFactory: false,
   })
 
   const buttonsSpring = useSpring(() => (store.mode === "normal" ? 1 : 0), { visualDuration: 0.2, bounce: 0 })
@@ -1265,6 +1267,20 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     () => prompt.ready().promise,
     (p) => p,
   )
+
+  createEffect(() => {
+    if (store.promptedAiFactory) return
+    if (providersLoading()) return
+
+    const configured = sync.data.config.model
+    if (!configured?.startsWith("aifactory/")) return
+    if (providers.connected().some((item) => item.id === "aifactory")) return
+
+    setStore("promptedAiFactory", true)
+    void import("@/components/dialog-connect-provider").then((x) => {
+      dialog.show(() => <x.DialogConnectProvider provider="aifactory" />)
+    })
+  })
 
   return (
     <div class="relative size-full _max-h-[320px] flex flex-col gap-0">
