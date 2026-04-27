@@ -309,6 +309,7 @@ export class Auth extends HeyApiClient {
       litellm_url?: string
       keycloak_url?: string
       client_id?: string
+      kes_url?: string
     },
     options?: Options<never, ThrowOnError>,
   ) {
