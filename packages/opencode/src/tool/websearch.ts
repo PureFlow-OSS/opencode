@@ -26,7 +26,7 @@ export const WebSearchTool = Tool.define(
   "websearch",
   Effect.gen(function* () {
     const http = yield* HttpClient.HttpClient
-    const config = yield* Config.Service
+    const config = yield* Effect.serviceOption(Config.Service)
 
     return {
       get description() {
@@ -60,7 +60,7 @@ export const WebSearchTool = Tool.define(
               contextMaxCharacters: params.contextMaxCharacters,
             },
             "25 seconds",
-            (yield* config.get()).http_proxy,
+            config._tag === "Some" ? (yield* config.value.get()).http_proxy : undefined,
           )
 
           return {
