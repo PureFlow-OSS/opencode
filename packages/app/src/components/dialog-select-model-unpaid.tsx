@@ -106,7 +106,7 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
                     <ProviderIcon data-slot="list-item-extra-icon" id={i.id} />
                     <span>{i.name}</span>
                     <Show when={i.id === "aifactory"}>
-                      <div class="text-14-regular text-text-weak">AI Modelle der RRZ-AiFactory</div>
+                      <div class="text-14-regular text-text-weak">AI Modelle der RRZ AI Factory</div>
                     </Show>
                     <Show when={popularProviders.includes(i.id)}>
                       <Tag>{language.t("dialog.provider.tag.recommended")}</Tag>

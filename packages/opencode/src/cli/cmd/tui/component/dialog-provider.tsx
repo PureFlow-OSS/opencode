@@ -41,7 +41,7 @@ export function createDialogProviderOptions() {
           value: provider.id,
           description: {
             "github-copilot": "GitHub Copilot models",
-            aifactory: "OpenAI-compatible models from Ai-Factory",
+            aifactory: "OpenAI-compatible models from RRZ AI Factory",
           }[provider.id],
           footer: consoleManaged ? sync.data.console_state.activeOrgName : undefined,
           category: provider.id in PROVIDER_PRIORITY ? "Popular" : "Other",
@@ -265,7 +265,7 @@ function ApiMethod(props: ApiMethodProps) {
         {
           aifactory: (
             <box gap={1}>
-              <text fg={theme.textMuted}>Enter your Ai-Factory user token.</text>
+              <text fg={theme.textMuted}>Enter your RRZ AI Factory user token.</text>
             </box>
           ),
         }[props.providerID] ?? undefined

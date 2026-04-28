@@ -72,6 +72,7 @@ let initStep: InitStep = { phase: "server_waiting" }
 
 let mainWindow: BrowserWindow | null = null
 let server: Server.Listener | null = null
+let sidecarStop: Promise<void> | null = null
 const loadingComplete = defer<void>()
 
 const pendingDeepLinks: string[] = []
@@ -111,16 +112,16 @@ function setupApp() {
   })
 
   app.on("before-quit", () => {
-    killSidecar()
+    void killSidecar()
   })
 
   app.on("will-quit", () => {
-    killSidecar()
+    void killSidecar()
   })
 
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, () => {
-      killSidecar()
+      void killSidecar()
       app.exit(0)
     })
   }
@@ -240,9 +241,10 @@ function wireMenu() {
     },
     reload: () => mainWindow?.reload(),
     relaunch: () => {
-      killSidecar()
-      app.relaunch()
-      app.exit(0)
+      void killSidecar().finally(() => {
+        app.relaunch()
+        app.exit(0)
+      })
     },
   })
 }
@@ -281,10 +283,15 @@ registerIpcHandlers({
   setBackgroundColor: (color) => setBackgroundColor(color),
 })
 
-function killSidecar() {
+async function killSidecar() {
+  if (sidecarStop) return sidecarStop
   if (!server) return
-  server.stop()
+  const active = server
   server = null
+  sidecarStop = active.stop(true).catch(() => undefined).finally(() => {
+    sidecarStop = null
+  })
+  await sidecarStop
 }
 
 function ensureLoopbackNoProxy() {
@@ -423,7 +430,8 @@ async function installUpdate() {
   logger.log("installing downloaded update", {
     version: downloadedUpdateVersion,
   })
-  killSidecar()
+  await killSidecar()
+  await delay(250)
   autoUpdater.quitAndInstall()
 }
 

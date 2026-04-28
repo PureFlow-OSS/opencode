@@ -33,8 +33,10 @@ export function SessionComposerRegion(props: {
     edit?: { id: string; prompt: FollowupDraft["prompt"]; context: FollowupDraft["context"] }
     onQueue: (draft: FollowupDraft) => void
     onAbort: () => void
-    onSend: (id: string) => void
+    onSteer: (id: string) => void
     onEdit: (id: string) => void
+    onDelete: (id: string) => void
+    onMove: (id: string, direction: -1 | 1) => void
     onEditLoaded: () => void
   }
   revert?: {
@@ -242,8 +244,10 @@ export function SessionComposerRegion(props: {
                 <SessionFollowupDock
                   items={props.followup!.items}
                   sending={props.followup!.sending}
-                  onSend={props.followup!.onSend}
+                  onSteer={props.followup!.onSteer}
                   onEdit={props.followup!.onEdit}
+                  onDelete={props.followup!.onDelete}
+                  onMove={props.followup!.onMove}
                 />
               </Show>
               <Show

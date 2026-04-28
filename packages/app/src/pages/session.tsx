@@ -1611,6 +1611,35 @@ export default function Page() {
     })
   }
 
+  const deleteFollowup = (id: string) => {
+    const sessionID = params.id
+    if (!sessionID) return
+    if (followupBusy(sessionID)) return
+
+    setFollowup("items", sessionID, (items) => (items ?? []).filter((entry) => entry.id !== id))
+    setFollowup("failed", sessionID, (value) => (value === id ? undefined : value))
+  }
+
+  const moveFollowup = (id: string, direction: -1 | 1) => {
+    const sessionID = params.id
+    if (!sessionID) return
+    if (followupBusy(sessionID)) return
+
+    setFollowup("items", sessionID, (items) => {
+      const list = items ?? []
+      const from = list.findIndex((entry) => entry.id === id)
+      const to = from + direction
+      if (from < 0 || to < 0 || to >= list.length) return list
+
+      const next = list.slice()
+      const item = next[from]
+      if (!item) return list
+      next.splice(from, 1)
+      next.splice(to, 0, item)
+      return next
+    })
+  }
+
   const clearFollowupEdit = () => {
     const id = params.id
     if (!id) return
@@ -1912,10 +1941,12 @@ export default function Page() {
                       if (!id) return
                       setFollowup("paused", id, true)
                     },
-                    onSend: (id) => {
+                    onSteer: (id) => {
                       void sendFollowup(params.id!, id, { manual: true })
                     },
                     onEdit: editFollowup,
+                    onDelete: deleteFollowup,
+                    onMove: moveFollowup,
                     onEditLoaded: clearFollowupEdit,
                   }
                 : undefined

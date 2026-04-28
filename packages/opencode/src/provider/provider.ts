@@ -32,6 +32,7 @@ import { ModelID, ProviderID } from "./schema"
 const log = Log.create({ service: "provider" })
 const AIFACTORY_ID = ProviderID.make("aifactory")
 const AIFACTORY_BASE_URL = "http://10.53.7.23/v1"
+const AIFACTORY_PROVIDER_CONFIG_URL = `${new URL(AIFACTORY_BASE_URL).origin}/opencode/provider-config.json`
 const AIFACTORY_BYPASS = new URL(AIFACTORY_BASE_URL).host
 const REQUIRED_PROVIDER_IDS = [ProviderID.githubCopilot, ProviderID.aifactory]
 
@@ -52,8 +53,85 @@ function normalizeAiFactoryReleaseDate(created: number | string | undefined) {
   return ""
 }
 
-function buildAiFactoryModel(modelID: string, created?: number | string): Model {
-  const reasoning = /(^o[134]\b)|(^gpt-5\b)|claude|reason|r1|deepseek|gemini/i.test(modelID)
+type AiFactoryModelLimits = {
+  context: number
+  output: number
+}
+
+type AiFactoryModelLimitRule = {
+  pattern: string
+  context?: number
+  output?: number
+  temperature?: boolean
+  reasoning?: boolean
+}
+
+type AiFactoryModelOverrides = {
+  limit: AiFactoryModelLimits
+  temperature?: boolean
+  reasoning?: boolean
+}
+
+function globToRegExp(pattern: string) {
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
+  return new RegExp(`^${escaped}$`, "i")
+}
+
+function resolveAiFactoryModelOverrides(modelID: string, rules: AiFactoryModelLimitRule[] | undefined): AiFactoryModelOverrides {
+  const fallback: AiFactoryModelOverrides = {
+    limit: {
+      context: 200_000,
+      output: 32_000,
+    },
+  }
+  const match = rules?.find((rule) => rule.pattern && globToRegExp(rule.pattern).test(modelID))
+  if (!match) return fallback
+  return {
+    limit: {
+      context: match.context ?? fallback.limit.context,
+      output: match.output ?? fallback.limit.output,
+    },
+    temperature: match.temperature,
+    reasoning: match.reasoning,
+  }
+}
+
+async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch) {
+  return (await fetchFn(AIFACTORY_PROVIDER_CONFIG_URL, {
+    signal: AbortSignal.timeout(3000),
+  })
+    .then(async (res) => {
+      if (!res.ok) return
+      return (await res.json()) as {
+        aifactory?: {
+          model_limits?: Array<{
+            pattern?: string
+            context?: number
+            output?: number
+            temperature?: boolean
+            reasoning?: boolean
+          }>
+        }
+      }
+    })
+    .catch(() => undefined))?.aifactory?.model_limits
+    ?.flatMap((rule) => {
+      if (typeof rule?.pattern !== "string" || !rule.pattern.trim()) return []
+      return [
+        {
+          pattern: rule.pattern.trim(),
+          context: typeof rule.context === "number" ? rule.context : undefined,
+          output: typeof rule.output === "number" ? rule.output : undefined,
+          temperature: typeof rule.temperature === "boolean" ? rule.temperature : undefined,
+          reasoning: typeof rule.reasoning === "boolean" ? rule.reasoning : undefined,
+        } satisfies AiFactoryModelLimitRule,
+      ]
+    })
+}
+
+function buildAiFactoryModel(modelID: string, created?: number | string, rules?: AiFactoryModelLimitRule[]): Model {
+  const inferredReasoning = /(^o[134]\b)|(^gpt-5\b)|claude|reason|r1|deepseek|gemini/i.test(modelID)
+  const overrides = resolveAiFactoryModelOverrides(modelID, rules)
   const base: Model = {
     id: ModelID.make(modelID),
     providerID: AIFACTORY_ID,
@@ -75,13 +153,10 @@ function buildAiFactoryModel(modelID: string, created?: number | string): Model 
         write: 0,
       },
     },
-    limit: {
-      context: 200_000,
-      output: 32_000,
-    },
+    limit: overrides.limit,
     capabilities: {
-      temperature: true,
-      reasoning,
+      temperature: overrides.temperature ?? true,
+      reasoning: overrides.reasoning ?? inferredReasoning,
       attachment: false,
       toolcall: true,
       input: {
@@ -111,20 +186,23 @@ function buildAiFactoryModel(modelID: string, created?: number | string): Model 
 }
 
 async function discoverAiFactoryModels(token: string, fetchFn: FetchLike = fetch) {
-  const payload = (await fetchFn(`${AIFACTORY_BASE_URL}/models`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    signal: AbortSignal.timeout(5000),
-  }).then((res) => {
-    if (!res.ok) throw new Error(`Ai-Factory model discovery failed: ${res.status}`)
-    return res.json()
-  })) as {
-    data?: Array<{
-      id?: string
-      created?: number | string
-    }>
-  }
+  const [rules, payload] = await Promise.all([
+    discoverAiFactoryConfig(fetchFn),
+    fetchFn(`${AIFACTORY_BASE_URL}/models`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      signal: AbortSignal.timeout(5000),
+    }).then((res) => {
+      if (!res.ok) throw new Error(`RRZ AI Factory model discovery failed: ${res.status}`)
+      return res.json() as Promise<{
+        data?: Array<{
+          id?: string
+          created?: number | string
+        }>
+      }>
+    }),
+  ])
 
   return Object.fromEntries(
     (payload.data ?? [])
@@ -133,7 +211,7 @@ async function discoverAiFactoryModels(token: string, fetchFn: FetchLike = fetch
         return [{ id: item.id.trim(), created: item.created }]
       })
       .filter((item) => item.id)
-      .map((item) => [item.id, buildAiFactoryModel(item.id, item.created)] as const),
+      .map((item) => [item.id, buildAiFactoryModel(item.id, item.created, rules)] as const),
   )
 }
 
@@ -1472,10 +1550,7 @@ const layer: Layer.Layer<
 
           yield* Effect.promise(async () => {
             try {
-              providers[providerID].models = {
-                ...providers[providerID].models,
-                ...(await discoverModels()),
-              }
+              providers[providerID].models = await discoverModels()
             } catch (e) {
               log.warn("state discovery error", { id: providerID, error: e })
             }

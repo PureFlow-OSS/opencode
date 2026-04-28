@@ -94,7 +94,7 @@ const providers: Record<string, Provider> = {
   },
   aifactory: {
     id: "aifactory",
-    name: "Ai-Factory",
+    name: "RRZ AI Factory",
     api: AIFACTORY_API,
     npm: "@ai-sdk/openai-compatible",
     env: [],

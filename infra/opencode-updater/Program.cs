@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +28,11 @@ app.MapGet("/opencode/latest.json", async (HttpContext context, IHttpClientFacto
 {
   if (feed.TryGet("latest.json", out var local)) return await LocalFileAsync(context, local);
   return await ProxyAsync(context, clientFactory, BuildUpstreamUrl(options.Value, "latest.json"));
+});
+
+app.MapGet("/opencode/provider-config.json", (IOptions<UpdaterOptions> options) =>
+{
+  return Results.Json(options.Value.ProviderConfig);
 });
 
 app.MapGet("/opencode/feed/{**asset}", async (HttpContext context, IHttpClientFactory clientFactory, IOptions<UpdaterOptions> options, LocalFeed feed, string? asset) =>
@@ -103,6 +109,37 @@ sealed class UpdaterOptions
   public string Version { get; set; } = "1.14.28";
   public string PublicBaseUrl { get; set; } = "http://10.53.7.23";
   public string ReleaseBaseUrlTemplate { get; set; } = "https://github.com/anomalyco/opencode/releases/download/v{{version}}";
+  public ProviderConfigOptions ProviderConfig { get; set; } = new();
+}
+
+sealed class ProviderConfigOptions
+{
+  [JsonPropertyName("aifactory")]
+  public AiFactoryConfigOptions AiFactory { get; set; } = new();
+}
+
+sealed class AiFactoryConfigOptions
+{
+  [JsonPropertyName("model_limits")]
+  public List<ModelLimitRuleOptions> ModelLimits { get; set; } = [];
+}
+
+sealed class ModelLimitRuleOptions
+{
+  [JsonPropertyName("pattern")]
+  public string Pattern { get; set; } = "*";
+
+  [JsonPropertyName("context")]
+  public int? Context { get; set; }
+
+  [JsonPropertyName("output")]
+  public int? Output { get; set; }
+
+  [JsonPropertyName("temperature")]
+  public bool? Temperature { get; set; }
+
+  [JsonPropertyName("reasoning")]
+  public bool? Reasoning { get; set; }
 }
 
 sealed class LocalFeed(string root)

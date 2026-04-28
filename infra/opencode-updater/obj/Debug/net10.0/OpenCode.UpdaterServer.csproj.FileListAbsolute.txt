@@ -41,3 +41,8 @@ C:\Users\Klaus\Desktop\PFH\opencode\infra\opencode-updater\obj\Debug\net10.0\ref
 C:\Users\Klaus\Desktop\PFH\opencode\infra\opencode-updater\obj\Debug\net10.0\OpenCode.UpdaterServer.pdb
 C:\Users\Klaus\Desktop\PFH\opencode\infra\opencode-updater\obj\Debug\net10.0\OpenCode.UpdaterServer.genruntimeconfig.cache
 C:\Users\Klaus\Desktop\PFH\opencode\infra\opencode-updater\obj\Debug\net10.0\ref\OpenCode.UpdaterServer.dll
+C:\Users\Klaus\Desktop\PFH\opencode\infra\opencode-updater\bin\Debug\net10.0\feed\.gitkeep
+C:\Users\Klaus\Desktop\PFH\opencode\infra\opencode-updater\bin\Debug\net10.0\feed\latest.example.yml
+C:\Users\Klaus\Desktop\PFH\opencode\infra\opencode-updater\bin\Debug\net10.0\feed\latest.yml
+C:\Users\Klaus\Desktop\PFH\opencode\infra\opencode-updater\bin\Debug\net10.0\feed\opencode-electron-win-x64.exe
+C:\Users\Klaus\Desktop\PFH\opencode\infra\opencode-updater\bin\Debug\net10.0\feed\opencode-electron-win-x64.exe.blockmap

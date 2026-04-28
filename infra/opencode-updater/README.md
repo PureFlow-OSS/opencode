@@ -7,6 +7,7 @@ Endpoints:
 - `GET /opencode/version`
 - `GET /opencode/url`
 - `GET /opencode/latest.json`
+- `GET /opencode/provider-config.json`
 - `GET /opencode/feed/{asset}`
 
 ## Use
@@ -14,6 +15,47 @@ Endpoints:
 1. Edit `appsettings.json`
 2. Set `Updater.Version`
 3. Restart container
+
+## Provider config
+
+The updater can also serve provider-side rollout config for the desktop app.
+
+Example `appsettings.json`:
+
+```json
+{
+  "Updater": {
+    "ProviderConfig": {
+      "aifactory": {
+        "model_limits": [
+          {
+            "pattern": "qwen*",
+            "context": 200000,
+            "output": 32000,
+            "temperature": true,
+            "reasoning": false
+          },
+          {
+            "pattern": "*",
+            "context": 60000,
+            "output": 32000,
+            "temperature": true
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+Rules are ordered. First match wins. `*` acts as fallback.
+
+Supported per-rule overrides:
+
+- `context`
+- `output`
+- `temperature`
+- `reasoning`
 
 Container image CI publishes to:
 
@@ -24,6 +66,8 @@ Optional env overrides:
 - `Updater__Version`
 - `Updater__PublicBaseUrl`
 - `Updater__ReleaseBaseUrlTemplate`
+- `Updater__ProviderConfig__aifactory__model_limits__0__pattern`
+- `Updater__ProviderConfig__aifactory__model_limits__0__context`
 
 ## Local fake feed
 

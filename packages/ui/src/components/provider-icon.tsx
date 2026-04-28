@@ -16,7 +16,7 @@ export const ProviderIcon: Component<ProviderIconProps> = (props) => {
       <svg
         data-component="provider-icon"
         viewBox="0 0 48 48"
-        aria-label="Ai-Factory"
+        aria-label="RRZ AI Factory"
         {...rest}
         classList={{
           ...local.classList,

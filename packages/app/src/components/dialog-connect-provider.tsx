@@ -137,7 +137,7 @@ export function DialogConnectProvider(props: { provider: string }) {
       : language.t("provider.connect.apiKey.label", { provider: provider().name })
   const tokenDescription = () =>
     provider().id === "aifactory"
-      ? "Enter your Ai-Factory user token to connect and load models from Ai-Factory."
+      ? "Enter your RRZ AI Factory user token to connect and load models from RRZ AI Factory."
       : language.t("provider.connect.apiKey.description", { provider: provider().name })
 
   function formatError(value: unknown, fallback: string): string {
@@ -364,15 +364,19 @@ export function DialogConnectProvider(props: { provider: string }) {
       const connected = refreshed?.data?.all.find((item) => item.id === "aifactory")
       if (!refreshed?.data || !connected || Object.keys(connected.models ?? {}).length === 0) {
         showToast({
-          title: "Ai-Factory token required",
-          description: "No Ai-Factory models were loaded. Please check your user token and try again.",
+          title: "RRZ AI Factory token required",
+          description: "No RRZ AI Factory models were loaded. Please check your user token and try again.",
         })
         return false
       }
       const normalized = normalizeProviderList(refreshed.data!)
       globalSync.set("provider", normalized)
-      if (dir()) {
-        const [, setProjectStore] = globalSync.child(dir(), { bootstrap: false })
+      const directories = new Set(
+        globalSync.data.project.flatMap((project) => [project.worktree, ...(project.sandboxes ?? [])]).filter(Boolean),
+      )
+      if (dir()) directories.add(dir())
+      for (const directory of directories) {
+        const [, setProjectStore] = globalSync.child(directory, { bootstrap: false })
         setProjectStore("provider", normalized)
         setProjectStore("provider_ready", true)
       }
@@ -389,10 +393,10 @@ export function DialogConnectProvider(props: { provider: string }) {
       showToast({
         variant: "success",
         icon: "circle-check",
-        title: "Ai-Factory models discovered",
+        title: "RRZ AI Factory models discovered",
         description: newest
           ? `${Object.keys(connected.models).length} models loaded. Default model set to ${newest.name ?? newest.id}.`
-          : `${Object.keys(connected.models).length} models loaded from Ai-Factory.`,
+          : `${Object.keys(connected.models).length} models loaded from RRZ AI Factory.`,
       })
       return true
     }

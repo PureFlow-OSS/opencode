@@ -371,7 +371,7 @@ export const ProvidersLoginCommand = cmd({
               value: x.id,
               hint: {
                 "github-copilot": "GitHub Copilot models",
-                aifactory: "Ai-Factory user token",
+                aifactory: "RRZ AI Factory user token",
               }[x.id],
             })),
           ),
@@ -420,7 +420,7 @@ export const ProvidersLoginCommand = cmd({
         }
 
         const key = await prompts.password({
-          message: provider === "aifactory" ? "Enter your Ai-Factory user token" : "Enter your API key",
+          message: provider === "aifactory" ? "Enter your RRZ AI Factory user token" : "Enter your API key",
           validate: (x) => (x && x.length > 0 ? undefined : "Required"),
         })
         if (prompts.isCancel(key)) throw new UI.CancelledError()
