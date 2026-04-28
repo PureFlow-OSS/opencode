@@ -17,6 +17,11 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
   const dialog = useDialog()
   const providers = useProviders()
   const language = useLanguage()
+  const items = () => model.list().filter((item) => model.visible({ modelID: item.id, providerID: item.provider.id }))
+  const connectable = () => {
+    const connected = new Set(providers.connected().map((item) => item.id))
+    return providers.popular().filter((item) => !connected.has(item.id))
+  }
 
   const connect = (provider: string) => {
     void import("./dialog-connect-provider").then((x) => {
@@ -36,11 +41,10 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
       class="overflow-y-auto [&_[data-slot=dialog-body]]:overflow-visible [&_[data-slot=dialog-body]]:flex-none"
     >
       <div class="flex flex-col gap-3 px-2.5" onKeyDown={handleKeyDown}>
-        <div class="text-14-medium text-text-base px-2.5">{language.t("dialog.model.unpaid.freeModels.title")}</div>
         <List
           class="[&_[data-slot=list-scroll]]:overflow-visible"
           ref={(ref) => (listRef = ref)}
-          items={model.list}
+          items={items}
           current={model.current()}
           key={(x) => `${x.provider.id}:${x.id}`}
           itemWrapper={(item, node) => (
@@ -68,8 +72,8 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
         >
           {(i) => (
             <div class="w-full flex items-center gap-x-2.5">
+              <ProviderIcon id={i.provider.id} class="size-4 shrink-0 icon-strong-base" />
               <span>{i.name}</span>
-              <Tag>{language.t("model.tag.free")}</Tag>
               <Show when={i.latest}>
                 <Tag>{language.t("model.tag.latest")}</Tag>
               </Show>
@@ -85,7 +89,7 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
               <List
                 class="w-full px-0"
                 key={(x) => x?.id}
-                items={providers.popular}
+                items={connectable}
                 activeIcon="plus-small"
                 sortBy={(a, b) => {
                   if (popularProviders.includes(a.id) && popularProviders.includes(b.id))
@@ -102,7 +106,7 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
                     <ProviderIcon data-slot="list-item-extra-icon" id={i.id} />
                     <span>{i.name}</span>
                     <Show when={i.id === "aifactory"}>
-                      <div class="text-14-regular text-text-weak">OpenAI-compatible models from Ai-Factory</div>
+                      <div class="text-14-regular text-text-weak">AI Modelle der RRZ-AiFactory</div>
                     </Show>
                     <Show when={popularProviders.includes(i.id)}>
                       <Tag>{language.t("dialog.provider.tag.recommended")}</Tag>

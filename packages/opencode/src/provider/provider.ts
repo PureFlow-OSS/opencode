@@ -76,7 +76,7 @@ function buildAiFactoryModel(modelID: string, created?: number | string): Model 
       },
     },
     limit: {
-      context: 256_000,
+      context: 200_000,
       output: 32_000,
     },
     capabilities: {

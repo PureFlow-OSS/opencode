@@ -11,11 +11,14 @@ import { TextField } from "@opencode-ai/ui/text-field"
 import { showToast } from "@opencode-ai/ui/toast"
 import { createEffect, createMemo, createResource, Match, onCleanup, onMount, Switch } from "solid-js"
 import { createStore, produce } from "solid-js/store"
+import { useParams } from "@solidjs/router"
 import { Link } from "@/components/link"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
+import { normalizeProviderList } from "@/context/global-sync/utils"
 import { useLanguage } from "@/context/language"
 import { useProviders } from "@/hooks/use-providers"
+import { decode64 } from "@/utils/base64"
 
 export function DialogConnectProvider(props: { provider: string }) {
   const dialog = useDialog()
@@ -23,6 +26,8 @@ export function DialogConnectProvider(props: { provider: string }) {
   const globalSDK = useGlobalSDK()
   const language = useLanguage()
   const providers = useProviders()
+  const params = useParams()
+  const dir = createMemo(() => decode64(params.dir) ?? "")
 
   const all = () => {
     void import("./dialog-select-provider").then((x) => {
@@ -357,12 +362,19 @@ export function DialogConnectProvider(props: { provider: string }) {
     if (props.provider === "aifactory") {
       const refreshed = await globalSDK.client.provider.list().catch(() => undefined)
       const connected = refreshed?.data?.all.find((item) => item.id === "aifactory")
-      if (!connected || Object.keys(connected.models ?? {}).length === 0) {
+      if (!refreshed?.data || !connected || Object.keys(connected.models ?? {}).length === 0) {
         showToast({
           title: "Ai-Factory token required",
           description: "No Ai-Factory models were loaded. Please check your user token and try again.",
         })
         return false
+      }
+      const normalized = normalizeProviderList(refreshed.data!)
+      globalSync.set("provider", normalized)
+      if (dir()) {
+        const [, setProjectStore] = globalSync.child(dir(), { bootstrap: false })
+        setProjectStore("provider", normalized)
+        setProjectStore("provider_ready", true)
       }
 
       const newest = newestAiFactoryModel(connected.models ?? {})

@@ -15,6 +15,10 @@ Endpoints:
 2. Set `Updater.Version`
 3. Restart container
 
+Container image CI publishes to:
+
+`ghcr.io/<owner>/opencode-updater`
+
 Optional env overrides:
 
 - `Updater__Version`
