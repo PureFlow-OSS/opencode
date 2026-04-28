@@ -26,7 +26,7 @@ export const WebFetchTool = Tool.define(
   "webfetch",
   Effect.gen(function* () {
     const http = yield* HttpClient.HttpClient
-    const httpOk = HttpClient.filterStatusOk(http)
+    const httpOk = HttpClient.filterStatusOk(HttpClient.followRedirects(http))
     const config = yield* Effect.serviceOption(Config.Service)
 
     return {
@@ -38,12 +38,14 @@ export const WebFetchTool = Tool.define(
             throw new Error("URL must start with http:// or https://")
           }
 
+          const url = params.url.startsWith("http://") ? `https://${params.url.slice("http://".length)}` : params.url
+
           yield* ctx.ask({
             permission: "webfetch",
-            patterns: [params.url],
+            patterns: [params.url, url],
             always: ["*"],
             metadata: {
-              url: params.url,
+              url,
               format: params.format,
               timeout: params.timeout,
             },
@@ -81,25 +83,27 @@ export const WebFetchTool = Tool.define(
             const script = [
               "$ProgressPreference = 'SilentlyContinue'",
               `$headers = @{ 'User-Agent' = '${headers["User-Agent"]}'; 'Accept' = '${headers.Accept}'; 'Accept-Language' = '${headers["Accept-Language"]}' }`,
-              `$response = Invoke-WebRequest -UseBasicParsing -Uri '${params.url}' -Headers $headers -Proxy '${proxy}' -ProxyUseDefaultCredentials -TimeoutSec ${Math.max(1, Math.ceil(timeout / 1000))}`,
+              `$response = Invoke-WebRequest -UseBasicParsing -MaximumRedirection 10 -Uri '${url}' -Headers $headers -Proxy '${proxy}' -ProxyUseDefaultCredentials -TimeoutSec ${Math.max(1, Math.ceil(timeout / 1000))}`,
               "$content = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$response.Content))",
               "$contentType = [string]$response.Headers['Content-Type']",
+              "$finalUrl = [string]$response.BaseResponse.ResponseUri.AbsoluteUri",
+              "Write-Output $finalUrl",
               "Write-Output $contentType",
               "Write-Output $content",
             ].join("; ")
             const raw = yield* Effect.promise(() =>
               Process.text(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script]),
             )
-            const [contentType = "", encoded = ""] = raw.text.replace(/\r/g, "").trimEnd().split("\n", 2)
+            const [finalUrl = url, contentType = "", encoded = ""] = raw.text.replace(/\r/g, "").trimEnd().split("\n", 3)
             const content = Buffer.from(encoded, "base64").toString("utf8")
-            const title = `${params.url} (${contentType})`
+            const title = `${finalUrl} (${contentType})`
 
             switch (params.format) {
               case "markdown":
                 if (contentType.includes("text/html")) {
                   return {
                     output: formatFetchedContent({
-                      url: params.url,
+                      url: finalUrl,
                       format: params.format,
                       contentType,
                       content,
@@ -111,7 +115,7 @@ export const WebFetchTool = Tool.define(
                 }
                 return {
                   output: formatFetchedContent({
-                    url: params.url,
+                    url: finalUrl,
                     format: params.format,
                     contentType,
                     content,
@@ -126,7 +130,7 @@ export const WebFetchTool = Tool.define(
                   const text = yield* Effect.promise(() => extractTextFromHTML(content))
                   return {
                     output: formatFetchedContent({
-                      url: params.url,
+                      url: finalUrl,
                       format: params.format,
                       contentType,
                       content,
@@ -138,7 +142,7 @@ export const WebFetchTool = Tool.define(
                 }
                 return {
                   output: formatFetchedContent({
-                    url: params.url,
+                    url: finalUrl,
                     format: params.format,
                     contentType,
                     content,
@@ -151,7 +155,7 @@ export const WebFetchTool = Tool.define(
               case "html":
                 return {
                   output: formatFetchedContent({
-                    url: params.url,
+                    url: finalUrl,
                     format: params.format,
                     contentType,
                     content,
@@ -164,7 +168,7 @@ export const WebFetchTool = Tool.define(
               default:
                 return {
                   output: formatFetchedContent({
-                    url: params.url,
+                    url: finalUrl,
                     format: params.format,
                     contentType,
                     content,
@@ -176,7 +180,7 @@ export const WebFetchTool = Tool.define(
             }
           }
 
-          const request = HttpClientRequest.get(params.url).pipe(HttpClientRequest.setHeaders(headers))
+          const request = HttpClientRequest.get(url).pipe(HttpClientRequest.setHeaders(headers))
 
           // Retry with honest UA if blocked by Cloudflare bot detection (TLS fingerprint mismatch)
           const response = yield* httpOk.execute(request).pipe(
@@ -187,9 +191,7 @@ export const WebFetchTool = Tool.define(
                 err.reason.response.headers["cf-mitigated"] === "challenge",
               () =>
                 httpOk.execute(
-                  HttpClientRequest.get(params.url).pipe(
-                    HttpClientRequest.setHeaders({ ...headers, "User-Agent": "opencode" }),
-                  ),
+                  HttpClientRequest.get(url).pipe(HttpClientRequest.setHeaders({ ...headers, "User-Agent": "opencode" })),
                 ),
             ),
             Effect.timeoutOrElse({ duration: timeout, orElse: () => Effect.die(new Error("Request timed out")) }),
@@ -208,7 +210,8 @@ export const WebFetchTool = Tool.define(
 
           const contentType = response.headers["content-type"] || ""
           const mime = contentType.split(";")[0]?.trim().toLowerCase() || ""
-          const title = `${params.url} (${contentType})`
+          const finalUrl = response.request.url
+          const title = `${finalUrl} (${contentType})`
 
           if (isImageAttachment(mime)) {
             const base64Content = Buffer.from(arrayBuffer).toString("base64")
@@ -235,7 +238,7 @@ export const WebFetchTool = Tool.define(
                 const markdown = convertHTMLToMarkdown(content)
                 return {
                   output: formatFetchedContent({
-                    url: params.url,
+                    url: finalUrl,
                     format: params.format,
                     contentType,
                     content,
@@ -247,7 +250,7 @@ export const WebFetchTool = Tool.define(
               }
               return {
                 output: formatFetchedContent({
-                  url: params.url,
+                  url: finalUrl,
                   format: params.format,
                   contentType,
                   content,
@@ -262,7 +265,7 @@ export const WebFetchTool = Tool.define(
                 const text = yield* Effect.promise(() => extractTextFromHTML(content))
                 return {
                   output: formatFetchedContent({
-                    url: params.url,
+                    url: finalUrl,
                     format: params.format,
                     contentType,
                     content,
@@ -274,7 +277,7 @@ export const WebFetchTool = Tool.define(
               }
               return {
                 output: formatFetchedContent({
-                  url: params.url,
+                  url: finalUrl,
                   format: params.format,
                   contentType,
                   content,
@@ -287,7 +290,7 @@ export const WebFetchTool = Tool.define(
             case "html":
               return {
                 output: formatFetchedContent({
-                  url: params.url,
+                  url: finalUrl,
                   format: params.format,
                   contentType,
                   content,
@@ -300,7 +303,7 @@ export const WebFetchTool = Tool.define(
             default:
               return {
                 output: formatFetchedContent({
-                  url: params.url,
+                  url: finalUrl,
                   format: params.format,
                   contentType,
                   content,
