@@ -319,7 +319,7 @@ export const WebFetchTool = Tool.define(
 )
 
 async function extractTextFromHTML(html: string) {
-  return html
+  return sanitizeHTML(html)
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
@@ -343,7 +343,7 @@ function convertHTMLToMarkdown(html: string): string {
     emDelimiter: "*",
   })
   turndownService.remove(["script", "style", "meta", "link"])
-  return turndownService.turndown(html)
+  return turndownService.turndown(sanitizeHTML(html))
 }
 
 function formatFetchedContent(input: {
@@ -375,7 +375,7 @@ function formatFetchedContent(input: {
 }
 
 function extractTextFallback(content: string) {
-  return content
+  return sanitizeHTML(content)
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
@@ -388,4 +388,21 @@ function extractTextFallback(content: string) {
     .replace(/&#39;/gi, "'")
     .replace(/\s+/g, " ")
     .trim()
+}
+
+function sanitizeHTML(html: string) {
+  return [
+    /<script[\s\S]*?<\/script>/gi,
+    /<style[\s\S]*?<\/style>/gi,
+    /<noscript[\s\S]*?<\/noscript>/gi,
+    /<iframe[\s\S]*?<\/iframe>/gi,
+    /<form[^>]+(?:consent|cookie|privacy|gdpr|onetrust|didomi|trustarc|fundingchoices|fc-consent-root|sp_message_container)[^>]*>[\s\S]*?<\/form>/gi,
+    /<section[^>]+(?:consent|cookie|privacy|gdpr|onetrust|didomi|trustarc|fundingchoices|fc-consent-root|sp_message_container)[^>]*>[\s\S]*?<\/section>/gi,
+    /<div[^>]+(?:consent|cookie|privacy|gdpr|onetrust|didomi|trustarc|fundingchoices|fc-consent-root|sp_message_container)[^>]*>[\s\S]*?<\/div>/gi,
+    /<aside[^>]+(?:consent|cookie|privacy|gdpr|onetrust|didomi|trustarc|fundingchoices|fc-consent-root|sp_message_container)[^>]*>[\s\S]*?<\/aside>/gi,
+    /<dialog[^>]*>[\s\S]*?<\/dialog>/gi,
+    /<div[^>]+aria-modal=["']true["'][^>]*>[\s\S]*?<\/div>/gi,
+    /<div[^>]+role=["']dialog["'][^>]*>[\s\S]*?<\/div>/gi,
+    /<title>\s*(Before you continue|Datenschutz|Privacy settings|Cookie Settings|Consent)[\s\S]*?<\/title>/gi,
+  ].reduce((output, pattern) => output.replace(pattern, " "), html)
 }
