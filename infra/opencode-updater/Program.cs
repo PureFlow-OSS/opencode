@@ -170,6 +170,9 @@ sealed class McpConfigOptions
 
   [JsonPropertyName("oauth")]
   public McpOAuthConfigOptions? OAuth { get; set; }
+
+  [JsonPropertyName("auth")]
+  public McpManagedAuthOptions? Auth { get; set; }
 }
 
 sealed class McpOAuthConfigOptions
@@ -185,6 +188,27 @@ sealed class McpOAuthConfigOptions
 
   [JsonPropertyName("redirectUri")]
   public string? RedirectUri { get; set; }
+}
+
+sealed class McpManagedAuthOptions
+{
+  [JsonPropertyName("type")]
+  public string Type { get; set; } = "";
+
+  [JsonPropertyName("label")]
+  public string? Label { get; set; }
+
+  [JsonPropertyName("description")]
+  public string? Description { get; set; }
+
+  [JsonPropertyName("placeholder")]
+  public string? Placeholder { get; set; }
+
+  [JsonPropertyName("header")]
+  public string? Header { get; set; }
+
+  [JsonPropertyName("prefix")]
+  public string? Prefix { get; set; }
 }
 
 sealed class LocalFeed(string root)

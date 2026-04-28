@@ -1,9 +1,13 @@
 import { Button } from "@opencode-ai/ui/button"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { Dialog } from "@opencode-ai/ui/dialog"
 import { Tag } from "@opencode-ai/ui/tag"
+import { TextField } from "@opencode-ai/ui/text-field"
 import { showToast } from "@opencode-ai/ui/toast"
-import { createMemo, For, Show, type Component } from "solid-js"
+import { createMemo, createResource, For, Show, type Component } from "solid-js"
+import { createStore } from "solid-js/store"
 import { useParams } from "@solidjs/router"
+import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
 import { decode64 } from "@/utils/base64"
@@ -12,36 +16,219 @@ import { SettingsList } from "./settings-list"
 import type { McpLocalConfig, McpRemoteConfig } from "@opencode-ai/sdk/v2/client"
 
 type McpConfig = McpLocalConfig | McpRemoteConfig
+type ManagedAuth = {
+  type: "pat"
+  label?: string
+  description?: string
+  placeholder?: string
+  header?: string
+  prefix?: string
+}
+
+type ManagedServer = {
+  config: McpConfig
+  auth?: ManagedAuth
+}
+
 type ServerItem =
-  | { name: string; config: McpConfig; source: "local" }
-  | { name: string; source: "managed" }
+  | { name: string; source: "local"; config: McpConfig; status?: string }
+  | { name: string; source: "managed"; managed: ManagedServer; local?: McpConfig; status?: string }
+
+const MANAGED_MCP_CONFIG_URL = "http://10.53.7.23/opencode/provider-config.json"
+
+function DialogManagedMcpPat(props: {
+  name: string
+  managed: ManagedServer
+  current?: string
+  onSave: (token: string) => Promise<void>
+}) {
+  const dialog = useDialog()
+  const language = useLanguage()
+  const [store, setStore] = createStore({
+    token: props.current ?? "",
+    saving: false,
+  })
+
+  const save = async (e: SubmitEvent) => {
+    e.preventDefault()
+    const token = store.token.trim()
+    if (!token || store.saving) return
+    setStore("saving", true)
+    await props
+      .onSave(token)
+      .then(() => dialog.close())
+      .finally(() => setStore("saving", false))
+  }
+
+  return (
+    <Dialog title={props.managed.auth?.label ?? "PAT"} transition>
+      <form onSubmit={save} class="flex flex-col gap-4 px-2.5 pb-3">
+        <div class="text-14-regular text-text-weak">
+          {props.managed.auth?.description ?? "Enter your personal access token."}
+        </div>
+        <TextField
+          autofocus
+          type="password"
+          label={props.managed.auth?.label ?? "PAT"}
+          placeholder={props.managed.auth?.placeholder ?? "Personal access token"}
+          value={store.token}
+          onChange={(value) => setStore("token", value)}
+        />
+        <div class="flex gap-3">
+          <Button type="submit" size="large" variant="primary" disabled={!store.token.trim() || store.saving}>
+            {store.saving ? language.t("common.saving") : language.t("common.save")}
+          </Button>
+          <Button type="button" size="large" variant="ghost" onClick={() => dialog.close()}>
+            {language.t("common.cancel")}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  )
+}
 
 export const SettingsMcp: Component = () => {
   const dialog = useDialog()
   const language = useLanguage()
   const globalSync = useGlobalSync()
+  const globalSDK = useGlobalSDK()
   const params = useParams()
   const dir = createMemo(() => decode64(params.dir) ?? "")
   const child = createMemo(() => (dir() ? globalSync.child(dir())?.[0] : undefined))
+  const [managed] = createResource(async () => {
+    const payload = (await fetch(MANAGED_MCP_CONFIG_URL, {
+      signal: AbortSignal.timeout(3000),
+    })
+      .then((res) => (res.ok ? res.json() : undefined))
+      .catch(() => undefined)) as
+      | {
+          mcp?: Record<
+            string,
+            (McpConfig & {
+              auth?: ManagedAuth
+            }) | undefined
+          >
+        }
+      | undefined
+    return Object.fromEntries(
+      Object.entries(payload?.mcp ?? {}).flatMap(([name, config]) => {
+        if (!config || typeof config !== "object" || !("type" in config)) return []
+        if (config.type !== "local" && config.type !== "remote") return []
+        return [
+          [
+            name,
+            {
+              config:
+                config.type === "local"
+                  ? {
+                      type: "local" as const,
+                      command: config.command,
+                      environment: config.environment,
+                      enabled: config.enabled,
+                      timeout: config.timeout,
+                    }
+                  : {
+                      type: "remote" as const,
+                      url: config.url,
+                      headers: config.headers,
+                      oauth: config.oauth,
+                      enabled: config.enabled,
+                      timeout: config.timeout,
+                    },
+              auth: config.auth?.type === "pat" ? config.auth : undefined,
+            } satisfies ManagedServer,
+          ] as const,
+        ]
+      }),
+    ) as Record<string, ManagedServer>
+  })
 
-  const servers = createMemo(() =>
-    [
-      ...Object.entries(globalSync.data.config.mcp ?? {})
-        .filter(([, config]) => config.type === "local" || config.type === "remote")
-        .map(([name, config]) => ({ name, config: config as McpConfig, source: "local" as const })),
-      ...Object.keys(child()?.mcp ?? {})
-        .filter((name) => !(globalSync.data.config.mcp?.[name] && "type" in globalSync.data.config.mcp[name]!))
-        .map((name) => ({ name, source: "managed" as const })),
-    ]
-      .sort((a, b) => a.name.localeCompare(b.name)),
-  )
+  const servers = createMemo<ServerItem[]>(() => {
+    const items: ServerItem[] = []
+    const names = Array.from(
+      new Set([
+        ...Object.keys(globalSync.data.config.mcp ?? {}),
+        ...Object.keys(managed.latest ?? {}),
+        ...Object.keys(child()?.mcp ?? {}),
+      ]),
+    )
+    for (const name of names) {
+      const local = globalSync.data.config.mcp?.[name]
+      const managedServer = managed.latest?.[name]
+      const status = child()?.mcp?.[name]?.status
+      if (managedServer) {
+        items.push({
+          name,
+          source: "managed",
+          managed: managedServer,
+          local: local && "type" in local ? (local as McpConfig) : undefined,
+          status,
+        })
+        continue
+      }
+      if (!local || !("type" in local) || (local.type !== "local" && local.type !== "remote")) continue
+      items.push({
+        name,
+        source: "local",
+        config: local as McpConfig,
+        status,
+      })
+    }
+    items.sort((a, b) => a.name.localeCompare(b.name))
+    return items
+  })
 
   const subtitle = (server: ServerItem) =>
     server.source === "managed"
-      ? "Managed by updater server"
+      ? server.managed.config.type === "local"
+        ? server.managed.config.command.join(" ")
+        : server.managed.config.url
       : server.config.type === "local"
         ? server.config.command.join(" ")
         : server.config.url
+
+  const patValue = (server: Extract<ServerItem, { source: "managed" }>) => {
+    if (server.local?.type !== "remote") return ""
+    const header = server.managed.auth?.header ?? "Authorization"
+    const prefix = server.managed.auth?.prefix ?? ""
+    const value = server.local.headers?.[header] ?? ""
+    return prefix && value.startsWith(prefix) ? value.slice(prefix.length) : value
+  }
+  const asManaged = (server: ServerItem) => server as Extract<ServerItem, { source: "managed" }>
+
+  const refreshMcp = async () => {
+    if (!dir()) return
+    const result = await globalSDK.client.mcp.status()
+    if (!result.data) return
+    const [, setChild] = globalSync.child(dir(), { bootstrap: false })
+    setChild("mcp", result.data)
+    setChild("mcp_ready", true)
+  }
+
+  const saveManagedPat = async (server: Extract<ServerItem, { source: "managed" }>, token: string) => {
+    if (server.managed.config.type !== "remote") return
+    const header = server.managed.auth?.header ?? "Authorization"
+    const prefix = server.managed.auth?.prefix ?? ""
+    const existing = { ...(globalSync.data.config.mcp ?? {}) }
+    existing[server.name] = {
+      ...server.managed.config,
+      headers: {
+        ...(server.managed.config.headers ?? {}),
+        ...(server.local?.type === "remote" ? server.local.headers ?? {} : {}),
+        [header]: `${prefix}${token}`,
+      },
+      oauth: server.managed.config.oauth,
+    }
+    await globalSync.updateConfig({ mcp: existing })
+    await globalSDK.client.mcp.connect({ name: server.name }).catch(() => undefined)
+    await refreshMcp().catch(() => undefined)
+    showToast({
+      variant: "success",
+      icon: "circle-check",
+      title: `${server.name} connected`,
+      description: "Managed MCP token saved.",
+    })
+  }
 
   const deleteServer = async (name: string) => {
     const existing = { ...(globalSync.data.config.mcp ?? {}) }
@@ -106,7 +293,31 @@ export const SettingsMcp: Component = () => {
                   </div>
                   <Show
                     when={item.source === "local"}
-                    fallback={<div class="text-12-regular text-text-weak">Updater managed</div>}
+                    fallback={
+                      <div class="flex items-center gap-2">
+                        <Show when={item.status}>
+                          {(status) => <div class="text-12-regular text-text-weak">{status()}</div>}
+                        </Show>
+                        <Show when={asManaged(item).managed.auth?.type === "pat"}>
+                          <Button
+                            size="large"
+                            variant="ghost"
+                            onClick={() =>
+                              dialog.show(() => (
+                                <DialogManagedMcpPat
+                                  name={item.name}
+                                  managed={asManaged(item).managed}
+                                  current={patValue(asManaged(item))}
+                                  onSave={(token) => saveManagedPat(asManaged(item), token)}
+                                />
+                              ))
+                            }
+                          >
+                            {asManaged(item).local ? "Update token" : "Connect"}
+                          </Button>
+                        </Show>
+                      </div>
+                    }
                   >
                     <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                       <Button

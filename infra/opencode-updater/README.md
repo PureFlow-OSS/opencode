@@ -20,6 +20,72 @@ Endpoints:
 
 The updater can also serve provider-side rollout config for the desktop app.
 
+## Full sample config
+
+This is a complete example with:
+
+- RRZ AI Factory model rollout rules
+- managed MCP servers
+- PAT auth metadata for a managed DevOps MCP
+
+```json
+{
+  "Updater": {
+    "Version": "1.14.28",
+    "PublicBaseUrl": "http://10.53.7.23",
+    "ReleaseBaseUrlTemplate": "https://github.com/anomalyco/opencode/releases/download/v{{version}}",
+    "ProviderConfig": {
+      "aifactory": {
+        "model_limits": [
+          {
+            "pattern": "qwen*",
+            "context": 200000,
+            "output": 32000,
+            "temperature": true,
+            "reasoning": false
+          },
+          {
+            "pattern": "*",
+            "context": 60000,
+            "output": 32000,
+            "temperature": true
+          }
+        ]
+      },
+      "mcp": {
+        "rrz-docs": {
+          "type": "remote",
+          "url": "http://10.53.7.23/mcp/docs",
+          "enabled": true
+        },
+        "rrz-devops": {
+          "type": "remote",
+          "url": "http://10.53.7.23/mcp/devops",
+          "enabled": true,
+          "auth": {
+            "type": "pat",
+            "label": "DevOps PAT",
+            "description": "Enter your personal access token for the RRZ DevOps MCP.",
+            "placeholder": "Personal access token",
+            "header": "Authorization",
+            "prefix": "Bearer "
+          }
+        }
+      }
+    }
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+```
+
+## Model rollout example
+
 Example `appsettings.json`:
 
 ```json
@@ -68,6 +134,19 @@ You can also push managed MCP servers:
           "type": "remote",
           "url": "http://10.53.7.23/mcp/docs",
           "enabled": true
+        },
+        "rrz-devops": {
+          "type": "remote",
+          "url": "http://10.53.7.23/mcp/devops",
+          "enabled": true,
+          "auth": {
+            "type": "pat",
+            "label": "DevOps PAT",
+            "description": "Enter your personal access token for the RRZ DevOps MCP.",
+            "placeholder": "Personal access token",
+            "header": "Authorization",
+            "prefix": "Bearer "
+          }
         }
       }
     }
@@ -76,6 +155,33 @@ You can also push managed MCP servers:
 ```
 
 These MCP entries are runtime-managed by the updater feed. Local user config can still define its own MCP servers and will override pushed ones with the same name.
+
+Supported managed MCP auth metadata:
+
+- `auth.type = "pat"`
+- `auth.label`
+- `auth.description`
+- `auth.placeholder`
+- `auth.header`
+- `auth.prefix`
+
+## Env var example
+
+If you want to override a small part without replacing the full JSON file:
+
+```powershell
+$env:Updater__Version = "1.14.29"
+$env:Updater__ProviderConfig__aifactory__model_limits__0__pattern = "qwen*"
+$env:Updater__ProviderConfig__aifactory__model_limits__0__context = "200000"
+$env:Updater__ProviderConfig__aifactory__model_limits__1__pattern = "*"
+$env:Updater__ProviderConfig__aifactory__model_limits__1__context = "60000"
+$env:Updater__ProviderConfig__mcp__rrz-devops__type = "remote"
+$env:Updater__ProviderConfig__mcp__rrz-devops__url = "http://10.53.7.23/mcp/devops"
+$env:Updater__ProviderConfig__mcp__rrz-devops__auth__type = "pat"
+$env:Updater__ProviderConfig__mcp__rrz-devops__auth__label = "DevOps PAT"
+$env:Updater__ProviderConfig__mcp__rrz-devops__auth__header = "Authorization"
+$env:Updater__ProviderConfig__mcp__rrz-devops__auth__prefix = "Bearer "
+```
 
 Container image CI publishes to:
 

@@ -133,7 +133,9 @@ async function discoverManagedMcpConfig(fetchFn: typeof fetch = fetch) {
       }
       return Object.fromEntries(
         Object.entries(payload.mcp ?? {}).flatMap(([name, config]) => {
-          const parsed = ConfigMCP.Info.zod.safeParse(config)
+          if (!config || typeof config !== "object") return []
+          const { auth: _, ...rest } = config as Record<string, unknown>
+          const parsed = ConfigMCP.Info.zod.safeParse(rest)
           if (!parsed.success) return []
           return [[name, parsed.data] as const]
         }),
