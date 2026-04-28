@@ -82,10 +82,7 @@ export const WebFetchTool = Tool.define(
               "$ProgressPreference = 'SilentlyContinue'",
               `$headers = @{ 'User-Agent' = '${headers["User-Agent"]}'; 'Accept' = '${headers.Accept}'; 'Accept-Language' = '${headers["Accept-Language"]}' }`,
               `$response = Invoke-WebRequest -UseBasicParsing -Uri '${params.url}' -Headers $headers -Proxy '${proxy}' -ProxyUseDefaultCredentials -TimeoutSec ${Math.max(1, Math.ceil(timeout / 1000))}`,
-              "$result = @{",
-              "  content = $response.Content",
-              "  contentType = $response.Headers['Content-Type']",
-              "}",
+              "$result = @{ content = $response.Content; contentType = $response.Headers['Content-Type'] }",
               "$result | ConvertTo-Json -Compress",
             ].join("; ")
             const raw = yield* Effect.promise(() =>
