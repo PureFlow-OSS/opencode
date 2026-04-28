@@ -98,25 +98,81 @@ export const WebFetchTool = Tool.define(
               case "markdown":
                 if (contentType.includes("text/html")) {
                   return {
-                    output: convertHTMLToMarkdown(content),
+                    output: formatFetchedContent({
+                      url: params.url,
+                      format: params.format,
+                      contentType,
+                      content,
+                      output: convertHTMLToMarkdown(content),
+                    }),
                     title,
                     metadata: {},
                   }
                 }
-                return { output: content, title, metadata: {} }
+                return {
+                  output: formatFetchedContent({
+                    url: params.url,
+                    format: params.format,
+                    contentType,
+                    content,
+                    output: content,
+                  }),
+                  title,
+                  metadata: {},
+                }
 
               case "text":
                 if (contentType.includes("text/html")) {
                   const text = yield* Effect.promise(() => extractTextFromHTML(content))
-                  return { output: text, title, metadata: {} }
+                  return {
+                    output: formatFetchedContent({
+                      url: params.url,
+                      format: params.format,
+                      contentType,
+                      content,
+                      output: text,
+                    }),
+                    title,
+                    metadata: {},
+                  }
                 }
-                return { output: content, title, metadata: {} }
+                return {
+                  output: formatFetchedContent({
+                    url: params.url,
+                    format: params.format,
+                    contentType,
+                    content,
+                    output: content,
+                  }),
+                  title,
+                  metadata: {},
+                }
 
               case "html":
-                return { output: content, title, metadata: {} }
+                return {
+                  output: formatFetchedContent({
+                    url: params.url,
+                    format: params.format,
+                    contentType,
+                    content,
+                    output: content,
+                  }),
+                  title,
+                  metadata: {},
+                }
 
               default:
-                return { output: content, title, metadata: {} }
+                return {
+                  output: formatFetchedContent({
+                    url: params.url,
+                    format: params.format,
+                    contentType,
+                    content,
+                    output: content,
+                  }),
+                  title,
+                  metadata: {},
+                }
             }
           }
 
@@ -178,25 +234,81 @@ export const WebFetchTool = Tool.define(
               if (contentType.includes("text/html")) {
                 const markdown = convertHTMLToMarkdown(content)
                 return {
-                  output: markdown,
+                  output: formatFetchedContent({
+                    url: params.url,
+                    format: params.format,
+                    contentType,
+                    content,
+                    output: markdown,
+                  }),
                   title,
                   metadata: {},
                 }
               }
-              return { output: content, title, metadata: {} }
+              return {
+                output: formatFetchedContent({
+                  url: params.url,
+                  format: params.format,
+                  contentType,
+                  content,
+                  output: content,
+                }),
+                title,
+                metadata: {},
+              }
 
             case "text":
               if (contentType.includes("text/html")) {
                 const text = yield* Effect.promise(() => extractTextFromHTML(content))
-                return { output: text, title, metadata: {} }
+                return {
+                  output: formatFetchedContent({
+                    url: params.url,
+                    format: params.format,
+                    contentType,
+                    content,
+                    output: text,
+                  }),
+                  title,
+                  metadata: {},
+                }
               }
-              return { output: content, title, metadata: {} }
+              return {
+                output: formatFetchedContent({
+                  url: params.url,
+                  format: params.format,
+                  contentType,
+                  content,
+                  output: content,
+                }),
+                title,
+                metadata: {},
+              }
 
             case "html":
-              return { output: content, title, metadata: {} }
+              return {
+                output: formatFetchedContent({
+                  url: params.url,
+                  format: params.format,
+                  contentType,
+                  content,
+                  output: content,
+                }),
+                title,
+                metadata: {},
+              }
 
             default:
-              return { output: content, title, metadata: {} }
+              return {
+                output: formatFetchedContent({
+                  url: params.url,
+                  format: params.format,
+                  contentType,
+                  content,
+                  output: content,
+                }),
+                title,
+                metadata: {},
+              }
           }
         }).pipe(Effect.orDie),
     }
@@ -229,4 +341,48 @@ function convertHTMLToMarkdown(html: string): string {
   })
   turndownService.remove(["script", "style", "meta", "link"])
   return turndownService.turndown(html)
+}
+
+function formatFetchedContent(input: {
+  url: string
+  format: "text" | "markdown" | "html"
+  contentType: string
+  content: string
+  output: string
+}) {
+  if (input.output.trim()) return input.output
+
+  if (input.format === "html" && input.content.trim()) return input.content
+
+  const text = extractTextFallback(input.content)
+  if (text) return text
+
+  if (input.content.trim()) {
+    return [
+      `Fetched ${input.url} successfully, but the ${input.format} conversion produced no readable text.`,
+      `Content-Type: ${input.contentType || "unknown"}`,
+      `Raw content length: ${input.content.length} bytes`,
+    ].join("\n")
+  }
+
+  return [
+    `Fetched ${input.url} successfully, but the response body was empty.`,
+    `Content-Type: ${input.contentType || "unknown"}`,
+  ].join("\n")
+}
+
+function extractTextFallback(content: string) {
+  return content
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim()
 }
