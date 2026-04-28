@@ -14,6 +14,7 @@ jobs:
   build-exe:
     runs-on: windows-latest
     env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       OPENCODE_CHANNEL: prod
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +40,7 @@ jobs:
 
       - name: Package Windows EXE
         working-directory: packages/desktop-electron
-        run: bun run package:win
+        run: bunx electron-builder --win --publish never --config electron-builder.config.ts
 
       - name: Upload EXE artifacts
         uses: actions/upload-artifact@v4
