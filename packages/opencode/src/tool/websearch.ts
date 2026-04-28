@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect"
 import { HttpClient } from "effect/unstable/http"
+import { Config } from "@/config"
 import * as Tool from "./tool"
 import * as McpWebSearch from "./mcp-websearch"
 import DESCRIPTION from "./websearch.txt"
@@ -62,6 +63,7 @@ function callProvider(
   provider: WebSearchProvider,
   params: Schema.Schema.Type<typeof Parameters>,
   ctx: Tool.Context,
+  proxy?: string,
 ) {
   if (provider === "parallel") {
     return McpWebSearch.call(
@@ -93,6 +95,7 @@ function callProvider(
       contextMaxCharacters: params.contextMaxCharacters,
     },
     "25 seconds",
+    proxy ? { "X-Proxy": proxy } : undefined,
   )
 }
 
@@ -101,6 +104,7 @@ export const WebSearchTool = Tool.define(
   Effect.gen(function* () {
     const http = yield* HttpClient.HttpClient
     const flags = yield* RuntimeFlags.Service
+    const config = yield* Config.Service
 
     return {
       get description() {
@@ -130,7 +134,7 @@ export const WebSearchTool = Tool.define(
             },
           })
 
-          const result = yield* callProvider(http, provider, params, ctx)
+          const result = yield* callProvider(http, provider, params, ctx, (yield* config.get()).http_proxy)
 
           return {
             output: result ?? "No search results found. Please try a different query.",
