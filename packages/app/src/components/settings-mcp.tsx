@@ -3,28 +3,45 @@ import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { Tag } from "@opencode-ai/ui/tag"
 import { showToast } from "@opencode-ai/ui/toast"
 import { createMemo, For, Show, type Component } from "solid-js"
+import { useParams } from "@solidjs/router"
 import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
+import { decode64 } from "@/utils/base64"
 import { DialogMcpForm } from "./dialog-mcp-form"
 import { SettingsList } from "./settings-list"
 import type { McpLocalConfig, McpRemoteConfig } from "@opencode-ai/sdk/v2/client"
 
 type McpConfig = McpLocalConfig | McpRemoteConfig
+type ServerItem =
+  | { name: string; config: McpConfig; source: "local" }
+  | { name: string; source: "managed" }
 
 export const SettingsMcp: Component = () => {
   const dialog = useDialog()
   const language = useLanguage()
   const globalSync = useGlobalSync()
+  const params = useParams()
+  const dir = createMemo(() => decode64(params.dir) ?? "")
+  const child = createMemo(() => (dir() ? globalSync.child(dir())?.[0] : undefined))
 
   const servers = createMemo(() =>
-    Object.entries(globalSync.data.config.mcp ?? {})
-      .filter(([, config]) => config.type === "local" || config.type === "remote")
-      .map(([name, config]) => ({ name, config: config as McpConfig }))
+    [
+      ...Object.entries(globalSync.data.config.mcp ?? {})
+        .filter(([, config]) => config.type === "local" || config.type === "remote")
+        .map(([name, config]) => ({ name, config: config as McpConfig, source: "local" as const })),
+      ...Object.keys(child()?.mcp ?? {})
+        .filter((name) => !(globalSync.data.config.mcp?.[name] && "type" in globalSync.data.config.mcp[name]!))
+        .map((name) => ({ name, source: "managed" as const })),
+    ]
       .sort((a, b) => a.name.localeCompare(b.name)),
   )
 
-  const subtitle = (config: McpConfig) =>
-    config.type === "local" ? config.command.join(" ") : config.url
+  const subtitle = (server: ServerItem) =>
+    server.source === "managed"
+      ? "Managed by updater server"
+      : server.config.type === "local"
+        ? server.config.command.join(" ")
+        : server.config.url
 
   const deleteServer = async (name: string) => {
     const existing = { ...(globalSync.data.config.mcp ?? {}) }
@@ -78,25 +95,34 @@ export const SettingsMcp: Component = () => {
                     <div class="flex items-center gap-2">
                       <span class="text-14-medium text-text-strong truncate">{item.name}</span>
                       <Tag>
-                        {item.config.type === "local"
-                          ? language.t("settings.mcp.server.type.local")
-                          : language.t("settings.mcp.server.type.remote")}
+                        {item.source === "managed"
+                          ? "Managed"
+                          : item.config.type === "local"
+                            ? language.t("settings.mcp.server.type.local")
+                            : language.t("settings.mcp.server.type.remote")}
                       </Tag>
                     </div>
-                    <span class="text-12-regular text-text-weak truncate">{subtitle(item.config)}</span>
+                    <span class="text-12-regular text-text-weak truncate">{subtitle(item)}</span>
                   </div>
-                  <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <Button
-                      size="large"
-                      variant="ghost"
-                      onClick={() => dialog.show(() => <DialogMcpForm name={item.name} config={item.config} />)}
-                    >
-                      {language.t("common.edit")}
-                    </Button>
-                    <Button size="large" variant="ghost" onClick={() => void deleteServer(item.name)}>
-                      {language.t("common.delete")}
-                    </Button>
-                  </div>
+                  <Show
+                    when={item.source === "local"}
+                    fallback={<div class="text-12-regular text-text-weak">Updater managed</div>}
+                  >
+                    <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <Button
+                        size="large"
+                        variant="ghost"
+                        onClick={() =>
+                          dialog.show(() => <DialogMcpForm name={item.name} config={(item as Extract<ServerItem, { source: "local" }>).config} />)
+                        }
+                      >
+                        {language.t("common.edit")}
+                      </Button>
+                      <Button size="large" variant="ghost" onClick={() => void deleteServer(item.name)}>
+                        {language.t("common.delete")}
+                      </Button>
+                    </div>
+                  </Show>
                 </div>
               )}
             </For>

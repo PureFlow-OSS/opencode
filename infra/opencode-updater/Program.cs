@@ -116,6 +116,9 @@ sealed class ProviderConfigOptions
 {
   [JsonPropertyName("aifactory")]
   public AiFactoryConfigOptions AiFactory { get; set; } = new();
+
+  [JsonPropertyName("mcp")]
+  public Dictionary<string, McpConfigOptions> Mcp { get; set; } = [];
 }
 
 sealed class AiFactoryConfigOptions
@@ -140,6 +143,48 @@ sealed class ModelLimitRuleOptions
 
   [JsonPropertyName("reasoning")]
   public bool? Reasoning { get; set; }
+}
+
+sealed class McpConfigOptions
+{
+  [JsonPropertyName("type")]
+  public string Type { get; set; } = "";
+
+  [JsonPropertyName("enabled")]
+  public bool? Enabled { get; set; }
+
+  [JsonPropertyName("timeout")]
+  public int? Timeout { get; set; }
+
+  [JsonPropertyName("environment")]
+  public Dictionary<string, string>? Environment { get; set; }
+
+  [JsonPropertyName("command")]
+  public string[]? Command { get; set; }
+
+  [JsonPropertyName("url")]
+  public string? Url { get; set; }
+
+  [JsonPropertyName("headers")]
+  public Dictionary<string, string>? Headers { get; set; }
+
+  [JsonPropertyName("oauth")]
+  public McpOAuthConfigOptions? OAuth { get; set; }
+}
+
+sealed class McpOAuthConfigOptions
+{
+  [JsonPropertyName("clientId")]
+  public string? ClientId { get; set; }
+
+  [JsonPropertyName("clientSecret")]
+  public string? ClientSecret { get; set; }
+
+  [JsonPropertyName("scope")]
+  public string? Scope { get; set; }
+
+  [JsonPropertyName("redirectUri")]
+  public string? RedirectUri { get; set; }
 }
 
 sealed class LocalFeed(string root)

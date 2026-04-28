@@ -57,6 +57,26 @@ Supported per-rule overrides:
 - `temperature`
 - `reasoning`
 
+You can also push managed MCP servers:
+
+```json
+{
+  "Updater": {
+    "ProviderConfig": {
+      "mcp": {
+        "rrz-docs": {
+          "type": "remote",
+          "url": "http://10.53.7.23/mcp/docs",
+          "enabled": true
+        }
+      }
+    }
+  }
+}
+```
+
+These MCP entries are runtime-managed by the updater feed. Local user config can still define its own MCP servers and will override pushed ones with the same name.
+
 Container image CI publishes to:
 
 `ghcr.io/<owner>/opencode-updater`
