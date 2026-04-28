@@ -26,7 +26,8 @@ const channel = (() => {
   return "dev"
 })()
 
-const skipWinSigntool = process.env.OPENCODE_SKIP_WIN_SIGNTOOLS === "true"
+const shouldUseWindowsSignScript = process.platform === "win32" && process.env.GITHUB_ACTIONS === "true"
+const shouldEditWindowsExecutable = process.env.OPENCODE_EDIT_EXECUTABLE !== "false"
 const outputDir = process.env.OPENCODE_ELECTRON_OUTPUT_DIR?.trim() || "dist"
 
 const getBase = (): Configuration => ({
@@ -62,10 +63,14 @@ const getBase = (): Configuration => ({
   },
   win: {
     icon: `resources/icons/icon.ico`,
-    signAndEditExecutable: !skipWinSigntool,
-    signtoolOptions: {
-      sign: signWindows,
-    },
+    signAndEditExecutable: shouldEditWindowsExecutable,
+    ...(shouldUseWindowsSignScript
+      ? {
+          signtoolOptions: {
+            sign: signWindows,
+          },
+        }
+      : {}),
     target: ["nsis"],
   },
   nsis: {

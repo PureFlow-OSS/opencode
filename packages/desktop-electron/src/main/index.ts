@@ -32,7 +32,21 @@ const appId = app.isPackaged ? APP_IDS[CHANNEL] : "ai.opencode.desktop.dev"
 app.setName(app.isPackaged ? APP_NAMES[CHANNEL] : "OpenCode Dev")
 app.setAppUserModelId(appId)
 app.setPath("userData", join(app.getPath("appData"), appId))
-const { autoUpdater } = pkg
+const updateCacheRoot =
+  process.platform === "win32" ? process.env.OPENCODE_UPDATE_CACHE_DIR?.trim() || "C:/Entwicklung" : undefined
+const autoUpdater = pkg.autoUpdater
+
+if (process.platform === "win32" && updateCacheRoot) {
+  const appAdapter = Reflect.get(autoUpdater, "app")
+  if (appAdapter && typeof appAdapter === "object") {
+    Object.defineProperty(appAdapter, "baseCachePath", {
+      configurable: true,
+      get() {
+        return updateCacheRoot
+      },
+    })
+  }
+}
 
 import type { InitStep, ServerReadyData, SqliteMigrationProgress, WslConfig } from "../preload/types"
 import { checkAppExists, resolveAppPath, wslPath } from "./apps"
@@ -330,11 +344,13 @@ function setupAutoUpdater() {
   autoUpdater.allowDowngrade = true
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.disableWebInstaller = true
   logger.log("auto updater configured", {
     channel: autoUpdater.channel,
     allowPrerelease: autoUpdater.allowPrerelease,
     allowDowngrade: autoUpdater.allowDowngrade,
     currentVersion: app.getVersion(),
+    cacheRoot: updateCacheRoot ?? null,
   })
 }
 

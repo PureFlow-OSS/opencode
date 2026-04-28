@@ -32,6 +32,8 @@ tsconfig.tsbuildinfo
 
 # Local updater and packaging artifacts
 .tmp/
+packages/dist*/
+packages/**/dist*/
 infra/opencode-updater/feed/*
 !infra/opencode-updater/feed/.gitkeep
 !infra/opencode-updater/feed/latest.example.yml
