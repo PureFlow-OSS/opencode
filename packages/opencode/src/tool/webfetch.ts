@@ -1,14 +1,17 @@
 import { Effect, Schema } from "effect"
 import { HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { Parser } from "htmlparser2"
+import { Config } from "@/config"
 import * as Tool from "./tool"
 import TurndownService from "turndown"
 import DESCRIPTION from "./webfetch.txt"
 import { isImageAttachment } from "@/util/media"
+import * as Process from "@/util/process"
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5MB
 const DEFAULT_TIMEOUT = 30 * 1000 // 30 seconds
 const MAX_TIMEOUT = 120 * 1000 // 2 minutes
+const envProxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.https_proxy || process.env.http_proxy
 
 export const Parameters = Schema.Struct({
   url: Schema.String.annotate({ description: "The URL to fetch content from" }),
@@ -26,6 +29,7 @@ export const WebFetchTool = Tool.define(
   Effect.gen(function* () {
     const http = yield* HttpClient.HttpClient
     const httpOk = HttpClient.filterStatusOk(http)
+    const config = yield* Config.Service
 
     return {
       description: DESCRIPTION,
@@ -71,6 +75,53 @@ export const WebFetchTool = Tool.define(
               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
             Accept: acceptHeader,
             "Accept-Language": "en-US,en;q=0.9",
+          }
+
+          const proxy = (yield* config.get()).http_proxy ?? envProxy
+
+          if (process.platform === "win32" && proxy) {
+            const script = [
+              "$ProgressPreference = 'SilentlyContinue'",
+              `$headers = @{ 'User-Agent' = '${headers["User-Agent"]}'; 'Accept' = '${headers.Accept}'; 'Accept-Language' = '${headers["Accept-Language"]}' }`,
+              `$response = Invoke-WebRequest -UseBasicParsing -Uri '${params.url}' -Headers $headers -Proxy '${proxy}' -ProxyUseDefaultCredentials -TimeoutSec ${Math.max(1, Math.ceil(timeout / 1000))}`,
+              "$result = @{ content = $response.Content; contentType = $response.Headers['Content-Type'] }",
+              "$result | ConvertTo-Json -Compress",
+            ].join("; ")
+            const raw = yield* Effect.promise(() =>
+              Process.text(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script]),
+            )
+            const parsed = JSON.parse(raw.text) as {
+              content?: string
+              contentType?: string
+            }
+            const content = parsed.content ?? ""
+            const contentType = parsed.contentType ?? ""
+            const title = `${params.url} (${contentType})`
+
+            switch (params.format) {
+              case "markdown":
+                if (contentType.includes("text/html")) {
+                  return {
+                    output: convertHTMLToMarkdown(content),
+                    title,
+                    metadata: {},
+                  }
+                }
+                return { output: content, title, metadata: {} }
+
+              case "text":
+                if (contentType.includes("text/html")) {
+                  const text = yield* Effect.promise(() => extractTextFromHTML(content))
+                  return { output: text, title, metadata: {} }
+                }
+                return { output: content, title, metadata: {} }
+
+              case "html":
+                return { output: content, title, metadata: {} }
+
+              default:
+                return { output: content, title, metadata: {} }
+            }
           }
 
           const request = HttpClientRequest.get(params.url).pipe(HttpClientRequest.setHeaders(headers))
