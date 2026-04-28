@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect"
 import { HttpClient } from "effect/unstable/http"
+import { Config } from "@/config"
 import * as Tool from "./tool"
 import * as McpExa from "./mcp-exa"
 import DESCRIPTION from "./websearch.txt"
@@ -25,6 +26,7 @@ export const WebSearchTool = Tool.define(
   "websearch",
   Effect.gen(function* () {
     const http = yield* HttpClient.HttpClient
+    const config = yield* Config.Service
 
     return {
       get description() {
@@ -58,6 +60,7 @@ export const WebSearchTool = Tool.define(
               contextMaxCharacters: params.contextMaxCharacters,
             },
             "25 seconds",
+            (yield* config.get()).http_proxy,
           )
 
           return {
