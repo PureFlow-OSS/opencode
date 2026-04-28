@@ -82,18 +82,16 @@ export const WebFetchTool = Tool.define(
               "$ProgressPreference = 'SilentlyContinue'",
               `$headers = @{ 'User-Agent' = '${headers["User-Agent"]}'; 'Accept' = '${headers.Accept}'; 'Accept-Language' = '${headers["Accept-Language"]}' }`,
               `$response = Invoke-WebRequest -UseBasicParsing -Uri '${params.url}' -Headers $headers -Proxy '${proxy}' -ProxyUseDefaultCredentials -TimeoutSec ${Math.max(1, Math.ceil(timeout / 1000))}`,
-              "$result = @{ content = $response.Content; contentType = $response.Headers['Content-Type'] }",
-              "$result | ConvertTo-Json -Compress",
+              "$content = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$response.Content))",
+              "$contentType = [string]$response.Headers['Content-Type']",
+              "Write-Output $contentType",
+              "Write-Output $content",
             ].join("; ")
             const raw = yield* Effect.promise(() =>
               Process.text(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script]),
             )
-            const parsed = JSON.parse(raw.text) as {
-              content?: string
-              contentType?: string
-            }
-            const content = parsed.content ?? ""
-            const contentType = parsed.contentType ?? ""
+            const [contentType = "", encoded = ""] = raw.text.replace(/\r/g, "").trimEnd().split("\n", 2)
+            const content = Buffer.from(encoded, "base64").toString("utf8")
             const title = `${params.url} (${contentType})`
 
             switch (params.format) {
@@ -206,35 +204,19 @@ export const WebFetchTool = Tool.define(
 )
 
 async function extractTextFromHTML(html: string) {
-  let text = ""
-  let skipContent = false
-
-  const rewriter = new HTMLRewriter()
-    .on("script, style, noscript, iframe, object, embed", {
-      element() {
-        skipContent = true
-      },
-      text() {
-        // Skip text content inside these elements
-      },
-    })
-    .on("*", {
-      element(element) {
-        // Reset skip flag when entering other elements
-        if (!["script", "style", "noscript", "iframe", "object", "embed"].includes(element.tagName)) {
-          skipContent = false
-        }
-      },
-      text(input) {
-        if (!skipContent) {
-          text += input.text
-        }
-      },
-    })
-    .transform(new Response(html))
-
-  await rewriter.text()
-  return text.trim()
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim()
 }
 
 function convertHTMLToMarkdown(html: string): string {
