@@ -86,6 +86,16 @@ function fileSearchTerms(filepath: string, mime: string) {
     .map((term) => term.toLowerCase())
 }
 
+function decodeDataUrlBytes(url: string) {
+  const idx = url.indexOf(",")
+  if (idx === -1) return new Uint8Array()
+
+  const head = url.slice(0, idx)
+  const body = url.slice(idx + 1)
+  if (head.includes(";base64")) return Buffer.from(body, "base64")
+  return Buffer.from(decodeURIComponent(body))
+}
+
 export interface Interface {
   readonly cancel: (sessionID: SessionID) => Effect.Effect<void>
   readonly prompt: (input: PromptInput) => Effect.Effect<MessageV2.WithParts>
@@ -1020,6 +1030,55 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                     text: decodeDataUrl(part.url),
                   },
                   { ...part, messageID: info.id, sessionID: input.sessionID },
+                ]
+              }
+              if (!isModelReadableFile(part.mime)) {
+                const filename = part.filename ?? "attachment"
+                const target = path.join(UNSUPPORTED_DROP_DIR, path.basename(filename))
+                const exit = yield* fsys.writeWithDirs(target, decodeDataUrlBytes(part.url)).pipe(Effect.exit)
+                if (Exit.isFailure(exit)) {
+                  const error = Cause.squash(exit.cause)
+                  log.error("failed to write unsupported data attachment", { error, target })
+                  const message = error instanceof Error ? error.message : String(error)
+                  return [
+                    {
+                      messageID: info.id,
+                      sessionID: input.sessionID,
+                      type: "text",
+                      synthetic: true,
+                      text: `Failed to prepare unsupported attachment ${filename} for MCP processing: ${message}`,
+                    },
+                  ]
+                }
+
+                const terms = fileSearchTerms(filename, part.mime)
+                const matchingTools = Object.entries(yield* mcp.tools())
+                  .filter(([name, tool]) => {
+                    const description =
+                      typeof (tool as { description?: unknown }).description === "string"
+                        ? (tool as { description: string }).description
+                        : ""
+                    const haystack = `${name} ${description}`.toLowerCase()
+                    return terms.some((term) => haystack.includes(term))
+                  })
+                  .map(([name]) => name)
+                  .slice(0, 8)
+
+                return [
+                  {
+                    messageID: info.id,
+                    sessionID: input.sessionID,
+                    type: "text",
+                    synthetic: true,
+                    text: [
+                      `The dropped file "${filename}" has type ${part.mime}, which opencode cannot read directly.`,
+                      `It was copied to ${target}.`,
+                      `Search the available MCP tools for methods matching this file type using these terms: ${terms.join(", ")}.`,
+                      matchingTools.length
+                        ? `Likely matching MCP tools: ${matchingTools.join(", ")}. Call the most appropriate MCP tool with the copied file path when the user asks about this file.`
+                        : "No obviously matching MCP tools were found by name or description; inspect the available MCP tools and call the one that handles this file type with the copied file path.",
+                    ].join("\n"),
+                  },
                 ]
               }
               break

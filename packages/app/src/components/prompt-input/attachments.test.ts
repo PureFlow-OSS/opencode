@@ -18,9 +18,11 @@ describe("attachmentMime", () => {
     expect(await attachmentMime(file)).toBe("text/plain")
   })
 
-  test("rejects binary files", async () => {
-    const file = new File([Uint8Array.of(0, 255, 1, 2)], "blob.bin", { type: "application/octet-stream" })
-    expect(await attachmentMime(file)).toBeUndefined()
+  test("keeps binary files for MCP-backed processing", async () => {
+    const file = new File([Uint8Array.of(0, 255, 1, 2)], "workbook.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    })
+    expect(await attachmentMime(file)).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
   })
 })
 

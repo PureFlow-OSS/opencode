@@ -250,7 +250,7 @@ export const dict = {
   "prompt.example.25": "Wie funktionieren Umgebungsvariablen hier?",
   "prompt.popover.emptyResults": "Keine passenden Ergebnisse",
   "prompt.popover.emptyCommands": "Keine passenden Befehle",
-  "prompt.dropzone.label": "Bilder, PDFs oder Textdateien hier ablegen",
+  "prompt.dropzone.label": "Dateien hier ablegen",
   "prompt.dropzone.file.label": "Ablegen zum @Erwähnen der Datei",
   "prompt.slash.badge.custom": "benutzerdefiniert",
   "prompt.slash.badge.skill": "Skill",
@@ -264,7 +264,7 @@ export const dict = {
   "prompt.action.send": "Senden",
   "prompt.action.stop": "Stopp",
   "prompt.toast.pasteUnsupported.title": "Nicht unterstützter Anhang",
-  "prompt.toast.pasteUnsupported.description": "Hier können nur Bilder, PDFs oder Textdateien angehängt werden.",
+  "prompt.toast.pasteUnsupported.description": "Diese Datei konnte nicht angehängt werden.",
   "prompt.toast.modelAgentRequired.title": "Wählen Sie einen Agenten und ein Modell",
   "prompt.toast.modelAgentRequired.description":
     "Wählen Sie einen Agenten und ein Modell, bevor Sie eine Eingabe senden.",

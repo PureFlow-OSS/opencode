@@ -1744,6 +1744,50 @@ it.live("copies unsupported dropped files for MCP processing", () =>
   ),
 )
 
+it.live("copies unsupported data attachments for MCP processing", () =>
+  provideTmpdirInstance(
+    () =>
+      Effect.gen(function* () {
+        const prompt = yield* SessionPrompt.Service
+        const sessions = yield* Session.Service
+        const session = yield* sessions.create({})
+        const msg = yield* prompt.prompt({
+          sessionID: session.id,
+          agent: "build",
+          noReply: true,
+          parts: [
+            {
+              type: "file",
+              mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              url: "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,ZmFrZSB3b3JrYm9vaw==",
+              filename: "upload.xlsx",
+            },
+          ],
+        })
+
+        const target = path.join(
+          process.platform === "win32" ? "C:\\Temp" : path.join(os.tmpdir(), "opencode-unsupported"),
+          "upload.xlsx",
+        )
+        expect(yield* Effect.promise(() => Bun.file(target).text())).toBe("fake workbook")
+        expect(
+          msg.parts.some(
+            (part) =>
+              part.type === "text" &&
+              part.synthetic &&
+              part.text.includes(`It was copied to ${target}`) &&
+              part.text.includes("excel") &&
+              part.text.includes("spreadsheet"),
+          ),
+        ).toBe(true)
+        expect(msg.parts.some((part) => part.type === "file")).toBe(false)
+
+        yield* sessions.remove(session.id)
+      }),
+    { git: true, config: cfg },
+  ),
+)
+
 // Special characters in filenames
 
 it.live("handles filenames with # character", () =>

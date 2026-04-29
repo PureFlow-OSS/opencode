@@ -50,6 +50,8 @@ export const ACCEPTED_FILE_TYPES = [
   ".tsx",
   ".txt",
   ".xml",
+  ".xls",
+  ".xlsx",
   ".yaml",
   ".yml",
   ".zsh",
