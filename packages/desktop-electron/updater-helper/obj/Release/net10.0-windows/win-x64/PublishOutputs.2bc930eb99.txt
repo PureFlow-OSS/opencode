@@ -1,0 +1,2 @@
+C:\Users\Klaus\Desktop\PFH\opencode\packages\desktop-electron\build\updater-helper\win-x64\OpenCode.UpdaterHelper.pdb
+C:\Users\Klaus\Desktop\PFH\opencode\packages\desktop-electron\build\updater-helper\win-x64\OpenCode.UpdaterHelper.exe

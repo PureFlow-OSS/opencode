@@ -43,6 +43,15 @@ const getBase = (): Configuration => ({
       to: "native/",
       filter: ["index.js", "index.d.ts", "build/Release/mac_window.node", "swift-build/**"],
     },
+    ...(process.platform === "win32"
+      ? [
+          {
+            from: "build/updater-helper/win-x64/",
+            to: "updater-helper/",
+            filter: ["OpenCode.UpdaterHelper.exe"],
+          },
+        ]
+      : []),
   ],
   mac: {
     category: "public.app-category.developer-tools",
