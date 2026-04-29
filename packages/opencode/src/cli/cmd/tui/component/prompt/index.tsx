@@ -2,7 +2,7 @@ import { BoxRenderable, RGBA, TextareaRenderable, MouseEvent, PasteEvent, decode
 import { createEffect, createMemo, onMount, createSignal, onCleanup, on, Show, Switch, Match } from "solid-js"
 import "opentui-spinner/solid"
 import path from "path"
-import { fileURLToPath } from "url"
+import { fileURLToPath, pathToFileURL } from "url"
 import { Filesystem } from "@/util"
 import { useLocal } from "@tui/context/local"
 import { tint, useTheme } from "@tui/context/theme"
@@ -937,6 +937,47 @@ export function Prompt(props: PromptProps) {
     return
   }
 
+  async function pasteFileReference(file: { filename: string; filepath: string; mime: string }) {
+    const currentOffset = input.visualCursor.offset
+    const extmarkStart = currentOffset
+    const count = store.prompt.parts.filter((x) => x.type === "file" && !x.mime.startsWith("image/")).length
+    const virtualText = `[File ${count + 1}: ${file.filename}]`
+    const extmarkEnd = extmarkStart + virtualText.length
+
+    input.insertText(virtualText + " ")
+
+    const extmarkId = input.extmarks.create({
+      start: extmarkStart,
+      end: extmarkEnd,
+      virtual: true,
+      styleId: pasteStyleId,
+      typeId: promptPartTypeId,
+    })
+
+    const part: Omit<FilePart, "id" | "messageID" | "sessionID"> = {
+      type: "file" as const,
+      mime: file.mime,
+      filename: file.filename,
+      url: pathToFileURL(file.filepath).href,
+      source: {
+        type: "file",
+        path: file.filepath,
+        text: {
+          start: extmarkStart,
+          end: extmarkEnd,
+          value: virtualText,
+        },
+      },
+    }
+    setStore(
+      produce((draft) => {
+        const partIndex = draft.prompt.parts.length
+        draft.prompt.parts.push(part)
+        draft.extmarkToPartIndex.set(extmarkId, partIndex)
+      }),
+    )
+  }
+
   const highlight = createMemo(() => {
     if (keybind.leader) return theme.border
     if (store.mode === "shell") return theme.primary
@@ -1190,6 +1231,14 @@ export function Prompt(props: PromptProps) {
                         })
                         return
                       }
+                    }
+                    if (await Filesystem.exists(filepath)) {
+                      await pasteFileReference({
+                        filename,
+                        filepath,
+                        mime,
+                      })
+                      return
                     }
                   } catch {}
                 }

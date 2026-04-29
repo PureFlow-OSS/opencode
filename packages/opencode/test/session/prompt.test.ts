@@ -3,6 +3,7 @@ import { FetchHttpClient } from "effect/unstable/http"
 import { expect } from "bun:test"
 import { Cause, Effect, Exit, Fiber, Layer } from "effect"
 import path from "path"
+import os from "os"
 import { fileURLToPath } from "url"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { Agent as AgentSvc } from "../../src/agent/agent"
@@ -1689,6 +1690,53 @@ it.live("keeps stored part order stable when file resolution is async", () =>
         expect(text[0]?.startsWith("Called the Read tool with the following input:")).toBe(true)
         expect(text[1]?.includes("Read tool failed to read")).toBe(true)
         expect(text[2]).toBe("after-file")
+
+        yield* sessions.remove(session.id)
+      }),
+    { git: true, config: cfg },
+  ),
+)
+
+it.live("copies unsupported dropped files for MCP processing", () =>
+  provideTmpdirInstance(
+    (dir) =>
+      Effect.gen(function* () {
+        const source = path.join(dir, "workbook.xlsx")
+        yield* Effect.promise(() => Bun.write(source, "fake workbook"))
+
+        const prompt = yield* SessionPrompt.Service
+        const sessions = yield* Session.Service
+        const session = yield* sessions.create({})
+        const msg = yield* prompt.prompt({
+          sessionID: session.id,
+          agent: "build",
+          noReply: true,
+          parts: [
+            {
+              type: "file",
+              mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              url: `file://${source}`,
+              filename: "workbook.xlsx",
+            },
+          ],
+        })
+
+        const target = path.join(
+          process.platform === "win32" ? "C:\\Temp" : path.join(os.tmpdir(), "opencode-unsupported"),
+          "workbook.xlsx",
+        )
+        expect(yield* Effect.promise(() => Bun.file(target).exists())).toBe(true)
+        expect(
+          msg.parts.some(
+            (part) =>
+              part.type === "text" &&
+              part.synthetic &&
+              part.text.includes(`It was copied to ${target}`) &&
+              part.text.includes("excel") &&
+              part.text.includes("spreadsheet"),
+          ),
+        ).toBe(true)
+        expect(msg.parts.some((part) => part.type === "file")).toBe(false)
 
         yield* sessions.remove(session.id)
       }),

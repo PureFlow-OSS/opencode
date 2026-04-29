@@ -68,6 +68,23 @@ const STRUCTURED_OUTPUT_SYSTEM_PROMPT = `IMPORTANT: The user has requested struc
 
 const log = Log.create({ service: "session.prompt" })
 const elog = EffectLogger.create({ service: "session.prompt" })
+const UNSUPPORTED_DROP_DIR = process.platform === "win32" ? "C:\\Temp" : path.join(os.tmpdir(), "opencode-unsupported")
+
+function isModelReadableFile(mime: string) {
+  return (
+    mime === "text/plain" ||
+    mime === "application/x-directory" ||
+    mime === "application/pdf" ||
+    mime.startsWith("image/")
+  )
+}
+
+function fileSearchTerms(filepath: string, mime: string) {
+  const ext = path.extname(filepath).toLowerCase().slice(1)
+  return [ext, mime, path.basename(filepath), ...(ext === "xls" || ext === "xlsx" ? ["excel", "spreadsheet"] : [])]
+    .filter((term) => term.length > 0)
+    .map((term) => term.toLowerCase())
+}
 
 export interface Interface {
   readonly cancel: (sessionID: SessionID) => Effect.Effect<void>
@@ -1144,6 +1161,58 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                     text: exit.value.output,
                   },
                   { ...part, messageID: info.id, sessionID: input.sessionID },
+                ]
+              }
+
+              if (!isModelReadableFile(part.mime)) {
+                const target = path.join(UNSUPPORTED_DROP_DIR, path.basename(filepath))
+                const exit = yield* fsys.readFile(filepath).pipe(
+                  Effect.flatMap((content) => fsys.writeWithDirs(target, content)),
+                  Effect.exit,
+                )
+                if (Exit.isFailure(exit)) {
+                  const error = Cause.squash(exit.cause)
+                  log.error("failed to copy unsupported file", { error, filepath, target })
+                  const message = error instanceof Error ? error.message : String(error)
+                  return [
+                    {
+                      messageID: info.id,
+                      sessionID: input.sessionID,
+                      type: "text",
+                      synthetic: true,
+                      text: `Failed to prepare unsupported file ${filepath} for MCP processing: ${message}`,
+                    },
+                  ]
+                }
+
+                const terms = fileSearchTerms(filepath, part.mime)
+                const matchingTools = Object.entries(yield* mcp.tools())
+                  .filter(([name, tool]) => {
+                    const description =
+                      typeof (tool as { description?: unknown }).description === "string"
+                        ? (tool as { description: string }).description
+                        : ""
+                    const haystack = `${name} ${description}`.toLowerCase()
+                    return terms.some((term) => haystack.includes(term))
+                  })
+                  .map(([name]) => name)
+                  .slice(0, 8)
+
+                return [
+                  {
+                    messageID: info.id,
+                    sessionID: input.sessionID,
+                    type: "text",
+                    synthetic: true,
+                    text: [
+                      `The dropped file "${part.filename ?? path.basename(filepath)}" has type ${part.mime}, which opencode cannot read directly.`,
+                      `It was copied to ${target}.`,
+                      `Search the available MCP tools for methods matching this file type using these terms: ${terms.join(", ")}.`,
+                      matchingTools.length
+                        ? `Likely matching MCP tools: ${matchingTools.join(", ")}. Call the most appropriate MCP tool with the copied file path when the user asks about this file.`
+                        : "No obviously matching MCP tools were found by name or description; inspect the available MCP tools and call the one that handles this file type with the copied file path.",
+                    ].join("\n"),
+                  },
                 ]
               }
 
