@@ -8,6 +8,7 @@ import { createMemo, type Component, For, Show } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
+import { normalizeProviderList } from "@/context/global-sync/utils"
 import { DialogConnectProvider } from "./dialog-connect-provider"
 import { DialogSelectProvider } from "./dialog-select-provider"
 import { DialogCustomProvider } from "./dialog-custom-provider"
@@ -112,6 +113,18 @@ const SettingsProvidersContent: Component = () => {
       })
   }
 
+  const fallbackModel = (provider: ReturnType<typeof normalizeProviderList>) => {
+    for (const item of provider.connected) {
+      const modelID = provider.default[item]
+      if (modelID) return `${item}/${modelID}`
+    }
+    const first = provider.all.find((item) => provider.connected.includes(item.id) && Object.keys(item.models).length > 0)
+    if (!first) return
+    const modelID = Object.values(first.models)[0]?.id
+    if (!modelID) return
+    return `${first.id}/${modelID}`
+  }
+
   const disconnect = async (providerID: string, name: string) => {
     if (isConfigCustom(providerID)) {
       await serverSDK()
@@ -120,21 +133,31 @@ const SettingsProvidersContent: Component = () => {
       await disableProvider(providerID, name)
       return
     }
-    await serverSDK()
-      .client.auth.remove({ providerID })
-      .then(async () => {
-        await serverSDK().client.global.dispose()
-        showToast({
-          variant: "success",
-          icon: "circle-check",
-          title: language.t("provider.disconnect.toast.disconnected.title", { provider: name }),
-          description: language.t("provider.disconnect.toast.disconnected.description", { provider: name }),
-        })
+    try {
+      await serverSDK().client.auth.remove({ providerID })
+      await serverSDK().client.global.dispose().catch(() => undefined)
+
+      const refreshed = await serverSDK().client.provider.list().catch(() => undefined)
+      if (refreshed?.data) {
+        const normalized = normalizeProviderList(refreshed.data)
+        serverSync().set("provider", normalized)
+        if (providerID === "aifactory" && serverSync().data.config.model?.startsWith("aifactory/")) {
+          await serverSync().updateConfig({
+            model: fallbackModel(normalized),
+          })
+        }
+      }
+
+      showToast({
+        variant: "success",
+        icon: "circle-check",
+        title: language.t("provider.disconnect.toast.disconnected.title", { provider: name }),
+        description: language.t("provider.disconnect.toast.disconnected.description", { provider: name }),
       })
-      .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err)
-        showToast({ title: language.t("common.requestFailed"), description: message })
-      })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      showToast({ title: language.t("common.requestFailed"), description: message })
+    }
   }
 
   return (
