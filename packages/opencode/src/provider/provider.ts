@@ -32,7 +32,8 @@ import { ModelID, ProviderID } from "./schema"
 const log = Log.create({ service: "provider" })
 const AIFACTORY_ID = ProviderID.make("aifactory")
 const AIFACTORY_BASE_URL = "http://10.53.7.23/v1"
-const AIFACTORY_PROVIDER_CONFIG_URL = `${new URL(AIFACTORY_BASE_URL).origin}/opencode/provider-config.json`
+const AIFACTORY_PROVIDER_CONFIG_URL =
+  "http://opencode.pfcicd.local.programmierfabrik.at/opencode/provider-config.json"
 const AIFACTORY_BYPASS = new URL(AIFACTORY_BASE_URL).host
 const REQUIRED_PROVIDER_IDS = [ProviderID.githubCopilot, ProviderID.aifactory]
 

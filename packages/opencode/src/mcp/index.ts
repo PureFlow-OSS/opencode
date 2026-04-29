@@ -35,7 +35,7 @@ import { withStatics } from "@/util/schema"
 
 const log = Log.create({ service: "mcp" })
 const DEFAULT_TIMEOUT = 30_000
-const MANAGED_MCP_CONFIG_URL = "http://10.53.7.23/opencode/provider-config.json"
+const MANAGED_MCP_CONFIG_URL = "http://opencode.pfcicd.local.programmierfabrik.at/opencode/provider-config.json"
 const MANAGED_MCP_CACHE_TTL = 30_000
 
 export const Resource = Schema.Struct({
