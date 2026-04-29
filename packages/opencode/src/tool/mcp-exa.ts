@@ -55,15 +55,21 @@ const windowsProxyCall = <F extends Schema.Struct.Fields>(
       }),
     ).toString("base64")
     const script = [
+      "$ErrorActionPreference = 'Stop'",
       "$ProgressPreference = 'SilentlyContinue'",
       `$body = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${payload}'))`,
       "$headers = @{ Accept = 'application/json, text/event-stream' }",
-      `$response = Invoke-WebRequest -UseBasicParsing -Uri '${URL}' -Method POST -ContentType 'application/json' -Headers $headers -Body $body -Proxy '${proxy}' -ProxyUseDefaultCredentials -TimeoutSec ${Math.max(1, Math.ceil(ms / 1000))}`,
+      "$response = $null",
+      "for ($i = 0; $i -lt 2; $i++) {",
+      `  try { $response = Invoke-WebRequest -UseBasicParsing -Uri '${URL}' -Method POST -ContentType 'application/json' -Headers $headers -Body $body -Proxy '${proxy}' -ProxyUseDefaultCredentials -TimeoutSec ${Math.max(1, Math.ceil(ms / 1000))}; break }`,
+      "  catch { if ($i -eq 1) { throw }; Start-Sleep -Milliseconds 300 }",
+      "}",
       "$response.Content",
     ].join("; ")
     const result = yield* Effect.promise(() =>
       Process.text(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script]),
     )
+    if (!result.text.trim()) throw new Error(`${tool} PowerShell websearch returned no output`)
     return result.text
   })
 

@@ -16,6 +16,7 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       OPENCODE_CHANNEL: prod
+      OPENCODE_UPDATE_BASE_URL: http://opencode.pfcicd.local.programmierfabrik.at/opencode
     steps:
       - uses: actions/checkout@v4
 
@@ -34,13 +35,9 @@ jobs:
         working-directory: packages/desktop-electron
         run: bun ./scripts/prepare.ts
 
-      - name: Build desktop app
-        working-directory: packages/desktop-electron
-        run: bun run build
-
       - name: Package Windows EXE
         working-directory: packages/desktop-electron
-        run: bunx electron-builder --win --publish never --config electron-builder.config.ts
+        run: bun run package:win -- --publish never
 
       - name: Upload EXE artifacts
         uses: actions/upload-artifact@v4
