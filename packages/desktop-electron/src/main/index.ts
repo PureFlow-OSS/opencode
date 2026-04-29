@@ -4,6 +4,7 @@ import { existsSync } from "node:fs"
 import { createServer } from "node:net"
 import { homedir } from "node:os"
 import { join } from "node:path"
+import { spawn } from "node:child_process"
 import type { Event } from "electron"
 import { app, BrowserWindow, dialog } from "electron"
 import pkg from "electron-updater"
@@ -73,6 +74,7 @@ let initStep: InitStep = { phase: "server_waiting" }
 let mainWindow: BrowserWindow | null = null
 let server: Server.Listener | null = null
 let sidecarStop: Promise<void> | null = null
+let appExit: Promise<void> | null = null
 const loadingComplete = defer<void>()
 
 const pendingDeepLinks: string[] = []
@@ -109,6 +111,13 @@ function setupApp() {
     event.preventDefault()
     logger.log("deep link received via open-url", { url })
     emitDeepLinks([url])
+  })
+
+  app.on("window-all-closed", () => {
+    logger.log("all windows closed")
+    mainWindow = null
+    if (process.platform === "darwin") return
+    void exitApplication("window-all-closed")
   })
 
   app.on("before-quit", () => {
@@ -294,6 +303,19 @@ async function killSidecar() {
   await sidecarStop
 }
 
+async function exitApplication(reason: string) {
+  if (appExit) return appExit
+  appExit = (async () => {
+    logger.log("exiting application", { reason })
+    await killSidecar()
+    await delay(100)
+    app.exit(0)
+  })().finally(() => {
+    appExit = null
+  })
+  await appExit
+}
+
 function ensureLoopbackNoProxy() {
   const loopback = ["127.0.0.1", "localhost", "::1"]
   const upsert = (key: string) => {
@@ -430,6 +452,34 @@ async function installUpdate() {
   logger.log("installing downloaded update", {
     version: downloadedUpdateVersion,
   })
+  if (process.platform === "win32") {
+    const installerPath = Reflect.get(autoUpdater, "installerPath")
+    const downloadedUpdateHelper = Reflect.get(autoUpdater, "downloadedUpdateHelper")
+    const packageFile = Reflect.get(downloadedUpdateHelper, "packageFile")
+    const installDirectory = Reflect.get(autoUpdater, "installDirectory")
+    const args = [
+      "--updated",
+      "--force-run",
+      ...(typeof installDirectory === "string" && installDirectory.length > 0 ? [`/D=${installDirectory}`] : []),
+      ...(typeof packageFile === "string" && packageFile.length > 0 ? [`--package-file=${packageFile}`] : []),
+    ]
+
+    if (typeof installerPath === "string" && installerPath.length > 0) {
+      logger.log("scheduling deferred installer launch", {
+        version: downloadedUpdateVersion,
+        installerPath,
+        args,
+      })
+      await killSidecar()
+      BrowserWindow.getAllWindows().forEach((win) => {
+        win.hide()
+        win.destroy()
+      })
+      await scheduleWindowsInstaller(installerPath, args)
+      await exitApplication("install-update")
+      return
+    }
+  }
   await killSidecar()
   await delay(250)
   autoUpdater.quitAndInstall()
@@ -474,6 +524,32 @@ async function checkForUpdates(alertOnFail: boolean) {
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function scheduleWindowsInstaller(installerPath: string, args: string[]) {
+  const payload = Buffer.from(JSON.stringify({ pid: process.pid, installerPath, args }), "utf8").toString("base64")
+  const command = [
+    `$payload = '${payload}'`,
+    "$data = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($payload)) | ConvertFrom-Json",
+    "while (Get-Process -Id $data.pid -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 200 }",
+    "Start-Sleep -Milliseconds 500",
+    "Start-Process -FilePath $data.installerPath -ArgumentList @($data.args)",
+  ].join("; ")
+  const encodedCommand = Buffer.from(command, "utf16le").toString("base64")
+
+  return new Promise<void>((resolve, reject) => {
+    const child = spawn(
+      "powershell",
+      ["-NoLogo", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encodedCommand],
+      {
+        detached: true,
+        stdio: "ignore",
+      },
+    )
+    child.on("error", reject)
+    child.unref()
+    resolve()
+  })
 }
 
 function defer<T>() {

@@ -331,6 +331,41 @@ function writableGlobal(info: Info) {
   return next
 }
 
+async function migrateLegacyAiFactoryProvider(input: {
+  path: string
+  text: string
+  data: Info
+  fs: AppFileSystem.Interface
+  auth: Auth.Interface
+}) {
+  const legacy = input.data.provider?.["aifactory"]
+  const key = legacy?.options?.apiKey
+  if (typeof key !== "string" || !key.trim()) return input.data
+
+  await Effect.runPromise(
+    input.auth.set("aifactory", {
+      type: "api",
+      key: key.trim(),
+    }),
+  )
+
+  const provider = { ...(input.data.provider ?? {}) }
+  delete provider["aifactory"]
+  const patch = {
+    provider: Object.keys(provider).length ? provider : undefined,
+  }
+  const updated = input.path.endsWith(".jsonc")
+    ? patchJsonc(input.text, patch)
+    : JSON.stringify(mergeDeep(writable(input.data), patch), null, 2)
+
+  await Effect.runPromise(input.fs.writeFileString(input.path, updated).pipe(Effect.orDie))
+  log.info("migrated legacy RRZ AI Factory config to auth store", { path: input.path })
+  return {
+    ...input.data,
+    provider: Object.keys(provider).length ? provider : undefined,
+  } satisfies Info
+}
+
 export const ConfigDirectoryTypoError = NamedError.create(
   "ConfigDirectoryTypoError",
   z.object({
@@ -370,9 +405,18 @@ export const layer = Layer.effect(
         ),
       )
       const parsed = ConfigParse.jsonc(expanded, source)
-      const data = ConfigParse.effectSchema(Info, normalizeLoadedConfig(parsed, source), source)
+      let data = ConfigParse.effectSchema(Info, normalizeLoadedConfig(parsed, source), source)
       if (!("path" in options)) return data
 
+      data = yield* Effect.promise(() =>
+        migrateLegacyAiFactoryProvider({
+          path: options.path,
+          text,
+          data,
+          fs,
+          auth: authSvc,
+        }),
+      )
       yield* Effect.promise(() => resolveLoadedPlugins(data, options.path))
       if (!data.$schema) {
         data.$schema = "https://opencode.ai/config.json"

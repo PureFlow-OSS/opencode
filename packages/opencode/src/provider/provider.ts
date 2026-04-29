@@ -1621,6 +1621,10 @@ const layer: Layer.Layer<
           }
 
           if (Object.keys(provider.models).length === 0) {
+            if (providerID === AIFACTORY_ID && provider.key) {
+              log.warn("keeping RRZ AI Factory provider without discovered models", { providerID })
+              continue
+            }
             delete providers[providerID]
             continue
           }
