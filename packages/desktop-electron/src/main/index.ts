@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { EventEmitter } from "node:events"
 import { existsSync } from "node:fs"
+import { writeFile } from "node:fs/promises"
 import { createServer } from "node:net"
 import { homedir } from "node:os"
 import { join } from "node:path"
@@ -465,17 +466,26 @@ async function installUpdate() {
     ]
 
     if (typeof installerPath === "string" && installerPath.length > 0) {
+      const helperLogPath = await scheduleWindowsInstaller(installerPath, args)
       logger.log("scheduling deferred installer launch", {
         version: downloadedUpdateVersion,
         installerPath,
         args,
+        helperLogPath,
       })
       await killSidecar()
       BrowserWindow.getAllWindows().forEach((win) => {
         win.hide()
         win.destroy()
       })
-      await scheduleWindowsInstaller(installerPath, args)
+      await dialog.showMessageBox({
+        type: "info",
+        title: "Installer wird gestartet",
+        message: "OpenCode wird beendet. Der Installer startet danach automatisch.",
+        detail: `Falls nichts passiert, pruefe diese Logdatei:\n${helperLogPath}`,
+        buttons: ["OK"],
+        defaultId: 0,
+      })
       await exitApplication("install-update")
       return
     }
@@ -526,21 +536,28 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-function scheduleWindowsInstaller(installerPath: string, args: string[]) {
-  const payload = Buffer.from(JSON.stringify({ pid: process.pid, installerPath, args }), "utf8").toString("base64")
-  const command = [
-    `$payload = '${payload}'`,
-    "$data = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($payload)) | ConvertFrom-Json",
-    "while (Get-Process -Id $data.pid -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 200 }",
-    "Start-Sleep -Milliseconds 500",
-    "Start-Process -FilePath $data.installerPath -ArgumentList @($data.args)",
-  ].join("; ")
-  const encodedCommand = Buffer.from(command, "utf16le").toString("base64")
+async function scheduleWindowsInstaller(installerPath: string, args: string[]) {
+  const helperId = randomUUID()
+  const scriptPath = join(app.getPath("temp"), `opencode-installer-${helperId}.ps1`)
+  const logPath = join(app.getPath("temp"), `opencode-installer-${helperId}.log`)
+  const quotePowerShell = (value: string) => `'${value.replaceAll("'", "''")}'`
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    `function Write-Log([string] $Message) { Add-Content -Path ${quotePowerShell(logPath)} -Value ((Get-Date -Format o) + ' ' + $Message) }`,
+    "Write-Log 'helper started'",
+    `while (Get-Process -Id ${process.pid} -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 200 }`,
+    "Write-Log 'app process exited'",
+    "Start-Sleep -Milliseconds 750",
+    `Write-Log ${quotePowerShell(`starting installer ${installerPath}`)}`,
+    `Start-Process -FilePath ${quotePowerShell(installerPath)} -ArgumentList @(${args.map(quotePowerShell).join(", ")})`,
+    "Write-Log 'installer start command sent'",
+  ].join("\n")
+  await writeFile(scriptPath, script, "utf8")
 
-  return new Promise<void>((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const child = spawn(
       "powershell",
-      ["-NoLogo", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encodedCommand],
+      ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", scriptPath],
       {
         detached: true,
         stdio: "ignore",
@@ -550,6 +567,7 @@ function scheduleWindowsInstaller(installerPath: string, args: string[]) {
     child.unref()
     resolve()
   })
+  return logPath
 }
 
 function defer<T>() {

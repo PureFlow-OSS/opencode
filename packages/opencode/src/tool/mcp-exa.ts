@@ -46,18 +46,16 @@ const windowsProxyCall = <F extends Schema.Struct.Fields>(
 ) =>
   Effect.fn("McpExa.windowsProxyCall")(function* () {
     const ms = timeoutMs(timeout)
-    const payload = Buffer.from(
-      JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "tools/call",
-        params: { name: tool, arguments: value },
-      }),
-    ).toString("base64")
+    const payload = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: tool, arguments: value },
+    }).replace(/'/g, "''")
     const script = [
       "$ErrorActionPreference = 'Stop'",
       "$ProgressPreference = 'SilentlyContinue'",
-      `$body = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${payload}'))`,
+      `$body = '${payload}'`,
       "$headers = @{ Accept = 'application/json, text/event-stream' }",
       "$response = $null",
       "for ($i = 0; $i -lt 2; $i++) { try {",
