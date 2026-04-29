@@ -52,10 +52,11 @@ export const WebFetchTool = Tool.define(
           })
 
           const timeout = Math.min((params.timeout ?? DEFAULT_TIMEOUT / 1000) * 1000, MAX_TIMEOUT)
+          const format = params.format ?? "markdown"
 
           // Build Accept header based on requested format with q parameters for fallbacks
           let acceptHeader = "*/*"
-          switch (params.format) {
+          switch (format) {
             case "markdown":
               acceptHeader = "text/markdown;q=1.0, text/x-markdown;q=0.9, text/plain;q=0.8, text/html;q=0.7, */*;q=0.1"
               break
@@ -112,13 +113,13 @@ export const WebFetchTool = Tool.define(
             const content = contentLines.join("\n")
             const title = `${finalUrl} (${contentType})`
 
-            switch (params.format) {
+            switch (format) {
               case "markdown":
                 if (contentType.includes("text/html")) {
                   return {
                     output: formatFetchedContent({
                       url: finalUrl,
-                      format: params.format,
+                      format,
                       contentType,
                       content,
                       output: convertHTMLToMarkdown(content),
@@ -130,7 +131,7 @@ export const WebFetchTool = Tool.define(
                 return {
                   output: formatFetchedContent({
                     url: finalUrl,
-                    format: params.format,
+                    format,
                     contentType,
                     content,
                     output: content,
@@ -145,7 +146,7 @@ export const WebFetchTool = Tool.define(
                   return {
                     output: formatFetchedContent({
                       url: finalUrl,
-                      format: params.format,
+                      format,
                       contentType,
                       content,
                       output: text,
@@ -157,7 +158,7 @@ export const WebFetchTool = Tool.define(
                 return {
                   output: formatFetchedContent({
                     url: finalUrl,
-                    format: params.format,
+                    format,
                     contentType,
                     content,
                     output: content,
@@ -170,7 +171,7 @@ export const WebFetchTool = Tool.define(
                 return {
                   output: formatFetchedContent({
                     url: finalUrl,
-                    format: params.format,
+                    format,
                     contentType,
                     content,
                     output: content,
@@ -183,7 +184,7 @@ export const WebFetchTool = Tool.define(
                 return {
                   output: formatFetchedContent({
                     url: finalUrl,
-                    format: params.format,
+                    format,
                     contentType,
                     content,
                     output: content,
@@ -246,14 +247,14 @@ export const WebFetchTool = Tool.define(
           const content = new TextDecoder().decode(arrayBuffer)
 
           // Handle content based on requested format and actual content type
-          switch (params.format) {
+          switch (format) {
             case "markdown":
               if (contentType.includes("text/html")) {
                 const markdown = convertHTMLToMarkdown(content)
                 return {
                   output: formatFetchedContent({
                     url: finalUrl,
-                    format: params.format,
+                    format,
                     contentType,
                     content,
                     output: markdown,
@@ -265,7 +266,7 @@ export const WebFetchTool = Tool.define(
               return {
                 output: formatFetchedContent({
                   url: finalUrl,
-                  format: params.format,
+                  format,
                   contentType,
                   content,
                   output: content,
@@ -280,7 +281,7 @@ export const WebFetchTool = Tool.define(
                 return {
                   output: formatFetchedContent({
                     url: finalUrl,
-                    format: params.format,
+                    format,
                     contentType,
                     content,
                     output: text,
@@ -292,7 +293,7 @@ export const WebFetchTool = Tool.define(
               return {
                 output: formatFetchedContent({
                   url: finalUrl,
-                  format: params.format,
+                  format,
                   contentType,
                   content,
                   output: content,
@@ -305,7 +306,7 @@ export const WebFetchTool = Tool.define(
               return {
                 output: formatFetchedContent({
                   url: finalUrl,
-                  format: params.format,
+                  format,
                   contentType,
                   content,
                   output: content,
@@ -318,7 +319,7 @@ export const WebFetchTool = Tool.define(
               return {
                 output: formatFetchedContent({
                   url: finalUrl,
-                  format: params.format,
+                  format,
                   contentType,
                   content,
                   output: content,
