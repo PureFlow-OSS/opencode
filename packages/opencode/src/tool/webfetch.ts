@@ -83,27 +83,11 @@ export const WebFetchTool = Tool.define(
             const script = [
               "$ErrorActionPreference = 'Stop'",
               "$ProgressPreference = 'SilentlyContinue'",
-              "[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12",
-              `$handler = New-Object System.Net.Http.HttpClientHandler`,
-              "$handler.AllowAutoRedirect = $true",
-              "$handler.UseProxy = $true",
-              `$proxy = New-Object System.Net.WebProxy('${proxy}')`,
-              "$proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials",
-              "$handler.Proxy = $proxy",
-              "$handler.UseDefaultCredentials = $true",
-              "$handler.PreAuthenticate = $true",
-              "$client = New-Object System.Net.Http.HttpClient($handler)",
-              `$client.Timeout = [TimeSpan]::FromSeconds(${Math.max(1, Math.ceil(timeout / 1000))})`,
-              `$request = New-Object System.Net.Http.HttpRequestMessage([System.Net.Http.HttpMethod]::Get, '${url}')`,
-              `$request.Headers.TryAddWithoutValidation('User-Agent', '${headers["User-Agent"]}') | Out-Null`,
-              `$request.Headers.TryAddWithoutValidation('Accept', '${headers.Accept}') | Out-Null`,
-              `$request.Headers.TryAddWithoutValidation('Accept-Language', '${headers["Accept-Language"]}') | Out-Null`,
-              "$response = $client.SendAsync($request).GetAwaiter().GetResult()",
-              "$response.EnsureSuccessStatusCode() | Out-Null",
-              "$bytes = $response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult()",
-              "$content = [Convert]::ToBase64String($bytes)",
-              "$contentType = if ($response.Content.Headers.ContentType) { [string]$response.Content.Headers.ContentType.ToString() } else { '' }",
-              "$finalUrl = [string]$response.RequestMessage.RequestUri.AbsoluteUri",
+              `$headers = @{ 'User-Agent' = '${headers["User-Agent"]}'; 'Accept' = '${headers.Accept}'; 'Accept-Language' = '${headers["Accept-Language"]}' }`,
+              `$response = Invoke-WebRequest -UseBasicParsing -MaximumRedirection 10 -Uri '${url}' -Headers $headers -Proxy '${proxy}' -ProxyUseDefaultCredentials -TimeoutSec ${Math.max(1, Math.ceil(timeout / 1000))}`,
+              "$content = [string]$response.Content",
+              "$contentType = [string]$response.Headers['Content-Type']",
+              "$finalUrl = if ($response.BaseResponse -and $response.BaseResponse.ResponseUri) { [string]$response.BaseResponse.ResponseUri.AbsoluteUri } else { '' }",
               "Write-Output $finalUrl",
               "Write-Output $contentType",
               "Write-Output $content",
@@ -114,11 +98,11 @@ export const WebFetchTool = Tool.define(
             if (!raw.text.trim()) {
               throw new Error("PowerShell webfetch returned no output")
             }
-            const [finalUrl = url, contentType = "", encoded = ""] = raw.text.replace(/\r/g, "").trimEnd().split("\n", 3)
+            const [finalUrl = url, contentType = "", ...contentLines] = raw.text.replace(/\r/g, "").trimEnd().split("\n")
             if (!finalUrl.trim()) {
               throw new Error("PowerShell webfetch did not return a final URL")
             }
-            const content = Buffer.from(encoded, "base64").toString("utf8")
+            const content = contentLines.join("\n")
             const title = `${finalUrl} (${contentType})`
 
             switch (params.format) {
