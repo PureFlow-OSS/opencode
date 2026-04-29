@@ -60,10 +60,13 @@ const windowsProxyCall = <F extends Schema.Struct.Fields>(
       `$body = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${payload}'))`,
       "$headers = @{ Accept = 'application/json, text/event-stream' }",
       "$response = $null",
-      "for ($i = 0; $i -lt 2; $i++) {",
-      `  try { $response = Invoke-WebRequest -UseBasicParsing -Uri '${URL}' -Method POST -ContentType 'application/json' -Headers $headers -Body $body -Proxy '${proxy}' -ProxyUseDefaultCredentials -TimeoutSec ${Math.max(1, Math.ceil(ms / 1000))}; break }`,
-      "  catch { if ($i -eq 1) { throw }; Start-Sleep -Milliseconds 300 }",
-      "}",
+      "for ($i = 0; $i -lt 2; $i++) { try {",
+      `  $response = Invoke-WebRequest -UseBasicParsing -Uri '${URL}' -Method POST -ContentType 'application/json' -Headers $headers -Body $body -Proxy '${proxy}' -ProxyUseDefaultCredentials -TimeoutSec ${Math.max(1, Math.ceil(ms / 1000))}`,
+      "  break",
+      "} catch {",
+      "  if ($i -eq 1) { throw }",
+      "  Start-Sleep -Milliseconds 300",
+      "} }",
       "$response.Content",
     ].join("; ")
     const result = yield* Effect.promise(() =>
