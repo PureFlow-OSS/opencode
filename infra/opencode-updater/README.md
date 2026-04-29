@@ -42,7 +42,11 @@ This is a complete example with:
             "context": 200000,
             "output": 32000,
             "temperature": true,
-            "reasoning": false
+            "reasoning": false,
+            "modalities": {
+              "input": ["text", "image", "pdf"],
+              "output": ["text"]
+            }
           },
           {
             "pattern": "*",
@@ -122,6 +126,8 @@ Supported per-rule overrides:
 - `output`
 - `temperature`
 - `reasoning`
+- `modalities.input`
+- `modalities.output`
 
 You can also push managed MCP servers:
 

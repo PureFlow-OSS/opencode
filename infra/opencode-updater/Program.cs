@@ -145,6 +145,18 @@ sealed class ModelLimitRuleOptions
 
   [JsonPropertyName("reasoning")]
   public bool? Reasoning { get; set; }
+
+  [JsonPropertyName("modalities")]
+  public ModalitiesOptions? Modalities { get; set; }
+}
+
+sealed class ModalitiesOptions
+{
+  [JsonPropertyName("input")]
+  public string[]? Input { get; set; }
+
+  [JsonPropertyName("output")]
+  public string[]? Output { get; set; }
 }
 
 sealed class McpConfigOptions

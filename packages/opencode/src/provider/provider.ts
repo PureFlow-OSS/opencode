@@ -65,12 +65,20 @@ type AiFactoryModelLimitRule = {
   output?: number
   temperature?: boolean
   reasoning?: boolean
+  modalities?: AiFactoryModalities
+}
+
+type AiFactoryModality = "text" | "audio" | "image" | "video" | "pdf"
+type AiFactoryModalities = {
+  input?: AiFactoryModality[]
+  output?: AiFactoryModality[]
 }
 
 type AiFactoryModelOverrides = {
   limit: AiFactoryModelLimits
   temperature?: boolean
   reasoning?: boolean
+  modalities?: AiFactoryModalities
 }
 
 function globToRegExp(pattern: string) {
@@ -94,6 +102,37 @@ function resolveAiFactoryModelOverrides(modelID: string, rules: AiFactoryModelLi
     },
     temperature: match.temperature,
     reasoning: match.reasoning,
+    modalities: match.modalities,
+  }
+}
+
+function normalizeAiFactoryModalities(value: unknown): AiFactoryModalities | undefined {
+  if (!isRecord(value)) return
+  const allowed = new Set<AiFactoryModality>(["text", "audio", "image", "video", "pdf"])
+  const input = Array.isArray(value.input)
+    ? value.input.filter((item): item is AiFactoryModality => allowed.has(item))
+    : undefined
+  const output = Array.isArray(value.output)
+    ? value.output.filter((item): item is AiFactoryModality => allowed.has(item))
+    : undefined
+  if (!input?.length && !output?.length) return
+  return {
+    ...(input?.length && { input }),
+    ...(output?.length && { output }),
+  }
+}
+
+function aiFactoryModalityFlags(
+  modalities: AiFactoryModality[] | undefined,
+  fallback: Record<AiFactoryModality, boolean>,
+) {
+  if (!modalities) return fallback
+  return {
+    text: modalities.includes("text"),
+    audio: modalities.includes("audio"),
+    image: modalities.includes("image"),
+    video: modalities.includes("video"),
+    pdf: modalities.includes("pdf"),
   }
 }
 
@@ -111,6 +150,7 @@ async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch) {
             output?: number
             temperature?: boolean
             reasoning?: boolean
+            modalities?: unknown
           }>
         }
       }
@@ -125,13 +165,13 @@ async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch) {
           output: typeof rule.output === "number" ? rule.output : undefined,
           temperature: typeof rule.temperature === "boolean" ? rule.temperature : undefined,
           reasoning: typeof rule.reasoning === "boolean" ? rule.reasoning : undefined,
+          modalities: normalizeAiFactoryModalities(rule.modalities),
         } satisfies AiFactoryModelLimitRule,
       ]
     })
 }
 
 function buildAiFactoryModel(modelID: string, created?: number | string, rules?: AiFactoryModelLimitRule[]): Model {
-  const inferredReasoning = /(^o[134]\b)|(^gpt-5\b)|claude|reason|r1|deepseek|gemini/i.test(modelID)
   const overrides = resolveAiFactoryModelOverrides(modelID, rules)
   const base: Model = {
     id: ModelID.make(modelID),
@@ -157,23 +197,23 @@ function buildAiFactoryModel(modelID: string, created?: number | string, rules?:
     limit: overrides.limit,
     capabilities: {
       temperature: overrides.temperature ?? true,
-      reasoning: overrides.reasoning ?? inferredReasoning,
-      attachment: false,
+      reasoning: overrides.reasoning ?? true,
+      attachment: overrides.modalities?.input?.some((item) => item !== "text") ?? false,
       toolcall: true,
-      input: {
+      input: aiFactoryModalityFlags(overrides.modalities?.input, {
         text: true,
         audio: false,
         image: false,
         video: false,
         pdf: false,
-      },
-      output: {
+      }),
+      output: aiFactoryModalityFlags(overrides.modalities?.output, {
         text: true,
         audio: false,
         image: false,
         video: false,
         pdf: false,
-      },
+      }),
       interleaved: false,
     },
     release_date: normalizeAiFactoryReleaseDate(created),
