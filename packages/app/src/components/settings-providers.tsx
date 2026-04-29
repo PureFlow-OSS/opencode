@@ -7,8 +7,12 @@ import { popularProviders, useProviders } from "@/hooks/use-providers"
 import { createMemo, type Component, For, Show } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { useGlobalSDK } from "@/context/global-sdk"
+import { useGlobalSync } from "@/context/global-sync"
+import { normalizeProviderList } from "@/context/global-sync/utils"
 import { DialogConnectProvider } from "./dialog-connect-provider"
 import { SettingsList } from "./settings-list"
+import { useParams } from "@solidjs/router"
+import { decode64 } from "@/utils/base64"
 
 type ProviderSource = "env" | "api" | "config" | "custom"
 type ProviderItem = ReturnType<ReturnType<typeof useProviders>["connected"]>[number]
@@ -21,7 +25,10 @@ export const SettingsProviders: Component = () => {
   const dialog = useDialog()
   const language = useLanguage()
   const globalSDK = useGlobalSDK()
+  const globalSync = useGlobalSync()
   const providers = useProviders()
+  const params = useParams()
+  const dir = createMemo(() => decode64(params.dir) ?? "")
 
   const connected = createMemo(() => {
     return providers.connected()
@@ -58,22 +65,55 @@ export const SettingsProviders: Component = () => {
   const note = (id: string) =>
     id === "aifactory" ? "AI Modelle der RRZ AI Factory" : PROVIDER_NOTES.find((item) => item.match(id))?.key
 
+  const fallbackModel = (provider: ReturnType<typeof normalizeProviderList>) => {
+    for (const item of provider.connected) {
+      const modelID = provider.default[item]
+      if (modelID) return `${item}/${modelID}`
+    }
+    const first = provider.all.find((item) => provider.connected.includes(item.id) && Object.keys(item.models).length > 0)
+    if (!first) return
+    const modelID = Object.values(first.models)[0]?.id
+    if (!modelID) return
+    return `${first.id}/${modelID}`
+  }
+
   const disconnect = async (providerID: string, name: string) => {
-    await globalSDK.client.auth
-      .remove({ providerID })
-      .then(async () => {
-        await globalSDK.client.global.dispose()
-        showToast({
-          variant: "success",
-          icon: "circle-check",
-          title: language.t("provider.disconnect.toast.disconnected.title", { provider: name }),
-          description: language.t("provider.disconnect.toast.disconnected.description", { provider: name }),
-        })
+    try {
+      await globalSDK.client.auth.remove({ providerID })
+      await globalSDK.client.global.dispose().catch(() => undefined)
+
+      const refreshed = await globalSDK.client.provider.list().catch(() => undefined)
+      if (refreshed?.data) {
+        const normalized = normalizeProviderList(refreshed.data)
+        globalSync.set("provider", normalized)
+        const directories = new Set(
+          globalSync.data.project.flatMap((project) => [project.worktree, ...(project.sandboxes ?? [])]).filter(Boolean),
+        )
+        if (dir()) directories.add(dir())
+        for (const directory of directories) {
+          const [, setProjectStore] = globalSync.child(directory, { bootstrap: false })
+          setProjectStore("provider", normalized)
+          setProjectStore("provider_ready", true)
+        }
+
+        if (providerID === "aifactory" && globalSync.data.config.model?.startsWith("aifactory/")) {
+          await globalSync.updateConfig({
+            ...globalSync.data.config,
+            model: fallbackModel(normalized),
+          })
+        }
+      }
+
+      showToast({
+        variant: "success",
+        icon: "circle-check",
+        title: language.t("provider.disconnect.toast.disconnected.title", { provider: name }),
+        description: language.t("provider.disconnect.toast.disconnected.description", { provider: name }),
       })
-      .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err)
-        showToast({ title: language.t("common.requestFailed"), description: message })
-      })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      showToast({ title: language.t("common.requestFailed"), description: message })
+    }
   }
 
   return (
