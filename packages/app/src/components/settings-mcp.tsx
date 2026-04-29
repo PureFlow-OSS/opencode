@@ -94,7 +94,7 @@ export const SettingsMcp: Component = () => {
   const globalSDK = useGlobalSDK()
   const params = useParams()
   const dir = createMemo(() => decode64(params.dir) ?? "")
-  const child = createMemo(() => (dir() ? globalSync.child(dir())?.[0] : undefined))
+  const child = createMemo(() => (dir() ? globalSync.child(dir(), { bootstrap: false })[0] : undefined))
   const [managed] = createResource(async () => {
     const payload = (await fetch(MANAGED_MCP_CONFIG_URL, {
       signal: AbortSignal.timeout(3000),

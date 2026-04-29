@@ -68,7 +68,7 @@ export function DialogMcpForm(props: Props) {
   const isEditing = () => !!props.name
 
   const initialOAuth: OAuthState = (() => {
-    if (props.config?.type === "remote" && props.config.oauth && props.config.oauth !== false) {
+    if (props.config?.type === "remote" && props.config.oauth) {
       return {
         clientId: props.config.oauth.clientId ?? "",
         clientSecret: props.config.oauth.clientSecret ?? "",
@@ -84,7 +84,7 @@ export function DialogMcpForm(props: Props) {
     command: props.config?.type === "local" ? props.config.command.join(" ") : "",
     url: props.config?.type === "remote" ? props.config.url : "",
     headers: headersFromRecord(props.config?.type === "remote" ? props.config.headers : undefined),
-    oauthEnabled: props.config?.type === "remote" && !!props.config.oauth && props.config.oauth !== false,
+    oauthEnabled: props.config?.type === "remote" && !!props.config.oauth,
     oauth: initialOAuth,
     enabled: props.config?.enabled ?? true,
     err: {},

@@ -887,6 +887,7 @@ export const dict = {
   "settings.commands.title": "Commands",
   "settings.commands.description": "Command settings will be configurable here.",
   "settings.mcp.title": "MCP Servers",
+  "settings.mcp.description": "MCP settings can be configured here.",
   "settings.mcp.add": "Add Server",
   "settings.mcp.empty": "No MCP servers configured. Add one to get started.",
   "settings.mcp.server.type.local": "Local",
