@@ -372,7 +372,7 @@ function setupAutoUpdater() {
   autoUpdater.allowPrerelease = false
   autoUpdater.allowDowngrade = true
   autoUpdater.autoDownload = false
-  autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.autoInstallOnAppQuit = false
   autoUpdater.disableWebInstaller = true
   logger.log("auto updater configured", {
     channel: autoUpdater.channel,

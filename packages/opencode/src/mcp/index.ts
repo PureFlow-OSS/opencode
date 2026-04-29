@@ -9,7 +9,7 @@ import {
   type Tool as MCPToolDef,
   ToolListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js"
-import { Config } from "../config"
+import { Config, ConfigManaged } from "../config"
 import { ConfigMCP } from "../config/mcp"
 import { Log } from "../util"
 import { NamedError } from "@opencode-ai/core/util/error"
@@ -128,7 +128,7 @@ async function discoverManagedMcpConfig(fetchFn: typeof fetch = fetch) {
   })
     .then(async (res) => {
       if (!res.ok) return {}
-      const payload = (await res.json()) as {
+      const payload = ConfigManaged.providerConfigPayload(await res.json()) as {
         mcp?: Record<string, unknown>
       }
       return Object.fromEntries(
@@ -475,7 +475,7 @@ export const layer = Layer.effect(
       return {
         ...managed,
         ...(cfg.mcp ?? {}),
-      }
+      } satisfies Record<string, McpEntry>
     })
 
     const descendants = Effect.fnUntraced(
@@ -518,7 +518,7 @@ export const layer = Layer.effect(
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("MCP.state")(function* () {
-        const config = yield* mergedMcpConfig()
+        const config: Record<string, McpEntry> = yield* mergedMcpConfig()
         const bridge = yield* EffectBridge.make()
         const s: State = {
           status: {},
@@ -606,7 +606,7 @@ export const layer = Layer.effect(
     const status = Effect.fn("MCP.status")(function* () {
       const s = yield* InstanceState.get(state)
 
-      const config = yield* mergedMcpConfig()
+      const config: Record<string, McpEntry> = yield* mergedMcpConfig()
       const result: Record<string, Status> = {}
 
       for (const [key, mcp] of Object.entries(config)) {
@@ -663,7 +663,7 @@ export const layer = Layer.effect(
       const s = yield* InstanceState.get(state)
 
       const cfg = yield* cfgSvc.get()
-      const config = yield* mergedMcpConfig()
+      const config: Record<string, McpEntry> = yield* mergedMcpConfig()
       const defaultTimeout = cfg.experimental?.mcp_timeout
 
       const connectedClients = Object.entries(s.clients).filter(
@@ -754,7 +754,8 @@ export const layer = Layer.effect(
     })
 
     const getMcpConfig = Effect.fnUntraced(function* (mcpName: string) {
-      const mcpConfig = (yield* mergedMcpConfig())[mcpName]
+      const config: Record<string, McpEntry> = yield* mergedMcpConfig()
+      const mcpConfig = config[mcpName]
       if (!mcpConfig || !isMcpConfigured(mcpConfig)) return undefined
       return mcpConfig
     })

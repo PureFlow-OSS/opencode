@@ -1,6 +1,6 @@
 import os from "os"
 import fuzzysort from "fuzzysort"
-import { Config } from "../config"
+import { Config, ConfigManaged } from "../config"
 import { mapValues, mergeDeep, omit, pickBy, sortBy } from "remeda"
 import { NoSuchModelError, type Provider as SDK } from "ai"
 import { Log } from "../util"
@@ -102,7 +102,7 @@ async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch) {
   })
     .then(async (res) => {
       if (!res.ok) return
-      return (await res.json()) as {
+      return ConfigManaged.providerConfigPayload(await res.json()) as {
         aifactory?: {
           model_limits?: Array<{
             pattern?: string
@@ -1570,7 +1570,10 @@ const layer: Layer.Layer<
           const pluginAuth = yield* auth.get(providerID).pipe(Effect.orDie)
 
           provider.models = yield* Effect.promise(async () => {
-            const next = await models(provider, { auth: pluginAuth })
+            const next = await models(provider, { auth: pluginAuth }).catch((e) => {
+              log.warn("plugin provider models error", { providerID, error: e })
+              return provider.models
+            })
             return Object.fromEntries(
               Object.entries(next).map(([id, model]) => [
                 id,

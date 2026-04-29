@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -123,6 +124,7 @@ sealed class ProviderConfigOptions
 
 sealed class AiFactoryConfigOptions
 {
+  [ConfigurationKeyName("model_limits")]
   [JsonPropertyName("model_limits")]
   public List<ModelLimitRuleOptions> ModelLimits { get; set; } = [];
 }

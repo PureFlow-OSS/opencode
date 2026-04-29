@@ -4,13 +4,11 @@ import { Dialog } from "@opencode-ai/ui/dialog"
 import { Tag } from "@opencode-ai/ui/tag"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { showToast } from "@opencode-ai/ui/toast"
-import { createMemo, createResource, For, Show, type Component } from "solid-js"
+import { createMemo, For, Show, type Component } from "solid-js"
 import { createStore } from "solid-js/store"
-import { useParams } from "@solidjs/router"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
-import { decode64 } from "@/utils/base64"
 import { DialogMcpForm } from "./dialog-mcp-form"
 import { SettingsList } from "./settings-list"
 import type { McpLocalConfig, McpRemoteConfig } from "@opencode-ai/sdk/v2/client"
@@ -33,8 +31,6 @@ type ManagedServer = {
 type ServerItem =
   | { name: string; source: "local"; config: McpConfig; status?: string }
   | { name: string; source: "managed"; managed: ManagedServer; local?: McpConfig; status?: string }
-
-const MANAGED_MCP_CONFIG_URL = "http://10.53.7.23/opencode/provider-config.json"
 
 function DialogManagedMcpPat(props: {
   name: string
@@ -92,77 +88,25 @@ export const SettingsMcp: Component = () => {
   const language = useLanguage()
   const globalSync = useGlobalSync()
   const globalSDK = useGlobalSDK()
-  const params = useParams()
-  const dir = createMemo(() => decode64(params.dir) ?? "")
-  const child = createMemo(() => (dir() ? globalSync.child(dir(), { bootstrap: false })[0] : undefined))
-  const [managed] = createResource(async () => {
-    const payload = (await fetch(MANAGED_MCP_CONFIG_URL, {
-      signal: AbortSignal.timeout(3000),
-    })
-      .then((res) => (res.ok ? res.json() : undefined))
-      .catch(() => undefined)) as
-      | {
-          mcp?: Record<
-            string,
-            (McpConfig & {
-              auth?: ManagedAuth
-            }) | undefined
-          >
-        }
-      | undefined
-    return Object.fromEntries(
-      Object.entries(payload?.mcp ?? {}).flatMap(([name, config]) => {
-        if (!config || typeof config !== "object" || !("type" in config)) return []
-        if (config.type !== "local" && config.type !== "remote") return []
-        return [
-          [
-            name,
-            {
-              config:
-                config.type === "local"
-                  ? {
-                      type: "local" as const,
-                      command: config.command,
-                      environment: config.environment,
-                      enabled: config.enabled,
-                      timeout: config.timeout,
-                    }
-                  : {
-                      type: "remote" as const,
-                      url: config.url,
-                      headers: config.headers,
-                      oauth: config.oauth,
-                      enabled: config.enabled,
-                      timeout: config.timeout,
-                    },
-              auth: config.auth?.type === "pat" ? config.auth : undefined,
-            } satisfies ManagedServer,
-          ] as const,
-        ]
-      }),
-    ) as Record<string, ManagedServer>
-  })
+  const managed = createMemo(() => ({} as Record<string, ManagedServer>))
 
   const servers = createMemo<ServerItem[]>(() => {
     const items: ServerItem[] = []
     const names = Array.from(
       new Set([
         ...Object.keys(globalSync.data.config.mcp ?? {}),
-        ...Object.keys(managed.latest ?? {}),
-        ...Object.keys(child()?.mcp ?? {}),
+        ...Object.keys(managed()),
       ]),
     )
     for (const name of names) {
       const local = globalSync.data.config.mcp?.[name]
-      const managedServer = managed.latest?.[name]
-      const status = child()?.mcp?.[name]?.status
+      const managedServer = managed()[name]
       if (managedServer) {
         items.push({
           name,
           source: "managed",
           managed: managedServer,
           local: local && "type" in local ? (local as McpConfig) : undefined,
-          status,
         })
         continue
       }
@@ -171,7 +115,6 @@ export const SettingsMcp: Component = () => {
         name,
         source: "local",
         config: local as McpConfig,
-        status,
       })
     }
     items.sort((a, b) => a.name.localeCompare(b.name))
@@ -196,15 +139,6 @@ export const SettingsMcp: Component = () => {
   }
   const asManaged = (server: ServerItem) => server as Extract<ServerItem, { source: "managed" }>
 
-  const refreshMcp = async () => {
-    if (!dir()) return
-    const result = await globalSDK.client.mcp.status()
-    if (!result.data) return
-    const [, setChild] = globalSync.child(dir(), { bootstrap: false })
-    setChild("mcp", result.data)
-    setChild("mcp_ready", true)
-  }
-
   const saveManagedPat = async (server: Extract<ServerItem, { source: "managed" }>, token: string) => {
     if (server.managed.config.type !== "remote") return
     const header = server.managed.auth?.header ?? "Authorization"
@@ -221,7 +155,6 @@ export const SettingsMcp: Component = () => {
     }
     await globalSync.updateConfig({ mcp: existing })
     await globalSDK.client.mcp.connect({ name: server.name }).catch(() => undefined)
-    await refreshMcp().catch(() => undefined)
     showToast({
       variant: "success",
       icon: "circle-check",
@@ -251,6 +184,16 @@ export const SettingsMcp: Component = () => {
       })
   }
 
+  const showMcpSettings = () => {
+    void import("./dialog-settings").then((x) => {
+      dialog.show(() => <x.DialogSettings defaultValue="mcp" />)
+    })
+  }
+
+  const showMcpForm = (props: { name?: string; config?: McpConfig } = {}) => {
+    dialog.show(() => <DialogMcpForm {...props} onBack={showMcpSettings} />)
+  }
+
   return (
     <div class="flex flex-col h-full overflow-y-auto no-scrollbar px-4 pb-10 sm:px-10 sm:pb-10">
       <div class="sticky top-0 z-10 bg-[linear-gradient(to_bottom,var(--surface-stronger-non-alpha)_calc(100%_-_24px),transparent)]">
@@ -260,7 +203,7 @@ export const SettingsMcp: Component = () => {
             size="large"
             variant="secondary"
             icon="plus-small"
-            onClick={() => dialog.show(() => <DialogMcpForm />)}
+            onClick={() => showMcpForm()}
           >
             {language.t("settings.mcp.add")}
           </Button>
@@ -324,7 +267,10 @@ export const SettingsMcp: Component = () => {
                         size="large"
                         variant="ghost"
                         onClick={() =>
-                          dialog.show(() => <DialogMcpForm name={item.name} config={(item as Extract<ServerItem, { source: "local" }>).config} />)
+                          showMcpForm({
+                            name: item.name,
+                            config: (item as Extract<ServerItem, { source: "local" }>).config,
+                          })
                         }
                       >
                         {language.t("common.edit")}

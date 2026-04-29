@@ -5,6 +5,7 @@ import os from "os"
 import path from "path"
 import { Log, Process } from "../util"
 import { warn } from "console"
+import { isRecord } from "@/util/record"
 
 const log = Log.create({ service: "config" })
 
@@ -41,6 +42,17 @@ export function parseManagedPlist(json: string): string {
     if (PLIST_META.has(key)) delete raw[key]
   }
   return JSON.stringify(raw)
+}
+
+export function providerConfigPayload(payload: unknown): Record<string, unknown> {
+  if (!isRecord(payload)) return {}
+  const updater = isRecord(payload.Updater) ? payload.Updater : isRecord(payload.updater) ? payload.updater : undefined
+  if (!updater) return payload
+  return isRecord(updater.ProviderConfig)
+    ? updater.ProviderConfig
+    : isRecord(updater.providerConfig)
+      ? updater.providerConfig
+      : payload
 }
 
 export async function readManagedPreferences() {

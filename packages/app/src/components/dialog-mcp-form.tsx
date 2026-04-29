@@ -58,6 +58,7 @@ type FormState = {
 type Props = {
   name?: string
   config?: McpConfig
+  onBack?: () => void
 }
 
 export function DialogMcpForm(props: Props) {
@@ -200,8 +201,8 @@ export function DialogMcpForm(props: Props) {
           tabIndex={-1}
           icon="arrow-left"
           variant="ghost"
-          onClick={() => dialog.close()}
-          aria-label={language.t("common.close")}
+          onClick={() => (props.onBack ? props.onBack() : dialog.close())}
+          aria-label={language.t("common.goBack")}
         />
       }
       transition
