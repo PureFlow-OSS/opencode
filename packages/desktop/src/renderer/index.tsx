@@ -231,6 +231,7 @@ const createPlatform = (): Platform => {
       return fetch(input, init)
     },
 
+    getMotd: () => window.api.getMotd(),
     getDefaultServer: async () => {
       const url = await window.api.getDefaultServerUrl().catch(() => null)
       if (!url) return null

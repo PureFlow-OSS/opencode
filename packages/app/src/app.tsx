@@ -39,6 +39,7 @@ import { LayoutProvider } from "@/context/layout"
 import { ModelsProvider } from "@/context/models"
 import { NotificationProvider } from "@/context/notification"
 import { PermissionProvider } from "@/context/permission"
+import { usePlatform } from "@/context/platform"
 import { PromptProvider } from "@/context/prompt"
 import { ServerConnection, ServerProvider, serverName, useServer } from "@/context/server"
 import { SettingsProvider, useSettings } from "@/context/settings"
@@ -59,9 +60,10 @@ import {
   sessionHref,
 } from "./utils/session-route"
 import { isSessionNotFoundError } from "./utils/server-errors"
-
 import Session from "@/pages/session"
 import { NewHome, LegacyHome } from "@/pages/home"
+
+const defaultMotd = { enabled: true, text: "RRZ AI Factory" }
 
 const NewSession = lazy(() => import("@/pages/new-session"))
 
@@ -442,9 +444,7 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
     <Show
       when={!checking()}
       fallback={
-        <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
-          <Splash class="w-16 h-20 opacity-50 animate-pulse" />
-        </div>
+        <StartupSplash />
       }
     >
       <Show
@@ -465,6 +465,20 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
         {props.children}
       </Show>
     </Show>
+  )
+}
+
+function StartupSplash() {
+  const platform = usePlatform()
+  const [motd] = createResource(() => platform.getMotd?.().catch(() => defaultMotd), { initialValue: defaultMotd })
+
+  return (
+    <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base gap-6">
+      <Splash class="w-16 h-20 opacity-50 animate-pulse" />
+      <Show when={motd()?.enabled && motd()?.text}>
+        <div class="max-w-[calc(100vw-4rem)] text-center text-14-regular text-text-muted truncate">{motd()?.text}</div>
+      </Show>
+    </div>
   )
 }
 
