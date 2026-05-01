@@ -78,7 +78,10 @@ export const WebFetchTool = Tool.define(
             "Accept-Language": "en-US,en;q=0.9",
           }
 
-          const proxy = (config._tag === "Some" ? (yield* config.value.get()).http_proxy : undefined) ?? envProxy
+          const proxy =
+            config._tag === "Some"
+              ? ((yield* config.value.get()).use_http_proxy === false ? undefined : (yield* config.value.get()).http_proxy)
+              : envProxy
 
           if (process.platform === "win32" && proxy) {
             const script = [

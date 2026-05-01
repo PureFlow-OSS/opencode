@@ -104,6 +104,9 @@ export const Info = Schema.Struct({
   http_proxy: Schema.optional(Schema.String).annotate({
     description: "HTTP or HTTPS proxy URL for outbound provider requests",
   }),
+  use_http_proxy: Schema.Boolean.pipe(Schema.optional, Schema.withDecodingDefault(Effect.succeed(true))).annotate({
+    description: "Whether the configured global HTTP proxy should be used. Defaults to true.",
+  }),
   logLevel: Schema.optional(LogLevelRef).annotate({ description: "Log level" }),
   server: Schema.optional(ConfigServer.Server).annotate({
     description: "Server configuration for opencode serve and web commands",

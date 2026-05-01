@@ -60,7 +60,9 @@ export const WebSearchTool = Tool.define(
               contextMaxCharacters: params.contextMaxCharacters,
             },
             "25 seconds",
-            config._tag === "Some" ? (yield* config.value.get()).http_proxy : undefined,
+            config._tag === "Some"
+              ? ((yield* config.value.get()).use_http_proxy === false ? undefined : (yield* config.value.get()).http_proxy)
+              : undefined,
           )
 
           return {

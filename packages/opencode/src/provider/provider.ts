@@ -271,11 +271,16 @@ function mergeNoProxyEntry(value: string | undefined, entry: string) {
 function applyProviderProxyConfig(config: Config.Info) {
   process.env.NO_PROXY = mergeNoProxyEntry(process.env.NO_PROXY, AIFACTORY_BYPASS)
   process.env.no_proxy = mergeNoProxyEntry(process.env.no_proxy, AIFACTORY_BYPASS)
-  if (!config.http_proxy) return
+  if (!config.use_http_proxy || !config.http_proxy) return
   process.env.HTTP_PROXY = config.http_proxy
   process.env.HTTPS_PROXY = config.http_proxy
   process.env.http_proxy = config.http_proxy
   process.env.https_proxy = config.http_proxy
+}
+
+function resolveProviderProxy(config: Config.Info, providerID: ProviderID) {
+  if (!config.use_http_proxy) return
+  return config.http_proxy
 }
 
 function providerFetch(providerID: ProviderID, proxy: string | undefined, fetchFn: FetchLike = fetch): FetchLike {
@@ -1224,7 +1229,7 @@ export interface Interface {
 interface State {
   models: Map<string, LanguageModelV3>
   providers: Record<ProviderID, Info>
-  proxy: string | undefined
+  proxy: Record<string, string | undefined>
   sdk: Map<string, BundledSDK>
   modelLoaders: Record<string, CustomModelLoader>
   varsLoaders: Record<string, CustomVarsLoader>
@@ -1378,7 +1383,7 @@ const layer: Layer.Layer<
           config: () => config.get(),
           env: () => env.all(),
           fetch: (providerID: ProviderID, input: RequestInfo | URL, init?: RequestInit) =>
-            providerFetch(providerID, cfg.http_proxy)(input, init),
+            providerFetch(providerID, resolveProviderProxy(cfg, providerID))(input, init),
           get: (key: string) => env.get(key),
         }
 
@@ -1679,7 +1684,9 @@ const layer: Layer.Layer<
         return {
           models: languages,
           providers,
-          proxy: cfg.http_proxy,
+          proxy: Object.fromEntries(
+            Object.keys(providers).map((providerID) => [providerID, resolveProviderProxy(cfg, ProviderID.make(providerID))]),
+          ),
           sdk,
           modelLoaders,
           varsLoaders,
@@ -1746,7 +1753,7 @@ const layer: Layer.Layer<
 
         const customFetch = options["fetch"]
         const chunkTimeout = options["chunkTimeout"]
-        const proxiedFetch = providerFetch(model.providerID, s.proxy, customFetch ?? fetch)
+        const proxiedFetch = providerFetch(model.providerID, s.proxy[model.providerID], customFetch ?? fetch)
         delete options["chunkTimeout"]
 
         options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
