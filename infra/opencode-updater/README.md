@@ -13,7 +13,8 @@ Endpoints:
 ## Use
 
 1. Edit `appsettings.json`
-2. Set `Updater.Version`
+2. Put a `feed/latest.yml` with `version:` if you want server version to come from the feed
+3. `Updater.Version` is fallback if no local `feed/latest.yml` version exists
 3. Restart container
 
 ## Provider config
@@ -215,6 +216,8 @@ docker run -d --name opencode-updater-test -p 8080:8080 `
 ```
 
 If file exists in `feed/`, server serves local file instead of proxying GitHub.
+
+If `feed/latest.yml` exists and contains a `version:` line, `/opencode/version` and upstream proxy version resolution use that value first. `Updater.Version` is only fallback when no local feed version can be read.
 
 Default upstream artifacts come from:
 

@@ -11,6 +11,30 @@ import { jsonRequest, runRequest } from "./trace"
 export const McpRoutes = lazy(() =>
   new Hono()
     .get(
+      "/managed",
+      describeRoute({
+        summary: "Get managed MCP servers",
+        description: "Get server-managed MCP configuration and authentication metadata.",
+        operationId: "mcp.managed",
+        responses: {
+          200: {
+            description: "Managed MCP servers",
+            content: {
+              "application/json": {
+                schema: resolver(z.record(z.string(), z.any())),
+              },
+            },
+          },
+        },
+      }),
+      async (c) =>
+        jsonRequest("McpRoutes.managed", c, function* () {
+          const mcp = yield* MCP.Service
+          if (!mcp.managed) return {}
+          return yield* mcp.managed()
+        }),
+    )
+    .get(
       "/",
       describeRoute({
         summary: "Get MCP status",

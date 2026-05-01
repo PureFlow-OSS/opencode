@@ -4,7 +4,7 @@ import { Dialog } from "@opencode-ai/ui/dialog"
 import { Tag } from "@opencode-ai/ui/tag"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { showToast } from "@opencode-ai/ui/toast"
-import { createMemo, For, Show, type Component } from "solid-js"
+import { createEffect, createMemo, createResource, For, Show, type Component } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
@@ -88,7 +88,16 @@ export const SettingsMcp: Component = () => {
   const language = useLanguage()
   const globalSync = useGlobalSync()
   const globalSDK = useGlobalSDK()
-  const managed = createMemo(() => ({} as Record<string, ManagedServer>))
+  const [managedData] = createResource<Record<string, ManagedServer>>(() =>
+    globalSDK
+      .request("/mcp/managed")
+      .then((res) => (res.ok ? (res.json() as Promise<Record<string, ManagedServer>>) : {})),
+  )
+  const [mcpStatus, { mutate: setMcpStatus }] = createResource<Record<string, { status: string }>>(() =>
+    globalSDK.client.mcp.status().then((res) => res.data ?? {}),
+  )
+  const managed = createMemo(() => managedData.latest ?? {})
+  const prompted = new Set<string>()
 
   const servers = createMemo<ServerItem[]>(() => {
     const items: ServerItem[] = []
@@ -107,6 +116,7 @@ export const SettingsMcp: Component = () => {
           source: "managed",
           managed: managedServer,
           local: local && "type" in local ? (local as McpConfig) : undefined,
+          status: mcpStatus.latest?.[name]?.status,
         })
         continue
       }
@@ -115,6 +125,7 @@ export const SettingsMcp: Component = () => {
         name,
         source: "local",
         config: local as McpConfig,
+        status: mcpStatus.latest?.[name]?.status,
       })
     }
     items.sort((a, b) => a.name.localeCompare(b.name))
@@ -155,6 +166,7 @@ export const SettingsMcp: Component = () => {
     }
     await globalSync.updateConfig({ mcp: existing })
     await globalSDK.client.mcp.connect({ name: server.name }).catch(() => undefined)
+    setMcpStatus(await globalSDK.client.mcp.status().then((res) => res.data ?? {}))
     showToast({
       variant: "success",
       icon: "circle-check",
@@ -162,6 +174,28 @@ export const SettingsMcp: Component = () => {
       description: "Managed MCP token saved.",
     })
   }
+
+  createEffect(() => {
+    const item = servers().find((server) => {
+      if (server.source !== "managed") return false
+      if (server.managed.auth?.type !== "pat") return false
+      if (server.local?.type === "remote") {
+        const header = server.managed.auth.header ?? "Authorization"
+        if (server.local.headers?.[header]) return false
+      }
+      return !prompted.has(server.name)
+    })
+    if (!item || item.source !== "managed") return
+    prompted.add(item.name)
+    dialog.show(() => (
+      <DialogManagedMcpPat
+        name={item.name}
+        managed={item.managed}
+        current={patValue(item)}
+        onSave={(token) => saveManagedPat(item, token)}
+      />
+    ))
+  })
 
   const deleteServer = async (name: string) => {
     const existing = { ...(globalSync.data.config.mcp ?? {}) }

@@ -237,6 +237,19 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
     return {
       url: currentServer.http.url,
       client: sdk,
+      request(path: string, init?: RequestInit) {
+        const headers = new Headers(init?.headers)
+        if (currentServer.http.password) {
+          headers.set(
+            "Authorization",
+            `Basic ${btoa(`${currentServer.http.username ?? "opencode"}:${currentServer.http.password}`)}`,
+          )
+        }
+        return (platform.fetch ?? fetch)(`${currentServer.http.url}${path}`, {
+          ...init,
+          headers,
+        })
+      },
       event: {
         on: emitter.on.bind(emitter),
         listen: emitter.listen.bind(emitter),

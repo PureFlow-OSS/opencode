@@ -73,6 +73,20 @@ export const Failed = NamedError.create(
 
 type MCPClient = Client
 
+export type ManagedAuth = {
+  type: "pat"
+  label?: string
+  description?: string
+  placeholder?: string
+  header?: string
+  prefix?: string
+}
+
+export type ManagedServer = {
+  config: ConfigMCP.Info
+  auth?: ManagedAuth
+}
+
 const StatusConnected = Schema.Struct({ status: Schema.Literal("connected") }).annotate({
   identifier: "MCPStatusConnected",
 })
@@ -117,13 +131,27 @@ function isMcpConfigured(entry: McpEntry): entry is ConfigMCP.Info {
 let managedMcpCache:
   | {
       expires: number
-      value: Record<string, ConfigMCP.Info>
+      value: Record<string, ManagedServer>
     }
   | undefined
 
-async function discoverManagedMcpConfig(fetchFn: typeof fetch = fetch) {
+function parseManagedAuth(value: unknown): ManagedAuth | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return
+  const input = value as Record<string, unknown>
+  if (input.type !== "pat") return
+  return {
+    type: "pat",
+    label: typeof input.label === "string" ? input.label : undefined,
+    description: typeof input.description === "string" ? input.description : undefined,
+    placeholder: typeof input.placeholder === "string" ? input.placeholder : undefined,
+    header: typeof input.header === "string" ? input.header : undefined,
+    prefix: typeof input.prefix === "string" ? input.prefix : undefined,
+  }
+}
+
+async function discoverManagedMcp(fetchFn: typeof fetch = fetch): Promise<Record<string, ManagedServer>> {
   if (managedMcpCache && managedMcpCache.expires > Date.now()) return managedMcpCache.value
-  const value = await fetchFn(MANAGED_MCP_CONFIG_URL, {
+  const value: Record<string, ManagedServer> = await fetchFn(MANAGED_MCP_CONFIG_URL, {
     signal: AbortSignal.timeout(3000),
   })
     .then(async (res) => {
@@ -137,16 +165,30 @@ async function discoverManagedMcpConfig(fetchFn: typeof fetch = fetch) {
           const { auth: _, ...rest } = config as Record<string, unknown>
           const parsed = ConfigMCP.Info.zod.safeParse(rest)
           if (!parsed.success) return []
-          return [[name, parsed.data] as const]
+          return [
+            [name, { config: parsed.data, auth: parseManagedAuth((config as Record<string, unknown>).auth) }] as const,
+          ]
         }),
       )
     })
-    .catch(() => ({} satisfies Record<string, ConfigMCP.Info>))
+    .catch(() => ({} satisfies Record<string, ManagedServer>))
   managedMcpCache = {
     expires: Date.now() + MANAGED_MCP_CACHE_TTL,
     value,
   }
   return value
+}
+
+async function discoverManagedMcpConfig(fetchFn: typeof fetch = fetch): Promise<Record<string, ConfigMCP.Info>> {
+  const managed = await discoverManagedMcp(fetchFn)
+  return Object.fromEntries(Object.entries(managed).map(([name, server]) => [name, server.config] as const))
+}
+
+function needsManagedPat(server: ManagedServer | undefined, mcp: ConfigMCP.Info) {
+  if (server?.auth?.type !== "pat") return false
+  if (mcp.type !== "remote") return false
+  const header = server.auth.header ?? "Authorization"
+  return !mcp.headers?.[header]
 }
 
 const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9_-]/g, "_")
@@ -242,6 +284,7 @@ interface State {
 
 export interface Interface {
   readonly status: () => Effect.Effect<Record<string, Status>>
+  readonly managed?: () => Effect.Effect<Record<string, ManagedServer>>
   readonly clients: () => Effect.Effect<Record<string, MCPClient>>
   readonly tools: () => Effect.Effect<Record<string, Tool>>
   readonly prompts: () => Effect.Effect<Record<string, PromptInfo & { client: string }>>
@@ -477,6 +520,7 @@ export const layer = Layer.effect(
         ...(cfg.mcp ?? {}),
       } satisfies Record<string, McpEntry>
     })
+    const managed = () => Effect.promise(() => discoverManagedMcp())
 
     const descendants = Effect.fnUntraced(
       function* (pid: number) {
@@ -519,6 +563,7 @@ export const layer = Layer.effect(
     const state = yield* InstanceState.make<State>(
       Effect.fn("MCP.state")(function* () {
         const config: Record<string, McpEntry> = yield* mergedMcpConfig()
+        const managedConfig: Record<string, ManagedServer> = yield* managed()
         const bridge = yield* EffectBridge.make()
         const s: State = {
           status: {},
@@ -537,6 +582,11 @@ export const layer = Layer.effect(
 
               if (mcp.enabled === false) {
                 s.status[key] = { status: "disabled" }
+                return
+              }
+
+              if (needsManagedPat(managedConfig[key], mcp)) {
+                s.status[key] = { status: "needs_auth" }
                 return
               }
 
@@ -624,6 +674,13 @@ export const layer = Layer.effect(
 
     const createAndStore = Effect.fn("MCP.createAndStore")(function* (name: string, mcp: ConfigMCP.Info) {
       const s = yield* InstanceState.get(state)
+      const managedConfig: Record<string, ManagedServer> = yield* managed()
+      if (needsManagedPat(managedConfig[name], mcp)) {
+        yield* closeClient(s, name)
+        delete s.clients[name]
+        s.status[name] = { status: "needs_auth" }
+        return s.status[name]
+      }
       const result = yield* create(name, mcp)
 
       s.status[name] = result.status
@@ -925,6 +982,7 @@ export const layer = Layer.effect(
 
     return Service.of({
       status,
+      managed,
       clients,
       tools,
       prompts,

@@ -23,6 +23,7 @@ const AuthRemoveResponse = Schema.Struct({
 
 export const McpPaths = {
   status: "/mcp",
+  managed: "/mcp/managed",
   auth: "/mcp/:name/auth",
   authCallback: "/mcp/:name/auth/callback",
   authAuthenticate: "/mcp/:name/auth/authenticate",
@@ -41,6 +42,15 @@ export const McpApi = HttpApi.make("mcp")
             identifier: "mcp.status",
             summary: "Get MCP status",
             description: "Get the status of all Model Context Protocol (MCP) servers.",
+          }),
+        ),
+        HttpApiEndpoint.get("managed", McpPaths.managed, {
+          success: Schema.Record(Schema.String, Schema.Any),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "mcp.managed",
+            summary: "Get managed MCP servers",
+            description: "Get server-managed MCP configuration and authentication metadata.",
           }),
         ),
         HttpApiEndpoint.post("add", McpPaths.status, {
@@ -137,6 +147,10 @@ export const mcpHandlers = Layer.unwrap(
     const status = Effect.fn("McpHttpApi.status")(function* () {
       return yield* mcp.status()
     })
+    const managed = Effect.fn("McpHttpApi.managed")(function* () {
+      if (!mcp.managed) return {}
+      return yield* mcp.managed()
+    })
 
     const add = Effect.fn("McpHttpApi.add")(function* (ctx: { payload: typeof AddPayload.Type }) {
       const result = (yield* mcp.add(ctx.payload.name, ctx.payload.config)).status
@@ -180,6 +194,7 @@ export const mcpHandlers = Layer.unwrap(
     return HttpApiBuilder.group(McpApi, "mcp", (handlers) =>
       handlers
         .handle("status", status)
+        .handle("managed", managed)
         .handle("add", add)
         .handle("authStart", authStart)
         .handle("authCallback", authCallback)

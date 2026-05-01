@@ -25,8 +25,9 @@ import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { Dialog } from "@opencode-ai/ui/dialog"
+import { TextField } from "@opencode-ai/ui/text-field"
 import { getFilename } from "@opencode-ai/core/util/path"
-import { Session, type Message } from "@opencode-ai/sdk/v2/client"
+import { Session, type McpLocalConfig, type McpRemoteConfig, type Message } from "@opencode-ai/sdk/v2/client"
 import { usePlatform } from "@/context/platform"
 import { useSettings } from "@/context/settings"
 import { createStore, produce, reconcile } from "solid-js/store"
@@ -538,8 +539,107 @@ export default function Layout(props: ParentProps) {
       })
     })
 
+  const useManagedMcpPatPrompt = () => {
+    type ManagedAuth = {
+      type: "pat"
+      label?: string
+      description?: string
+      placeholder?: string
+      header?: string
+      prefix?: string
+    }
+    type ManagedServer = {
+      config: McpLocalConfig | McpRemoteConfig
+      auth?: ManagedAuth
+    }
+    const prompted = new Set<string>()
+    const [managedData] = createResource<Record<string, ManagedServer>>(() =>
+      globalSDK
+        .request("/mcp/managed")
+        .then((res) => (res.ok ? (res.json() as Promise<Record<string, ManagedServer>>) : {})),
+    )
+
+    function DialogManagedMcpPat(props: { name: string; managed: ManagedServer }) {
+      const [store, setDialogStore] = createStore({
+        token: "",
+        saving: false,
+      })
+      const save = async (e: SubmitEvent) => {
+        e.preventDefault()
+        const token = store.token.trim()
+        if (!token || store.saving) return
+        if (!props.managed.config || props.managed.config.type !== "remote") return
+        setDialogStore("saving", true)
+        const header = props.managed.auth?.header ?? "Authorization"
+        const prefix = props.managed.auth?.prefix ?? ""
+        await globalSync
+          .updateConfig({
+            mcp: {
+              ...(globalSync.data.config.mcp ?? {}),
+              [props.name]: {
+                ...props.managed.config,
+                headers: {
+                  ...(props.managed.config.headers ?? {}),
+                  [header]: `${prefix}${token}`,
+                },
+              },
+            },
+          })
+          .then(() => globalSDK.client.mcp.connect({ name: props.name }).catch(() => undefined))
+          .finally(() => setDialogStore("saving", false))
+        dialog.close()
+      }
+      return (
+        <Dialog title={props.managed.auth?.label ?? "PAT"} transition>
+          <form onSubmit={save} class="flex flex-col gap-4 px-2.5 pb-3">
+            <div class="text-14-regular text-text-weak">
+              {props.managed.auth?.description ?? "Enter your personal access token."}
+            </div>
+            <TextField
+              autofocus
+              type="password"
+              label={props.managed.auth?.label ?? "PAT"}
+              placeholder={props.managed.auth?.placeholder ?? "Personal access token"}
+              value={store.token}
+              onChange={(value) => setDialogStore("token", value)}
+            />
+            <div class="flex gap-3">
+              <Button type="submit" size="large" variant="primary" disabled={!store.token.trim() || store.saving}>
+                {store.saving ? language.t("common.saving") : language.t("common.save")}
+              </Button>
+              <Button type="button" size="large" variant="ghost" onClick={() => dialog.close()}>
+                {language.t("common.cancel")}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
+      )
+    }
+
+    createEffect(() => {
+      const managed = managedData.latest ?? {}
+      const entry = Object.entries(managed).find(([name, server]) => {
+        if (prompted.has(name)) return false
+        if (server.auth?.type !== "pat") return false
+        const config = globalSync.data.config.mcp?.[name]
+        if (
+          config &&
+          "type" in config &&
+          config.type === "remote" &&
+          config.headers?.[server.auth.header ?? "Authorization"]
+        )
+          return false
+        return true
+      })
+      if (!entry) return
+      prompted.add(entry[0])
+      dialog.show(() => <DialogManagedMcpPat name={entry[0]} managed={entry[1]} />)
+    })
+  }
+
   useUpdatePolling()
   useSDKNotificationToasts()
+  useManagedMcpPatPrompt()
 
   function scrollToSession(sessionId: string, sessionKey: string) {
     if (!scrollContainerRef) return

@@ -7,14 +7,15 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<UpdaterOptions>(builder.Configuration.GetSection("Updater"));
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton(new LocalFeed(Path.Combine(builder.Environment.ContentRootPath, "feed")));
+builder.Services.AddSingleton<UpdaterVersionResolver>();
 
 var app = builder.Build();
 
 app.MapGet("/", () => Results.Redirect("/opencode/version"));
 
-app.MapGet("/opencode/version", (IOptions<UpdaterOptions> options) =>
+app.MapGet("/opencode/version", (UpdaterVersionResolver versionResolver) =>
 {
-  return Results.Text(options.Value.Version.Trim(), "text/plain");
+  return Results.Text(versionResolver.Resolve(), "text/plain");
 });
 
 app.MapGet("/opencode/url", (HttpRequest request, IOptions<UpdaterOptions> options) =>
@@ -25,10 +26,10 @@ app.MapGet("/opencode/url", (HttpRequest request, IOptions<UpdaterOptions> optio
   );
 });
 
-app.MapGet("/opencode/latest.json", async (HttpContext context, IHttpClientFactory clientFactory, IOptions<UpdaterOptions> options, LocalFeed feed) =>
+app.MapGet("/opencode/latest.json", async (HttpContext context, IHttpClientFactory clientFactory, IOptions<UpdaterOptions> options, UpdaterVersionResolver versionResolver, LocalFeed feed) =>
 {
   if (feed.TryGet("latest.json", out var local)) return await LocalFileAsync(context, local);
-  return await ProxyAsync(context, clientFactory, BuildUpstreamUrl(options.Value, "latest.json"));
+  return await ProxyAsync(context, clientFactory, BuildUpstreamUrl(options.Value, versionResolver.Resolve(), "latest.json"));
 });
 
 app.MapGet("/opencode/provider-config.json", (IOptions<UpdaterOptions> options) =>
@@ -36,21 +37,21 @@ app.MapGet("/opencode/provider-config.json", (IOptions<UpdaterOptions> options) 
   return Results.Json(options.Value.ProviderConfig);
 });
 
-app.MapGet("/opencode/feed/{**asset}", async (HttpContext context, IHttpClientFactory clientFactory, IOptions<UpdaterOptions> options, LocalFeed feed, string? asset) =>
+app.MapGet("/opencode/feed/{**asset}", async (HttpContext context, IHttpClientFactory clientFactory, IOptions<UpdaterOptions> options, UpdaterVersionResolver versionResolver, LocalFeed feed, string? asset) =>
 {
   var resolvedAsset = (asset ?? "").TrimStart('/');
   if (string.IsNullOrWhiteSpace(resolvedAsset) || resolvedAsset.Contains("..", StringComparison.Ordinal))
     return Results.BadRequest();
 
   if (feed.TryGet(resolvedAsset, out var local)) return await LocalFileAsync(context, local);
-  return await ProxyAsync(context, clientFactory, BuildUpstreamUrl(options.Value, resolvedAsset));
+  return await ProxyAsync(context, clientFactory, BuildUpstreamUrl(options.Value, versionResolver.Resolve(), resolvedAsset));
 });
 
 app.Run();
 
-static string BuildUpstreamUrl(UpdaterOptions options, string asset)
+static string BuildUpstreamUrl(UpdaterOptions options, string version, string asset)
 {
-  return $"{options.ReleaseBaseUrlTemplate.Replace("{{version}}", options.Version.Trim(), StringComparison.Ordinal).TrimEnd('/')}/{asset}";
+  return $"{options.ReleaseBaseUrlTemplate.Replace("{{version}}", version.Trim(), StringComparison.Ordinal).TrimEnd('/')}/{asset}";
 }
 
 static string GetPublicBaseUrl(UpdaterOptions options, HttpRequest request)
@@ -231,5 +232,29 @@ sealed class LocalFeed(string root)
   {
     file = Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar));
     return File.Exists(file);
+  }
+
+  public string? TryReadVersionFromLatestYml()
+  {
+    var path = Path.Combine(root, "latest.yml");
+    if (!File.Exists(path)) return null;
+
+    var version = File
+      .ReadLines(path)
+      .Select((line) => line.Trim())
+      .FirstOrDefault((line) => line.StartsWith("version:", StringComparison.OrdinalIgnoreCase));
+
+    if (string.IsNullOrWhiteSpace(version)) return null;
+
+    var value = version["version:".Length..].Trim().Trim('"');
+    return string.IsNullOrWhiteSpace(value) ? null : value;
+  }
+}
+
+sealed class UpdaterVersionResolver(IOptions<UpdaterOptions> options, LocalFeed feed)
+{
+  public string Resolve()
+  {
+    return feed.TryReadVersionFromLatestYml() ?? options.Value.Version.Trim();
   }
 }
