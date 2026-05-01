@@ -5,8 +5,8 @@ import { Font } from "@opencode-ai/ui/font"
 import { Splash } from "@opencode-ai/ui/logo"
 import { Progress } from "@opencode-ai/ui/progress"
 import "./styles.css"
-import { createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js"
-import type { InitStep, SqliteMigrationProgress } from "../preload/types"
+import { Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js"
+import type { InitStep, Motd, SqliteMigrationProgress } from "../preload/types"
 
 const root = document.getElementById("root")!
 const lines = ["Just a moment...", "Migrating your database", "This may take a couple of minutes"]
@@ -16,6 +16,7 @@ render(() => {
   const [step, setStep] = createSignal<InitStep | null>(null)
   const [line, setLine] = createSignal(0)
   const [percent, setPercent] = createSignal(0)
+  const [motd, setMotd] = createSignal<Motd | null>(null)
 
   const phase = createMemo(() => step()?.phase)
 
@@ -39,6 +40,8 @@ render(() => {
         setStep({ phase: "done" })
       }
     })
+
+    window.api.getMotd().then(setMotd).catch(() => undefined)
 
     onCleanup(() => {
       listener()
@@ -75,6 +78,11 @@ render(() => {
               aria-label="Database migration progress"
               getValueLabel={({ value }) => `${Math.round(value)}%`}
             />
+            <Show when={motd()?.enabled && motd()?.text}>
+              <span class="w-80 max-w-[calc(100vw-4rem)] overflow-hidden text-center text-ellipsis whitespace-nowrap text-text-muted text-12-normal">
+                {motd()?.text}
+              </span>
+            </Show>
           </div>
         </div>
       </div>

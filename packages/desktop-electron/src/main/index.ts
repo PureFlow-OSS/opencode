@@ -82,6 +82,9 @@ const pendingDeepLinks: string[] = []
 
 const serverReady = defer<ServerReadyData>()
 const logger = initLogging()
+let updateServerConfig: Awaited<ReturnType<typeof updateServer.fetch>> | undefined
+let updateServerConfigPromise: ReturnType<typeof updateServer.fetch> | undefined
+const defaultMotd = { enabled: true, text: "RRZ AI Factory" }
 
 logger.log("app starting", {
   version: app.getVersion(),
@@ -89,6 +92,7 @@ logger.log("app starting", {
 })
 
 setupApp()
+void getUpdateServerConfig()
 
 function setupApp() {
   ensureLoopbackNoProxy()
@@ -274,6 +278,11 @@ registerIpcHandlers({
       initEmitter.off("step", listener)
     }
   },
+  getMotd: async () => {
+    const motd = (await getUpdateServerConfig())?.motd
+    if (motd?.enabled === false) return null
+    return motd ?? defaultMotd
+  },
   getWindowConfig: () => ({ updaterEnabled: UPDATER_ENABLED }),
   consumeInitialDeepLinks: () => pendingDeepLinks.splice(0),
   getDefaultServerUrl: () => getDefaultServerUrl(),
@@ -386,6 +395,15 @@ function setupAutoUpdater() {
 
 let downloadedUpdateVersion: string | undefined
 
+async function getUpdateServerConfig(refresh = false) {
+  if (!refresh && updateServerConfig !== undefined) return updateServerConfig
+  if (!refresh && updateServerConfigPromise) return updateServerConfigPromise
+  updateServerConfigPromise = updateServer.fetch()
+  updateServerConfig = await updateServerConfigPromise
+  updateServerConfigPromise = undefined
+  return updateServerConfig
+}
+
 async function checkUpdate() {
   if (!UPDATER_ENABLED) return { updateAvailable: false }
   if (downloadedUpdateVersion) {
@@ -394,7 +412,7 @@ async function checkUpdate() {
     })
     return { updateAvailable: true, version: downloadedUpdateVersion }
   }
-  const remote = await updateServer.fetch()
+  const remote = await getUpdateServerConfig(true)
   if (!remote) {
     logger.log("update server unreachable")
     return { updateAvailable: false }

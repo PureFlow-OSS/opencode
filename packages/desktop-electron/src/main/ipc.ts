@@ -4,6 +4,7 @@ import type { IpcMainEvent, IpcMainInvokeEvent } from "electron"
 
 import type {
   InitStep,
+  Motd,
   ServerReadyData,
   SqliteMigrationProgress,
   TitlebarTheme,
@@ -21,6 +22,7 @@ const pickerFilters = (ext?: string[]) => {
 type Deps = {
   killSidecar: () => void
   awaitInitialization: (sendStep: (step: InitStep) => void) => Promise<ServerReadyData>
+  getMotd: () => Promise<Motd | null> | Motd | null
   getWindowConfig: () => Promise<WindowConfig> | WindowConfig
   consumeInitialDeepLinks: () => Promise<string[]> | string[]
   getDefaultServerUrl: () => Promise<string | null> | string | null
@@ -46,6 +48,7 @@ export function registerIpcHandlers(deps: Deps) {
     const send = (step: InitStep) => event.sender.send("init-step", step)
     return deps.awaitInitialization(send)
   })
+  ipcMain.handle("get-motd", () => deps.getMotd())
   ipcMain.handle("get-window-config", () => deps.getWindowConfig())
   ipcMain.handle("consume-initial-deep-links", () => deps.consumeInitialDeepLinks())
   ipcMain.handle("get-default-server-url", () => deps.getDefaultServerUrl())

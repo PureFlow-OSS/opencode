@@ -8,6 +8,11 @@ export type ServerReadyData = {
 
 export type SqliteMigrationProgress = { type: "InProgress"; value: number } | { type: "Done" }
 
+export type Motd = {
+  enabled: boolean
+  text: string
+}
+
 export type WslConfig = { enabled: boolean }
 
 export type LinuxDisplayBackend = "wayland" | "auto"
@@ -23,6 +28,7 @@ export type ElectronAPI = {
   killSidecar: () => Promise<void>
   installCli: () => Promise<string>
   awaitInitialization: (onStep: (step: InitStep) => void) => Promise<ServerReadyData>
+  getMotd: () => Promise<Motd | null>
   getWindowConfig: () => Promise<WindowConfig>
   consumeInitialDeepLinks: () => Promise<string[]>
   getDefaultServerUrl: () => Promise<string | null>

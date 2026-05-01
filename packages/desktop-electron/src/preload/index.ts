@@ -11,6 +11,7 @@ const api: ElectronAPI = {
       ipcRenderer.removeListener("init-step", handler)
     })
   },
+  getMotd: () => ipcRenderer.invoke("get-motd"),
   getWindowConfig: () => ipcRenderer.invoke("get-window-config"),
   consumeInitialDeepLinks: () => ipcRenderer.invoke("consume-initial-deep-links"),
   getDefaultServerUrl: () => ipcRenderer.invoke("get-default-server-url"),

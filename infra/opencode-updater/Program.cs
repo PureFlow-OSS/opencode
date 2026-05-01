@@ -26,6 +26,16 @@ app.MapGet("/opencode/url", (HttpRequest request, IOptions<UpdaterOptions> optio
   );
 });
 
+app.MapGet("/opencode/config", (HttpRequest request, IOptions<UpdaterOptions> options, UpdaterVersionResolver versionResolver) =>
+{
+  return Results.Json(new
+  {
+    version = versionResolver.Resolve(),
+    url = $"{GetPublicBaseUrl(options.Value, request).TrimEnd('/')}/opencode/feed",
+    motd = options.Value.Motd,
+  });
+});
+
 app.MapGet("/opencode/latest.json", async (HttpContext context, IHttpClientFactory clientFactory, IOptions<UpdaterOptions> options, UpdaterVersionResolver versionResolver, LocalFeed feed) =>
 {
   if (feed.TryGet("latest.json", out var local)) return await LocalFileAsync(context, local);
@@ -111,11 +121,27 @@ sealed class UpdaterOptions
   public string Version { get; set; } = "1.14.28";
   public string PublicBaseUrl { get; set; } = "http://10.53.7.23";
   public string ReleaseBaseUrlTemplate { get; set; } = "https://github.com/anomalyco/opencode/releases/download/v{{version}}";
+  public MotdOptions Motd { get; set; } = new();
   public ProviderConfigOptions ProviderConfig { get; set; } = new();
+}
+
+sealed class MotdOptions
+{
+  [JsonPropertyName("text")]
+  public string Text { get; set; } = "RRZ AI Factory";
+
+  [JsonPropertyName("enabled")]
+  public bool Enabled { get; set; } = true;
 }
 
 sealed class ProviderConfigOptions
 {
+  [JsonPropertyName("model")]
+  public string? Model { get; set; }
+
+  [JsonPropertyName("small_model")]
+  public string? SmallModel { get; set; }
+
   [JsonPropertyName("aifactory")]
   public AiFactoryConfigOptions AiFactory { get; set; } = new();
 

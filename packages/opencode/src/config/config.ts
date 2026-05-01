@@ -561,6 +561,17 @@ export const layer = Layer.effect(
         const global = yield* getGlobal()
         yield* merge(Global.Path.config, global, "global")
 
+        const remoteProviderConfig = yield* Effect.promise(() => ConfigManaged.readProviderConfig())
+        yield* merge(
+          "updater-provider-config",
+          {
+            model: typeof remoteProviderConfig.model === "string" ? remoteProviderConfig.model : undefined,
+            small_model:
+              typeof remoteProviderConfig.small_model === "string" ? remoteProviderConfig.small_model : undefined,
+          },
+          "global",
+        )
+
         if (Flag.OPENCODE_CONFIG) {
           yield* merge(Flag.OPENCODE_CONFIG, yield* loadFile(Flag.OPENCODE_CONFIG))
           log.debug("loaded custom config", { path: Flag.OPENCODE_CONFIG })

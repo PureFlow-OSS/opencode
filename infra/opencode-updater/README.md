@@ -6,6 +6,7 @@ Endpoints:
 
 - `GET /opencode/version`
 - `GET /opencode/url`
+- `GET /opencode/config`
 - `GET /opencode/latest.json`
 - `GET /opencode/provider-config.json`
 - `GET /opencode/feed/{asset}`
@@ -21,6 +22,9 @@ Endpoints:
 
 The updater can also serve provider-side rollout config for the desktop app.
 
+Set `ProviderConfig.model` to provision the default model. Local or project config can still override it with `model`.
+Set `ProviderConfig.small_model` to provision the default small model.
+
 ## Full sample config
 
 This is a complete example with:
@@ -35,7 +39,12 @@ This is a complete example with:
     "Version": "1.14.28",
     "PublicBaseUrl": "http://10.53.7.23",
     "ReleaseBaseUrlTemplate": "https://github.com/anomalyco/opencode/releases/download/v{{version}}",
+    "Motd": {
+      "text": "RRZ AI Factory",
+      "enabled": true
+    },
     "ProviderConfig": {
+      "model": "aifactory/Qwen3.6-35B-A3B-FP8",
       "aifactory": {
         "model_limits": [
           {
@@ -88,6 +97,23 @@ This is a complete example with:
   "AllowedHosts": "*"
 }
 ```
+
+## Desktop config
+
+`/opencode/config` returns the update version, feed URL, and the desktop boot MOTD:
+
+```json
+{
+  "version": "1.14.28",
+  "url": "http://10.53.7.23/opencode/feed",
+  "motd": {
+    "text": "RRZ AI Factory",
+    "enabled": true
+  }
+}
+```
+
+If `Updater.Motd` is not configured, the server defaults to `RRZ AI Factory`. Set `Updater.Motd.enabled` to `false` to hide it.
 
 ## Model rollout example
 
@@ -178,6 +204,8 @@ If you want to override a small part without replacing the full JSON file:
 
 ```powershell
 $env:Updater__Version = "1.14.29"
+$env:Updater__Motd__text = "RRZ AI Factory"
+$env:Updater__Motd__enabled = "true"
 $env:Updater__ProviderConfig__aifactory__model_limits__0__pattern = "qwen*"
 $env:Updater__ProviderConfig__aifactory__model_limits__0__context = "200000"
 $env:Updater__ProviderConfig__aifactory__model_limits__1__pattern = "*"
@@ -197,6 +225,8 @@ Container image CI publishes to:
 Optional env overrides:
 
 - `Updater__Version`
+- `Updater__Motd__text`
+- `Updater__Motd__enabled`
 - `Updater__PublicBaseUrl`
 - `Updater__ReleaseBaseUrlTemplate`
 - `Updater__ProviderConfig__aifactory__model_limits__0__pattern`
