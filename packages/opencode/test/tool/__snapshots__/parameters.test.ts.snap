@@ -287,6 +287,71 @@ exports[`tool parameters JSON Schema (wire shape) plan 1`] = `
 }
 `;
 
+exports[`tool parameters JSON Schema (wire shape) playwright 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "action": {
+      "description": "Browser action to perform",
+      "enum": [
+        "navigate",
+        "screenshot",
+        "click",
+        "type",
+        "evaluate",
+        "text",
+        "close",
+      ],
+      "type": "string",
+    },
+    "executable_path": {
+      "description": "Path to a Chrome, Chromium, or Edge executable. If omitted, OPENCODE_PLAYWRIGHT_EXECUTABLE_PATH or an installed Chrome/Edge channel is used.",
+      "type": "string",
+    },
+    "full_page": {
+      "description": "Capture the full page for screenshots",
+      "type": "boolean",
+    },
+    "height": {
+      "description": "Viewport height in pixels",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": "integer",
+    },
+    "script": {
+      "description": "JavaScript expression or function body to evaluate in the page. Required for evaluate.",
+      "type": "string",
+    },
+    "selector": {
+      "description": "CSS selector for click, type, or text. Defaults to body for text.",
+      "type": "string",
+    },
+    "text": {
+      "description": "Text to type. Required for type.",
+      "type": "string",
+    },
+    "timeout": {
+      "description": "Optional timeout in milliseconds (max 120000)",
+      "type": "number",
+    },
+    "url": {
+      "description": "URL to navigate to. Required for navigate.",
+      "type": "string",
+    },
+    "width": {
+      "description": "Viewport width in pixels",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": "integer",
+    },
+  },
+  "required": [
+    "action",
+  ],
+  "type": "object",
+}
+`;
+
 exports[`tool parameters JSON Schema (wire shape) question 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",

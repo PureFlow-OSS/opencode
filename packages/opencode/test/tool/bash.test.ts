@@ -236,7 +236,7 @@ describe("tool.bash", () => {
             ctx,
           ),
         )
-        const processID = started.metadata.process_id as string
+        const processID = (started.metadata as Record<string, unknown>).process_id as string
         expect(processID).toBeTruthy()
 
         let output = ""

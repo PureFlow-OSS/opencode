@@ -20,6 +20,7 @@ import { Parameters as Grep } from "../../src/tool/grep"
 import { Parameters as Invalid } from "../../src/tool/invalid"
 import { Parameters as Lsp } from "../../src/tool/lsp"
 import { Parameters as Plan } from "../../src/tool/plan"
+import { Parameters as Playwright } from "../../src/tool/playwright"
 import { Parameters as Question } from "../../src/tool/question"
 import { Parameters as Read } from "../../src/tool/read"
 import { Parameters as Skill } from "../../src/tool/skill"
@@ -28,6 +29,7 @@ import { Parameters as Todo } from "../../src/tool/todo"
 import { Parameters as WebFetch } from "../../src/tool/webfetch"
 import { Parameters as WebSearch } from "../../src/tool/websearch"
 import { Parameters as Write } from "../../src/tool/write"
+import { ToolID } from "../../src/tool/schema"
 
 const parse = <S extends Schema.Decoder<unknown>>(schema: S, input: unknown): S["Type"] =>
   Schema.decodeUnknownSync(schema)(input)
@@ -48,6 +50,7 @@ describe("tool parameters", () => {
     test("invalid", () => expect(toJsonSchema(Invalid)).toMatchSnapshot())
     test("lsp", () => expect(toJsonSchema(Lsp)).toMatchSnapshot())
     test("plan", () => expect(toJsonSchema(Plan)).toMatchSnapshot())
+    test("playwright", () => expect(toJsonSchema(Playwright)).toMatchSnapshot())
     test("question", () => expect(toJsonSchema(Question)).toMatchSnapshot())
     test("read", () => expect(toJsonSchema(Read)).toMatchSnapshot())
     test("skill", () => expect(toJsonSchema(Skill)).toMatchSnapshot())
@@ -95,10 +98,10 @@ describe("tool parameters", () => {
 
   describe("bash_read", () => {
     test("accepts process_id only", () => {
-      expect(parse(BashRead, { process_id: "tool_123" }).process_id).toBe("tool_123")
+      expect(String(parse(BashRead, { process_id: ToolID.make("tool_123") }).process_id)).toBe("tool_123")
     })
     test("accepts optional stream, offset, limit", () => {
-      const parsed = parse(BashRead, { process_id: "tool_123", stream: "stderr", offset: 2, limit: 10 })
+      const parsed = parse(BashRead, { process_id: ToolID.make("tool_123"), stream: "stderr", offset: 2, limit: 10 })
       expect(parsed.stream).toBe("stderr")
       expect(parsed.offset).toBe(2)
       expect(parsed.limit).toBe(10)
@@ -107,7 +110,7 @@ describe("tool parameters", () => {
 
   describe("bash_stop", () => {
     test("accepts process_id", () => {
-      expect(parse(BashStop, { process_id: "tool_123" }).process_id).toBe("tool_123")
+      expect(String(parse(BashStop, { process_id: ToolID.make("tool_123") }).process_id)).toBe("tool_123")
     })
     test("rejects missing process_id", () => {
       expect(accepts(BashStop, {})).toBe(false)
@@ -202,6 +205,20 @@ describe("tool parameters", () => {
   describe("plan", () => {
     test("accepts empty object", () => {
       expect(parse(Plan, {})).toEqual({})
+    })
+  })
+
+  describe("playwright", () => {
+    test("accepts navigate", () => {
+      const parsed = parse(Playwright, { action: "navigate", url: "http://localhost:3000" })
+      expect(parsed.action).toBe("navigate")
+    })
+    test("accepts screenshot options", () => {
+      const parsed = parse(Playwright, { action: "screenshot", width: 1280, height: 720, full_page: true })
+      expect(parsed.full_page).toBe(true)
+    })
+    test("rejects unknown action", () => {
+      expect(accepts(Playwright, { action: "hover" })).toBe(false)
     })
   })
 

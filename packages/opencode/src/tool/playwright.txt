@@ -1,0 +1,15 @@
+Browser automation tool backed by Playwright Core.
+
+Use this tool when you need to inspect or interact with web pages, especially local development servers and dynamic pages that WebFetch cannot render. The tool keeps one headless system Chrome/Edge page alive across calls so you can navigate, click, type, evaluate JavaScript, read visible text, and take screenshots.
+
+Common workflow:
+1. navigate to a URL
+2. read text or take a screenshot
+3. click or type into selectors
+4. evaluate small JavaScript snippets when DOM inspection is needed
+
+Notes:
+- Use CSS selectors for click/type/text actions.
+- Use screenshot after meaningful visual changes.
+- Use close when the browser session is no longer needed.
+- opencode does not ship a browser binary for this tool. It uses Chrome/Edge installed on the machine, or OPENCODE_PLAYWRIGHT_EXECUTABLE_PATH / executable_path.

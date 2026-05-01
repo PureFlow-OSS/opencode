@@ -45,6 +45,16 @@ describe("tool.registry", () => {
     ),
   )
 
+  it.live("includes playwright as a built-in tool", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const registry = yield* ToolRegistry.Service
+        const ids = yield* registry.ids()
+        expect(ids).toContain("playwright")
+      }),
+    ),
+  )
+
   it.live("loads tools from .opencode/tools (plural)", () =>
     provideTmpdirInstance((dir) =>
       Effect.gen(function* () {

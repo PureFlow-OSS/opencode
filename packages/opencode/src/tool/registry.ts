@@ -30,6 +30,7 @@ import { Log } from "@/util"
 import { LspTool } from "./lsp"
 import * as Truncate from "./truncate"
 import { ApplyPatchTool } from "./apply_patch"
+import { PlaywrightTool } from "./playwright"
 import { Glob } from "@opencode-ai/core/util/glob"
 import path from "path"
 import { pathToFileURL } from "url"
@@ -121,6 +122,7 @@ export const layer: Layer.Layer<
     const greptool = yield* GrepTool
     const patchtool = yield* ApplyPatchTool
     const skilltool = yield* SkillTool
+    const playwright = yield* PlaywrightTool
     const agent = yield* Agent.Service
 
     const state = yield* InstanceState.make<State>(
@@ -208,6 +210,7 @@ export const layer: Layer.Layer<
           search: Tool.init(websearch),
           code: Tool.init(codesearch),
           skill: Tool.init(skilltool),
+          playwright: Tool.init(playwright),
           patch: Tool.init(patchtool),
           question: Tool.init(question),
           lsp: Tool.init(lsptool),
@@ -233,6 +236,7 @@ export const layer: Layer.Layer<
             tool.search,
             tool.code,
             tool.skill,
+            tool.playwright,
             tool.patch,
             ...(Flag.OPENCODE_EXPERIMENTAL_LSP_TOOL ? [tool.lsp] : []),
             ...(Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE && Flag.OPENCODE_CLIENT === "cli" ? [tool.plan] : []),
