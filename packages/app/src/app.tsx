@@ -37,6 +37,7 @@ import { LayoutProvider } from "@/context/layout"
 import { ModelsProvider } from "@/context/models"
 import { NotificationProvider } from "@/context/notification"
 import { PermissionProvider } from "@/context/permission"
+import { usePlatform } from "@/context/platform"
 import { PromptProvider } from "@/context/prompt"
 import { ServerConnection, ServerProvider, serverName, useServer } from "@/context/server"
 import { SettingsProvider } from "@/context/settings"
@@ -50,6 +51,7 @@ const HomeRoute = lazy(() => import("@/pages/home"))
 const loadSession = () => import("@/pages/session")
 const Session = lazy(loadSession)
 const Loading = () => <div class="size-full" />
+const defaultMotd = { enabled: true, text: "RRZ AI Factory" }
 
 if (typeof location === "object" && /\/session(?:\/|$)/.test(location.pathname)) {
   void loadSession()
@@ -184,9 +186,7 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
   return (
     <Suspense
       fallback={
-        <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
-          <Splash class="w-16 h-20 opacity-50 animate-pulse" />
-        </div>
+        <StartupSplash />
       }
     >
       {/*<Show
@@ -217,6 +217,20 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
       </Show>
       {/*</Show>*/}
     </Suspense>
+  )
+}
+
+function StartupSplash() {
+  const platform = usePlatform()
+  const [motd] = createResource(() => platform.getMotd?.().catch(() => defaultMotd), { initialValue: defaultMotd })
+
+  return (
+    <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base gap-6">
+      <Splash class="w-16 h-20 opacity-50 animate-pulse" />
+      <Show when={motd()?.enabled && motd()?.text}>
+        <div class="max-w-[calc(100vw-4rem)] text-center text-14-regular text-text-muted truncate">{motd()?.text}</div>
+      </Show>
+    </div>
   )
 }
 

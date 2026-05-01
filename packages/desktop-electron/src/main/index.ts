@@ -279,7 +279,9 @@ registerIpcHandlers({
     }
   },
   getMotd: async () => {
-    const motd = (await getUpdateServerConfig())?.motd
+    const motd = (
+      await Promise.race([getUpdateServerConfig(), delay(750).then(() => updateServerConfig)])
+    )?.motd
     if (motd?.enabled === false) return null
     return motd ?? defaultMotd
   },

@@ -8,6 +8,7 @@ type OpenDirectoryPickerOptions = { title?: string; multiple?: boolean }
 type OpenFilePickerOptions = { title?: string; multiple?: boolean; accept?: string[]; extensions?: string[] }
 type SaveFilePickerOptions = { title?: string; defaultPath?: string }
 type UpdateInfo = { updateAvailable: boolean; version?: string }
+type Motd = { enabled: boolean; text: string }
 
 export type Platform = {
   /** Platform discriminator */
@@ -57,6 +58,9 @@ export type Platform = {
 
   /** Fetch override */
   fetch?: typeof fetch
+
+  /** Optional startup message from host app */
+  getMotd?(): Promise<Motd | null>
 
   /** Get the configured default server URL (platform-specific) */
   getDefaultServer?(): Promise<ServerConnection.Key | null>

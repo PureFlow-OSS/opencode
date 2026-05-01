@@ -202,6 +202,8 @@ const createPlatform = (): Platform => {
       return fetch(input, init)
     },
 
+    getMotd: () => window.api.getMotd(),
+
     getWslEnabled: () => isWslEnabled(),
 
     setWslEnabled: async (enabled) => {
