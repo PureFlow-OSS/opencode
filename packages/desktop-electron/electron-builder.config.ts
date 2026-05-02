@@ -86,6 +86,7 @@ const getBase = (): Configuration => ({
   nsis: {
     oneClick: false,
     allowToChangeInstallationDirectory: true,
+    include: "resources/installer.nsh",
     installerIcon: `resources/icons/icon.ico`,
     installerHeaderIcon: `resources/icons/icon.ico`,
   },
