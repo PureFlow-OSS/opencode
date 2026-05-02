@@ -81,6 +81,7 @@ const getBase = (): Configuration => ({
         }
       : {}),
     target: ["nsis"],
+    verifyUpdateCodeSignature: false,
   },
   nsis: {
     oneClick: false,

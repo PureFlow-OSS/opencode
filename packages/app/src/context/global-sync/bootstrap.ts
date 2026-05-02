@@ -182,8 +182,11 @@ function warmSessions(input: {
   ).then(() => undefined)
 }
 
-export const loadProvidersQuery = (directory: string | null) =>
-  queryOptions<null>({ queryKey: [directory, "providers"], queryFn: skipToken })
+export const loadProvidersQuery = (directory: string | null, sdk?: OpencodeClient) =>
+  queryOptions({
+    queryKey: [directory, "providers"],
+    queryFn: sdk ? () => retry(() => sdk.provider.list().then((x) => normalizeProviderList(x.data!))) : skipToken,
+  })
 
 export const loadAgentsQuery = (
   directory: string | null,

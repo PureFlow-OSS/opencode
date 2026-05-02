@@ -1,3 +1,4 @@
+import { sentryVitePlugin } from "@sentry/vite-plugin"
 import { defineConfig } from "electron-vite"
 import appPlugin from "@opencode-ai/app/vite"
 import * as fs from "node:fs/promises"
@@ -13,6 +14,23 @@ const updateBaseUrl = process.env.OPENCODE_UPDATE_BASE_URL
 const OPENCODE_SERVER_DIST = "../opencode/dist/node"
 
 const nodePtyPkg = `@lydell/node-pty-${process.platform}-${process.arch}`
+
+const sentry =
+  process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT
+    ? sentryVitePlugin({
+        authToken: process.env.SENTRY_AUTH_TOKEN,
+        org: process.env.SENTRY_ORG,
+        project: process.env.SENTRY_PROJECT,
+        telemetry: false,
+        release: {
+          name: process.env.SENTRY_RELEASE ?? process.env.VITE_SENTRY_RELEASE,
+        },
+        sourcemaps: {
+          assets: "./out/renderer/**",
+          filesToDeleteAfterUpload: "./out/renderer/**/*.map",
+        },
+      })
+    : false
 
 export default defineConfig({
   main: {
@@ -64,7 +82,7 @@ export default defineConfig({
     },
   },
   renderer: {
-    plugins: [appPlugin],
+    plugins: [appPlugin, sentry],
     publicDir: "../../../app/public",
     root: "src/renderer",
     define: {
@@ -72,6 +90,7 @@ export default defineConfig({
       "import.meta.env.VITE_OPENCODE_UPDATE_BASE_URL": JSON.stringify(updateBaseUrl),
     },
     build: {
+      sourcemap: true,
       rollupOptions: {
         input: {
           main: "src/renderer/index.html",

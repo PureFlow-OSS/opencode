@@ -8,6 +8,21 @@ import { lazy } from "@/util/lazy"
 import { Effect } from "effect"
 import { jsonRequest, runRequest } from "./trace"
 
+const UnsupportedOAuthError = z
+  .object({
+    error: z.string(),
+  })
+  .meta({ ref: "McpUnsupportedOAuthError" })
+
+const unsupportedOAuthErrorResponse = {
+  description: "MCP server does not support OAuth",
+  content: {
+    "application/json": {
+      schema: resolver(UnsupportedOAuthError),
+    },
+  },
+}
+
 export const McpRoutes = lazy(() =>
   new Hono()
     .get(
@@ -109,7 +124,8 @@ export const McpRoutes = lazy(() =>
               },
             },
           },
-          ...errors(400, 404),
+          400: unsupportedOAuthErrorResponse,
+          ...errors(404),
         },
       }),
       async (c) => {
@@ -181,7 +197,8 @@ export const McpRoutes = lazy(() =>
               },
             },
           },
-          ...errors(400, 404),
+          400: unsupportedOAuthErrorResponse,
+          ...errors(404),
         },
       }),
       async (c) => {

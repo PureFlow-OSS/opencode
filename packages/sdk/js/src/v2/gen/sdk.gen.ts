@@ -29,7 +29,7 @@ import type {
   ExperimentalConsoleSwitchOrgResponses,
   ExperimentalResourceListResponses,
   ExperimentalSessionListResponses,
-  ExperimentalWorkspaceAdaptorListResponses,
+  ExperimentalWorkspaceAdapterListResponses,
   ExperimentalWorkspaceCreateErrors,
   ExperimentalWorkspaceCreateResponses,
   ExperimentalWorkspaceListResponses,
@@ -70,6 +70,7 @@ import type {
   McpConnectResponses,
   McpDisconnectResponses,
   McpLocalConfig,
+  McpManagedResponses,
   McpRemoteConfig,
   McpStatusResponses,
   OutputFormat,
@@ -512,11 +513,11 @@ export class App extends HeyApiClient {
   }
 }
 
-export class Adaptor extends HeyApiClient {
+export class Adapter extends HeyApiClient {
   /**
-   * List workspace adaptors
+   * List workspace adapters
    *
-   * List all available workspace adaptors for the current project.
+   * List all available workspace adapters for the current project.
    */
   public list<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -536,8 +537,8 @@ export class Adaptor extends HeyApiClient {
         },
       ],
     )
-    return (options?.client ?? this.client).get<ExperimentalWorkspaceAdaptorListResponses, unknown, ThrowOnError>({
-      url: "/experimental/workspace/adaptor",
+    return (options?.client ?? this.client).get<ExperimentalWorkspaceAdapterListResponses, unknown, ThrowOnError>({
+      url: "/experimental/workspace/adapter",
       ...options,
       ...params,
     })
@@ -731,9 +732,9 @@ export class Workspace extends HeyApiClient {
     })
   }
 
-  private _adaptor?: Adaptor
-  get adaptor(): Adaptor {
-    return (this._adaptor ??= new Adaptor({ client: this.client }))
+  private _adapter?: Adapter
+  get adapter(): Adapter {
+    return (this._adapter ??= new Adapter({ client: this.client }))
   }
 }
 
@@ -848,12 +849,12 @@ export class Session extends HeyApiClient {
     parameters?: {
       directory?: string
       workspace?: string
-      roots?: boolean
+      roots?: boolean | "true" | "false"
       start?: number
       cursor?: number
       search?: string
       limit?: number
-      archived?: boolean
+      archived?: boolean | "true" | "false"
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -1647,7 +1648,9 @@ export class Session2 extends HeyApiClient {
     parameters?: {
       directory?: string
       workspace?: string
-      roots?: boolean
+      scope?: "project"
+      path?: string
+      roots?: boolean | "true" | "false"
       start?: number
       search?: string
       limit?: number
@@ -1661,6 +1664,8 @@ export class Session2 extends HeyApiClient {
           args: [
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
+            { in: "query", key: "scope" },
+            { in: "query", key: "path" },
             { in: "query", key: "roots" },
             { in: "query", key: "start" },
             { in: "query", key: "search" },
@@ -3547,6 +3552,36 @@ export class Auth2 extends HeyApiClient {
 }
 
 export class Mcp extends HeyApiClient {
+  /**
+   * Get managed MCP servers
+   *
+   * Get server-managed MCP configuration and authentication metadata.
+   */
+  public managed<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<McpManagedResponses, unknown, ThrowOnError>({
+      url: "/mcp/managed",
+      ...options,
+      ...params,
+    })
+  }
+
   /**
    * Get MCP status
    *
