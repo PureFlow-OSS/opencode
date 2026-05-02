@@ -1,16 +1,37 @@
+import { Global } from "@opencode-ai/core/global"
+import * as Log from "@opencode-ai/core/util/log"
+import path from "path"
 import { Schema } from "effect"
+import { Installation } from "../installation"
+import { Flag } from "@opencode-ai/core/flag/flag"
+import { lazy } from "@/util/lazy"
+import { Filesystem } from "@/util/filesystem"
+import { Flock } from "@opencode-ai/core/util/flock"
+import { Hash } from "@opencode-ai/core/util/hash"
+
+// Try to import bundled snapshot (generated at build time)
+// Falls back to undefined in dev mode when snapshot doesn't exist
+/* @ts-ignore */
+
+const log = Log.create({ service: "models.dev" })
+const source = url()
+const filepath = path.join(
+  Global.Path.cache,
+  source === "https://models.dev" ? "models.json" : `models-${Hash.fast(source)}.json`,
+)
+const ttl = 5 * 60 * 1000
 
 const Cost = Schema.Struct({
-  input: Schema.Number,
-  output: Schema.Number,
-  cache_read: Schema.optional(Schema.Number),
-  cache_write: Schema.optional(Schema.Number),
+  input: Schema.Finite,
+  output: Schema.Finite,
+  cache_read: Schema.optional(Schema.Finite),
+  cache_write: Schema.optional(Schema.Finite),
   context_over_200k: Schema.optional(
     Schema.Struct({
-      input: Schema.Number,
-      output: Schema.Number,
-      cache_read: Schema.optional(Schema.Number),
-      cache_write: Schema.optional(Schema.Number),
+      input: Schema.Finite,
+      output: Schema.Finite,
+      cache_read: Schema.optional(Schema.Finite),
+      cache_write: Schema.optional(Schema.Finite),
     }),
   ),
 })
@@ -34,9 +55,9 @@ export const Model = Schema.Struct({
   ),
   cost: Schema.optional(Cost),
   limit: Schema.Struct({
-    context: Schema.Number,
-    input: Schema.optional(Schema.Number),
-    output: Schema.Number,
+    context: Schema.Finite,
+    input: Schema.optional(Schema.Finite),
+    output: Schema.Finite,
   }),
   modalities: Schema.optional(
     Schema.Struct({
@@ -80,14 +101,11 @@ export const Provider = Schema.Struct({
 
 export type Provider = Schema.Schema.Type<typeof Provider>
 
-const COPILOT_API = "https://api.githubcopilot.com"
-const AIFACTORY_API = "http://10.53.7.23/v1"
-
-const providers: Record<string, Provider> = {
+const customProviders: Record<string, Provider> = {
   "github-copilot": {
     id: "github-copilot",
     name: "GitHub Copilot",
-    api: COPILOT_API,
+    api: "https://api.githubcopilot.com",
     npm: "@ai-sdk/github-copilot",
     env: [],
     models: {},
@@ -95,15 +113,85 @@ const providers: Record<string, Provider> = {
   aifactory: {
     id: "aifactory",
     name: "RRZ AI Factory",
-    api: AIFACTORY_API,
+    api: "http://10.53.7.23/v1",
     npm: "@ai-sdk/openai-compatible",
     env: [],
     models: {},
   },
 }
 
-export async function get() {
-  return providers as Record<string, Provider>
+function url() {
+  return Flag.OPENCODE_MODELS_URL || "https://models.dev"
 }
 
-export async function refresh(_force = false) {}
+function fresh() {
+  return Date.now() - Number(Filesystem.stat(filepath)?.mtimeMs ?? 0) < ttl
+}
+
+function skip(force: boolean) {
+  return !force && fresh()
+}
+
+const fetchApi = async () => {
+  const result = await fetch(`${url()}/api.json`, {
+    headers: { "User-Agent": Installation.USER_AGENT },
+    signal: AbortSignal.timeout(10000),
+  })
+  return { ok: result.ok, text: await result.text() }
+}
+
+export const Data = lazy<Promise<Record<string, unknown>>>(async () => {
+  const result = await Filesystem.readJson(Flag.OPENCODE_MODELS_PATH ?? filepath).catch(() => {})
+  if (result) return result as Record<string, unknown>
+  // @ts-ignore
+  const snapshot = await import("./models-snapshot.js")
+    .then((m) => m.snapshot as Record<string, unknown>)
+    .catch(() => undefined)
+  if (snapshot) return snapshot
+  if (Flag.OPENCODE_DISABLE_MODELS_FETCH) return {} as Record<string, unknown>
+  return (await Flock.withLock(`models-dev:${filepath}`, async () => {
+    const result = await Filesystem.readJson(Flag.OPENCODE_MODELS_PATH ?? filepath).catch(() => {})
+    if (result) return result as Record<string, unknown>
+    const result2 = await fetchApi()
+    if (result2.ok) {
+      await Filesystem.write(filepath, result2.text).catch((e) => {
+        log.error("Failed to write models cache", { error: e })
+      })
+    }
+    return JSON.parse(result2.text) as Record<string, unknown>
+  })) as Record<string, unknown>
+})
+
+export async function get(): Promise<Record<string, Provider>> {
+  return {
+    ...((await Data()) as Record<string, Provider>),
+    ...customProviders,
+  }
+}
+
+export async function refresh(force = false) {
+  if (skip(force)) return Data.reset()
+  await Flock.withLock(`models-dev:${filepath}`, async () => {
+    if (skip(force)) return Data.reset()
+    const result = await fetchApi()
+    if (!result.ok) return
+    await Filesystem.write(filepath, result.text)
+    Data.reset()
+  }).catch((e) => {
+    log.error("Failed to fetch models.dev", {
+      error: e,
+    })
+  })
+}
+
+if (!Flag.OPENCODE_DISABLE_MODELS_FETCH && !process.argv.includes("--get-yargs-completions")) {
+  void refresh()
+  setInterval(
+    async () => {
+      await refresh()
+    },
+    60 * 1000 * 60,
+  ).unref()
+}
+
+export * as ModelsDev from "./models"

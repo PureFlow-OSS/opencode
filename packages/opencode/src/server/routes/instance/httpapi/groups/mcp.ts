@@ -3,6 +3,8 @@ import { ConfigMCP } from "@/config/mcp"
 import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../middleware/authorization"
+import { InstanceContextMiddleware } from "../middleware/instance-context"
+import { WorkspaceRoutingMiddleware } from "../middleware/workspace-routing"
 
 export const AddPayload = Schema.Struct({
   name: Schema.String,
@@ -71,7 +73,7 @@ export const McpApi = HttpApi.make("mcp")
         HttpApiEndpoint.post("authStart", McpPaths.auth, {
           params: { name: Schema.String },
           success: AuthStartResponse,
-          error: HttpApiError.BadRequest,
+          error: UnsupportedOAuthError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "mcp.auth.start",
@@ -94,7 +96,7 @@ export const McpApi = HttpApi.make("mcp")
         HttpApiEndpoint.post("authAuthenticate", McpPaths.authAuthenticate, {
           params: { name: Schema.String },
           success: MCP.Status,
-          error: HttpApiError.BadRequest,
+          error: UnsupportedOAuthError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "mcp.auth.authenticate",
@@ -137,6 +139,8 @@ export const McpApi = HttpApi.make("mcp")
           description: "Experimental HttpApi MCP routes.",
         }),
       )
+      .middleware(InstanceContextMiddleware)
+      .middleware(WorkspaceRoutingMiddleware)
       .middleware(Authorization),
   )
   .annotateMerge(
