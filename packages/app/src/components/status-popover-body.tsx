@@ -15,7 +15,7 @@ import { useSDK } from "@/context/sdk"
 import { normalizeServerUrl, ServerConnection, useServer } from "@/context/server"
 import { useSync } from "@/context/sync"
 import { useCheckServerHealth, type ServerHealth } from "@/utils/server-health"
-import { loadMcpQuery } from "@/context/global-sync"
+import { loadMcpQuery } from "@/context/global-sync/bootstrap"
 
 const pollMs = 10_000
 

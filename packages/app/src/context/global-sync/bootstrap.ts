@@ -183,9 +183,21 @@ function warmSessions(input: {
 }
 
 export const loadProvidersQuery = (directory: string | null, sdk?: OpencodeClient) =>
-  queryOptions({
+  queryOptions<ProviderListResponse | null>({
     queryKey: [directory, "providers"],
     queryFn: sdk ? () => retry(() => sdk.provider.list().then((x) => normalizeProviderList(x.data!))) : skipToken,
+  })
+
+export const loadMcpQuery = (directory: string, sdk?: OpencodeClient) =>
+  queryOptions({
+    queryKey: [directory, "mcp"],
+    queryFn: sdk ? () => sdk.mcp.status().then((r) => r.data ?? {}) : skipToken,
+  })
+
+export const loadLspQuery = (directory: string, sdk?: OpencodeClient) =>
+  queryOptions({
+    queryKey: [directory, "lsp"],
+    queryFn: sdk ? () => sdk.lsp.status().then((r) => r.data ?? []) : skipToken,
   })
 
 export const loadAgentsQuery = (

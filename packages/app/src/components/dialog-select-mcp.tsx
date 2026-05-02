@@ -6,7 +6,7 @@ import { Dialog } from "@opencode-ai/ui/dialog"
 import { List } from "@opencode-ai/ui/list"
 import { Switch } from "@opencode-ai/ui/switch"
 import { useLanguage } from "@/context/language"
-import { loadMcpQuery } from "@/context/global-sync"
+import { loadMcpQuery } from "@/context/global-sync/bootstrap"
 
 const statusLabels = {
   connected: "mcp.status.connected",
