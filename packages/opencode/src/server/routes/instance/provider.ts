@@ -41,11 +41,15 @@ export const ProviderRoutes = lazy(() =>
           const enabled = Provider.normalizeEnabledProviders(config.enabled_providers)
           const filtered: Record<string, (typeof all)[string]> = {}
           for (const [key, value] of Object.entries(all)) {
+            if (ModelsDev.isHiddenProvider(key)) continue
             if ((enabled ? enabled.has(key) : true) && !disabled.has(key)) {
               filtered[key] = value
             }
           }
           const connected = yield* svc.list()
+          for (const key of Object.keys(connected)) {
+            if (ModelsDev.isHiddenProvider(key)) delete connected[key as keyof typeof connected]
+          }
           const providers = Object.assign(
             mapValues(filtered, (x) => Provider.fromModelsDevProvider(x)),
             connected,

@@ -5,6 +5,7 @@ import { zod } from "@/util/effect-zod"
 import { namedSchemaError } from "@/util/named-schema-error"
 import { optionalOmitUndefined, withStatics } from "@/util/schema"
 import { Plugin } from "../plugin"
+import { isHiddenProvider } from "./models"
 import { ProviderID } from "./schema"
 import { Array as Arr, Effect, Layer, Record, Result, Context, Schema } from "effect"
 
@@ -131,31 +132,33 @@ export const layer: Layer.Layer<Service, never, Auth.Service | Plugin.Service> =
     const methods = Effect.fn("ProviderAuth.methods")(function* () {
       const hooks = (yield* InstanceState.get(state)).hooks
       return decode(
-        Record.map(hooks, (item) =>
-          item.methods.map((method) => ({
-            type: method.type,
-            label: method.label,
-            ...(method.prompts && {
-              prompts: method.prompts.map((prompt) => {
-                if (prompt.type === "select") {
+        Record.map(
+          Object.fromEntries(Object.entries(hooks).filter(([providerID]) => !isHiddenProvider(providerID))),
+          (item) =>
+            item.methods.map((method) => ({
+              type: method.type,
+              label: method.label,
+              ...(method.prompts && {
+                prompts: method.prompts.map((prompt) => {
+                  if (prompt.type === "select") {
+                    return {
+                      type: "select" as const,
+                      key: prompt.key,
+                      message: prompt.message,
+                      options: prompt.options,
+                      ...(prompt.when && { when: prompt.when }),
+                    }
+                  }
                   return {
-                    type: "select" as const,
+                    type: "text" as const,
                     key: prompt.key,
                     message: prompt.message,
-                    options: prompt.options,
+                    ...(prompt.placeholder && { placeholder: prompt.placeholder }),
                     ...(prompt.when && { when: prompt.when }),
                   }
-                }
-                return {
-                  type: "text" as const,
-                  key: prompt.key,
-                  message: prompt.message,
-                  ...(prompt.placeholder && { placeholder: prompt.placeholder }),
-                  ...(prompt.when && { when: prompt.when }),
-                }
+                }),
               }),
-            }),
-          })),
+            })),
         ),
       )
     })

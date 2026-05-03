@@ -22,9 +22,13 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       const enabled = config.enabled_providers ? new Set(config.enabled_providers) : undefined
       const filtered: Record<string, (typeof all)[string]> = {}
       for (const [key, value] of Object.entries(all)) {
+        if (ModelsDev.isHiddenProvider(key)) continue
         if ((enabled ? enabled.has(key) : true) && !disabled.has(key)) filtered[key] = value
       }
       const connected = yield* provider.list()
+      for (const key of Object.keys(connected)) {
+        if (ModelsDev.isHiddenProvider(key)) delete connected[key as keyof typeof connected]
+      }
       const providers = Object.assign(
         mapValues(filtered, (item) => Provider.fromModelsDevProvider(item)),
         connected,

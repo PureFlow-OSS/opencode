@@ -120,6 +120,12 @@ const customProviders: Record<string, Provider> = {
   },
 }
 
+const hiddenProviders = new Set(["openai", "opencode"])
+
+export function isHiddenProvider(providerID: string) {
+  return hiddenProviders.has(providerID)
+}
+
 function url() {
   return Flag.OPENCODE_MODELS_URL || "https://models.dev"
 }
@@ -163,10 +169,12 @@ export const Data = lazy<Promise<Record<string, unknown>>>(async () => {
 })
 
 export async function get(): Promise<Record<string, Provider>> {
-  return {
-    ...((await Data()) as Record<string, Provider>),
-    ...customProviders,
-  }
+  return Object.fromEntries(
+    Object.entries({
+      ...((await Data()) as Record<string, Provider>),
+      ...customProviders,
+    }).filter(([providerID]) => !isHiddenProvider(providerID)),
+  )
 }
 
 export async function refresh(force = false) {
