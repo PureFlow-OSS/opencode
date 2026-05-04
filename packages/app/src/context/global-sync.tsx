@@ -20,9 +20,7 @@ import { applyDirectoryEvent, applyGlobalEvent, cleanupDroppedSessionCaches } fr
 import { createRefreshQueue } from "./global-sync/queue"
 import { clearSessionPrefetchDirectory } from "./global-sync/session-prefetch"
 import { estimateRootSessionTotal, loadRootSessionsWithFallback } from "./global-sync/session-load"
-import { trimSessions } from "./global-sync/session-trim"
 import type { ProjectMeta } from "./global-sync/types"
-import { SESSION_RECENT_LIMIT } from "./global-sync/types"
 import { directoryKey } from "./global-sync/utils"
 import { formatServerError } from "@/utils/server-errors"
 import { queryOptions, skipToken, useQueryClient } from "@tanstack/solid-query"
@@ -66,7 +64,6 @@ function createGlobalSync() {
   const sdkCache = new Map<string, OpencodeClient>()
   const booting = new Map<string, Promise<void>>()
   const sessionLoads = new Map<string, Promise<void>>()
-  const sessionMeta = new Map<string, { limit: number }>()
   const [providerCache, setProviderCache] = persisted(
     Persist.global("provider-cache", ["provider-cache.v1"]),
     createStore<ProviderListResponse>({ all: [], connected: [], default: {} }),
@@ -162,7 +159,6 @@ function createGlobalSync() {
     },
     onDispose: (directory) => {
       queue.clear(directory)
-      sessionMeta.delete(directory)
       sdkCache.delete(directory)
       clearProviderRev(directory)
       clearSessionPrefetchDirectory(directory)
@@ -177,28 +173,13 @@ function createGlobalSync() {
 
     children.pin(directory)
     const [store, setStore] = children.child(directory, { bootstrap: false })
-    const meta = sessionMeta.get(key)
-    if (meta && meta.limit >= store.limit) {
-      const next = trimSessions(store.session, {
-        limit: store.limit,
-        permission: store.permission,
-      })
-      if (next.length !== store.session.length) {
-        setStore("session", reconcile(next, { key: "id" }))
-        cleanupDroppedSessionCaches(store, setStore, next, setSessionTodo)
-      }
-      children.unpin(directory)
-      return
-    }
-
-    const limit = Math.max(store.limit + SESSION_RECENT_LIMIT, SESSION_RECENT_LIMIT)
     const promise = queryClient
       .fetchQuery({
         ...loadSessionsQuery(directory),
         queryFn: () =>
           loadRootSessionsWithFallback({
             directory,
-            limit,
+            limit: store.limit,
             list: (query) => globalSDK.client.session.list(query),
           })
             .then((x) => {
@@ -206,12 +187,10 @@ function createGlobalSync() {
                 .filter((s) => !!s?.id)
                 .filter((s) => !s.time?.archived)
                 .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-              const limit = store.limit
               const childSessions = store.session.filter((s) => !!s.parentID)
-              const sessions = trimSessions([...nonArchived, ...childSessions], {
-                limit,
-                permission: store.permission,
-              })
+              const sessions = [...nonArchived, ...childSessions].sort((a, b) =>
+                a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+              )
               batch(() => {
                 setStore(
                   "sessionTotal",
@@ -224,7 +203,6 @@ function createGlobalSync() {
                 setStore("session", reconcile(sessions, { key: "id" }))
                 cleanupDroppedSessionCaches(store, setStore, sessions, setSessionTodo)
               })
-              sessionMeta.set(key, { limit })
             })
             .catch((err) => {
               console.error("Failed to load sessions", err)

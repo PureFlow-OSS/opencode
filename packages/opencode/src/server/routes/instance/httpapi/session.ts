@@ -43,6 +43,7 @@ const ListQuery = Schema.Struct({
   start: Schema.optional(Schema.NumberFromString),
   search: Schema.optional(Schema.String),
   limit: Schema.optional(Schema.NumberFromString),
+  archived: Schema.optional(Schema.Literals(["true", "false"])),
 })
 const DiffQuery = Schema.Struct(Struct.omit(SessionSummary.DiffInput.fields, ["sessionID"]))
 const MessagesQuery = Schema.Struct({
@@ -440,6 +441,7 @@ export const sessionHandlers = Layer.unwrap(
             start: ctx.query.start,
             search: ctx.query.search,
             limit: ctx.query.limit,
+            archived: ctx.query.archived === "true" ? true : ctx.query.archived === "false" ? false : undefined,
           }),
         ),
       )

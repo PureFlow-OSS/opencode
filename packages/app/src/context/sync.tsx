@@ -181,7 +181,6 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       return globalSync.child(directory)
     }
     const absolute = (path: string) => (current()[0].path.directory + "/" + path).replace("//", "/")
-    const initialMessagePageSize = 80
     const historyMessagePageSize = 200
     const inflight = new Map<string, Promise<void>>()
     const inflightDiff = new Map<string, Promise<void>>()
@@ -294,7 +293,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
     const fetchMessages = async (input: {
       client: typeof sdk.client
       sessionID: string
-      limit: number
+      limit?: number
       before?: string
     }) => {
       const messages = await retry(() =>
@@ -318,11 +317,11 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       directory: string
       client: typeof sdk.client
       setStore: Setter
-      sessionID: string
-      limit: number
-      before?: string
-      mode?: "replace" | "prepend"
-    }) => {
+        sessionID: string
+        limit?: number
+        before?: string
+        mode?: "replace" | "prepend"
+      }) => {
       const key = keyFor(input.directory, input.sessionID)
       if (meta.loading[key]) return
 
@@ -464,7 +463,6 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             const cached = store.message[sessionID] !== undefined && meta.limit[key] !== undefined
             if (cached && hasSession && !opts?.force) return
 
-            const limit = meta.limit[key] ?? initialMessagePageSize
             const sessionReq =
               hasSession && !opts?.force
                 ? Promise.resolve()
@@ -493,7 +491,6 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
                     client,
                     setStore,
                     sessionID,
-                    limit,
                   })
 
             await Promise.all([sessionReq, messagesReq])

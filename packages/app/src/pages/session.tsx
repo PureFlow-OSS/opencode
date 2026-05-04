@@ -93,7 +93,6 @@ type SessionHistoryWindowInput = {
  * small batches while scrolling upward, and prefetches older history near top.
  */
 function createSessionHistoryWindow(input: SessionHistoryWindowInput) {
-  const turnInit = 10
   const turnBatch = 8
   const turnScrollThreshold = 200
   const turnPrefetchBuffer = 16
@@ -107,7 +106,7 @@ function createSessionHistoryWindow(input: SessionHistoryWindowInput) {
     prefetchNoGrowth: 0,
   })
 
-  const initialTurnStart = (len: number) => (len > turnInit ? len - turnInit : 0)
+  const initialTurnStart = (_len: number) => 0
 
   const turnStart = createMemo(() => {
     const id = input.sessionID()

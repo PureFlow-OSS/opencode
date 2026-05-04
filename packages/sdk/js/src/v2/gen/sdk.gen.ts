@@ -70,6 +70,7 @@ import type {
   McpConnectResponses,
   McpDisconnectResponses,
   McpLocalConfig,
+  McpManagedResponses,
   McpRemoteConfig,
   McpStatusResponses,
   OutputFormat,
@@ -1651,6 +1652,7 @@ export class Session2 extends HeyApiClient {
       start?: number
       search?: string
       limit?: number
+      archived?: boolean
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -1665,6 +1667,7 @@ export class Session2 extends HeyApiClient {
             { in: "query", key: "start" },
             { in: "query", key: "search" },
             { in: "query", key: "limit" },
+            { in: "query", key: "archived" },
           ],
         },
       ],
@@ -3547,6 +3550,36 @@ export class Auth2 extends HeyApiClient {
 }
 
 export class Mcp extends HeyApiClient {
+  /**
+   * Get managed MCP servers
+   *
+   * Get server-managed MCP configuration and authentication metadata.
+   */
+  public managed<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<McpManagedResponses, unknown, ThrowOnError>({
+      url: "/mcp/managed",
+      ...options,
+      ...params,
+    })
+  }
+
   /**
    * Get MCP status
    *

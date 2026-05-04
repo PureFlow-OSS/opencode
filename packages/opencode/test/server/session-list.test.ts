@@ -107,4 +107,21 @@ describe("session.list", () => {
       },
     })
   })
+
+  test("can exclude archived sessions before limiting", async () => {
+    await using tmp = await tmpdir({ git: true })
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const archived = await svc.create({ title: "archived-session" })
+        const active = await svc.create({ title: "active-session" })
+
+        await run(SessionNs.Service.use((svc) => svc.setArchived({ sessionID: archived.id, time: Date.now() })))
+
+        const sessions = [...svc.list({ roots: true, archived: false, limit: 1 })]
+
+        expect(sessions.map((s) => s.id)).toEqual([active.id])
+      },
+    })
+  })
 })

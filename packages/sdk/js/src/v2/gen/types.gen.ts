@@ -1478,6 +1478,10 @@ export type Config = {
    * HTTP or HTTPS proxy URL for outbound provider requests
    */
   http_proxy?: string
+  /**
+   * Whether the configured global HTTP proxy should be used. Defaults to true.
+   */
+  use_http_proxy?: boolean
   logLevel?: LogLevel
   server?: ServerConfig
   /**
@@ -3302,6 +3306,10 @@ export type SessionListData = {
      * Maximum number of sessions to return
      */
     limit?: number
+    /**
+     * Include archived sessions
+     */
+    archived?: boolean
   }
   url: "/session"
 }
@@ -4810,6 +4818,27 @@ export type EventSubscribeResponses = {
 }
 
 export type EventSubscribeResponse = EventSubscribeResponses[keyof EventSubscribeResponses]
+
+export type McpManagedData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/mcp/managed"
+}
+
+export type McpManagedResponses = {
+  /**
+   * Managed MCP servers
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type McpManagedResponse = McpManagedResponses[keyof McpManagedResponses]
 
 export type McpStatusData = {
   body?: never
