@@ -28,6 +28,7 @@ import { useTheme } from "@opencode-ai/ui/theme"
 
 const root = document.getElementById("root")
 const defaultMotd = { enabled: true, text: "RRZ AI Factory" }
+const bootSplashMinDuration = 900
 if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
   throw new Error(t("error.dev.rootNotFound"))
 }
@@ -305,6 +306,9 @@ render(() => {
   }
 
   const [windowCount] = createResource(() => window.api.getWindowCount())
+  const [bootSplashReady] = createResource(
+    () => new Promise((resolve) => setTimeout(() => resolve(true), bootSplashMinDuration)),
+  )
 
   // Fetch sidecar credentials (available immediately, before health check)
   const [sidecar] = createResource(() => window.api.awaitInitialization(() => undefined))
@@ -374,6 +378,7 @@ render(() => {
             !sidecar.loading &&
             !windowConfig.loading &&
             !windowCount.loading &&
+            !bootSplashReady.loading &&
             !locale.loading
           }
           fallback={<BootSplash />}
