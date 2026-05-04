@@ -22,9 +22,12 @@ import pkg from "../../package.json"
 import { initI18n, t } from "./i18n"
 import { webviewZoom } from "./webview-zoom"
 import "./styles.css"
+import { Splash } from "@opencode-ai/ui/logo"
 import { useTheme } from "@opencode-ai/ui/theme"
 
 const root = document.getElementById("root")
+const defaultMotd = { enabled: true, text: "RRZ AI Factory" }
+const bootSplashMinDuration = 900
 if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
   throw new Error(t("error.dev.rootNotFound"))
 }
@@ -252,6 +255,20 @@ window.api.onMenuCommand((id) => {
   menuTrigger?.(id)
 })
 listenForDeepLinks()
+root?.replaceChildren()
+
+function BootSplash() {
+  const [motd] = createResource(() => window.api.getMotd().catch(() => defaultMotd), { initialValue: defaultMotd })
+
+  return (
+    <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base gap-6">
+      <Splash class="w-28 h-28 opacity-50 animate-pulse" />
+      <Show when={motd()?.enabled && motd()?.text}>
+        <div class="max-w-[calc(100vw-4rem)] text-center text-16-regular text-text-muted truncate">{motd()?.text}</div>
+      </Show>
+    </div>
+  )
+}
 
 render(() => {
   const platform = createPlatform()
@@ -269,6 +286,9 @@ render(() => {
   }
 
   const [windowCount] = createResource(() => window.api.getWindowCount())
+  const [bootSplashReady] = createResource(
+    () => new Promise((resolve) => setTimeout(() => resolve(true), bootSplashMinDuration)),
+  )
 
   // Fetch sidecar credentials (available immediately, before health check)
   const [sidecar] = createResource(() => window.api.awaitInitialization(() => undefined))
@@ -338,8 +358,10 @@ render(() => {
             !sidecar.loading &&
             !windowConfig.loading &&
             !windowCount.loading &&
+            !bootSplashReady.loading &&
             !locale.loading
           }
+          fallback={<BootSplash />}
         >
           {(_) => {
             return (

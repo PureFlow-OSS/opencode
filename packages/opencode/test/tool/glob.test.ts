@@ -54,6 +54,46 @@ describe("tool.glob", () => {
     ),
   )
 
+  it.live("skips generated directories during broad searches", () =>
+    provideTmpdirInstance((dir) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() => Bun.write(path.join(dir, "src", "a.ts"), "export const a = 1\n"))
+        yield* Effect.promise(() => Bun.write(path.join(dir, "node_modules", "pkg", "b.ts"), "export const b = 1\n"))
+        const info = yield* GlobTool
+        const glob = yield* info.init()
+        const result = yield* glob.execute(
+          {
+            pattern: "**/*.ts",
+            path: dir,
+          },
+          ctx,
+        )
+        expect(result.metadata.count).toBe(1)
+        expect(result.output).toContain(path.join(dir, "src", "a.ts"))
+        expect(result.output).not.toContain(path.join(dir, "node_modules", "pkg", "b.ts"))
+      }),
+    ),
+  )
+
+  it.live("allows explicit searches inside generated directories", () =>
+    provideTmpdirInstance((dir) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() => Bun.write(path.join(dir, "node_modules", "pkg", "b.ts"), "export const b = 1\n"))
+        const info = yield* GlobTool
+        const glob = yield* info.init()
+        const result = yield* glob.execute(
+          {
+            pattern: "**/*.ts",
+            path: path.join(dir, "node_modules"),
+          },
+          ctx,
+        )
+        expect(result.metadata.count).toBe(1)
+        expect(result.output).toContain(path.join(dir, "node_modules", "pkg", "b.ts"))
+      }),
+    ),
+  )
+
   it.live("rejects exact file paths", () =>
     provideTmpdirInstance((dir) =>
       Effect.gen(function* () {

@@ -15,6 +15,54 @@ export const Parameters = Schema.Struct({
   }),
 })
 
+const LIMIT = 100
+const TIMEOUT = "30 seconds"
+const DEFAULT_IGNORES = [
+  "node_modules",
+  "bower_components",
+  ".pnpm-store",
+  "vendor",
+  ".npm",
+  "dist",
+  "build",
+  "out",
+  ".next",
+  "target",
+  "bin",
+  "obj",
+  ".git",
+  ".svn",
+  ".hg",
+  ".vscode",
+  ".idea",
+  ".turbo",
+  ".output",
+  "desktop",
+  ".sst",
+  ".cache",
+  ".webkit-cache",
+  "__pycache__",
+  ".pytest_cache",
+  "mypy_cache",
+  ".history",
+  ".gradle",
+]
+
+function pathSegments(value: string) {
+  return value.split(/[\\/]+/).filter(Boolean)
+}
+
+function globPatterns(search: string, pattern: string) {
+  const explicit = new Set([...pathSegments(search), ...pathSegments(pattern)])
+  return [
+    ...DEFAULT_IGNORES.flatMap((dir) => {
+      if (explicit.has(dir)) return []
+      return [`!${dir}/**`, `!**/${dir}/**`]
+    }),
+    pattern,
+  ]
+}
+
 export const GlobTool = Tool.define(
   "glob",
   Effect.gen(function* () {
@@ -45,29 +93,47 @@ export const GlobTool = Tool.define(
           }
           yield* assertExternalDirectoryEffect(ctx, search, { kind: "directory" })
 
-          const limit = 100
           let truncated = false
-          const files = yield* rg.files({ cwd: search, glob: [params.pattern], signal: ctx.abort }).pipe(
-            Stream.mapEffect((file) =>
-              Effect.gen(function* () {
-                const full = path.resolve(search, file)
-                const info = yield* fs.stat(full).pipe(Effect.catch(() => Effect.succeed(undefined)))
-                const mtime =
-                  info?.mtime.pipe(
-                    Option.map((date) => date.getTime()),
-                    Option.getOrElse(() => 0),
-                  ) ?? 0
-                return { path: full, mtime }
+          const result = yield* rg
+            .files({ cwd: search, glob: globPatterns(search, params.pattern), signal: ctx.abort })
+            .pipe(
+              Stream.mapEffect((file) =>
+                Effect.gen(function* () {
+                  const full = path.resolve(search, file)
+                  const info = yield* fs.stat(full).pipe(Effect.catch(() => Effect.succeed(undefined)))
+                  const mtime =
+                    info?.mtime.pipe(
+                      Option.map((date) => date.getTime()),
+                      Option.getOrElse(() => 0),
+                    ) ?? 0
+                  return { path: full, mtime }
+                }),
+              ),
+              Stream.take(LIMIT + 1),
+              Stream.runCollect,
+              Effect.map((chunk) => [...chunk]),
+              Effect.map((files) => ({ files, timedOut: false })),
+              Effect.timeoutOrElse({
+                duration: TIMEOUT,
+                orElse: () => Effect.succeed({ files: [], timedOut: true }),
               }),
-            ),
-            Stream.take(limit + 1),
-            Stream.runCollect,
-            Effect.map((chunk) => [...chunk]),
-          )
+            )
 
-          if (files.length > limit) {
+          if (result.timedOut) {
+            return {
+              title: path.relative(ins.worktree, search),
+              metadata: {
+                count: 0,
+                truncated: true,
+              },
+              output: `Glob search timed out after ${TIMEOUT}. Try a more specific path or pattern.`,
+            }
+          }
+
+          const files = result.files
+          if (files.length > LIMIT) {
             truncated = true
-            files.length = limit
+            files.length = LIMIT
           }
           files.sort((a, b) => b.mtime - a.mtime)
 
@@ -78,7 +144,7 @@ export const GlobTool = Tool.define(
             if (truncated) {
               output.push("")
               output.push(
-                `(Results are truncated: showing first ${limit} results. Consider using a more specific path or pattern.)`,
+                `(Results are truncated: showing first ${LIMIT} results. Consider using a more specific path or pattern.)`,
               )
             }
           }

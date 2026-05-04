@@ -118,7 +118,7 @@ static async Task<IResult> LocalFileAsync(HttpContext context, string path)
 
 sealed class UpdaterOptions
 {
-  public string Version { get; set; } = "1.14.28";
+  public string Version { get; set; } = "1.14.33";
   public string PublicBaseUrl { get; set; } = "http://10.53.7.23";
   public string ReleaseBaseUrlTemplate { get; set; } = "https://github.com/anomalyco/opencode/releases/download/v{{version}}";
   public MotdOptions Motd { get; set; } = new();

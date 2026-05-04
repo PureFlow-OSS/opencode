@@ -36,7 +36,7 @@ This is a complete example with:
 ```json
 {
   "Updater": {
-    "Version": "1.14.28",
+    "Version": "1.14.33",
     "PublicBaseUrl": "http://10.53.7.23",
     "ReleaseBaseUrlTemplate": "https://github.com/anomalyco/opencode/releases/download/v{{version}}",
     "Motd": {
@@ -104,7 +104,7 @@ This is a complete example with:
 
 ```json
 {
-  "version": "1.14.28",
+  "version": "1.14.33",
   "url": "http://10.53.7.23/opencode/feed",
   "motd": {
     "text": "RRZ AI Factory",

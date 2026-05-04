@@ -17,6 +17,7 @@ import { batch } from "solid-js"
 import { reconcile, type SetStoreFunction, type Store } from "solid-js/store"
 import type { State, VcsCache } from "./types"
 import { cmp, normalizeAgentList, normalizeProviderList } from "./utils"
+import { pathKey } from "@/utils/path-key"
 import { formatServerError } from "@/utils/server-errors"
 import { QueryClient, queryOptions, skipToken } from "@tanstack/solid-query"
 
@@ -145,7 +146,10 @@ function groupBySession<T extends { id: string; sessionID: string }>(input: T[])
 }
 
 function projectID(directory: string, projects: Project[]) {
-  return projects.find((project) => project.worktree === directory || project.sandboxes?.includes(directory))?.id
+  const key = pathKey(directory)
+  return projects.find(
+    (project) => pathKey(project.worktree) === key || project.sandboxes?.some((x) => pathKey(x) === key),
+  )?.id
 }
 
 function mergeSession(setStore: SetStoreFunction<State>, session: Session) {
@@ -182,8 +186,23 @@ function warmSessions(input: {
   ).then(() => undefined)
 }
 
-export const loadProvidersQuery = (directory: string | null) =>
-  queryOptions<null>({ queryKey: [directory, "providers"], queryFn: skipToken })
+export const loadProvidersQuery = (directory: string | null, sdk?: OpencodeClient) =>
+  queryOptions<ProviderListResponse | null>({
+    queryKey: [directory, "providers"],
+    queryFn: sdk ? () => retry(() => sdk.provider.list().then((x) => normalizeProviderList(x.data!))) : skipToken,
+  })
+
+export const loadMcpQuery = (directory: string, sdk?: OpencodeClient) =>
+  queryOptions({
+    queryKey: [directory, "mcp"],
+    queryFn: sdk ? () => sdk.mcp.status().then((r) => r.data ?? {}) : skipToken,
+  })
+
+export const loadLspQuery = (directory: string, sdk?: OpencodeClient) =>
+  queryOptions({
+    queryKey: [directory, "lsp"],
+    queryFn: sdk ? () => sdk.lsp.status().then((r) => r.data ?? []) : skipToken,
+  })
 
 export const loadAgentsQuery = (
   directory: string | null,
@@ -242,7 +261,7 @@ export async function bootstrapDirectory(input: {
 }) {
   const loading = input.store.status !== "complete"
   const seededProject = projectID(input.directory, input.global.project)
-  const seededPath = input.global.path.directory === input.directory ? input.global.path : undefined
+  const seededPath = pathKey(input.global.path.directory) === pathKey(input.directory) ? input.global.path : undefined
   if (seededProject) input.setStore("project", seededProject)
   if (seededPath) input.setStore("path", seededPath)
   if (input.store.provider.all.length === 0 && input.global.provider.all.length > 0) {
@@ -278,6 +297,7 @@ export async function bootstrapDirectory(input: {
         (() =>
           input.queryClient.ensureQueryData(
             loadPathQuery(input.directory, input.sdk, (x) => {
+              input.setStore("path", x.data!)
               const next = projectID(x.data?.directory ?? input.directory, input.global.project)
               if (next) input.setStore("project", next)
             }),

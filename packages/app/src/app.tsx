@@ -23,7 +23,6 @@ import {
   onCleanup,
   type ParentProps,
   Show,
-  Suspense,
 } from "solid-js"
 import { Dynamic } from "solid-js/web"
 import { CommandProvider } from "@/context/command"
@@ -50,7 +49,6 @@ import { useCheckServerHealth } from "./utils/server-health"
 const HomeRoute = lazy(() => import("@/pages/home"))
 const loadSession = () => import("@/pages/session")
 const Session = lazy(loadSession)
-const Loading = () => <div class="size-full" />
 const defaultMotd = { enabled: true, text: "RRZ AI Factory" }
 
 if (typeof location === "object" && /\/session(?:\/|$)/.test(location.pathname)) {
@@ -123,10 +121,8 @@ function SessionProviders(props: ParentProps) {
 function RouterRoot(props: ParentProps<{ appChildren?: JSX.Element }>) {
   return (
     <AppShellProviders>
-      {/*<Suspense fallback={<Loading />}>*/}
       {props.appChildren}
       {props.children}
-      {/*</Suspense>*/}
     </AppShellProviders>
   )
 }
@@ -183,23 +179,16 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
         ),
   )
 
+  const health = createMemo(() => {
+    if (checkMode() === "background") return startupHealthCheck.latest
+    if (startupHealthCheck.loading) return undefined
+    return startupHealthCheck()
+  })
+
   return (
-    <Suspense
-      fallback={
-        <StartupSplash />
-      }
-    >
-      {/*<Show
-        when={checkMode() === "blocking" ? !startupHealthCheck.loading : startupHealthCheck.state !== "pending"}
-        fallback={
-          <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
-            <Splash class="w-16 h-20 opacity-50 animate-pulse" />
-          </div>
-        }
-      >*/}
-      {checkMode() === "blocking" ? startupHealthCheck() : startupHealthCheck.latest}
+    <Show when={health() !== undefined} fallback={<StartupSplash />}>
       <Show
-        when={startupHealthCheck()}
+        when={health()}
         fallback={
           <ConnectionError
             onRetry={() => {
@@ -215,8 +204,7 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
       >
         {props.children}
       </Show>
-      {/*</Show>*/}
-    </Suspense>
+    </Show>
   )
 }
 
@@ -226,9 +214,9 @@ function StartupSplash() {
 
   return (
     <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base gap-6">
-      <Splash class="w-16 h-20 opacity-50 animate-pulse" />
+      <Splash class="w-28 h-28 opacity-50 animate-pulse" />
       <Show when={motd()?.enabled && motd()?.text}>
-        <div class="max-w-[calc(100vw-4rem)] text-center text-14-regular text-text-muted truncate">{motd()?.text}</div>
+        <div class="max-w-[calc(100vw-4rem)] text-center text-16-regular text-text-muted truncate">{motd()?.text}</div>
       </Show>
     </div>
   )
@@ -248,7 +236,7 @@ function ConnectionError(props: { onRetry?: () => void; onServerSelected?: (key:
   return (
     <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base gap-6 p-6">
       <div class="flex flex-col items-center max-w-md text-center">
-        <Splash class="w-12 h-15 mb-4" />
+        <Splash class="w-14 h-14 mb-4" />
         <p class="text-14-regular text-text-base">
           {unreachable()[0]}
           <span class="text-text-strong font-medium">{name()}</span>
