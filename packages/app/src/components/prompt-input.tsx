@@ -56,6 +56,7 @@ import { promptPlaceholder } from "./prompt-input/placeholder"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
 import { useQueries } from "@tanstack/solid-query"
 import { loadAgentsQuery, loadProvidersQuery } from "@/context/global-sync/bootstrap"
+import { sessionWorking } from "@/utils/session-working"
 
 interface PromptInputProps {
   class?: string
@@ -244,7 +245,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         type: "idle",
       },
   )
-  const working = createMemo(() => status()?.type !== "idle")
+  const working = createMemo(() =>
+    sessionWorking({
+      messages: params.id ? sync.data.message[params.id] : undefined,
+      status: status(),
+    }),
+  )
   const imageAttachments = createMemo(() =>
     prompt.current().filter((part): part is ImageAttachmentPart => part.type === "image"),
   )

@@ -244,6 +244,10 @@ export function createPromptSubmit(input: PromptSubmitInput) {
         sessionID,
       })
       .catch(() => {})
+      .finally(() => {
+        sync.set("session_status", sessionID, { type: "idle" })
+        setStore("session_status", sessionID, { type: "idle" })
+      })
   }
 
   const restoreCommentItems = (items: CommentItem[]) => {
