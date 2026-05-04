@@ -89,13 +89,30 @@ function createGlobalSync() {
   let eventFrame: number | undefined
   let eventTimer: ReturnType<typeof setTimeout> | undefined
 
+  const normalizeProject = (project: Project) => {
+    const worktree = String(directoryKey(project.worktree))
+    const sandboxes = project.sandboxes?.map((directory) => String(directoryKey(directory)))
+    if (
+      worktree === project.worktree &&
+      (!sandboxes || sandboxes.every((directory, index) => directory === project.sandboxes?.[index]))
+    ) {
+      return project
+    }
+    return { ...project, worktree, sandboxes }
+  }
+
   onCleanup(() => {
     if (eventFrame !== undefined) cancelAnimationFrame(eventFrame)
     if (eventTimer !== undefined) clearTimeout(eventTimer)
   })
 
   const setProjects = (next: Project[] | ((draft: Project[]) => Project[])) => {
-    setGlobalStore("project", next)
+    setGlobalStore(
+      "project",
+      reconcile((typeof next === "function" ? next(globalStore.project) : next).map(normalizeProject), {
+        key: "worktree",
+      }),
+    )
   }
 
   const setBootStore = ((...input: unknown[]) => {
