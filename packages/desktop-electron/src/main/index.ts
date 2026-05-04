@@ -279,9 +279,7 @@ registerIpcHandlers({
     }
   },
   getMotd: async () => {
-    const motd = (
-      await Promise.race([getUpdateServerConfig(), delay(750).then(() => updateServerConfig)])
-    )?.motd
+    const motd = (await getUpdateServerConfig(true))?.motd
     if (motd?.enabled === false) return null
     return motd ?? defaultMotd
   },
@@ -417,6 +415,10 @@ async function checkUpdate() {
   const remote = await getUpdateServerConfig(true)
   if (!remote) {
     logger.log("update server unreachable")
+    return { updateAvailable: false }
+  }
+  if (!remote.version || !remote.url) {
+    logger.log("update server config has no update metadata")
     return { updateAvailable: false }
   }
   if (updateServer.compareVersions(app.getVersion(), remote.version) <= 0) {

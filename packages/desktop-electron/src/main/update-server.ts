@@ -2,6 +2,7 @@ const UPDATE_SERVER_BASE_URL =
   process.env.OPENCODE_UPDATE_BASE_URL ?? import.meta.env.OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode"
 
 const MOTD_TEXT_LIMIT = 180
+const UPDATE_SERVER_TIMEOUT = 3_000
 
 const parseVersion = (value: string) =>
   value
@@ -16,8 +17,8 @@ export type UpdateServerMotd = {
 }
 
 type UpdateServerConfig = {
-  version: string
-  url: string
+  version?: string
+  url?: string
   motd?: UpdateServerMotd
 }
 
@@ -39,6 +40,7 @@ function getText(value: unknown) {
 
 function parseMotd(value: unknown): UpdateServerMotd | undefined {
   if (!isRecord(value)) return
+  if (value.enabled === false) return { enabled: false, text: "" }
   if (value.enabled !== true) return
   const text = getText(value.text)
   if (!text) return
@@ -72,18 +74,18 @@ export const updateServer = {
     return delta > 0 ? 1 : -1
   },
   async fetchConfig(): Promise<ParsedUpdateServerConfig | null> {
-    return fetch(this.configUrl, { cache: "no-store" })
+    return fetch(this.configUrl, { cache: "no-store", signal: AbortSignal.timeout(UPDATE_SERVER_TIMEOUT) })
       .then((result) => (result.ok ? (result.json() as Promise<unknown>) : undefined))
       .then((result) => parseConfig(result))
       .catch(() => null)
   },
   async fetchLegacy(): Promise<UpdateServerConfig | null> {
     const [version, url] = await Promise.all([
-      fetch(this.versionUrl, { cache: "no-store" })
+      fetch(this.versionUrl, { cache: "no-store", signal: AbortSignal.timeout(UPDATE_SERVER_TIMEOUT) })
         .then((result) => (result.ok ? result.text() : ""))
         .then((result) => result.trim())
         .catch(() => ""),
-      fetch(this.feedUrl, { cache: "no-store" })
+      fetch(this.feedUrl, { cache: "no-store", signal: AbortSignal.timeout(UPDATE_SERVER_TIMEOUT) })
         .then((result) => (result.ok ? result.text() : ""))
         .then((result) => result.trim())
         .catch(() => ""),
@@ -94,6 +96,7 @@ export const updateServer = {
   async fetch(): Promise<UpdateServerConfig | null> {
     const config = await this.fetchConfig()
     if (config?.version && config.url) return { version: config.version, url: config.url, motd: config.motd }
+    if (config?.motd) return { motd: config.motd }
 
     const legacy = await this.fetchLegacy()
     if (!legacy) return null

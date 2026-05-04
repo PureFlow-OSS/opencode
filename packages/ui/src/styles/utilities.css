@@ -99,6 +99,15 @@
   letter-spacing: var(--letter-spacing-normal);
 }
 
+.text-16-regular {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-large);
+  font-style: normal;
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-x-large);
+  letter-spacing: var(--letter-spacing-normal);
+}
+
 .text-16-medium {
   font-family: var(--font-family-sans);
   font-size: var(--font-size-large);

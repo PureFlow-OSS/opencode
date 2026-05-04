@@ -12,6 +12,8 @@ const root = document.getElementById("root")!
 const lines = ["Just a moment...", "Migrating your database", "This may take a couple of minutes"]
 const delays = [3000, 9000]
 
+root.replaceChildren()
+
 render(() => {
   const [step, setStep] = createSignal<InitStep | null>(null)
   const [line, setLine] = createSignal(0)
@@ -67,7 +69,7 @@ render(() => {
       <div class="w-screen h-screen bg-background-base flex items-center justify-center">
         <Font />
         <div class="flex flex-col items-center gap-11">
-          <Splash class="w-20 h-25 opacity-15" />
+          <Splash class="w-32 h-32 opacity-15" />
           <div class="w-60 flex flex-col items-center gap-4" aria-live="polite">
             <span class="w-full overflow-hidden text-center text-ellipsis whitespace-nowrap text-text-strong text-14-normal">
               {status()}
