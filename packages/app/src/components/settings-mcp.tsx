@@ -91,7 +91,8 @@ export const SettingsMcp: Component = () => {
   const [managedData] = createResource<Record<string, ManagedServer>>(() =>
     globalSDK
       .request("/mcp/managed")
-      .then((res) => (res.ok ? (res.json() as Promise<Record<string, ManagedServer>>) : {})),
+      .then((res) => (res.ok ? (res.json() as Promise<Record<string, ManagedServer>>) : {}))
+      .catch(() => ({})),
   )
   const [mcpStatus, { mutate: setMcpStatus }] = createResource<Record<string, { status: string }>>(() =>
     globalSDK.client.mcp.status().then((res) => res.data ?? {}),

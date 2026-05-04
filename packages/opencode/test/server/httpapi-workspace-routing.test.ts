@@ -361,6 +361,27 @@ describe("HttpApi workspace routing middleware", () => {
     }),
   )
 
+  it.live("keeps control-plane routes local even when selected workspace is missing", () =>
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped()
+      const workspaceID = WorkspaceID.ascending("wrk_missing_local")
+
+      yield* HttpRouter.add(
+        "GET",
+        "/session",
+        Effect.gen(function* () {
+          const route = yield* WorkspaceRouteContext
+          return yield* HttpServerResponse.json({ directory: route.directory, workspaceID: route.workspaceID })
+        }),
+      ).pipe(Layer.provide(workspaceRoutingTestLayer), HttpRouter.serve, Layer.build)
+
+      const response = yield* HttpClient.get(`/session?workspace=${workspaceID}&directory=${encodeURIComponent(dir)}`)
+
+      expect(response.status).toBe(200)
+      expect(yield* response.json).toEqual({ directory: dir, workspaceID })
+    }),
+  )
+
   it.live("keeps control-plane routes local even when workspace is selected", () =>
     Effect.gen(function* () {
       const dir = yield* tmpdirScoped({ git: true })

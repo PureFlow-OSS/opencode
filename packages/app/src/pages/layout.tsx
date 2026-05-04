@@ -556,7 +556,8 @@ export default function Layout(props: ParentProps) {
     const [managedData] = createResource<Record<string, ManagedServer>>(() =>
       globalSDK
         .request("/mcp/managed")
-        .then((res) => (res.ok ? (res.json() as Promise<Record<string, ManagedServer>>) : {})),
+        .then((res) => (res.ok ? (res.json() as Promise<Record<string, ManagedServer>>) : {}))
+        .catch(() => ({})),
     )
 
     function DialogManagedMcpPat(props: { name: string; managed: ManagedServer }) {
@@ -690,12 +691,13 @@ export default function Layout(props: ParentProps) {
 
     if (list.length === 0) {
       if (!last) return
-      await openProject(last, true)
-    } else {
-      const next = list.find((project) => project.worktree === last) ?? list[0]
-      if (!next) return
-      await openProject(next.worktree, true)
+      void openProject(last, true)
+      return
     }
+
+    const next = list.find((project) => project.worktree === last) ?? list[0]
+    if (!next) return
+    void openProject(next.worktree, true)
   })
 
   const workspaceName = (directory: string, projectId?: string, branch?: string) => {

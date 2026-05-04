@@ -142,12 +142,12 @@ function planRequest(
     const workspaceID = selectedWorkspaceID(url, sessionWorkspaceID)
     const workspace = yield* resolveWorkspace(workspaceID, envWorkspaceID)
 
-    if (workspaceID && workspace === undefined && !envWorkspaceID) {
-      return RequestPlan.MissingWorkspace({ workspaceID })
-    }
-
     if (workspace !== undefined && !envWorkspaceID && !shouldStayOnControlPlane(request, url)) {
       return yield* planWorkspaceRequest(request, url, workspace)
+    }
+
+    if (workspaceID && workspace === undefined && !envWorkspaceID && !shouldStayOnControlPlane(request, url)) {
+      return RequestPlan.MissingWorkspace({ workspaceID })
     }
 
     return RequestPlan.Local({ directory: defaultDirectory(request, url), workspaceID: envWorkspaceID ?? workspaceID })

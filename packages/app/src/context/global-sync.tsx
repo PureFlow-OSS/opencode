@@ -162,10 +162,6 @@ function createGlobalSync() {
       clearSessionPrefetchDirectory(directory)
     },
     translate: language.t,
-    getSdk: sdkFor,
-    global: {
-      provider: globalStore.provider,
-    },
   })
 
   async function loadSessions(directory: string) {
