@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, Match, onCleanup, Switch } from "solid-js"
+import { createMemo, For, Match, Switch } from "solid-js"
 import { Button } from "@opencode-ai/ui/button"
 import { Logo } from "@opencode-ai/ui/logo"
 import { useLayout } from "@/context/layout"
@@ -13,8 +13,6 @@ import { DialogSelectServer } from "@/components/dialog-select-server"
 import { useServer } from "@/context/server"
 import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
-
-const EMPTY_STATE_BOOT_GRACE = 2000
 
 export default function Home() {
   const sync = useGlobalSync()
@@ -32,18 +30,6 @@ export default function Home() {
       .slice()
       .sort((a, b) => projectTime(b) - projectTime(a))
       .slice(0, 5)
-  })
-  const [showEmpty, setShowEmpty] = createSignal(false)
-
-  createEffect(() => {
-    const empty = server.ready() && sync.ready && recent().length === 0
-    if (!empty) {
-      setShowEmpty(false)
-      return
-    }
-
-    const timer = window.setTimeout(() => setShowEmpty(true), EMPTY_STATE_BOOT_GRACE)
-    onCleanup(() => window.clearTimeout(timer))
   })
 
   const serverDotClass = createMemo(() => {
@@ -137,7 +123,7 @@ export default function Home() {
             </Button>
           </div>
         </Match>
-        <Match when={showEmpty()}>
+        <Match when={server.ready() && sync.ready}>
           <div class="mt-30 mx-auto flex flex-col items-center gap-3">
             <Icon name="folder-add-left" size="large" />
             <div class="flex flex-col gap-1 items-center justify-center">

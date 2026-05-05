@@ -255,7 +255,6 @@ window.api.onMenuCommand((id) => {
   menuTrigger?.(id)
 })
 listenForDeepLinks()
-root?.replaceChildren()
 
 function BootSplash() {
   const [motd] = createResource(() => window.api.getMotd().catch(() => defaultMotd), { initialValue: defaultMotd })

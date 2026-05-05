@@ -7,7 +7,6 @@ import {
   on,
   onCleanup,
   onMount,
-  createSignal,
   ParentProps,
   Show,
   untrack,
@@ -89,8 +88,6 @@ import {
 } from "./layout/sidebar-workspace"
 import { ProjectDragOverlay, SortableProject, type ProjectSidebarContext } from "./layout/sidebar-project"
 import { SidebarContent } from "./layout/sidebar-shell"
-
-const EMPTY_STATE_BOOT_GRACE = 2000
 
 export default function Layout(props: ParentProps) {
   const [store, setStore, , ready] = persisted(
@@ -2130,7 +2127,7 @@ export default function Layout(props: ParentProps) {
     const project = panelProps.project
     const merged = createMemo(() => panelProps.mobile || (panelProps.merged ?? layout.sidebar.opened()))
     const hover = createMemo(() => !panelProps.mobile && panelProps.merged === false && !layout.sidebar.opened())
-    const canShowEmpty = createMemo(
+    const empty = createMemo(
       () =>
         !params.dir &&
         pageReady() &&
@@ -2140,16 +2137,6 @@ export default function Layout(props: ParentProps) {
         !autoselecting.loading &&
         layout.projects.list().length === 0,
     )
-    const [showEmpty, setShowEmpty] = createSignal(false)
-    createEffect(() => {
-      if (!canShowEmpty()) {
-        setShowEmpty(false)
-        return
-      }
-
-      const timer = window.setTimeout(() => setShowEmpty(true), EMPTY_STATE_BOOT_GRACE)
-      onCleanup(() => window.clearTimeout(timer))
-    })
     const projectName = createMemo(() => {
       const item = project()
       if (!item) return ""
@@ -2205,7 +2192,7 @@ export default function Layout(props: ParentProps) {
         <Show
           when={project()}
           fallback={
-            <Show when={showEmpty()}>
+            <Show when={empty()}>
               <div class="flex-1 min-h-0 -mt-4 flex items-center justify-center px-6 pb-64 text-center">
                 <div class="mt-8 flex max-w-60 flex-col items-center gap-6 text-center">
                   <div class="flex flex-col gap-3">
