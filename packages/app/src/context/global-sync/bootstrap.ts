@@ -124,7 +124,6 @@ export async function bootstrapGlobal(input: {
   //   translate: input.translate,
   //   formatMoreCount: input.formatMoreCount,
   // })
-  await waitForPaint()
   await runAll(slow)
   // showErrors({
   //   errors: errors(),
