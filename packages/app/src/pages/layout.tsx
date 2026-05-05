@@ -673,7 +673,7 @@ export default function Layout(props: ParentProps) {
     const id = child.project
     if (!id) return
 
-    const meta = globalSync.data.project.find((p) => p.id === id)
+    const meta = globalSync.data.project.find((p) => p?.id === id)
     const root = meta?.worktree
     if (!root) return
 
@@ -1339,7 +1339,7 @@ export default function Layout(props: ParentProps) {
     const id = child.project
     if (!id) return directory
 
-    const meta = globalSync.data.project.find((item) => item.id === id)
+    const meta = globalSync.data.project.find((item) => item?.id === id)
     return meta?.worktree ?? directory
   }
 

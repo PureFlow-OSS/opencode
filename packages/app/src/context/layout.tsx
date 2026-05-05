@@ -388,8 +388,8 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       const [childStore] = globalSync.child(project.worktree, { bootstrap: false })
       const projectID = childStore.project
       const metadata = projectID
-        ? globalSync.data.project.find((x) => x.id === projectID)
-        : globalSync.data.project.find((x) => x.worktree === project.worktree)
+        ? globalSync.data.project.find((x) => x?.id === projectID)
+        : globalSync.data.project.find((x) => x?.worktree === project.worktree)
 
       // Preserve local icon override from per-workspace localStorage cache (childStore.icon).
       // Without this, different subdirectories of the same git repo would share the same
@@ -404,6 +404,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
     const roots = createMemo(() => {
       const map = new Map<string, string>()
       for (const project of globalSync.data.project) {
+        if (!project?.worktree) continue
         const sandboxes = project.sandboxes ?? []
         for (const sandbox of sandboxes) {
           map.set(sandbox, project.worktree)
