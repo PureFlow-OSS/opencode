@@ -21,7 +21,7 @@ export const Splash = (props: Pick<ComponentProps<"svg">, "ref" | "class">) => {
       ref={props.ref}
       data-component="logo-splash"
       classList={{ [props.class ?? ""]: !!props.class }}
-      viewBox="0 0 80 100"
+      viewBox="0 0 63 64"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >

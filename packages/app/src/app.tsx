@@ -473,11 +473,15 @@ function StartupSplash() {
   const [motd] = createResource(() => platform.getMotd?.().catch(() => defaultMotd), { initialValue: defaultMotd })
 
   return (
-    <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base gap-6">
-      <Splash class="w-16 h-20 opacity-50 animate-pulse" />
-      <Show when={motd()?.enabled && motd()?.text}>
-        <div class="max-w-[calc(100vw-4rem)] text-center text-14-regular text-text-muted truncate">{motd()?.text}</div>
-      </Show>
+    <div class="h-dvh w-screen flex items-center justify-center bg-background-base">
+      <div class="flex flex-col items-center justify-center gap-6 text-center">
+        <Splash class="w-28 h-28 opacity-50 animate-pulse" />
+        <Show when={motd()?.enabled && motd()?.text}>
+          <div class="max-w-[calc(100vw-4rem)] text-center text-26-regular text-text-muted truncate">
+            {motd()?.text}
+          </div>
+        </Show>
+      </div>
     </div>
   )
 }

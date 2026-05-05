@@ -283,6 +283,24 @@ window.api.onMenuCommand((id) => {
 })
 listenForDeepLinks()
 
+function BootSplash() {
+  const defaultMotd = { enabled: true, text: "RRZ AI Factory" }
+  const [motd] = createResource(() => window.api.getMotd().catch(() => defaultMotd), { initialValue: defaultMotd })
+
+  return (
+    <div class="h-dvh w-screen flex items-center justify-center bg-background-base">
+      <div class="flex flex-col items-center justify-center gap-6 text-center">
+        <Splash class="w-28 h-28 opacity-50 animate-pulse" />
+        <Show when={motd()?.enabled && motd()?.text}>
+          <div class="max-w-[calc(100vw-4rem)] text-center text-26-regular text-text-muted truncate">
+            {motd()?.text}
+          </div>
+        </Show>
+      </div>
+    </div>
+  )
+}
+
 render(() => {
   const platform = createPlatform()
   const loadLocale = async () => {
@@ -333,11 +351,7 @@ render(() => {
 
   function App() {
     const wslServers = useWslServers()
-    const splash = (
-      <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
-        <Splash class="w-16 h-20 opacity-50 animate-pulse" />
-      </div>
-    )
+    const splash = <BootSplash />
 
     const ready = createMemo(
       () => !defaultServer.loading && !sidecar.loading && !windowCount.loading && !locale.loading,
