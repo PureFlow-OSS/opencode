@@ -155,6 +155,39 @@ test("aifactory host added to NO_PROXY", async () => {
   }
 })
 
+test("configured aifactory host added to NO_PROXY", async () => {
+  const original = {
+    NO_PROXY: process.env.NO_PROXY,
+    no_proxy: process.env.no_proxy,
+  }
+  process.env.NO_PROXY = "localhost"
+  process.env.no_proxy = "127.0.0.1"
+  try {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await Bun.write(
+          path.join(dir, "opencode.json"),
+          JSON.stringify({
+            $schema: "https://opencode.ai/config.json",
+            aifactory_host: "http://192.0.2.20",
+          }),
+        )
+      },
+    })
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        await list()
+        expect(process.env.NO_PROXY?.split(",").map((item) => item.trim())).toContain("192.0.2.20")
+        expect(process.env.no_proxy?.split(",").map((item) => item.trim())).toContain("192.0.2.20")
+      },
+    })
+  } finally {
+    process.env.NO_PROXY = original.NO_PROXY
+    process.env.no_proxy = original.no_proxy
+  }
+})
+
 test("disabled_providers excludes provider", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {

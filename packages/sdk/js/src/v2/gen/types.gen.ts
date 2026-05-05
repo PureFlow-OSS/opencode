@@ -1479,6 +1479,10 @@ export type Config = {
    */
   http_proxy?: string
   /**
+   * RRZ AI Factory host. Defaults to http://10.53.7.23.
+   */
+  aifactory_host?: string
+  /**
    * Whether the configured global HTTP proxy should be used. Defaults to true.
    */
   use_http_proxy?: boolean

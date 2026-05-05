@@ -31,11 +31,16 @@ import { ModelID, ProviderID } from "./schema"
 
 const log = Log.create({ service: "provider" })
 const AIFACTORY_ID = ProviderID.make("aifactory")
-const AIFACTORY_BASE_URL = "http://10.53.7.23/v1"
+const DEFAULT_AIFACTORY_HOST = "http://10.53.7.23"
 const AIFACTORY_PROVIDER_CONFIG_URL =
   "http://opencode.pfcicd.local.programmierfabrik.at/opencode/provider-config.json"
-const AIFACTORY_BYPASS = new URL(AIFACTORY_BASE_URL).host
 const REQUIRED_PROVIDER_IDS = [ProviderID.githubCopilot, ProviderID.aifactory]
+
+function aiFactoryBaseURL(config: Pick<Config.Info, "aifactory_host">) {
+  const host = (config.aifactory_host?.trim() || DEFAULT_AIFACTORY_HOST).replace(/\/+$/, "")
+  if (host.endsWith("/v1")) return host
+  return `${host}/v1`
+}
 
 export function normalizeEnabledProviders(providerIDs: string[] | undefined) {
   if (!providerIDs) return undefined
@@ -171,7 +176,12 @@ async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch) {
     })
 }
 
-function buildAiFactoryModel(modelID: string, created?: number | string, rules?: AiFactoryModelLimitRule[]): Model {
+function buildAiFactoryModel(
+  modelID: string,
+  baseURL: string,
+  created?: number | string,
+  rules?: AiFactoryModelLimitRule[],
+): Model {
   const overrides = resolveAiFactoryModelOverrides(modelID, rules)
   const base: Model = {
     id: ModelID.make(modelID),
@@ -180,7 +190,7 @@ function buildAiFactoryModel(modelID: string, created?: number | string, rules?:
     family: modelID.split(/[-/]/)[0],
     api: {
       id: modelID,
-      url: AIFACTORY_BASE_URL,
+      url: baseURL,
       npm: "@ai-sdk/openai-compatible",
     },
     status: "active",
@@ -226,10 +236,10 @@ function buildAiFactoryModel(modelID: string, created?: number | string, rules?:
   }
 }
 
-async function discoverAiFactoryModels(token: string, fetchFn: FetchLike = fetch) {
+async function discoverAiFactoryModels(token: string, baseURL: string, fetchFn: FetchLike = fetch) {
   const [rules, payload] = await Promise.all([
     discoverAiFactoryConfig(fetchFn),
-    fetchFn(`${AIFACTORY_BASE_URL}/models`, {
+    fetchFn(`${baseURL}/models`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -252,7 +262,7 @@ async function discoverAiFactoryModels(token: string, fetchFn: FetchLike = fetch
         return [{ id: item.id.trim(), created: item.created }]
       })
       .filter((item) => item.id)
-      .map((item) => [item.id, buildAiFactoryModel(item.id, item.created, rules)] as const),
+      .map((item) => [item.id, buildAiFactoryModel(item.id, baseURL, item.created, rules)] as const),
   )
 }
 
@@ -269,8 +279,9 @@ function mergeNoProxyEntry(value: string | undefined, entry: string) {
 }
 
 function applyProviderProxyConfig(config: Config.Info) {
-  process.env.NO_PROXY = mergeNoProxyEntry(process.env.NO_PROXY, AIFACTORY_BYPASS)
-  process.env.no_proxy = mergeNoProxyEntry(process.env.no_proxy, AIFACTORY_BYPASS)
+  const bypass = new URL(aiFactoryBaseURL(config)).host
+  process.env.NO_PROXY = mergeNoProxyEntry(process.env.NO_PROXY, bypass)
+  process.env.no_proxy = mergeNoProxyEntry(process.env.no_proxy, bypass)
   if (!config.use_http_proxy || !config.http_proxy) return
   process.env.HTTP_PROXY = config.http_proxy
   process.env.HTTPS_PROXY = config.http_proxy
@@ -464,6 +475,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       }),
     aifactory: Effect.fnUntraced(function* () {
       const config = yield* dep.config()
+      const baseURL = aiFactoryBaseURL(config)
       const auth = yield* dep.auth("aifactory")
       const token =
         auth?.type === "api"
@@ -475,11 +487,11 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       return {
         autoload: Boolean(token),
         options: {
-          baseURL: AIFACTORY_BASE_URL,
+          baseURL,
         },
         async discoverModels() {
           if (!token) return {}
-          return discoverAiFactoryModels(token, (input, init) => dep.fetch(AIFACTORY_ID, input, init))
+          return discoverAiFactoryModels(token, baseURL, (input, init) => dep.fetch(AIFACTORY_ID, input, init))
         },
       }
     }),
