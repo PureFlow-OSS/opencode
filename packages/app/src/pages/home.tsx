@@ -23,10 +23,12 @@ export default function Home() {
   const server = useServer()
   const language = useLanguage()
   const homedir = createMemo(() => sync.data.path.home)
+  const projectTime = (project: (typeof sync.data.project)[number]) => project?.time?.updated ?? project?.time?.created ?? 0
   const recent = createMemo(() => {
     return sync.data.project
+      .filter((project) => !!project?.worktree)
       .slice()
-      .sort((a, b) => (b.time.updated ?? b.time.created) - (a.time.updated ?? a.time.created))
+      .sort((a, b) => projectTime(b) - projectTime(a))
       .slice(0, 5)
   })
 
@@ -86,7 +88,7 @@ export default function Home() {
         {server.name}
       </Button>
       <Switch>
-        <Match when={sync.data.project.length > 0}>
+        <Match when={recent().length > 0}>
           <div class="mt-20 w-full flex flex-col gap-4">
             <div class="flex gap-2 items-center justify-between pl-3">
               <div class="text-14-medium text-text-strong">{language.t("home.recentProjects")}</div>
@@ -105,7 +107,7 @@ export default function Home() {
                   >
                     {project.worktree.replace(homedir(), "~")}
                     <div class="text-14-regular text-text-weak">
-                      {DateTime.fromMillis(project.time.updated ?? project.time.created).toRelative()}
+                      {DateTime.fromMillis(projectTime(project)).toRelative()}
                     </div>
                   </Button>
                 )}

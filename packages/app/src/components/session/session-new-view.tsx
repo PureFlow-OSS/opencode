@@ -28,6 +28,10 @@ export function NewSessionView(props: NewSessionViewProps) {
     return MAIN_WORKTREE
   })
   const projectRoot = createMemo(() => sync.project?.worktree ?? sdk.directory)
+  const projectModified = createMemo(() => {
+    const project = sync.project
+    return project?.time?.updated ?? project?.time?.created
+  })
   const isWorktree = createMemo(() => {
     const project = sync.project
     if (!project) return false
@@ -69,15 +73,13 @@ export function NewSessionView(props: NewSessionViewProps) {
                 {label(current())}
               </div>
             </div>
-            <Show when={sync.project}>
-              {(project) => (
+            <Show when={projectModified()}>
+              {(modified) => (
                 <div class="flex items-start justify-center gap-3 min-h-5">
                   <div class="text-12-medium text-text-weak leading-5 min-w-0 max-w-160 break-words text-center">
                     {language.t("session.new.lastModified")}&nbsp;
                     <span class="text-text-strong">
-                      {DateTime.fromMillis(project().time.updated ?? project().time.created)
-                        .setLocale(language.intl())
-                        .toRelative()}
+                      {DateTime.fromMillis(modified()).setLocale(language.intl()).toRelative()}
                     </span>
                   </div>
                 </div>

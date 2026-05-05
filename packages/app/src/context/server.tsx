@@ -216,7 +216,7 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
     })
 
     const origin = createMemo(() => projectsKey(state.active))
-    const projectsList = createMemo(() => store.projects[origin()] ?? [])
+    const projectsList = createMemo(() => (store.projects[origin()] ?? []).filter((x) => !!x?.worktree))
     const current: Accessor<ServerConnection.Any | undefined> = createMemo(
       () => allServers().find((s) => ServerConnection.key(s) === state.active) ?? allServers()[0],
     )
@@ -249,14 +249,14 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
         open(directory: string) {
           const key = origin()
           if (!key) return
-          const current = store.projects[key] ?? []
+          const current = projectsList()
           if (current.find((x) => pathKey(x.worktree) === pathKey(directory))) return
           setStore("projects", key, [{ worktree: directory, expanded: true }, ...current])
         },
         close(directory: string) {
           const key = origin()
           if (!key) return
-          const current = store.projects[key] ?? []
+          const current = projectsList()
           setStore(
             "projects",
             key,
@@ -266,21 +266,27 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
         expand(directory: string) {
           const key = origin()
           if (!key) return
-          const current = store.projects[key] ?? []
-          const index = current.findIndex((x) => pathKey(x.worktree) === pathKey(directory))
-          if (index !== -1) setStore("projects", key, index, "expanded", true)
+          const current = projectsList()
+          setStore(
+            "projects",
+            key,
+            current.map((x) => (pathKey(x.worktree) === pathKey(directory) ? { ...x, expanded: true } : x)),
+          )
         },
         collapse(directory: string) {
           const key = origin()
           if (!key) return
-          const current = store.projects[key] ?? []
-          const index = current.findIndex((x) => pathKey(x.worktree) === pathKey(directory))
-          if (index !== -1) setStore("projects", key, index, "expanded", false)
+          const current = projectsList()
+          setStore(
+            "projects",
+            key,
+            current.map((x) => (pathKey(x.worktree) === pathKey(directory) ? { ...x, expanded: false } : x)),
+          )
         },
         move(directory: string, toIndex: number) {
           const key = origin()
           if (!key) return
-          const current = store.projects[key] ?? []
+          const current = projectsList()
           const fromIndex = current.findIndex((x) => pathKey(x.worktree) === pathKey(directory))
           if (fromIndex === -1 || fromIndex === toIndex) return
           const result = [...current]
