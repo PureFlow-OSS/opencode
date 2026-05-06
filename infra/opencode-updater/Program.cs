@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json.Serialization;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,6 +9,10 @@ builder.Services.Configure<UpdaterOptions>(builder.Configuration.GetSection("Upd
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton(new LocalFeed(Path.Combine(builder.Environment.ContentRootPath, "feed")));
 builder.Services.AddSingleton<UpdaterVersionResolver>();
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+  options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+});
 
 var app = builder.Build();
 
@@ -139,6 +144,7 @@ sealed class ProviderConfigOptions
   [JsonPropertyName("model")]
   public string? Model { get; set; }
 
+  [ConfigurationKeyName("small_model")]
   [JsonPropertyName("small_model")]
   public string? SmallModel { get; set; }
 
