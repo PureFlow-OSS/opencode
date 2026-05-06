@@ -8,6 +8,7 @@ Endpoints:
 - `GET /opencode/url`
 - `GET /opencode/config`
 - `GET /opencode/latest.json`
+- `GET /opencode/changelog.md`
 - `GET /opencode/provider-config.json`
 - `GET /opencode/feed/{asset}`
 
@@ -37,9 +38,13 @@ Requests may include `X-OpenCode-AiFactory-Api-Key`. When `UpdaterBeta.Enabled` 
 Local feed layout:
 
 - stable: `feed/latest.json`, `feed/latest.yml`, `feed/<asset>`
+- stable changelog: `feed/changelog.md`
 - beta: `feed/beta/latest.json`, `feed/beta/latest.yml`, `feed/beta/<asset>`
+- beta changelog: `feed/beta/changelog.md`
 
 When beta user is matched, updater first looks in `feed/beta/`. Stable users keep using `feed/`. Missing files return `404`.
+
+`GET /opencode/changelog.md` returns markdown changelog from matching feed directory using same stable/beta resolution as update files.
 
 ## Beta rollout
 

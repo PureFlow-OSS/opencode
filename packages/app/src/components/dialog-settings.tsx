@@ -9,6 +9,7 @@ import { SettingsKeybinds } from "./settings-keybinds"
 import { SettingsMcp } from "./settings-mcp"
 import { SettingsModels } from "./settings-models"
 import { SettingsProviders } from "./settings-providers"
+import { SettingsChangelog } from "./settings-changelog"
 
 export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
   const language = useLanguage()
@@ -31,6 +32,10 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
                     <Tabs.Trigger value="shortcuts">
                       <Icon name="keyboard" />
                       {language.t("settings.tab.shortcuts")}
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="changelog">
+                      <Icon name="bullet-list" />
+                      {language.t("settings.tab.changelog")}
                     </Tabs.Trigger>
                   </div>
                 </div>
@@ -65,6 +70,9 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
         </Tabs.Content>
         <Tabs.Content value="shortcuts" class="no-scrollbar">
           <SettingsKeybinds />
+        </Tabs.Content>
+        <Tabs.Content value="changelog" class="no-scrollbar">
+          <SettingsChangelog />
         </Tabs.Content>
         <Tabs.Content value="providers" class="no-scrollbar">
           <SettingsProviders />

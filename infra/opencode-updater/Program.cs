@@ -15,6 +15,13 @@ builder.Services.Configure<UpdaterOptions>("beta", betaConfiguration.GetSection(
 builder.Services.Configure<UpdaterBetaOptions>(betaConfiguration.GetSection("UpdaterBeta"));
 builder.Services.AddHttpClient();
 builder.Services.AddMemoryCache();
+builder.Services.AddCors((options) =>
+{
+  options.AddDefaultPolicy((policy) => policy
+    .AllowAnyOrigin()
+    .AllowAnyHeader()
+    .AllowAnyMethod());
+});
 builder.Services.AddSingleton(new LocalFeed(Path.Combine(builder.Environment.ContentRootPath, "feed")));
 builder.Services.AddSingleton<UpdaterVersionResolver>();
 builder.Services.AddSingleton<UpdaterRolloutResolver>();
@@ -24,6 +31,8 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 });
 
 var app = builder.Build();
+
+app.UseCors();
 
 app.MapGet("/", () => Results.Redirect("/opencode/version"));
 
@@ -54,6 +63,13 @@ app.MapGet("/opencode/latest.json", async (HttpContext context, LocalFeed feed, 
 {
   var rollout = await rolloutResolver.ResolveAsync(context.Request, context.RequestAborted);
   if (feed.TryGet("latest.json", rollout.IsBeta, out var local)) return await LocalFileAsync(context, local);
+  return Results.NotFound();
+});
+
+app.MapGet("/opencode/changelog.md", async (HttpContext context, LocalFeed feed, UpdaterRolloutResolver rolloutResolver) =>
+{
+  var rollout = await rolloutResolver.ResolveAsync(context.Request, context.RequestAborted);
+  if (feed.TryGet("changelog.md", rollout.IsBeta, out var local)) return await LocalFileAsync(context, local);
   return Results.NotFound();
 });
 
@@ -97,6 +113,7 @@ static async Task<IResult> LocalFileAsync(HttpContext context, string path)
   {
     ".yml" => "text/yaml; charset=utf-8",
     ".json" => "application/json; charset=utf-8",
+    ".md" => "text/markdown; charset=utf-8",
     ".blockmap" => "application/octet-stream",
     ".exe" => "application/octet-stream",
     _ => "application/octet-stream",

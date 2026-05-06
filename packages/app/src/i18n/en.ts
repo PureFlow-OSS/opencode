@@ -716,6 +716,7 @@ export const dict = {
   "settings.section.server": "Server",
   "settings.tab.general": "General",
   "settings.tab.shortcuts": "Shortcuts",
+  "settings.tab.changelog": "Changelog",
   "settings.desktop.section.wsl": "WSL",
   "settings.desktop.wsl.title": "WSL integration",
   "settings.desktop.wsl.description": "Run the OpenCode server inside WSL on Windows.",
@@ -927,6 +928,9 @@ export const dict = {
   "settings.mcp.toast.updated.description": "{{name}} has been updated",
   "settings.mcp.toast.deleted.title": "Server removed",
   "settings.mcp.toast.deleted.description": "{{name}} has been removed",
+  "settings.changelog.title": "Changelog",
+  "settings.changelog.description": "Loaded from the configured update server feed.",
+  "settings.changelog.empty": "No changelog available.",
 
   "settings.permissions.title": "Permissions",
   "settings.permissions.description": "Control what tools the server can use by default.",

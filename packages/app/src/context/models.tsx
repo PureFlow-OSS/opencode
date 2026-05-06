@@ -50,8 +50,8 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
       return typeof key === "string" && key.trim() ? key.trim() : undefined
     })
     const [serverRules] = createResource(
-      () => aifactoryApiKey(),
-      (apiKey) => readAiFactoryModelVisibilityRules(platform.fetch ?? fetch, { apiKey }),
+      () => ({ apiKey: aifactoryApiKey() }),
+      (input) => readAiFactoryModelVisibilityRules(platform.fetch ?? fetch, input),
       { initialValue: [] as Array<{ pattern: string; visible: boolean }> },
     )
 
