@@ -32,8 +32,6 @@ import { ModelID, ProviderID } from "./schema"
 const log = Log.create({ service: "provider" })
 const AIFACTORY_ID = ProviderID.make("aifactory")
 const DEFAULT_AIFACTORY_HOST = "http://10.53.7.23"
-const AIFACTORY_PROVIDER_CONFIG_URL =
-  "http://opencode.pfcicd.local.programmierfabrik.at/opencode/provider-config.json"
 const REQUIRED_PROVIDER_IDS = [ProviderID.githubCopilot, ProviderID.aifactory]
 
 function aiFactoryBaseURL(config: Pick<Config.Info, "aifactory_host">) {
@@ -142,7 +140,7 @@ function aiFactoryModalityFlags(
 }
 
 async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch) {
-  return (await fetchFn(AIFACTORY_PROVIDER_CONFIG_URL, {
+  return (await fetchFn(ConfigManaged.providerConfigUrl(), {
     signal: AbortSignal.timeout(3000),
   })
     .then(async (res) => {

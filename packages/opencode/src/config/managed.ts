@@ -10,7 +10,7 @@ import { isRecord } from "@/util/record"
 const log = Log.create({ service: "config" })
 
 const MANAGED_PLIST_DOMAIN = "ai.opencode.managed"
-const PROVIDER_CONFIG_URL = "http://opencode.pfcicd.local.programmierfabrik.at/opencode/provider-config.json"
+const DEFAULT_PROVIDER_CONFIG_URL = "http://opencode.pfcicd.local.programmierfabrik.at/opencode/provider-config.json"
 
 // Keys injected by macOS/MDM into the managed plist that are not OpenCode config
 const PLIST_META = new Set([
@@ -56,8 +56,12 @@ export function providerConfigPayload(payload: unknown): Record<string, unknown>
       : payload
 }
 
+export function providerConfigUrl() {
+  return process.env.OPENCODE_PROVIDER_CONFIG_URL?.trim() || DEFAULT_PROVIDER_CONFIG_URL
+}
+
 export async function readProviderConfig(fetchFn: typeof fetch = fetch): Promise<Record<string, unknown>> {
-  return fetchFn(PROVIDER_CONFIG_URL, {
+  return fetchFn(providerConfigUrl(), {
     signal: AbortSignal.timeout(3000),
   })
     .then(async (res) => {

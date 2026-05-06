@@ -35,7 +35,6 @@ import { withStatics } from "@/util/schema"
 
 const log = Log.create({ service: "mcp" })
 const DEFAULT_TIMEOUT = 30_000
-const MANAGED_MCP_CONFIG_URL = "http://opencode.pfcicd.local.programmierfabrik.at/opencode/provider-config.json"
 const MANAGED_MCP_CACHE_TTL = 30_000
 
 export const Resource = Schema.Struct({
@@ -151,7 +150,7 @@ function parseManagedAuth(value: unknown): ManagedAuth | undefined {
 
 async function discoverManagedMcp(fetchFn: typeof fetch = fetch): Promise<Record<string, ManagedServer>> {
   if (managedMcpCache && managedMcpCache.expires > Date.now()) return managedMcpCache.value
-  const value: Record<string, ManagedServer> = await fetchFn(MANAGED_MCP_CONFIG_URL, {
+  const value: Record<string, ManagedServer> = await fetchFn(ConfigManaged.providerConfigUrl(), {
     signal: AbortSignal.timeout(3000),
   })
     .then(async (res) => {

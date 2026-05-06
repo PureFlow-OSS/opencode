@@ -561,6 +561,7 @@ function delay(ms: number) {
 
 function resolveInstallDirectory(input: unknown) {
   if (typeof input === "string" && input.length > 0) return input
+  if (process.platform === "win32") return "C:/Entwicklung/OpenCode"
   if (!app.isPackaged) return
   return dirname(process.execPath)
 }
