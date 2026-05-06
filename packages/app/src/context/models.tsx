@@ -1,10 +1,16 @@
-import { createMemo } from "solid-js"
+import { createMemo, createResource } from "solid-js"
 import { createStore } from "solid-js/store"
 import { DateTime } from "luxon"
 import { filter, firstBy, flat, groupBy, mapValues, pipe, uniqueBy, values } from "remeda"
 import { createSimpleContext } from "@opencode-ai/ui/context"
+import { usePlatform } from "@/context/platform"
 import { useProviders } from "@/hooks/use-providers"
 import { Persist, persisted } from "@/utils/persist"
+import {
+  defaultModelVisibilityRules,
+  readAiFactoryModelVisibilityRules,
+  resolveAiFactoryModelVisibility,
+} from "./model-visibility"
 
 export type ModelKey = { providerID: string; modelID: string }
 
@@ -25,6 +31,7 @@ function modelKey(model: ModelKey) {
 export const { use: useModels, provider: ModelsProvider } = createSimpleContext({
   name: "Models",
   init: () => {
+    const platform = usePlatform()
     const providers = useProviders()
 
     const [store, setStore, _, ready] = persisted(
@@ -36,6 +43,10 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
       }),
     )
 
+    const [serverRules] = createResource(() => readAiFactoryModelVisibilityRules(platform.fetch ?? fetch), {
+      initialValue: [] as Array<{ pattern: string; visible: boolean }>,
+    })
+
     const available = createMemo(() =>
       providers.connected().flatMap((p) =>
         Object.values(p.models).map((m) => ({
@@ -44,6 +55,7 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
         })),
       ),
     )
+    const defaultRules = createMemo(() => [...defaultModelVisibilityRules(), ...serverRules()])
 
     const release = createMemo(
       () =>
@@ -116,6 +128,11 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
       const state = visibility().get(key)
       if (state === "hide") return false
       if (state === "show") return true
+      const found = find(model)
+      if (found?.provider.id === "aifactory") {
+        const resolved = resolveAiFactoryModelVisibility(found, defaultRules())
+        if (resolved !== undefined) return resolved
+      }
       if (latestSet().has(key)) return true
       const date = release().get(key)
       if (!date?.isValid) return true

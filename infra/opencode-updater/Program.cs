@@ -154,6 +154,10 @@ sealed class AiFactoryConfigOptions
   [ConfigurationKeyName("model_limits")]
   [JsonPropertyName("model_limits")]
   public List<ModelLimitRuleOptions> ModelLimits { get; set; } = [];
+
+  [ConfigurationKeyName("model_visibility")]
+  [JsonPropertyName("model_visibility")]
+  public List<ModelVisibilityRuleOptions> ModelVisibility { get; set; } = [];
 }
 
 sealed class ModelLimitRuleOptions
@@ -175,6 +179,15 @@ sealed class ModelLimitRuleOptions
 
   [JsonPropertyName("modalities")]
   public ModalitiesOptions? Modalities { get; set; }
+}
+
+sealed class ModelVisibilityRuleOptions
+{
+  [JsonPropertyName("pattern")]
+  public string Pattern { get; set; } = "*";
+
+  [JsonPropertyName("visible")]
+  public bool? Visible { get; set; }
 }
 
 sealed class ModalitiesOptions

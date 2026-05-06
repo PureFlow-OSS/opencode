@@ -24,6 +24,7 @@ The updater can also serve provider-side rollout config for the desktop app.
 
 Set `ProviderConfig.model` to provision the default model. Local or project config can still override it with `model`.
 Set `ProviderConfig.small_model` to provision the default small model.
+Set `ProviderConfig.aifactory.model_visibility` to override default visibility for AI Factory models in the client.
 
 ## Full sample config
 
@@ -46,6 +47,12 @@ This is a complete example with:
     "ProviderConfig": {
       "model": "aifactory/Qwen3.6-35B-A3B-FP8",
       "aifactory": {
+        "model_visibility": [
+          {
+            "pattern": "all-team-models",
+            "visible": true
+          }
+        ],
         "model_limits": [
           {
             "pattern": "qwen*",
@@ -124,6 +131,12 @@ Example `appsettings.json`:
   "Updater": {
     "ProviderConfig": {
       "aifactory": {
+        "model_visibility": [
+          {
+            "pattern": "all-proxy-models",
+            "visible": true
+          }
+        ],
         "model_limits": [
           {
             "pattern": "qwen*",
@@ -147,6 +160,8 @@ Example `appsettings.json`:
 
 Rules are ordered. First match wins. `*` acts as fallback.
 
+Client default hides AI Factory models matching `*embedding*`, `all-proxy-models`, and `all-team-models`. `model_visibility` can override that per pattern. Last matching visibility rule wins.
+
 Supported per-rule overrides:
 
 - `context`
@@ -155,6 +170,41 @@ Supported per-rule overrides:
 - `reasoning`
 - `modalities.input`
 - `modalities.output`
+
+## Model visibility example
+
+Example `appsettings.json`:
+
+```json
+{
+  "Updater": {
+    "ProviderConfig": {
+      "aifactory": {
+        "model_visibility": [
+          {
+            "pattern": "*embedding*",
+            "visible": false
+          },
+          {
+            "pattern": "all-proxy-models",
+            "visible": false
+          },
+          {
+            "pattern": "all-team-models",
+            "visible": false
+          },
+          {
+            "pattern": "all-team-models",
+            "visible": true
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+Useful for hiding embedding or aggregate models by default, while selectively re-enabling individual patterns from server config.
 
 You can also push managed MCP servers:
 
@@ -206,6 +256,8 @@ If you want to override a small part without replacing the full JSON file:
 $env:Updater__Version = "1.14.29"
 $env:Updater__Motd__text = "RRZ AI Factory"
 $env:Updater__Motd__enabled = "true"
+$env:Updater__ProviderConfig__aifactory__model_visibility__0__pattern = "all-team-models"
+$env:Updater__ProviderConfig__aifactory__model_visibility__0__visible = "true"
 $env:Updater__ProviderConfig__aifactory__model_limits__0__pattern = "qwen*"
 $env:Updater__ProviderConfig__aifactory__model_limits__0__context = "200000"
 $env:Updater__ProviderConfig__aifactory__model_limits__1__pattern = "*"

@@ -159,13 +159,13 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         const configured = defaults[provider.id]
         if (configured) {
           const model = { providerID: provider.id, modelID: configured }
-          if (validModel(model)) return model
+          if (validModel(model) && models.visible(model)) return model
         }
 
-        const first = Object.values(provider.models)[0]
-        if (!first) continue
-        const model = { providerID: provider.id, modelID: first.id }
-        if (validModel(model)) return model
+        const first = Object.values(provider.models)
+          .map((item) => ({ providerID: provider.id, modelID: item.id }))
+          .find((item) => validModel(item) && models.visible(item))
+        if (first) return first
       }
     }
 
