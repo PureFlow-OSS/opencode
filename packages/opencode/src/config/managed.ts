@@ -13,6 +13,7 @@ const log = Log.create({ service: "config" })
 
 const MANAGED_PLIST_DOMAIN = "ai.opencode.managed"
 const DEFAULT_UPDATE_BASE_URL = "http://opencode.pfcicd.local.programmierfabrik.at/opencode"
+export const PROVIDER_CONFIG_AIFACTORY_API_KEY_HEADER = "X-OpenCode-AiFactory-Api-Key"
 
 // Keys injected by macOS/MDM into the managed plist that are not OpenCode config
 const PLIST_META = new Set([
@@ -69,8 +70,41 @@ export function providerConfigUrl() {
   return `${updateBaseUrl()}/provider-config.json`
 }
 
-export async function readProviderConfig(fetchFn: typeof fetch = fetch): Promise<Record<string, unknown>> {
+function isRecordWith<T extends string>(value: unknown, key: T): value is Record<T, unknown> {
+  return isRecord(value) && key in value
+}
+
+export function aifactoryApiKey(input: {
+  config?: unknown
+  auth?: Record<string, unknown>
+}) {
+  const auth = input.auth?.["aifactory"]
+  if (isRecord(auth) && auth.type === "api" && typeof auth.key === "string" && auth.key.trim()) {
+    return auth.key.trim()
+  }
+  const provider = isRecord(input.config) && isRecord(input.config.provider) ? input.config.provider : undefined
+  const aifactory = provider && isRecord(provider.aifactory) ? provider.aifactory : undefined
+  const options = aifactory && isRecord(aifactory.options) ? aifactory.options : undefined
+  if (typeof options?.apiKey !== "string" || !options.apiKey.trim()) return
+  return options.apiKey.trim()
+}
+
+export function providerConfigRequestInit(input: {
+  config?: unknown
+  auth?: Record<string, unknown>
+} = {}) {
+  const apiKey = aifactoryApiKey(input) ?? process.env.OPENCODE_AIFACTORY_API_KEY?.trim()
+  if (!apiKey) return {}
+  return {
+    headers: {
+      [PROVIDER_CONFIG_AIFACTORY_API_KEY_HEADER]: apiKey,
+    },
+  } satisfies RequestInit
+}
+
+export async function readProviderConfig(fetchFn: typeof fetch = fetch, init: RequestInit = {}): Promise<Record<string, unknown>> {
   return fetchFn(providerConfigUrl(), {
+    ...init,
     signal: AbortSignal.timeout(3000),
   })
     .then(async (res) => {

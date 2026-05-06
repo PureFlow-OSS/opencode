@@ -54,3 +54,54 @@ test("providerConfigPayload accepts lower camel updater payload", () => {
     },
   })
 })
+
+test("providerConfigRequestInit sends only aifactory api key", () => {
+  expect(
+    ConfigManaged.providerConfigRequestInit({
+      config: {
+        provider: {
+          aifactory: {
+            options: {
+              apiKey: "rrz-key",
+            },
+          },
+          litellm: {
+            options: {
+              apiKey: "ignored",
+            },
+          },
+        },
+      },
+    }),
+  ).toEqual({
+    headers: {
+      [ConfigManaged.PROVIDER_CONFIG_AIFACTORY_API_KEY_HEADER]: "rrz-key",
+    },
+  })
+})
+
+test("providerConfigRequestInit prefers auth store aifactory key", () => {
+  expect(
+    ConfigManaged.providerConfigRequestInit({
+      config: {
+        provider: {
+          aifactory: {
+            options: {
+              apiKey: "config-key",
+            },
+          },
+        },
+      },
+      auth: {
+        aifactory: {
+          type: "api",
+          key: "auth-key",
+        },
+      },
+    }),
+  ).toEqual({
+    headers: {
+      [ConfigManaged.PROVIDER_CONFIG_AIFACTORY_API_KEY_HEADER]: "auth-key",
+    },
+  })
+})

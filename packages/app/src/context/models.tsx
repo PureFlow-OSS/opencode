@@ -6,6 +6,7 @@ import { createSimpleContext } from "@opencode-ai/ui/context"
 import { usePlatform } from "@/context/platform"
 import { useProviders } from "@/hooks/use-providers"
 import { Persist, persisted } from "@/utils/persist"
+import { useGlobalSync } from "./global-sync"
 import {
   defaultModelVisibilityRules,
   readAiFactoryModelVisibilityRules,
@@ -33,6 +34,7 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
   init: () => {
     const platform = usePlatform()
     const providers = useProviders()
+    const globalSync = useGlobalSync()
 
     const [store, setStore, _, ready] = persisted(
       Persist.global("model", ["model.v1"]),
@@ -43,9 +45,15 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
       }),
     )
 
-    const [serverRules] = createResource(() => readAiFactoryModelVisibilityRules(platform.fetch ?? fetch), {
-      initialValue: [] as Array<{ pattern: string; visible: boolean }>,
+    const aifactoryApiKey = createMemo(() => {
+      const key = globalSync.data.config.provider?.["aifactory"]?.options?.apiKey
+      return typeof key === "string" && key.trim() ? key.trim() : undefined
     })
+    const [serverRules] = createResource(
+      () => aifactoryApiKey(),
+      (apiKey) => readAiFactoryModelVisibilityRules(platform.fetch ?? fetch, { apiKey }),
+      { initialValue: [] as Array<{ pattern: string; visible: boolean }> },
+    )
 
     const available = createMemo(() =>
       providers.connected().flatMap((p) =>

@@ -128,11 +128,19 @@ function isMcpConfigured(entry: McpEntry): entry is ConfigMCP.Info {
 }
 
 let managedMcpCache:
-  | {
-      expires: number
-      value: Record<string, ManagedServer>
-    }
+  | Record<
+      string,
+      {
+        expires: number
+        value: Record<string, ManagedServer>
+      }
+    >
   | undefined
+
+function cacheKey(init: RequestInit) {
+  const headers = new Headers(init.headers)
+  return headers.get(ConfigManaged.PROVIDER_CONFIG_AIFACTORY_API_KEY_HEADER) ?? ""
+}
 
 function parseManagedAuth(value: unknown): ManagedAuth | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return
@@ -148,9 +156,15 @@ function parseManagedAuth(value: unknown): ManagedAuth | undefined {
   }
 }
 
-async function discoverManagedMcp(fetchFn: typeof fetch = fetch): Promise<Record<string, ManagedServer>> {
-  if (managedMcpCache && managedMcpCache.expires > Date.now()) return managedMcpCache.value
+async function discoverManagedMcp(
+  fetchFn: typeof fetch = fetch,
+  init: RequestInit = {},
+): Promise<Record<string, ManagedServer>> {
+  const key = cacheKey(init)
+  const cached = managedMcpCache?.[key]
+  if (cached && cached.expires > Date.now()) return cached.value
   const value: Record<string, ManagedServer> = await fetchFn(ConfigManaged.providerConfigUrl(), {
+    ...init,
     signal: AbortSignal.timeout(3000),
   })
     .then(async (res) => {
@@ -172,14 +186,20 @@ async function discoverManagedMcp(fetchFn: typeof fetch = fetch): Promise<Record
     })
     .catch(() => ({} satisfies Record<string, ManagedServer>))
   managedMcpCache = {
-    expires: Date.now() + MANAGED_MCP_CACHE_TTL,
-    value,
+    ...(managedMcpCache ?? {}),
+    [key]: {
+      expires: Date.now() + MANAGED_MCP_CACHE_TTL,
+      value,
+    },
   }
   return value
 }
 
-async function discoverManagedMcpConfig(fetchFn: typeof fetch = fetch): Promise<Record<string, ConfigMCP.Info>> {
-  const managed = await discoverManagedMcp(fetchFn)
+async function discoverManagedMcpConfig(
+  fetchFn: typeof fetch = fetch,
+  init: RequestInit = {},
+): Promise<Record<string, ConfigMCP.Info>> {
+  const managed = await discoverManagedMcp(fetchFn, init)
   return Object.fromEntries(Object.entries(managed).map(([name, server]) => [name, server.config] as const))
 }
 
@@ -513,13 +533,19 @@ export const layer = Layer.effect(
     const cfgSvc = yield* Config.Service
     const mergedMcpConfig = Effect.fn("MCP.mergedConfig")(function* () {
       const cfg = yield* cfgSvc.get()
-      const managed = yield* Effect.promise(() => discoverManagedMcpConfig())
+      const managed = yield* Effect.promise(() =>
+        discoverManagedMcpConfig(fetch, ConfigManaged.providerConfigRequestInit({ config: cfg })),
+      )
       return {
         ...managed,
         ...(cfg.mcp ?? {}),
       } satisfies Record<string, McpEntry>
     })
-    const managed = () => Effect.promise(() => discoverManagedMcp())
+    const managed = () =>
+      Effect.gen(function* () {
+        const cfg = yield* cfgSvc.get()
+        return yield* Effect.promise(() => discoverManagedMcp(fetch, ConfigManaged.providerConfigRequestInit({ config: cfg })))
+      })
 
     const descendants = Effect.fnUntraced(
       function* (pid: number) {

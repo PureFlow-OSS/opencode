@@ -1,5 +1,6 @@
 const UPDATE_SERVER_BASE_URL = import.meta.env.VITE_OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode"
 const PROVIDER_CONFIG_URL = `${UPDATE_SERVER_BASE_URL}/provider-config.json`
+const AIFACTORY_API_KEY_HEADER = "X-OpenCode-AiFactory-Api-Key"
 const DEFAULT_RULES = [
   { pattern: "*embedding*", visible: false },
   { pattern: "all-proxy-models", visible: false },
@@ -46,10 +47,20 @@ export function parseAiFactoryModelVisibilityRules(payload: unknown) {
   })
 }
 
-export async function readAiFactoryModelVisibilityRules(fetchFn: typeof fetch = fetch) {
-  return fetchFn(PROVIDER_CONFIG_URL, {
+function buildRequestInit(input: { apiKey?: string } = {}) {
+  if (!input.apiKey?.trim()) return { cache: "no-store", signal: AbortSignal.timeout(3000) } satisfies RequestInit
+  return {
     cache: "no-store",
+    headers: {
+      [AIFACTORY_API_KEY_HEADER]: input.apiKey.trim(),
+    },
     signal: AbortSignal.timeout(3000),
+  } satisfies RequestInit
+}
+
+export async function readAiFactoryModelVisibilityRules(fetchFn: typeof fetch = fetch, input: { apiKey?: string } = {}) {
+  return fetchFn(PROVIDER_CONFIG_URL, {
+    ...buildRequestInit(input),
   })
     .then((result) => (result.ok ? result.json() : undefined))
     .then((result) => parseAiFactoryModelVisibilityRules(result))

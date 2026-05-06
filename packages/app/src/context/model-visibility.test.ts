@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import {
   defaultModelVisibilityRules,
   parseAiFactoryModelVisibilityRules,
+  readAiFactoryModelVisibilityRules,
   resolveAiFactoryModelVisibility,
 } from "./model-visibility"
 
@@ -43,5 +44,25 @@ describe("model visibility", () => {
         defaultModelVisibilityRules(),
       ),
     ).toBe(false)
+  })
+
+  test("provider config fetch sends aifactory header", async () => {
+    let headers: Headers | undefined
+    const fetchFn = Object.assign(
+      async (_input: URL | RequestInfo, init?: RequestInit) => {
+        headers = new Headers(init?.headers)
+        return new Response(JSON.stringify({ aifactory: { model_visibility: [] } }), {
+          headers: {
+            "content-type": "application/json",
+          },
+        })
+      },
+      { preconnect: fetch.preconnect },
+    ) satisfies typeof fetch
+    await readAiFactoryModelVisibilityRules(
+      fetchFn,
+      { apiKey: "rrz-key" },
+    )
+    expect(headers?.get("X-OpenCode-AiFactory-Api-Key")).toBe("rrz-key")
   })
 })

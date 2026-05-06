@@ -139,8 +139,9 @@ function aiFactoryModalityFlags(
   }
 }
 
-async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch) {
+async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch, init: RequestInit = {}) {
   return (await fetchFn(ConfigManaged.providerConfigUrl(), {
+    ...init,
     signal: AbortSignal.timeout(3000),
   })
     .then(async (res) => {
@@ -234,9 +235,14 @@ function buildAiFactoryModel(
   }
 }
 
-async function discoverAiFactoryModels(token: string, baseURL: string, fetchFn: FetchLike = fetch) {
+async function discoverAiFactoryModels(
+  token: string,
+  baseURL: string,
+  fetchFn: FetchLike = fetch,
+  providerConfigInit: RequestInit = {},
+) {
   const [rules, payload] = await Promise.all([
-    discoverAiFactoryConfig(fetchFn),
+    discoverAiFactoryConfig(fetchFn, providerConfigInit),
     fetchFn(`${baseURL}/models`, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -489,7 +495,15 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         },
         async discoverModels() {
           if (!token) return {}
-          return discoverAiFactoryModels(token, baseURL, (input, init) => dep.fetch(AIFACTORY_ID, input, init))
+          return discoverAiFactoryModels(
+            token,
+            baseURL,
+            (input, init) => dep.fetch(AIFACTORY_ID, input, init),
+            ConfigManaged.providerConfigRequestInit({
+              config,
+              auth: auth ? { aifactory: auth } : undefined,
+            }),
+          )
         },
       }
     }),

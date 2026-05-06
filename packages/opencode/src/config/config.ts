@@ -589,7 +589,9 @@ export const layer = Layer.effect(
         const global = yield* getGlobal()
         yield* merge(Global.Path.config, global, "global")
 
-        const remoteProviderConfig = yield* Effect.promise(() => ConfigManaged.readProviderConfig())
+        const remoteProviderConfig = yield* Effect.promise(() =>
+          ConfigManaged.readProviderConfig(fetch, ConfigManaged.providerConfigRequestInit({ config: global, auth })),
+        )
         yield* merge(
           "updater-provider-config",
           {

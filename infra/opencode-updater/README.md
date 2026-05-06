@@ -11,12 +11,16 @@ Endpoints:
 - `GET /opencode/provider-config.json`
 - `GET /opencode/feed/{asset}`
 
+If client sends `X-OpenCode-AiFactory-Api-Key`, updater can evaluate beta rollout rules from `appsettings.beta.json`.
+
 ## Use
 
 1. Edit `appsettings.json`
-2. Put a `feed/latest.yml` with `version:` if you want server version to come from the feed
-3. `Updater.Version` is fallback if no local `feed/latest.yml` version exists
-3. Restart container
+2. Optionally edit `appsettings.beta.json` for key-based beta rollout
+2. Put a `feed/latest.yml` with `version:` if you want stable version to come from local feed
+3. Optionally put beta artifacts under `feed/beta/` with its own `latest.yml`
+4. `Updater.Version` / `appsettings.beta.json -> Updater.Version` are fallback when no matching local `latest.yml` exists
+5. Restart container
 
 ## Provider config
 
@@ -25,6 +29,51 @@ The updater can also serve provider-side rollout config for the desktop app.
 Set `ProviderConfig.model` to provision the default model. Local or project config can still override it with `model`.
 Set `ProviderConfig.small_model` to provision the default small model.
 Set `ProviderConfig.aifactory.model_visibility` to override default visibility for AI Factory models in the client.
+
+Requests may include `X-OpenCode-AiFactory-Api-Key`. When `UpdaterBeta.Enabled` is `true`, server calls LiteLLM `key/info` with that key, collects common group fields like `groups`, `group`, `team_id`, `team_alias`, and serves `appsettings.beta.json` when any configured `UpdaterBeta.Groups` value matches.
+
+`/opencode/url` and `/opencode/config` return a feed URL with a short-lived hashed `beta` token for matched beta users so downstream feed requests stay on beta config without exposing raw API keys.
+
+Local feed layout:
+
+- stable: `feed/latest.json`, `feed/latest.yml`, `feed/<asset>`
+- beta: `feed/beta/latest.json`, `feed/beta/latest.yml`, `feed/beta/<asset>`
+
+When beta user is matched, updater first looks in `feed/beta/`. Stable users keep using `feed/`. Missing files return `404`.
+
+## Beta rollout
+
+Example `appsettings.beta.json`:
+
+```json
+{
+  "Updater": {
+    "Version": "1.14.99",
+    "ProviderConfig": {
+      "model": "aifactory/Qwen3.6-35B-A3B-FP8",
+      "aifactory": {
+        "model_visibility": [
+          {
+            "pattern": "all-team-models",
+            "visible": true
+          }
+        ]
+      }
+    }
+  },
+  "UpdaterBeta": {
+    "Enabled": true,
+    "HeaderName": "X-OpenCode-AiFactory-Api-Key",
+    "Groups": ["desktop-beta", "early-access"],
+    "LiteLLM": {
+      "BaseUrl": "https://litellm.example.com",
+      "KeyInfoPath": "/key/info"
+    }
+  }
+}
+```
+
+Only AI Factory key is forwarded by client-side rollout fetches. Other provider keys are ignored.
 
 ## Full sample config
 
@@ -39,7 +88,6 @@ This is a complete example with:
   "Updater": {
     "Version": "1.14.33",
     "PublicBaseUrl": "http://10.53.7.23",
-    "ReleaseBaseUrlTemplate": "https://github.com/anomalyco/opencode/releases/download/v{{version}}",
     "Motd": {
       "text": "RRZ AI Factory",
       "enabled": true
@@ -282,7 +330,6 @@ Optional env overrides:
 - `Updater__Motd__text`
 - `Updater__Motd__enabled`
 - `Updater__PublicBaseUrl`
-- `Updater__ReleaseBaseUrlTemplate`
 - `Updater__ProviderConfig__aifactory__model_limits__0__pattern`
 - `Updater__ProviderConfig__aifactory__model_limits__0__context`
 
@@ -299,16 +346,16 @@ docker run -d --name opencode-updater-test -p 8080:8080 `
   opencode-updater-local
 ```
 
-If file exists in `feed/`, server serves local file instead of proxying GitHub.
+If file exists in matching feed directory, server serves local file directly.
 
-If `feed/latest.yml` exists and contains a `version:` line, `/opencode/version` and upstream proxy version resolution use that value first. `Updater.Version` is only fallback when no local feed version can be read.
+If `feed/latest.yml` exists and contains a `version:` line, stable `/opencode/version` uses that value first.
 
-Default upstream artifacts come from:
+If `feed/beta/latest.yml` exists and contains a `version:` line, matched beta users use that value first.
 
-`https://github.com/anomalyco/opencode/releases/download/v{version}`
+`Updater.Version` is fallback for stable when no local stable `latest.yml` can be read. `appsettings.beta.json -> Updater.Version` is fallback for beta when no local beta `latest.yml` can be read.
 
 `/opencode/url` returns:
 
 `http://10.53.7.23/opencode/feed`
 
-That feed serves Electron updater metadata and assets through proxy.
+That feed serves Electron updater metadata and assets from local feed files only.

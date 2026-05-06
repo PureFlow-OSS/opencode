@@ -1,6 +1,11 @@
+import { readFile } from "node:fs/promises"
+import os from "node:os"
+import path from "node:path"
+
 const UPDATE_SERVER_BASE_URL =
   process.env.OPENCODE_UPDATE_BASE_URL ?? import.meta.env.OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode"
 
+const AIFACTORY_API_KEY_HEADER = "X-OpenCode-AiFactory-Api-Key"
 const MOTD_TEXT_LIMIT = 180
 const UPDATE_SERVER_TIMEOUT = 3_000
 
@@ -59,6 +64,38 @@ function parseConfig(value: unknown): ParsedUpdateServerConfig | null {
   return { version, url, motd }
 }
 
+function dataDir() {
+  const home = os.homedir()
+  if (process.platform === "win32") return path.join(process.env.LOCALAPPDATA || path.join(home, "AppData", "Local"), "opencode")
+  if (process.platform === "darwin") return path.join(home, "Library", "Application Support", "opencode")
+  return path.join(process.env.XDG_DATA_HOME || path.join(home, ".local", "share"), "opencode")
+}
+
+async function aifactoryApiKey() {
+  const fromEnv = process.env.OPENCODE_AIFACTORY_API_KEY?.trim()
+  if (fromEnv) return fromEnv
+  try {
+    const payload = JSON.parse(await readFile(path.join(dataDir(), "auth.json"), "utf8")) as Record<string, unknown>
+    const auth = payload["aifactory"]
+    if (!isRecord(auth) || auth.type !== "api" || typeof auth.key !== "string" || !auth.key.trim()) return
+    return auth.key.trim()
+  } catch {
+    return
+  }
+}
+
+async function requestInit() {
+  const apiKey = await aifactoryApiKey()
+  if (!apiKey) return { cache: "no-store", signal: AbortSignal.timeout(UPDATE_SERVER_TIMEOUT) } satisfies RequestInit
+  return {
+    cache: "no-store",
+    headers: {
+      [AIFACTORY_API_KEY_HEADER]: apiKey,
+    },
+    signal: AbortSignal.timeout(UPDATE_SERVER_TIMEOUT),
+  } satisfies RequestInit
+}
+
 export const updateServer = {
   configUrl: `${UPDATE_SERVER_BASE_URL}/config`,
   versionUrl: `${UPDATE_SERVER_BASE_URL}/version`,
@@ -74,18 +111,19 @@ export const updateServer = {
     return delta > 0 ? 1 : -1
   },
   async fetchConfig(): Promise<ParsedUpdateServerConfig | null> {
-    return fetch(this.configUrl, { cache: "no-store", signal: AbortSignal.timeout(UPDATE_SERVER_TIMEOUT) })
+    return fetch(this.configUrl, await requestInit())
       .then((result) => (result.ok ? (result.json() as Promise<unknown>) : undefined))
       .then((result) => parseConfig(result))
       .catch(() => null)
   },
   async fetchLegacy(): Promise<UpdateServerConfig | null> {
+    const init = await requestInit()
     const [version, url] = await Promise.all([
-      fetch(this.versionUrl, { cache: "no-store", signal: AbortSignal.timeout(UPDATE_SERVER_TIMEOUT) })
+      fetch(this.versionUrl, init)
         .then((result) => (result.ok ? result.text() : ""))
         .then((result) => result.trim())
         .catch(() => ""),
-      fetch(this.feedUrl, { cache: "no-store", signal: AbortSignal.timeout(UPDATE_SERVER_TIMEOUT) })
+      fetch(this.feedUrl, init)
         .then((result) => (result.ok ? result.text() : ""))
         .then((result) => result.trim())
         .catch(() => ""),
