@@ -7,10 +7,12 @@ import { Log, Process } from "../util"
 import { warn } from "console"
 import { isRecord } from "@/util/record"
 
+declare const OPENCODE_UPDATE_BASE_URL: string | undefined
+
 const log = Log.create({ service: "config" })
 
 const MANAGED_PLIST_DOMAIN = "ai.opencode.managed"
-const DEFAULT_PROVIDER_CONFIG_URL = "http://opencode.pfcicd.local.programmierfabrik.at/opencode/provider-config.json"
+const DEFAULT_UPDATE_BASE_URL = "http://opencode.pfcicd.local.programmierfabrik.at/opencode"
 
 // Keys injected by macOS/MDM into the managed plist that are not OpenCode config
 const PLIST_META = new Set([
@@ -56,8 +58,15 @@ export function providerConfigPayload(payload: unknown): Record<string, unknown>
       : payload
 }
 
+export function updateBaseUrl() {
+  return (process.env.OPENCODE_UPDATE_BASE_URL?.trim() || OPENCODE_UPDATE_BASE_URL || DEFAULT_UPDATE_BASE_URL).replace(
+    /\/+$/,
+    "",
+  )
+}
+
 export function providerConfigUrl() {
-  return process.env.OPENCODE_PROVIDER_CONFIG_URL?.trim() || DEFAULT_PROVIDER_CONFIG_URL
+  return `${updateBaseUrl()}/provider-config.json`
 }
 
 export async function readProviderConfig(fetchFn: typeof fetch = fetch): Promise<Record<string, unknown>> {

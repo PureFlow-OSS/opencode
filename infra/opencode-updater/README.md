@@ -239,7 +239,7 @@ You can also push managed MCP servers:
 
 These MCP entries are runtime-managed by the updater feed. Local user config can still define its own MCP servers and will override pushed ones with the same name.
 
-For local development or alternate deployments, the desktop and server code can override the default provider config feed URL with `OPENCODE_PROVIDER_CONFIG_URL` at build or runtime.
+For local development or alternate deployments, the desktop and server code derive the provider config feed from `OPENCODE_UPDATE_BASE_URL`. When packaging the Electron desktop app, set this env before the `../opencode` server build runs so the bundled sidecar picks it up.
 
 Supported managed MCP auth metadata:
 
