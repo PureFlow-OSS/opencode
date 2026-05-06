@@ -163,43 +163,45 @@ export const SettingsProviders: Component = () => {
           </SettingsList>
         </div>
 
-        <div class="flex flex-col gap-1">
-          <h3 class="text-14-medium text-text-strong pb-2">{language.t("settings.providers.section.popular")}</h3>
-          <SettingsList>
-            <For each={popular()}>
-              {(item) => (
-                <div class="flex flex-wrap items-center justify-between gap-4 min-h-16 py-3 border-b border-border-weak-base last:border-none">
-                  <div class="flex flex-col min-w-0">
-                    <div class="flex items-center gap-x-3">
-                      <ProviderIcon id={item.id} class="size-5 shrink-0 icon-strong-base" />
-                      <span class="text-14-medium text-text-strong">{item.name}</span>
-                      <Show when={popularProviders.includes(item.id)}>
-                        <Tag>{language.t("dialog.provider.tag.recommended")}</Tag>
+        <Show when={popular().length > 0}>
+          <div class="flex flex-col gap-1">
+            <h3 class="text-14-medium text-text-strong pb-2">{language.t("settings.providers.section.popular")}</h3>
+            <SettingsList>
+              <For each={popular()}>
+                {(item) => (
+                  <div class="flex flex-wrap items-center justify-between gap-4 min-h-16 py-3 border-b border-border-weak-base last:border-none">
+                    <div class="flex flex-col min-w-0">
+                      <div class="flex items-center gap-x-3">
+                        <ProviderIcon id={item.id} class="size-5 shrink-0 icon-strong-base" />
+                        <span class="text-14-medium text-text-strong">{item.name}</span>
+                        <Show when={popularProviders.includes(item.id)}>
+                          <Tag>{language.t("dialog.provider.tag.recommended")}</Tag>
+                        </Show>
+                      </div>
+                      <Show when={note(item.id)}>
+                        {(key) => (
+                          <span class="text-12-regular text-text-weak pl-8">
+                            {key().startsWith("dialog.") ? language.t(key()) : key()}
+                          </span>
+                        )}
                       </Show>
                     </div>
-                    <Show when={note(item.id)}>
-                      {(key) => (
-                        <span class="text-12-regular text-text-weak pl-8">
-                          {key().startsWith("dialog.") ? language.t(key()) : key()}
-                        </span>
-                      )}
-                    </Show>
+                    <Button
+                      size="large"
+                      variant="secondary"
+                      icon="plus-small"
+                      onClick={() => {
+                        dialog.show(() => <DialogConnectProvider provider={item.id} />)
+                      }}
+                    >
+                      {language.t("common.connect")}
+                    </Button>
                   </div>
-                  <Button
-                    size="large"
-                    variant="secondary"
-                    icon="plus-small"
-                    onClick={() => {
-                      dialog.show(() => <DialogConnectProvider provider={item.id} />)
-                    }}
-                  >
-                    {language.t("common.connect")}
-                  </Button>
-                </div>
-              )}
-            </For>
-          </SettingsList>
-        </div>
+                )}
+              </For>
+            </SettingsList>
+          </div>
+        </Show>
       </div>
     </div>
   )
