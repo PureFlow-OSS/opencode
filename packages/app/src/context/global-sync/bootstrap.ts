@@ -18,7 +18,7 @@ import { reconcile, type SetStoreFunction, type Store } from "solid-js/store"
 import type { State, VcsCache } from "./types"
 import { cmp, normalizeAgentList, normalizeProviderList } from "./utils"
 import { pathKey } from "@/utils/path-key"
-import { formatServerError } from "@/utils/server-errors"
+import { debugServerError, formatUserFacingServerError } from "@/utils/server-errors"
 import { QueryClient, queryOptions, skipToken } from "@tanstack/solid-query"
 
 type GlobalStore = {
@@ -369,7 +369,13 @@ export async function bootstrapDirectory(input: {
             input.setStore("mcp", x.data!)
             input.setStore("mcp_ready", true)
           }),
-        ),
+        ).catch((err) => {
+          console.error("Failed to refresh MCP status", {
+            directory: input.directory,
+            error: debugServerError(err),
+          })
+          throw err
+        }),
       () =>
         input.queryClient.ensureQueryData({
           ...loadProvidersQuery(input.directory),
@@ -388,7 +394,7 @@ export async function bootstrapDirectory(input: {
                 showToast({
                   variant: "error",
                   title: input.translate("toast.project.reloadFailed.title", { project }),
-                  description: formatServerError(err, input.translate),
+                  description: formatUserFacingServerError(err, input.translate),
                 })
               })
               .then(() => null),
@@ -398,12 +404,15 @@ export async function bootstrapDirectory(input: {
     await waitForPaint()
     const slowErrs = errors(await runAll(slow))
     if (slowErrs.length > 0) {
-      console.error("Failed to finish bootstrap instance", slowErrs[0])
+      console.error("Failed to finish bootstrap instance", {
+        directory: input.directory,
+        errors: slowErrs.map((err) => debugServerError(err)),
+      })
       const project = getFilename(input.directory)
       showToast({
         variant: "error",
         title: input.translate("toast.project.reloadFailed.title", { project }),
-        description: formatServerError(slowErrs[0], input.translate),
+        description: formatUserFacingServerError(slowErrs[0], input.translate),
       })
     }
 

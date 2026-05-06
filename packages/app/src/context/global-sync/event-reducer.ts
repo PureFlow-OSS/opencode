@@ -30,6 +30,7 @@ export function applyGlobalEvent(input: {
 
   if (input.event.type !== "project.updated") return
   const properties = input.event.properties as Project
+  if (!properties?.id) return
   const result = Binary.search(input.project, properties.id, (s) => s.id)
   if (result.found) {
     input.setGlobalProject(

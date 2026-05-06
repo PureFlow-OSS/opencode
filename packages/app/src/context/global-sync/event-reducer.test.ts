@@ -130,6 +130,20 @@ describe("applyGlobalEvent", () => {
 
     expect(refreshCount).toBe(1)
   })
+
+  test("ignores malformed project.updated without id", () => {
+    const project = [{ id: "a" }] as Project[]
+    applyGlobalEvent({
+      event: { type: "project.updated", properties: {} },
+      project,
+      refresh() {},
+      setGlobalProject() {
+        throw new Error("should not update project list")
+      },
+    })
+
+    expect(project.map((x) => x.id)).toEqual(["a"])
+  })
 })
 
 describe("applyDirectoryEvent", () => {

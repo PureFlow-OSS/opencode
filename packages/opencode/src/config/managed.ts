@@ -60,10 +60,8 @@ export function providerConfigPayload(payload: unknown): Record<string, unknown>
 }
 
 export function updateBaseUrl() {
-  return (process.env.OPENCODE_UPDATE_BASE_URL?.trim() || OPENCODE_UPDATE_BASE_URL || DEFAULT_UPDATE_BASE_URL).replace(
-    /\/+$/,
-    "",
-  )
+  const embedded = typeof OPENCODE_UPDATE_BASE_URL !== "undefined" ? OPENCODE_UPDATE_BASE_URL : undefined
+  return (process.env.OPENCODE_UPDATE_BASE_URL?.trim() || embedded || DEFAULT_UPDATE_BASE_URL).replace(/\/+$/, "")
 }
 
 export function providerConfigUrl() {

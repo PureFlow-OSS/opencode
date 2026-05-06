@@ -53,6 +53,7 @@ await Bun.build({
   define: {
     OPENCODE_MIGRATIONS: JSON.stringify(migrations),
     OPENCODE_CHANNEL: `'${Script.channel}'`,
+    OPENCODE_UPDATE_BASE_URL: JSON.stringify(process.env.OPENCODE_UPDATE_BASE_URL?.trim() || undefined),
   },
   files: {
     "opencode-web-ui.gen.ts": "",

@@ -22,7 +22,7 @@ import { clearSessionPrefetchDirectory } from "./global-sync/session-prefetch"
 import { estimateRootSessionTotal, loadRootSessionsWithFallback } from "./global-sync/session-load"
 import type { ProjectMeta } from "./global-sync/types"
 import { directoryKey } from "./global-sync/utils"
-import { formatServerError } from "@/utils/server-errors"
+import { debugServerError, formatUserFacingServerError } from "@/utils/server-errors"
 import { queryOptions, skipToken, useQueryClient } from "@tanstack/solid-query"
 import { Persist, persisted } from "@/utils/persist"
 
@@ -205,12 +205,16 @@ function createGlobalSync() {
               })
             })
             .catch((err) => {
-              console.error("Failed to load sessions", err)
+              console.error("Failed to load sessions", {
+                directory,
+                queryLimit: store.limit,
+                error: debugServerError(err),
+              })
               const project = getFilename(directory)
               showToast({
                 variant: "error",
                 title: language.t("toast.session.listFailed.title", { project }),
-                description: formatServerError(err, language.t),
+                description: formatUserFacingServerError(err, language.t),
               })
             })
             .then(() => null),
