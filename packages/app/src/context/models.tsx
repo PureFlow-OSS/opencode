@@ -113,6 +113,11 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
     )
 
     const find = (key: ModelKey) => list().find((m) => m.id === key.modelID && m.provider.id === key.providerID)
+    const policyVisibility = (model: ModelKey) => {
+      const found = find(model)
+      if (found?.provider.id !== "aifactory") return
+      return resolveAiFactoryModelVisibility(found, defaultRules())
+    }
 
     function update(model: ModelKey, state: Visibility) {
       const index = store.user.findIndex((x) => x.modelID === model.modelID && x.providerID === model.providerID)
@@ -125,14 +130,12 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
 
     const visible = (model: ModelKey) => {
       const key = modelKey(model)
+      const policy = policyVisibility(model)
+      if (policy === false) return false
       const state = visibility().get(key)
       if (state === "hide") return false
       if (state === "show") return true
-      const found = find(model)
-      if (found?.provider.id === "aifactory") {
-        const resolved = resolveAiFactoryModelVisibility(found, defaultRules())
-        if (resolved !== undefined) return resolved
-      }
+      if (policy === true) return true
       if (latestSet().has(key)) return true
       const date = release().get(key)
       if (!date?.isValid) return true
@@ -164,6 +167,9 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
     return {
       ready,
       list,
+      manageable: createMemo(() =>
+        list().filter((item) => policyVisibility({ providerID: item.provider.id, modelID: item.id }) !== false),
+      ),
       find,
       visible,
       setVisibility,

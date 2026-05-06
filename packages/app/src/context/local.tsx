@@ -273,6 +273,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       current,
       recent,
       list: models.list,
+      manageable: models.manageable,
       cycle(direction: 1 | -1) {
         const items = recent()
         const item = current()

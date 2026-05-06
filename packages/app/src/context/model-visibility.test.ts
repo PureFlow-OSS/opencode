@@ -35,4 +35,13 @@ describe("model visibility", () => {
       ),
     ).toBe(true)
   })
+
+  test("embedding aliases are hidden by default", () => {
+    expect(
+      resolveAiFactoryModelVisibility(
+        { id: "qwen/qwen3-embedding-4b", name: "qwen/qwen3-embedding-4b" },
+        defaultModelVisibilityRules(),
+      ),
+    ).toBe(false)
+  })
 })
