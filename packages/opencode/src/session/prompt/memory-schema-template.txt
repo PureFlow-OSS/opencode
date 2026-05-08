@@ -1,0 +1,46 @@
+# Project Memory — Schema Guide
+
+This directory (`.opencode/memory/`) stores persistent project knowledge injected into
+every AI session. Maintain these files actively — update and trim entries as the project
+evolves rather than only appending.
+
+---
+
+## Tier-1 files (always injected, subject to token budget)
+
+### `skills.md`
+Reusable techniques, patterns, and procedures specific to this project.
+Examples: how to run the test suite, how to regenerate the SDK, build commands,
+deployment steps, common debugging approaches.
+
+### `guidelines.md`
+Coding conventions, style rules, and architectural decisions the AI must follow.
+Examples: "use Bun APIs instead of Node equivalents", "no try/catch — use .catch()",
+"snake_case for Drizzle schema fields".
+
+### `entities.md`
+Key domain concepts, data models, service names, and external systems.
+Examples: important types and their shapes, service boundaries, API endpoints,
+third-party integrations and their quirks.
+
+---
+
+## Tier-3 files (future — not yet injected automatically)
+
+### `decisions/`
+Architectural or design decisions with context and rationale.
+File naming: `YYYY-MM-DD-slug.md` (e.g. `2025-11-03-switch-to-drizzle.md`).
+
+### `lessons/`
+Post-mortems, bug patterns, and hard-won insights to avoid repeating mistakes.
+File naming: `YYYY-MM-DD-slug.md` (e.g. `2025-10-15-sqlite-locking.md`).
+
+---
+
+## Maintenance rules
+
+- **Maintain, don't just append.** Remove stale entries; keep files concise.
+- **Budget matters.** Tier-1 files share a 2 000-token budget (combined). Prioritise
+  the most frequently relevant information.
+- **One fact, one place.** Don't duplicate across files.
+- **This file (`SCHEMA.md`) is not injected** — it is documentation only.

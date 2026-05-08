@@ -2,7 +2,7 @@ import os from "os"
 import fuzzysort from "fuzzysort"
 import { Config, ConfigManaged } from "../config"
 import { mapValues, mergeDeep, omit, pickBy, sortBy } from "remeda"
-import { NoSuchModelError, type Provider as SDK } from "ai"
+import { NoSuchModelError, type Provider as SDK, type EmbeddingModel } from "ai"
 import { Log } from "../util"
 import { Npm } from "@opencode-ai/core/npm"
 import { Hash } from "@opencode-ai/core/util/hash"
@@ -1248,6 +1248,7 @@ export interface Interface {
   ) => Effect.Effect<{ providerID: ProviderID; modelID: string } | undefined>
   readonly getSmallModel: (providerID: ProviderID) => Effect.Effect<Model | undefined>
   readonly defaultModel: () => Effect.Effect<{ providerID: ProviderID; modelID: ModelID }>
+  readonly getEmbeddingModel: (providerID: ProviderID, modelID: string) => Effect.Effect<EmbeddingModel | undefined>
 }
 
 interface State {
@@ -2017,7 +2018,24 @@ const layer: Layer.Layer<
       }
     })
 
-    return Service.of({ list, getProvider, getModel, getLanguage, closest, getSmallModel, defaultModel })
+    const getEmbeddingModel = Effect.fn("Provider.getEmbeddingModel")(function* (
+      providerID: ProviderID,
+      modelID: string,
+    ) {
+      const s = yield* InstanceState.get(state)
+      const provider = s.providers[providerID]
+      if (!provider) return undefined
+      const representativeModel = Object.values(provider.models)[0]
+      if (!representativeModel) return undefined
+      const envs = yield* env.all()
+      return yield* Effect.promise(async () => {
+        const sdk = await resolveSDK(representativeModel, s, envs)
+        if (!("embeddingModel" in sdk) || typeof sdk.embeddingModel !== "function") return undefined
+        return sdk.embeddingModel(modelID) as EmbeddingModel
+      }).pipe(Effect.catchAll(() => Effect.succeed(undefined)))
+    })
+
+    return Service.of({ list, getProvider, getModel, getLanguage, closest, getSmallModel, defaultModel, getEmbeddingModel })
   }),
 )
 

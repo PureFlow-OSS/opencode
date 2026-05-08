@@ -1,5 +1,13 @@
 import { PlanExitTool } from "./plan"
 import { Session } from "../session"
+import { MemoryAddTool } from "./memory_add"
+import { MemoryUpdateTool } from "./memory_update"
+import { MemoryRemoveTool } from "./memory_remove"
+import { MemoryListTool } from "./memory_list"
+import { MemorySearchTool } from "./memory_search"
+import { MemoryProposeTool } from "./memory_propose"
+import { MemoryService } from "@/memory/service"
+import { MemoryProposals } from "@/memory/proposals"
 import { QuestionTool } from "./question"
 import { BashTool } from "./bash"
 import { BashReadTool } from "./bash_read"
@@ -94,6 +102,8 @@ export const layer: Layer.Layer<
   | Format.Service
   | Truncate.Service
   | BashProcess.Service
+  | MemoryService.Service
+  | MemoryProposals.Service
 > = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -124,6 +134,12 @@ export const layer: Layer.Layer<
     const skilltool = yield* SkillTool
     const playwright = yield* PlaywrightTool
     const agent = yield* Agent.Service
+    const memoryAdd = yield* MemoryAddTool
+    const memoryUpdate = yield* MemoryUpdateTool
+    const memoryRemove = yield* MemoryRemoveTool
+    const memoryList = yield* MemoryListTool
+    const memorySearch = yield* MemorySearchTool
+    const memoryPropose = yield* MemoryProposeTool
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("ToolRegistry.state")(function* (ctx) {
@@ -215,6 +231,12 @@ export const layer: Layer.Layer<
           question: Tool.init(question),
           lsp: Tool.init(lsptool),
           plan: Tool.init(plan),
+          memory_add: Tool.init(memoryAdd),
+          memory_update: Tool.init(memoryUpdate),
+          memory_remove: Tool.init(memoryRemove),
+          memory_list: Tool.init(memoryList),
+          memory_search: Tool.init(memorySearch),
+          memory_propose: Tool.init(memoryPropose),
         })
 
         return {
@@ -240,6 +262,12 @@ export const layer: Layer.Layer<
             tool.patch,
             ...(Flag.OPENCODE_EXPERIMENTAL_LSP_TOOL ? [tool.lsp] : []),
             ...(Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE && Flag.OPENCODE_CLIENT === "cli" ? [tool.plan] : []),
+            tool.memory_add,
+            tool.memory_update,
+            tool.memory_remove,
+            tool.memory_list,
+            tool.memory_search,
+            tool.memory_propose,
           ],
           task: tool.task,
           read: tool.read,
@@ -253,7 +281,9 @@ export const layer: Layer.Layer<
     })
 
     const ids: Interface["ids"] = Effect.fn("ToolRegistry.ids")(function* () {
-      return (yield* all()).map((tool) => tool.id)
+      return (yield* all())
+        .filter((tool) => !tool.hidden)
+        .map((tool) => tool.id)
     })
 
     const describeSkill = Effect.fn("ToolRegistry.describeSkill")(function* (agent: Agent.Info) {
@@ -362,5 +392,7 @@ export const defaultLayer = Layer.suspend(() =>
     Layer.provide(Ripgrep.defaultLayer),
     Layer.provide(Truncate.defaultLayer),
     Layer.provide(BashProcess.defaultLayer),
+    Layer.provide(MemoryService.defaultLayer),
+    Layer.provide(MemoryProposals.defaultLayer),
   ),
 )
