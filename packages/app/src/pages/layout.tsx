@@ -153,6 +153,7 @@ export default function Layout(props: ParentProps) {
 
   const [state, setState] = createStore({
     autoselect: !initialDirectory,
+    restoreStartupSession: !!initialDirectory && !params.id,
     busyWorkspaces: {} as Record<string, boolean>,
     hoverProject: undefined as string | undefined,
     scrollSessionKey: undefined as string | undefined,
@@ -302,6 +303,24 @@ export default function Layout(props: ParentProps) {
     const directory = decode64(dir)
     if (!directory) return
     setState("autoselect", false)
+  })
+
+  createEffect(() => {
+    if (!state.restoreStartupSession) return
+    if (!pageReady()) return
+    if (!layoutReady()) return
+    if (params.id) {
+      setState("restoreStartupSession", false)
+      return
+    }
+    if (new URLSearchParams(location.search).get("prompt")) {
+      setState("restoreStartupSession", false)
+      return
+    }
+    const directory = currentDir()
+    if (!directory) return
+    setState("restoreStartupSession", false)
+    void navigateToProject(directory)
   })
 
   const editorOpen = editor.editorOpen
