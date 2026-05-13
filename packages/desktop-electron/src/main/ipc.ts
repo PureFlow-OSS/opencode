@@ -72,6 +72,28 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("check-update", () => deps.checkUpdate())
   ipcMain.handle("install-update", () => deps.installUpdate())
   ipcMain.handle("set-background-color", (_event: IpcMainInvokeEvent, color: string) => deps.setBackgroundColor(color))
+  ipcMain.handle(
+    "fetch-update-server",
+    async (
+      _event: IpcMainInvokeEvent,
+      input: { url: string; method?: string; headers?: Record<string, string>; body?: string },
+    ) => {
+      const response = await fetch(input.url, {
+        method: input.method,
+        headers: input.headers,
+        body: input.body,
+        signal: AbortSignal.timeout(5000),
+      })
+      return {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        url: response.url,
+        headers: Object.fromEntries(response.headers.entries()),
+        text: await response.text(),
+      }
+    },
+  )
   ipcMain.handle("store-get", (_event: IpcMainInvokeEvent, name: string, key: string) => {
     const store = getStore(name)
     const value = store.get(key)

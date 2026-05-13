@@ -1,9 +1,10 @@
 import { readFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
+import { net } from "electron"
+import { updateServerBaseUrl } from "./update-server-trust"
 
-const UPDATE_SERVER_BASE_URL =
-  process.env.OPENCODE_UPDATE_BASE_URL ?? import.meta.env.OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode"
+const UPDATE_SERVER_BASE_URL = updateServerBaseUrl()
 
 const AIFACTORY_API_KEY_HEADER = "X-OpenCode-AiFactory-Api-Key"
 const MOTD_TEXT_LIMIT = 180
@@ -111,7 +112,7 @@ export const updateServer = {
     return delta > 0 ? 1 : -1
   },
   async fetchConfig(): Promise<ParsedUpdateServerConfig | null> {
-    return fetch(this.configUrl, await requestInit())
+    return net.fetch(this.configUrl, await requestInit())
       .then((result) => (result.ok ? (result.json() as Promise<unknown>) : undefined))
       .then((result) => parseConfig(result))
       .catch(() => null)
@@ -119,11 +120,11 @@ export const updateServer = {
   async fetchLegacy(): Promise<UpdateServerConfig | null> {
     const init = await requestInit()
     const [version, url] = await Promise.all([
-      fetch(this.versionUrl, init)
+      net.fetch(this.versionUrl, init)
         .then((result) => (result.ok ? result.text() : ""))
         .then((result) => result.trim())
         .catch(() => ""),
-      fetch(this.feedUrl, init)
+      net.fetch(this.feedUrl, init)
         .then((result) => (result.ok ? result.text() : ""))
         .then((result) => result.trim())
         .catch(() => ""),

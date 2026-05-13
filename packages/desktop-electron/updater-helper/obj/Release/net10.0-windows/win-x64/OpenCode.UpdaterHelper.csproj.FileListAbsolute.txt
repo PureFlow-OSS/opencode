@@ -213,7 +213,6 @@ C:\Users\Klaus\Desktop\PFH\opencode\packages\desktop-electron\updater-helper\bin
 C:\Users\Klaus\Desktop\PFH\opencode\packages\desktop-electron\updater-helper\bin\Release\net10.0-windows\win-x64\hostfxr.dll
 C:\Users\Klaus\Desktop\PFH\opencode\packages\desktop-electron\updater-helper\bin\Release\net10.0-windows\win-x64\hostpolicy.dll
 C:\Users\Klaus\Desktop\PFH\opencode\packages\desktop-electron\updater-helper\bin\Release\net10.0-windows\win-x64\mscordaccore.dll
-C:\Users\Klaus\Desktop\PFH\opencode\packages\desktop-electron\updater-helper\bin\Release\net10.0-windows\win-x64\mscordaccore_amd64_amd64_10.0.726.21808.dll
 C:\Users\Klaus\Desktop\PFH\opencode\packages\desktop-electron\updater-helper\bin\Release\net10.0-windows\win-x64\mscordbi.dll
 C:\Users\Klaus\Desktop\PFH\opencode\packages\desktop-electron\updater-helper\bin\Release\net10.0-windows\win-x64\mscorrc.dll
 C:\Users\Klaus\Desktop\PFH\opencode\packages\desktop-electron\updater-helper\bin\Release\net10.0-windows\win-x64\msquic.dll
@@ -280,3 +279,4 @@ C:\Users\Klaus\Desktop\PFH\opencode\packages\desktop-electron\updater-helper\obj
 C:\Users\Klaus\Desktop\PFH\opencode\packages\desktop-electron\updater-helper\obj\Release\net10.0-windows\win-x64\OpenCode.UpdaterHelper.pdb
 C:\Users\Klaus\Desktop\PFH\opencode\packages\desktop-electron\updater-helper\obj\Release\net10.0-windows\win-x64\OpenCode.UpdaterHelper.genruntimeconfig.cache
 C:\Users\Klaus\Desktop\PFH\opencode\packages\desktop-electron\updater-helper\obj\Release\net10.0-windows\win-x64\ref\OpenCode.UpdaterHelper.dll
+C:\Users\Klaus\Desktop\PFH\opencode\packages\desktop-electron\updater-helper\bin\Release\net10.0-windows\win-x64\mscordaccore_amd64_amd64_10.0.826.23019.dll

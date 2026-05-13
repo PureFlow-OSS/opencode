@@ -35,6 +35,26 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
 void initI18n()
 
 const deepLinkEvent = "opencode:deep-link"
+const updateServerBaseUrl = (import.meta.env.VITE_OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode")
+  .trim()
+  .replace(/\/+$/, "")
+
+function isUpdateServerRequestUrl(input: string) {
+  try {
+    const trusted = new URL(updateServerBaseUrl)
+    const url = new URL(input, window.location.href)
+    return url.hostname === trusted.hostname
+  } catch {
+    return false
+  }
+}
+
+function normalizeHeaders(headers: HeadersInit | undefined) {
+  if (!headers) return
+  if (headers instanceof Headers) return Object.fromEntries(headers.entries())
+  if (Array.isArray(headers)) return Object.fromEntries(headers)
+  return headers
+}
 
 const emitDeepLinks = (urls: string[]) => {
   if (urls.length === 0) return
@@ -202,6 +222,24 @@ const createPlatform = (): Platform => {
 
     fetch: (input, init) => {
       if (input instanceof Request) return fetch(input)
+      const url = typeof input === "string" ? input : input.toString()
+      if (isUpdateServerRequestUrl(url)) {
+        return window.api
+          .fetchUpdateServer({
+            url,
+            method: init?.method,
+            headers: normalizeHeaders(init?.headers),
+            body: typeof init?.body === "string" ? init.body : undefined,
+          })
+          .then(
+            (result) =>
+              new Response(result.text, {
+                status: result.status,
+                statusText: result.statusText,
+                headers: result.headers,
+              }),
+          )
+      }
       return fetch(input, init)
     },
 

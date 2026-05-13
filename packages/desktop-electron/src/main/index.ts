@@ -7,7 +7,7 @@ import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { spawn } from "node:child_process"
 import type { Event } from "electron"
-import { app, BrowserWindow, dialog } from "electron"
+import { app, BrowserWindow, dialog, session } from "electron"
 import pkg from "electron-updater"
 
 import contextMenu from "electron-context-menu"
@@ -59,6 +59,7 @@ import { parseMarkdown } from "./markdown"
 import { createMenu } from "./menu"
 import { getDefaultServerUrl, getWslConfig, setDefaultServerUrl, setWslConfig, spawnLocalServer } from "./server"
 import { updateServer } from "./update-server"
+import { shouldTrustUpdateServerCertificate } from "./update-server-trust"
 import {
   createLoadingWindow,
   createMainWindow,
@@ -92,7 +93,6 @@ logger.log("app starting", {
 })
 
 setupApp()
-void getUpdateServerConfig()
 
 function setupApp() {
   ensureLoopbackNoProxy()
@@ -142,9 +142,13 @@ function setupApp() {
 
   void app.whenReady().then(async () => {
     app.setAsDefaultProtocolClient("opencode")
+    session.defaultSession.setCertificateVerifyProc((request, callback) => {
+      callback(shouldTrustUpdateServerCertificate(request.hostname) ? 0 : -3)
+    })
     registerRendererProtocol()
     setDockIcon()
     setupAutoUpdater()
+    void getUpdateServerConfig()
     await initialize()
   })
 }
