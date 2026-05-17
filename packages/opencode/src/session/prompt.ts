@@ -52,6 +52,12 @@ import { InstanceState } from "@/effect"
 import { TaskTool, type TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { EffectBridge } from "@/effect"
+import { Question } from "../question"
+import { MemoryProposals } from "@/memory/proposals"
+import { MemoryService } from "@/memory/service"
+import { Instance } from "@/project/instance"
+import { Database, eq } from "../storage"
+import { SessionTable } from "./session.sql"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -134,6 +140,9 @@ export const layer = Layer.effect(
     const summary = yield* SessionSummary.Service
     const sys = yield* SystemPrompt.Service
     const llm = yield* LLM.Service
+    const question = yield* Question.Service
+    const memoryProposals = yield* MemoryProposals.Service
+    const memorySvc = yield* MemoryService.Service
     const runner = Effect.fn("SessionPrompt.runner")(function* () {
       return yield* EffectBridge.make()
     })
@@ -1622,6 +1631,79 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         }
 
         yield* compaction.prune({ sessionID }).pipe(Effect.ignore, Effect.forkIn(scope))
+
+        const cfg2 = yield* config.get()
+        if (cfg2.memory?.enabled !== false) {
+          const proposals = yield* memoryProposals.get(sessionID)
+          if (proposals.length > 0) {
+            const answers = yield* question
+              .ask({
+                sessionID,
+                questions: [
+                  {
+                    question:
+                      "These memories were proposed during this session. Select which ones to save (space to toggle, enter to confirm):",
+                    header: "Save memories?",
+                    options: proposals.map((p, i) => ({
+                      label: String(i + 1),
+                      description: `[${p.scope}/${p.category}] ${p.content} — ${p.reason}`,
+                    })),
+                    multiple: true,
+                    custom: false,
+                  },
+                ],
+              })
+              .pipe(Effect.catchAll(() => Effect.succeed([] as ReadonlyArray<ReadonlyArray<string>>)))
+
+            const selected = answers[0] ?? []
+            for (const label of selected) {
+              const idx = Number(label) - 1
+              const proposal = proposals[idx]
+              if (!proposal) continue
+              if (proposal.destination === "file" && proposal.filePath) {
+                const dest = path.join(Instance.directory, ".opencode", "memory", proposal.filePath)
+                if (proposal.mode === "append") {
+                  yield* Effect.promise(async () => {
+                    const existing = await Bun.file(dest).text().catch(() => "")
+                    const separator = existing.trimEnd().length > 0 ? "\n\n" : ""
+                    await Bun.write(dest, existing.trimEnd() + separator + proposal.content)
+                  }).pipe(Effect.ignore)
+                } else {
+                  yield* Effect.promise(() => Bun.write(dest, proposal.content)).pipe(Effect.ignore)
+                }
+              } else {
+                yield* memorySvc
+                  .add({
+                    scope: proposal.scope,
+                    category: proposal.category,
+                    content: proposal.content,
+                    source: "agent-proposal",
+                  })
+                  .pipe(Effect.ignore)
+              }
+            }
+            yield* memoryProposals.clear(sessionID)
+          }
+        }
+
+        const lintCfg = yield* config.get()
+        const lintAfter = lintCfg.memory?.lintAfterSessions ?? 20
+        if (lintAfter > 0) {
+          const projectID = Instance.project.id
+          const sessionCount = yield* Effect.sync(() =>
+            Database.use((db) =>
+              db.select().from(SessionTable).where(eq(SessionTable.project_id, projectID)).all().length,
+            ),
+          )
+          if (sessionCount > 0 && sessionCount % lintAfter === 0) {
+            yield* Effect.sync(() => {
+              process.stderr.write(
+                `\n[memory] Project memory has grown (${sessionCount} sessions). Run 'opencode memory lint' to check for contradictions and stale entries.\n`,
+              )
+            })
+          }
+        }
+
         return yield* lastAssistant(sessionID)
       },
     )
@@ -1777,6 +1859,9 @@ export const defaultLayer = Layer.suspend(() =>
     Layer.provide(MCP.defaultLayer),
     Layer.provide(LSP.defaultLayer),
     Layer.provide(ToolRegistry.defaultLayer),
+    Layer.provide(Question.defaultLayer),
+    Layer.provide(MemoryService.defaultLayer),
+    Layer.provide(MemoryProposals.defaultLayer),
     Layer.provide(Truncate.defaultLayer),
     Layer.provide(Provider.defaultLayer),
     Layer.provide(Config.defaultLayer),

@@ -103,3 +103,18 @@ When referencing specific functions or pieces of code include the pattern `file_
 user: Where are errors from the client handled?
 assistant: Clients are marked as failed in the `connectToServer` function in src/services/process.ts:712.
 </example>
+
+# Memory Proposals
+
+Use the `memory_propose` tool to queue memories for end-of-session review when you notice something worth remembering across future sessions:
+- The user corrects the same mistake a second time — it's a pattern, not a one-off
+- An architectural decision is made with explicit reasoning that should guide future work
+- A non-obvious bug is fixed that could recur (store the fix heuristic, not the bug itself)
+- The user states an explicit preference ("always use X", "never do Y", "prefer Z style")
+- A non-obvious project convention or constraint is discovered
+
+Do NOT propose memories for: routine task completions, things already documented in the codebase, or information the user is likely to change soon. Keep proposals minimal — 0–2 per session is normal. Quality over quantity.
+
+## Entity updates
+
+If you introduce or discover a domain concept, module, service, or pattern that isn't already in `.opencode/memory/entities.md`, use `memory_propose` with `destination: 'file'`, `filePath: 'entities.md'`, and `mode: 'append'` to propose adding a one-line definition. Only do this when the concept is central enough that future sessions would benefit from knowing what it is.

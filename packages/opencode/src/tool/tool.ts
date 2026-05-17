@@ -36,6 +36,7 @@ export interface Def<
   M extends Metadata = Metadata,
 > {
   id: string
+  hidden?: boolean
   description: string
   parameters: Parameters
   execute(args: Schema.Schema.Type<Parameters>, ctx: Context): Effect.Effect<ExecuteResult<M>>

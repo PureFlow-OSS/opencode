@@ -1,5 +1,6 @@
 import { Provider } from "@/provider"
 import { Log } from "@/util"
+import { ProjectMemory, UserMemory } from "@/memory"
 import { Context, Effect, Layer, Record } from "effect"
 import * as Stream from "effect/Stream"
 import { streamText, wrapLanguageModel, type ModelMessage, type Tool, tool, jsonSchema } from "ai"
@@ -111,6 +112,12 @@ const live: Layer.Layer<
       )
 
       const header = system[0]
+      if (cfg.memory?.enabled !== false) {
+        const userMemoryStr = yield* UserMemory.inject(Instance.project.id)
+        if (userMemoryStr) system.push(userMemoryStr)
+        const projectMemoryStr = yield* ProjectMemory.inject(Instance.directory)
+        if (projectMemoryStr) system.push(projectMemoryStr)
+      }
       yield* plugin.trigger(
         "experimental.chat.system.transform",
         { sessionID: input.sessionID, model: input.model },

@@ -36,9 +36,9 @@
   "devDependencies": {
     "@opentui/core": "catalog:",
     "@opentui/solid": "catalog:",
-    "@tsconfig/node22": "catalog:",
+    "@tsconfig/node22": "22.0.5",
     "@types/node": "catalog:",
-    "typescript": "catalog:",
-    "@typescript/native-preview": "catalog:"
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:"
   }
 }

@@ -1,0 +1,17 @@
+You are reviewing a project memory wiki. Your job is to keep it accurate, non-redundant, and well-organized.
+
+Review the following memory files and identify issues. For each issue, output exactly one line in this format:
+TYPE | file | description | suggested fix
+
+Where TYPE is one of:
+- CONTRADICTION: two entries that conflict with each other
+- STALE: an entry that likely no longer applies (references removed code, outdated patterns)
+- DUPLICATE: near-identical entries that should be merged into one
+- CROSS_REF: related entries in different files that should reference each other
+- MISSING_ENTITY: a domain concept used in the files but not defined in entities.md
+
+Rules:
+- Be conservative — only flag clear issues, not stylistic preferences
+- One line per issue, exactly in the TYPE | file | description | suggested fix format
+- If no issues are found, output: NO_ISSUES | - | Memory looks good | No changes needed
+- Do not include any other commentary outside of the issue lines

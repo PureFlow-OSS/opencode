@@ -264,6 +264,21 @@ export const Info = Schema.Struct({
       }),
     }),
   ),
+  memory: Schema.optional(
+    Schema.Struct({
+      enabled: Schema.optional(Schema.Boolean).annotate({
+        description: "Inject .opencode/memory/ files into the system prompt (default: true)",
+      }),
+      lintAfterSessions: Schema.optional(NonNegativeInt).annotate({
+        description:
+          "Suggest running 'opencode memory lint' after every N sessions in this project (0 = disabled, default: 20)",
+      }),
+      embeddingModel: Schema.optional(Schema.String).annotate({
+        description:
+          "Model for semantic memory search in provider/model format, e.g. 'openai/text-embedding-3-small'. Omit to disable embeddings.",
+      }),
+    }),
+  ).annotate({ description: "Project memory injection settings" }),
 })
   .annotate({ identifier: "Config" })
   .pipe(
