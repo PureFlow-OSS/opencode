@@ -79,12 +79,26 @@ export function createSessionComposerState(options?: { closeMs?: number | (() =>
     return store.responding === perm.id
   })
 
-  const decide = (response: "once" | "always" | "reject") => {
+  const decide = (response: "once" | "always" | "reject" | "full-access") => {
     const perm = permissionRequest()
     if (!perm) return
     if (store.responding === perm.id) return
 
     setStore("responding", perm.id)
+    if (response === "full-access") {
+      permission.enableAutoAcceptDirectory(sdk.directory)
+      sdk.client.permission
+        .respond({ sessionID: perm.sessionID, permissionID: perm.id, response: "once" })
+        .catch((err: unknown) => {
+          const description = err instanceof Error ? err.message : String(err)
+          showToast({ title: language.t("common.requestFailed"), description })
+        })
+        .finally(() => {
+          setStore("responding", (id) => (id === perm.id ? undefined : id))
+        })
+      return
+    }
+
     sdk.client.permission
       .respond({ sessionID: perm.sessionID, permissionID: perm.id, response })
       .catch((err: unknown) => {

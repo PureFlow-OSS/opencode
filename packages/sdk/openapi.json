@@ -4626,7 +4626,7 @@
                 "properties": {
                   "response": {
                     "type": "string",
-                    "enum": ["once", "always", "reject"]
+                    "enum": ["once", "always", "never", "reject"]
                   }
                 },
                 "required": ["response"]
@@ -4712,7 +4712,7 @@
                 "properties": {
                   "reply": {
                     "type": "string",
-                    "enum": ["once", "always", "reject"]
+                    "enum": ["once", "always", "never", "reject"]
                   },
                   "message": {
                     "type": "string"
@@ -7854,7 +7854,7 @@
               },
               "reply": {
                 "type": "string",
-                "enum": ["once", "always", "reject"]
+                "enum": ["once", "always", "never", "reject"]
               }
             },
             "required": ["sessionID", "requestID", "reply"]

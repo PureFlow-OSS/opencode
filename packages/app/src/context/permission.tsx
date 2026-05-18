@@ -17,7 +17,7 @@ import {
 type PermissionRespondFn = (input: {
   sessionID: string
   permissionID: string
-  response: "once" | "always" | "reject"
+  response: "once" | "always" | "never" | "reject"
   directory?: string
 }) => void
 
@@ -262,6 +262,10 @@ export const { use: usePermission, provider: PermissionProvider } = createSimple
       enableAutoAccept(sessionID: string, directory: string) {
         if (isAutoAccepting(sessionID, directory)) return
         enable(sessionID, directory)
+      },
+      enableAutoAcceptDirectory(directory: string) {
+        if (isAutoAcceptingDirectory(directory)) return
+        enableDirectory(directory)
       },
       disableAutoAccept(sessionID: string, directory?: string) {
         disable(sessionID, directory)

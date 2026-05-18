@@ -53,7 +53,9 @@ export class Request extends Schema.Class<Request>("PermissionRequest")({
   static readonly zod = zod(this)
 }
 
-export const Reply = Schema.Literals(["once", "always", "reject"]).pipe(withStatics((s) => ({ zod: zod(s) })))
+export const Reply = Schema.Literals(["once", "always", "never", "reject"]).pipe(
+  withStatics((s) => ({ zod: zod(s) })),
+)
 export type Reply = Schema.Schema.Type<typeof Reply>
 
 const reply = {
@@ -225,19 +227,35 @@ export const layer = Layer.effect(
         reply: input.reply,
       })
 
-      if (input.reply === "reject") {
+      if (input.reply === "reject" || input.reply === "never") {
         yield* Deferred.fail(
           existing.deferred,
           input.message ? new CorrectedError({ feedback: input.message }) : new RejectedError(),
         )
 
+        if (input.reply === "never") {
+          for (const pattern of existing.info.patterns) {
+            approved.push({
+              permission: existing.info.permission,
+              pattern,
+              action: "deny",
+            })
+          }
+        }
+
         for (const [id, item] of pending.entries()) {
           if (item.info.sessionID !== existing.info.sessionID) continue
+          if (
+            input.reply === "never" &&
+            !item.info.patterns.every((pattern) => evaluate(item.info.permission, pattern, approved).action === "deny")
+          ) {
+            continue
+          }
           pending.delete(id)
           yield* bus.publish(Event.Replied, {
             sessionID: item.info.sessionID,
             requestID: item.info.id,
-            reply: "reject",
+            reply: input.reply,
           })
           yield* Deferred.fail(item.deferred, new RejectedError())
         }
