@@ -176,6 +176,13 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       const sessionID = id()
       if (!sessionID || !item) return
       if ((sync.data.session_status[sessionID]?.type ?? "idle") !== "idle") return
+      const active = current()
+      const source = active
+        ? {
+            providerID: active.provider.id,
+            modelID: active.id,
+          }
+        : item
 
       const result = shouldCompactOnModelSwitch({
         messages: sync.data.message[sessionID] ?? [],
@@ -186,8 +193,8 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
       await sdk.client.session.summarize({
         sessionID,
-        providerID: item.providerID,
-        modelID: item.modelID,
+        providerID: source.providerID,
+        modelID: source.modelID,
       })
     }
 

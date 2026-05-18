@@ -138,6 +138,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       async function compactForModelSwitch(model: { providerID: string; modelID: string }) {
         if (route.data.type !== "session") return
         if (sync.session.status(route.data.sessionID) !== "idle") return
+        const active = currentModel() ?? model
 
         const result = shouldCompactOnModelSwitch({
           messages: sync.data.message[route.data.sessionID] ?? [],
@@ -147,14 +148,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         if (!result.shouldCompact) return
 
         toast.show({
-          message: `Compacting session for ${model.providerID}/${model.modelID} before switching models`,
+          message: `Compacting session with ${active.providerID}/${active.modelID} before switching to ${model.providerID}/${model.modelID}`,
           variant: "info",
           duration: 3000,
         })
         await sdk.client.session.summarize({
           sessionID: route.data.sessionID,
-          providerID: model.providerID,
-          modelID: model.modelID,
+          providerID: active.providerID,
+          modelID: active.modelID,
         })
       }
 

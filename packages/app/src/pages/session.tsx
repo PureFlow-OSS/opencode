@@ -51,6 +51,7 @@ import {
   shouldFocusTerminalOnKeyDown,
 } from "@/pages/session/helpers"
 import { MessageTimeline } from "@/pages/session/message-timeline"
+import { filterCompletedCompactionUserMessages } from "@/pages/session/compaction-visibility"
 import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/pages/session/review-tab"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { syncSessionModel } from "@/pages/session/session-model-helpers"
@@ -470,8 +471,12 @@ export default function Page() {
   const visibleUserMessages = createMemo(
     () => {
       const revert = revertMessageID()
-      if (!revert) return userMessages()
-      return userMessages().filter((m) => m.id < revert)
+      const visible = !revert ? userMessages() : userMessages().filter((m) => m.id < revert)
+      return filterCompletedCompactionUserMessages({
+        userMessages: visible,
+        messages: messages(),
+        parts: sync.data.part,
+      })
     },
     emptyUserMessages,
     {
