@@ -1560,6 +1560,56 @@ const layer: Layer.Layer<
           }
         }
 
+        // inject enterprise provider (LiteLLM + Keycloak JWT) if connected
+        {
+          const enterpriseProviderID = ProviderID.make("enterprise")
+          const enterpriseAuth = yield* auth.get(enterpriseProviderID).pipe(Effect.orDie)
+          if (enterpriseAuth?.type === "api" && !disabled.has(enterpriseProviderID)) {
+            const litellmUrl = enterpriseAuth.metadata?.litellm_url
+            if (litellmUrl) {
+              const enterpriseModelsFile = path.join(Global.Path.data, "enterprise-models.json")
+              const cachedModels = yield* fs.readJson(enterpriseModelsFile).pipe(
+                Effect.map((data) => data as { id: string }[]),
+                Effect.orElseSucceed(() => [] as { id: string }[]),
+              )
+              const enterpriseModels: Record<string, Model> = {}
+              for (const m of cachedModels) {
+                enterpriseModels[m.id] = {
+                  id: ModelID.make(m.id),
+                  providerID: enterpriseProviderID,
+                  name: m.id,
+                  api: { id: m.id, url: litellmUrl, npm: "@ai-sdk/openai-compatible" },
+                  status: "active",
+                  headers: {},
+                  options: {},
+                  cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+                  limit: { context: 128000, output: 4096 },
+                  capabilities: {
+                    temperature: true,
+                    reasoning: false,
+                    attachment: false,
+                    toolcall: true,
+                    input: { text: true, audio: false, image: false, video: false, pdf: false },
+                    output: { text: true, audio: false, image: false, video: false, pdf: false },
+                    interleaved: false,
+                  },
+                  release_date: "",
+                  variants: {},
+                }
+              }
+              providers[enterpriseProviderID] = {
+                id: enterpriseProviderID,
+                name: "Enterprise (LiteLLM)",
+                source: "api",
+                env: [],
+                options: { apiKey: enterpriseAuth.key, baseURL: litellmUrl },
+                models: enterpriseModels,
+              }
+              modelLoaders[enterpriseProviderID] = async (sdk: any, modelID: string) => sdk.languageModel(modelID)
+            }
+          }
+        }
+
         // plugin auth loader - database now has entries for config providers
         for (const plugin of plugins) {
           if (!plugin.auth) continue

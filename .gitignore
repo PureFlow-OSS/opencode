@@ -29,6 +29,8 @@ UPCOMING_CHANGELOG.md
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
+litellm_config.yaml
+H:/Development/opencode/.env
 
 # Local updater and packaging artifacts
 .tmp/

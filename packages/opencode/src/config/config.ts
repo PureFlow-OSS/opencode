@@ -211,6 +211,12 @@ export const Info = Schema.Struct({
   enterprise: Schema.optional(
     Schema.Struct({
       url: Schema.optional(Schema.String).annotate({ description: "Enterprise URL" }),
+      keycloak_url: Schema.optional(Schema.String).annotate({
+        description: "Keycloak realm URL, e.g. https://keycloak.corp.com/realms/corp",
+      }),
+      client_id: Schema.optional(Schema.String).annotate({
+        description: "OIDC client ID registered in Keycloak (default: opencode)",
+      }),
     }),
   ),
   tool_output: Schema.optional(

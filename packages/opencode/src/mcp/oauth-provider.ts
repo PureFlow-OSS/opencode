@@ -192,6 +192,8 @@ export class McpOAuthProvider implements OAuthClientProvider {
   }
 }
 
+export const ENTERPRISE_OAUTH_CALLBACK_PATH = "/enterprise/oauth/callback"
+
 export { OAUTH_CALLBACK_PORT, OAUTH_CALLBACK_PATH }
 
 /**

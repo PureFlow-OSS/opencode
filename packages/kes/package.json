@@ -1,0 +1,13 @@
+{
+  "name": "@opencode-ai/kes",
+  "version": "1.0.0",
+  "description": "Key Exchange Server — validates Keycloak JWTs and issues LiteLLM API keys",
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun run --watch src/index.ts"
+  },
+  "dependencies": {
+    "jose": "^5.9.6"
+  }
+}
