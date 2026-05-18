@@ -14,9 +14,9 @@ export const todoState = (input: {
   count: number
   done: boolean
   live: boolean
-}): "hide" | "clear" | "open" | "close" => {
+}): "hide" | "clear" | "open" | "close" | "hold" => {
   if (input.count === 0) return "hide"
-  if (!input.live) return "clear"
+  if (!input.live) return input.done ? "clear" : "hold"
   if (!input.done) return "open"
   return "close"
 }
@@ -65,6 +65,7 @@ export function createSessionComposerState(options?: { closeMs?: number | (() =>
 
   const busy = createMemo(() => status().type !== "idle")
   const live = createMemo(() => busy() || blocked())
+  const resumable = createMemo(() => todos().length > 0 && !done() && !live())
 
   const [store, setStore] = createStore({
     responding: undefined as string | undefined,
@@ -180,6 +181,13 @@ export function createSessionComposerState(options?: { closeMs?: number | (() =>
           return
         }
 
+        if (next === "hold") {
+          if (timer) window.clearTimeout(timer)
+          timer = undefined
+          setStore({ dock: true, closing: false, opening: false })
+          return
+        }
+
         setStore({ dock: true, opening: false, closing: true })
         if (!timer) scheduleClose()
       },
@@ -203,6 +211,8 @@ export function createSessionComposerState(options?: { closeMs?: number | (() =>
     permissionResponding,
     decide,
     todos,
+    live,
+    resumable,
     dock: () => store.dock,
     closing: () => store.closing,
     opening: () => store.opening,

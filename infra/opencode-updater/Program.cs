@@ -128,7 +128,7 @@ static async Task<IResult> LocalFileAsync(HttpContext context, string path)
 
 sealed class UpdaterOptions
 {
-  public string Version { get; set; } = "1.14.34";
+  public string Version { get; set; } = "1.14.35";
   public string PublicBaseUrl { get; set; } = "http://10.53.7.23";
   public MotdOptions Motd { get; set; } = new();
   public ProviderConfigOptions ProviderConfig { get; set; } = new();

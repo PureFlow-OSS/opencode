@@ -1,3 +1,20 @@
+# v1.14.35
+
+## Added
+
+- Added a full access action to permission prompts.
+- Added automatic compaction before switching to tighter-context models in both the app and TUI.
+
+## Improved
+
+- Permission prompts can now remember accepted commands, with clearer button labels in the session UI.
+- Desktop update checks now route update-server requests through Electron when needed for managed environments.
+
+## Fixed
+
+- Fixed failures when switching a long conversation onto models with tighter context limits by compacting before the switch.
+- Fixed desktop updater requests against HTTPS update servers that use private or self-signed certificates.
+
 # v1.14.34
 
 ## Added

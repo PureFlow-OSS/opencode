@@ -4,6 +4,7 @@ import { Checkbox } from "@opencode-ai/ui/checkbox"
 import { DockTray } from "@opencode-ai/ui/dock-surface"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { useSpring } from "@opencode-ai/ui/motion-spring"
+import { Tag } from "@opencode-ai/ui/tag"
 import { TextReveal } from "@opencode-ai/ui/text-reveal"
 import { TextStrikethrough } from "@opencode-ai/ui/text-strikethrough"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
@@ -42,8 +43,12 @@ function dot(status: Todo["status"]) {
 export function SessionTodoDock(props: {
   sessionID?: string
   todos: Todo[]
+  live: boolean
+  resumable: boolean
+  title: string
   collapseLabel: string
   expandLabel: string
+  continueLabel: string
   dockProgress: number
 }) {
   const language = useLanguage()
@@ -72,6 +77,7 @@ export function SessionTodoDock(props: {
   )
 
   const preview = createMemo(() => active()?.content ?? "")
+  const collapsedText = createMemo(() => (store.collapsed ? preview() || label() : label()))
   const collapse = useSpring(() => (store.collapsed ? 1 : 0), { visualDuration: 0.3, bounce: 0 })
   const dock = createMemo(() => Math.max(0, Math.min(1, props.dockProgress)))
   const shut = createMemo(() => 1 - dock())
@@ -104,7 +110,7 @@ export function SessionTodoDock(props: {
       <div ref={contentRef}>
         <div
           data-action="session-todo-toggle"
-          class="pl-3 pr-2 py-2 flex items-center gap-2 overflow-visible"
+          class="pl-3 pr-2 py-2.5 flex items-center gap-3 overflow-visible"
           role="button"
           tabIndex={0}
           onClick={toggle}
@@ -114,49 +120,72 @@ export function SessionTodoDock(props: {
             toggle()
           }}
         >
-          <span
-            class="text-14-regular text-text-strong cursor-default inline-flex items-baseline shrink-0 overflow-visible"
-            aria-label={label()}
-            style={{
-              "--tool-motion-odometer-ms": "600ms",
-              "--tool-motion-mask": "18%",
-              "--tool-motion-mask-height": "0px",
-              "--tool-motion-spring-ms": "560ms",
-              "white-space": "pre",
-              opacity: `${Math.max(0, Math.min(1, 1 - shut()))}`,
-            }}
-          >
-            <Index each={progress()}>
-              {(item) =>
-                item() === doneToken ? (
-                  <AnimatedNumber value={done()} />
-                ) : item() === totalToken ? (
-                  <AnimatedNumber value={total()} />
-                ) : (
-                  <span>{item()}</span>
-                )
-              }
-            </Index>
-          </span>
-          <div
-            data-slot="session-todo-preview"
-            class="ml-1 min-w-0 overflow-hidden"
-            style={{
-              flex: "1 1 auto",
-              "max-width": "100%",
-            }}
-          >
-            <TextReveal
-              class="text-14-regular text-text-base cursor-default"
-              text={store.collapsed ? preview() : undefined}
-              duration={600}
-              travel={25}
-              edge={17}
-              spring="cubic-bezier(0.34, 1, 0.64, 1)"
-              springSoft="cubic-bezier(0.34, 1, 0.64, 1)"
-              growOnly
-              truncate
-            />
+          <div class="min-w-0 flex-1 flex flex-col gap-1">
+            <div class="min-w-0 flex items-center gap-2">
+              <span class="text-[11px] font-medium uppercase tracking-[0.14em] text-text-weak shrink-0">
+                {props.title}
+              </span>
+              <Tag
+                class="shrink-0"
+                style={{
+                  opacity: props.resumable && !props.live ? "1" : "0",
+                  transform: props.resumable && !props.live ? "translateY(0)" : "translateY(-2px)",
+                  transition: "opacity 180ms var(--tool-motion-ease, cubic-bezier(0.22, 1, 0.36, 1)), transform 180ms var(--tool-motion-ease, cubic-bezier(0.22, 1, 0.36, 1))",
+                }}
+              >
+                {props.continueLabel}
+              </Tag>
+            </div>
+            <div
+              class="min-w-0 flex items-center gap-2"
+              style={{
+                opacity: `${Math.max(0, Math.min(1, 1 - shut()))}`,
+              }}
+            >
+              <span
+                class="text-14-regular text-text-strong cursor-default inline-flex items-baseline shrink-0 overflow-visible"
+                aria-label={label()}
+                style={{
+                  "--tool-motion-odometer-ms": "600ms",
+                  "--tool-motion-mask": "18%",
+                  "--tool-motion-mask-height": "0px",
+                  "--tool-motion-spring-ms": "560ms",
+                  "white-space": "pre",
+                }}
+              >
+                <Index each={progress()}>
+                  {(item) =>
+                    item() === doneToken ? (
+                      <AnimatedNumber value={done()} />
+                    ) : item() === totalToken ? (
+                      <AnimatedNumber value={total()} />
+                    ) : (
+                      <span>{item()}</span>
+                    )
+                  }
+                </Index>
+              </span>
+              <div
+                data-slot="session-todo-preview"
+                class="min-w-0 overflow-hidden"
+                style={{
+                  flex: "1 1 auto",
+                  "max-width": "100%",
+                }}
+              >
+                <TextReveal
+                  class="text-14-regular text-text-base cursor-default"
+                  text={collapsedText()}
+                  duration={600}
+                  travel={25}
+                  edge={17}
+                  spring="cubic-bezier(0.34, 1, 0.64, 1)"
+                  springSoft="cubic-bezier(0.34, 1, 0.64, 1)"
+                  growOnly
+                  truncate
+                />
+              </div>
+            </div>
           </div>
           <div class="ml-auto">
             <IconButton
@@ -190,6 +219,7 @@ export function SessionTodoDock(props: {
             opacity: `${Math.max(0, Math.min(1, 1 - hide()))}`,
           }}
         >
+          <div class="mx-3 mb-2 border-t border-border-weak-base/80" />
           <TodoList todos={props.todos} />
         </div>
       </div>
