@@ -3,6 +3,7 @@ import { createSimpleContext } from "./helper"
 import { batch, createEffect, createMemo } from "solid-js"
 import { useSync } from "@tui/context/sync"
 import { useTheme } from "@tui/context/theme"
+import { useRoute } from "@tui/context/route"
 import { uniqueBy } from "remeda"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
@@ -12,6 +13,7 @@ import { useArgs } from "./args"
 import { useSDK } from "./sdk"
 import { RGBA } from "@opentui/core"
 import { Filesystem } from "@/util"
+import { shouldCompactOnModelSwitch } from "../util/model-switch-compaction"
 
 export function parseModel(model: string) {
   const [providerID, ...rest] = model.split("/")
@@ -27,6 +29,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     const sync = useSync()
     const sdk = useSDK()
     const toast = useToast()
+    const route = useRoute()
 
     function isModelValid(model: { providerID: string; modelID: string }) {
       const provider = sync.data.provider.find((x) => x.id === model.providerID)
@@ -130,6 +133,29 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       const filePath = path.join(Global.Path.state, "model.json")
       const state = {
         pending: false,
+      }
+
+      async function compactForModelSwitch(model: { providerID: string; modelID: string }) {
+        if (route.data.type !== "session") return
+        if (sync.session.status(route.data.sessionID) !== "idle") return
+
+        const result = shouldCompactOnModelSwitch({
+          messages: sync.data.message[route.data.sessionID] ?? [],
+          providers: sync.data.provider,
+          model,
+        })
+        if (!result.shouldCompact) return
+
+        toast.show({
+          message: `Compacting session for ${model.providerID}/${model.modelID} before switching models`,
+          variant: "info",
+          duration: 3000,
+        })
+        await sdk.client.session.summarize({
+          sessionID: route.data.sessionID,
+          providerID: model.providerID,
+          modelID: model.modelID,
+        })
       }
 
       function save() {
@@ -247,9 +273,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           if (next >= recent.length) next = 0
           const val = recent[next]
           if (!val) return
-          const a = agent.current()
-          if (!a) return
-          setModelStore("model", a.name, { ...val })
+          void this.set(val)
         },
         cycleFavorite(direction: 1 | -1) {
           const favorites = modelStore.favorite.filter((item) => isModelValid(item))
@@ -275,39 +299,33 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           }
           const next = favorites[index]
           if (!next) return
+          void this.set(next, { recent: true })
+        },
+        async set(model: { providerID: string; modelID: string }, options?: { recent?: boolean; compact?: boolean }) {
+          if (!isModelValid(model)) {
+            toast.show({
+              message: `Model ${model.providerID}/${model.modelID} is not valid`,
+              variant: "warning",
+              duration: 3000,
+            })
+            return
+          }
           const a = agent.current()
           if (!a) return
-          setModelStore("model", a.name, { ...next })
-          const uniq = uniqueBy([next, ...modelStore.recent], (x) => `${x.providerID}/${x.modelID}`)
-          if (uniq.length > 10) uniq.pop()
-          setModelStore(
-            "recent",
-            uniq.map((x) => ({ providerID: x.providerID, modelID: x.modelID })),
-          )
-          save()
-        },
-        set(model: { providerID: string; modelID: string }, options?: { recent?: boolean }) {
+          const current = currentModel()
+          const same = current?.providerID === model.providerID && current?.modelID === model.modelID
+          if (!same && options?.compact !== false) await compactForModelSwitch(model)
+
           batch(() => {
-            if (!isModelValid(model)) {
-              toast.show({
-                message: `Model ${model.providerID}/${model.modelID} is not valid`,
-                variant: "warning",
-                duration: 3000,
-              })
-              return
-            }
-            const a = agent.current()
-            if (!a) return
             setModelStore("model", a.name, model)
-            if (options?.recent) {
-              const uniq = uniqueBy([model, ...modelStore.recent], (x) => `${x.providerID}/${x.modelID}`)
-              if (uniq.length > 10) uniq.pop()
-              setModelStore(
-                "recent",
-                uniq.map((x) => ({ providerID: x.providerID, modelID: x.modelID })),
-              )
-              save()
-            }
+            if (!options?.recent) return
+            const uniq = uniqueBy([model, ...modelStore.recent], (x) => `${x.providerID}/${x.modelID}`)
+            if (uniq.length > 10) uniq.pop()
+            setModelStore(
+              "recent",
+              uniq.map((x) => ({ providerID: x.providerID, modelID: x.modelID })),
+            )
+            save()
           })
         },
         toggleFavorite(model: { providerID: string; modelID: string }) {
@@ -406,7 +424,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           model.set({
             providerID: value.model.providerID,
             modelID: value.model.modelID,
-          })
+          }, { compact: false })
         else
           toast.show({
             variant: "warning",

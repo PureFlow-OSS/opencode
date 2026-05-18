@@ -9,6 +9,7 @@ import { Persist, persisted } from "@/utils/persist"
 import { cycleModelVariant, getConfiguredAgentVariant, resolveModelVariant } from "./model-variant"
 import { useSDK } from "./sdk"
 import { useSync } from "./sync"
+import { shouldCompactOnModelSwitch } from "./model-switch-compaction"
 
 export type ModelKey = { providerID: string; modelID: string; variant?: string }
 
@@ -171,6 +172,25 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
     const fallback = createMemo<ModelKey | undefined>(() => configuredModel() ?? recentModel() ?? defaultModel())
 
+    const compactForModelSwitch = async (item: ModelKey | undefined) => {
+      const sessionID = id()
+      if (!sessionID || !item) return
+      if ((sync.data.session_status[sessionID]?.type ?? "idle") !== "idle") return
+
+      const result = shouldCompactOnModelSwitch({
+        messages: sync.data.message[sessionID] ?? [],
+        providers: providers.all(),
+        model: item,
+      })
+      if (!result.shouldCompact) return
+
+      await sdk.client.session.summarize({
+        sessionID,
+        providerID: item.providerID,
+        modelID: item.modelID,
+      })
+    }
+
     const agent = {
       list,
       current() {
@@ -288,9 +308,16 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
         const entry = items[next]
         if (!entry) return
-        model.set({ providerID: entry.provider.id, modelID: entry.id })
+        void model.set({ providerID: entry.provider.id, modelID: entry.id })
       },
-      set(item: ModelKey | undefined, options?: { recent?: boolean }) {
+      async set(item: ModelKey | undefined, options?: { recent?: boolean; compact?: boolean }) {
+        const currentItem = current()
+        const same =
+          currentItem?.provider.id === item?.providerID &&
+          currentItem?.id === item?.modelID &&
+          selected() === item?.variant
+        if (!same && options?.compact !== false) await compactForModelSwitch(item)
+
         batch(() => {
           setStore("last", {
             type: "model",
