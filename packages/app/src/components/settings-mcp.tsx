@@ -6,9 +6,11 @@ import { TextField } from "@opencode-ai/ui/text-field"
 import { showToast } from "@opencode-ai/ui/toast"
 import { createEffect, createMemo, createResource, For, Show, type Component } from "solid-js"
 import { createStore } from "solid-js/store"
+import { useParams } from "@solidjs/router"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
+import { decode64 } from "@/utils/base64"
 import { DialogMcpForm } from "./dialog-mcp-form"
 import { SettingsList } from "./settings-list"
 import type { McpLocalConfig, McpRemoteConfig } from "@opencode-ai/sdk/v2/client"
@@ -88,6 +90,8 @@ export const SettingsMcp: Component = () => {
   const language = useLanguage()
   const globalSync = useGlobalSync()
   const globalSDK = useGlobalSDK()
+  const params = useParams()
+  const dir = createMemo(() => decode64(params.dir) ?? globalSync.data.path.directory ?? "")
   const [managedData] = createResource<Record<string, ManagedServer>>(() =>
     globalSDK
       .request("/mcp/managed")
@@ -168,7 +172,13 @@ export const SettingsMcp: Component = () => {
     }
     await globalSync.updateConfig({ mcp: existing })
     await globalSDK.client.mcp.connect({ name: server.name }).catch(() => undefined)
-    setMcpStatus(await globalSDK.client.mcp.status().then((res) => res.data ?? {}))
+    const next = await globalSDK.client.mcp.status().then((res) => res.data ?? {})
+    setMcpStatus(next)
+    if (dir()) {
+      const [, setStore] = globalSync.child(dir(), { bootstrap: false })
+      setStore("mcp", next)
+      setStore("mcp_ready", true)
+    }
     showToast({
       variant: "success",
       icon: "circle-check",
@@ -204,15 +214,32 @@ export const SettingsMcp: Component = () => {
     const existing = { ...(globalSync.data.config.mcp ?? {}) }
     delete existing[name]
     setDeleting(name, true)
+    if (dir()) {
+      const [, setStore] = globalSync.child(dir(), { bootstrap: false })
+      setStore("mcp", (current) => {
+        if (!(name in current)) return current
+        const next = { ...current }
+        delete next[name]
+        return next
+      })
+      setStore("mcp_ready", true)
+    }
+    showToast({
+      variant: "success",
+      icon: "circle-check",
+      title: language.t("settings.mcp.toast.deleted.title"),
+      description: language.t("settings.mcp.toast.deleted.description", { name }),
+    })
     await globalSync
       .updateConfig({ mcp: existing })
-      .then(() => {
-        showToast({
-          variant: "success",
-          icon: "circle-check",
-          title: language.t("settings.mcp.toast.deleted.title"),
-          description: language.t("settings.mcp.toast.deleted.description", { name }),
-        })
+      .then(async () => {
+        const next = await globalSDK.client.mcp.status().then((res) => res.data ?? {})
+        setMcpStatus(next)
+        if (dir()) {
+          const [, setStore] = globalSync.child(dir(), { bootstrap: false })
+          setStore("mcp", next)
+          setStore("mcp_ready", true)
+        }
       })
       .catch((err: unknown) => {
         setDeleting(name, false)

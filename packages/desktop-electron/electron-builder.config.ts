@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process"
+import fs from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
@@ -29,12 +30,21 @@ const channel = (() => {
 const shouldUseWindowsSignScript = process.platform === "win32" && process.env.GITHUB_ACTIONS === "true"
 const shouldEditWindowsExecutable = process.env.OPENCODE_EDIT_EXECUTABLE !== "false"
 const outputDir = process.env.OPENCODE_ELECTRON_OUTPUT_DIR?.trim() || "dist"
+const changelog = path.join(rootDir, "changelog.md")
+
+async function copyChangelog() {
+  await fs.mkdir(path.join(rootDir, outputDir), { recursive: true })
+  await fs.copyFile(changelog, path.join(rootDir, outputDir, "changelog.md"))
+}
 
 const getBase = (): Configuration => ({
   artifactName: "opencode-electron-${os}-${arch}.${ext}",
   directories: {
     output: outputDir,
     buildResources: "resources",
+  },
+  artifactBuildCompleted: async () => {
+    await copyChangelog()
   },
   files: ["out/**/*", "resources/**/*"],
   extraResources: [

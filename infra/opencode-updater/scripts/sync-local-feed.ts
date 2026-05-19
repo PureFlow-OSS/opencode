@@ -21,4 +21,6 @@ await Bun.write(
   await Bun.file(`${sourceDir}/opencode-electron-win-x64.exe.blockmap`).arrayBuffer(),
 )
 
+await Bun.write(`${targetDir}/changelog.md`, await Bun.file(`${sourceDir}/changelog.md`).text())
+
 console.log(`local feed synced to ${targetDir} with version ${version}`)

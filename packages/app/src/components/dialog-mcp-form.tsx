@@ -6,10 +6,12 @@ import { Switch } from "@opencode-ai/ui/switch"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { showToast } from "@opencode-ai/ui/toast"
 import { useMutation } from "@tanstack/solid-query"
+import { useParams } from "@solidjs/router"
 import { batch, For, Show } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
+import { decode64 } from "@/utils/base64"
 import type { McpLocalConfig, McpRemoteConfig } from "@opencode-ai/sdk/v2/client"
 
 type McpConfig = McpLocalConfig | McpRemoteConfig
@@ -65,6 +67,8 @@ export function DialogMcpForm(props: Props) {
   const dialog = useDialog()
   const globalSync = useGlobalSync()
   const language = useLanguage()
+  const params = useParams()
+  const dir = () => decode64(params.dir) ?? globalSync.data.path.directory ?? ""
 
   const isEditing = () => !!props.name
 
@@ -163,6 +167,18 @@ export function DialogMcpForm(props: Props) {
       const name = form.name.trim()
       const existing = { ...(globalSync.data.config.mcp ?? {}) }
       existing[name] = config
+      if (dir()) {
+        const [store, setStore] = globalSync.child(dir(), { bootstrap: false })
+        setStore("mcp_ready", true)
+        setStore(
+          "mcp",
+          name,
+          store.mcp[name] ??
+            ({
+              status: config.enabled === false ? "disabled" : "disabled",
+            } as (typeof store.mcp)[string]),
+        )
+      }
       await globalSync.updateConfig({ mcp: existing })
       return name
     },
@@ -196,7 +212,7 @@ export function DialogMcpForm(props: Props) {
 
   return (
     <Dialog
-      size="large"
+      size="x-large"
       fit={form.type === "local"}
       class={form.type === "local" ? "[&_[data-slot=dialog-body]]:overflow-visible" : undefined}
       title={
