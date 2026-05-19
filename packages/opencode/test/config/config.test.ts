@@ -329,6 +329,60 @@ it.effect("creates global jsonc config with schema when no global configs exist"
   ),
 )
 
+it.effect("updates global config and removes deleted mcp servers from sibling files", () =>
+  withGlobalConfig({ config: { mcp: { azure: { type: "remote", url: "https://example.com/azure", enabled: true } } } }, ({ dir }) =>
+    Effect.gen(function* () {
+      yield* FSUtil.use.writeWithDirs(
+        path.join(dir, "config.json"),
+        JSON.stringify({
+          $schema: "https://opencode.ai/config.json",
+          mcp: {
+            azure: {
+              type: "remote",
+              url: "https://example.com/azure",
+              enabled: true,
+            },
+            excel: {
+              type: "remote",
+              url: "https://example.com/excel",
+              enabled: true,
+            },
+          },
+        }),
+      )
+
+      const next = yield* Config.use.updateGlobal({
+        mcp: {
+          azure: {
+            type: "remote",
+            url: "https://example.com/azure",
+            enabled: true,
+          },
+        },
+      })
+
+      expect(next.mcp).toEqual({
+        azure: {
+          type: "remote",
+          url: "https://example.com/azure",
+          enabled: true,
+        },
+      })
+      const written = yield* FSUtil.use.readJson(path.join(dir, "opencode.json"))
+      expect(written).toMatchObject({
+        $schema: "https://opencode.ai/config.json",
+        mcp: {
+          azure: {
+            type: "remote",
+            url: "https://example.com/azure",
+            enabled: true,
+          },
+        },
+      })
+    }),
+  ),
+)
+
 it.effect("does not create global config when OPENCODE_CONFIG_DIR is set", () =>
   Effect.gen(function* () {
     const custom = yield* tmpdirScoped()

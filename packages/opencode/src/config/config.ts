@@ -159,7 +159,19 @@ function patchJsonc(input: string, patch: unknown, path: string[] = []): string 
     return applyEdits(input, edits)
   }
 
-  return Object.entries(patch).reduce((result, [key, value]) => patchJsonc(result, value, [...path, key]), input)
+  return Object.entries(patch).reduce((result, [key, value]) => {
+    // Replace MCP block as whole object so removed server keys are actually deleted.
+    if (path.length === 0 && key === "mcp") {
+      const edits = modify(result, [key], value, {
+        formattingOptions: {
+          insertSpaces: true,
+          tabSize: 2,
+        },
+      })
+      return applyEdits(result, edits)
+    }
+    return patchJsonc(result, value, [...path, key])
+  }, input)
 }
 
 function writable(info: Info) {
