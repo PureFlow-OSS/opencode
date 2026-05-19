@@ -324,7 +324,19 @@ function patchJsonc(input: string, patch: unknown, path: string[] = []): string 
     return applyEdits(input, edits)
   }
 
-  return Object.entries(patch).reduce((result, [key, value]) => patchJsonc(result, value, [...path, key]), input)
+  return Object.entries(patch).reduce((result, [key, value]) => {
+    // Replace MCP block as whole object so removed server keys are actually deleted.
+    if (path.length === 0 && key === "mcp") {
+      const edits = modify(result, [key], value, {
+        formattingOptions: {
+          insertSpaces: true,
+          tabSize: 2,
+        },
+      })
+      return applyEdits(result, edits)
+    }
+    return patchJsonc(result, value, [...path, key])
+  }, input)
 }
 
 function writable(info: Info) {
@@ -849,13 +861,7 @@ export const layer = Layer.effect(
       const before = (yield* readConfigFile(file)) ?? "{}"
       const patch = writableGlobal(config)
 
-      const updated = file.endsWith(".jsonc")
-        ? patchJsonc(before, patch)
-        : JSON.stringify(
-            mergeDeep(writable(ConfigParse.effectSchema(Info, ConfigParse.jsonc(before, file), file)), patch),
-            null,
-            2,
-          )
+      const updated = patchJsonc(before, patch)
       const managedPatch = managedHttpProxyPatch(
         ConfigParse.effectSchema(Info, ConfigParse.jsonc(updated, file), file),
         ConfigParse.jsonc(updated, file),
