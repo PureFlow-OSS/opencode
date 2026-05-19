@@ -1,3 +1,21 @@
+# v1.14.36
+
+## Added
+
+- Added MCP URL validation so remote servers must use `http://` or `https://`.
+
+## Improved
+
+- MCP settings dialogs are now larger and better sized for editing more complex server setups.
+- MCP updates now sync more consistently between Settings and the status popover, including faster local UI refreshes after changes.
+- Desktop build packaging now includes the changelog file more reliably.
+
+## Fixed
+
+- Fixed MCP server deletion so removed entries stay deleted from global config files instead of reappearing from lower-priority config sources.
+- Fixed stale MCP state races after config changes by waiting for instance invalidation before follow-up reloads.
+- Fixed MCP status lists so failed or deleted entries do not linger in the status popover.
+
 # v1.14.35
 
 ## Added
