@@ -15,6 +15,7 @@ import { useSDK } from "@/context/sdk"
 import { normalizeServerUrl, ServerConnection, useServer } from "@/context/server"
 import { useSync } from "@/context/sync"
 import { useCheckServerHealth, type ServerHealth } from "@/utils/server-health"
+import { isMcpNameHidden } from "./mcp-ui-state"
 
 const pollMs = 10_000
 
@@ -182,7 +183,7 @@ export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
   createEffect(() => {
     if (!props.shown()) return
 
-    if (!sync.data.mcp_ready && !load.mcpDone && !load.mcpLoading) {
+    if (!load.mcpLoading) {
       setLoad("mcpLoading", true)
       void sdk.client.mcp
         .status()
@@ -234,7 +235,11 @@ export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
   const sortedServers = createMemo(() => listServersByHealth(servers(), server.key, health))
   const toggleMcp = useMcpToggleMutation()
   const defaultServer = useDefaultServerKey(platform.getDefaultServer)
-  const mcpNames = createMemo(() => Object.keys(sync.data.mcp ?? {}).sort((a, b) => a.localeCompare(b)))
+  const mcpNames = createMemo(() =>
+    Object.keys(sync.data.mcp ?? {})
+      .filter((name) => !isMcpNameHidden(name))
+      .sort((a, b) => a.localeCompare(b)),
+  )
   const mcpStatus = (name: string) => sync.data.mcp?.[name]?.status
   const mcpConnected = createMemo(() => mcpNames().filter((name) => mcpStatus(name) === "connected").length)
   const lspItems = createMemo(() => sync.data.lsp ?? [])

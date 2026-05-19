@@ -11,6 +11,8 @@ import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
 import { decode64 } from "@/utils/base64"
+import { formatServerError } from "@/utils/server-errors"
+import { hideMcpName, showMcpName } from "./mcp-ui-state"
 import { DialogMcpForm } from "./dialog-mcp-form"
 import { SettingsList } from "./settings-list"
 import type { McpLocalConfig, McpRemoteConfig } from "@opencode-ai/sdk/v2/client"
@@ -158,6 +160,7 @@ export const SettingsMcp: Component = () => {
 
   const saveManagedPat = async (server: Extract<ServerItem, { source: "managed" }>, token: string) => {
     if (server.managed.config.type !== "remote") return
+    showMcpName(server.name)
     const header = server.managed.auth?.header ?? "Authorization"
     const prefix = server.managed.auth?.prefix ?? ""
     const existing = { ...(globalSync.data.config.mcp ?? {}) }
@@ -214,6 +217,7 @@ export const SettingsMcp: Component = () => {
     const existing = { ...(globalSync.data.config.mcp ?? {}) }
     delete existing[name]
     setDeleting(name, true)
+    hideMcpName(name)
     if (dir()) {
       const [, setStore] = globalSync.child(dir(), { bootstrap: false })
       setStore("mcp", (current) => {
@@ -243,9 +247,10 @@ export const SettingsMcp: Component = () => {
       })
       .catch((err: unknown) => {
         setDeleting(name, false)
+        showMcpName(name)
         showToast({
           title: language.t("common.requestFailed"),
-          description: err instanceof Error ? err.message : String(err),
+          description: formatServerError(err, language.t, language.t("common.requestFailed")),
         })
       })
   }

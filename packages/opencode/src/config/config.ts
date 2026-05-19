@@ -883,7 +883,8 @@ export const layer = Layer.effect(
         }
       }
 
-      if (changed) yield* invalidate()
+      // Wait for instances to dispose before returning so follow-up reloads don't race stale MCP state.
+      if (changed) yield* invalidate(true)
       return next
     })
 

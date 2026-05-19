@@ -12,6 +12,8 @@ import { createStore, produce } from "solid-js/store"
 import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
 import { decode64 } from "@/utils/base64"
+import { formatServerError } from "@/utils/server-errors"
+import { showMcpName } from "./mcp-ui-state"
 import type { McpLocalConfig, McpRemoteConfig } from "@opencode-ai/sdk/v2/client"
 
 type McpConfig = McpLocalConfig | McpRemoteConfig
@@ -33,6 +35,15 @@ function headersToRecord(rows: HeaderRow[]): Record<string, string> | undefined 
     if (row.key.trim()) result[row.key.trim()] = row.value
   }
   return Object.keys(result).length ? result : undefined
+}
+
+function isValidRemoteUrl(value: string) {
+  try {
+    const url = new URL(value)
+    return url.protocol === "http:" || url.protocol === "https:"
+  } catch {
+    return false
+  }
 }
 
 type OAuthState = {
@@ -135,6 +146,8 @@ export function DialogMcpForm(props: Props) {
 
     if (form.type === "remote" && !form.url.trim())
       errs.url = language.t("settings.mcp.form.validation.urlRequired")
+    if (form.type === "remote" && form.url.trim() && !isValidRemoteUrl(form.url.trim()))
+      errs.url = "URL must start with http:// or https://"
 
     setForm("err", errs)
     if (Object.keys(errs).length) return null
@@ -167,6 +180,7 @@ export function DialogMcpForm(props: Props) {
       const name = form.name.trim()
       const existing = { ...(globalSync.data.config.mcp ?? {}) }
       existing[name] = config
+      showMcpName(name)
       if (dir()) {
         const [store, setStore] = globalSync.child(dir(), { bootstrap: false })
         setStore("mcp_ready", true)
@@ -197,7 +211,7 @@ export function DialogMcpForm(props: Props) {
     onError: (err: unknown) => {
       showToast({
         title: language.t("common.requestFailed"),
-        description: err instanceof Error ? err.message : String(err),
+        description: formatServerError(err, language.t, language.t("common.requestFailed")),
       })
     },
   }))
