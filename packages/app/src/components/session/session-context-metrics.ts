@@ -47,7 +47,6 @@ const lastAssistantWithTokens = (messages: Message[]) => {
   }
 }
 
-const build = (messages: Message[] = [], providers: Provider[] = []): Metrics => {
 const build = (
   messages: Message[] = [],
   providers: Provider[] = [],
