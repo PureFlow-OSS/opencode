@@ -19,6 +19,7 @@ export const commands = {
 	wslPath: (path: string, mode: "windows" | "linux" | null) => __TAURI_INVOKE<string>("wsl_path", { path, mode }),
 	resolveAppPath: (appName: string) => __TAURI_INVOKE<string | null>("resolve_app_path", { appName }),
 	openPath: (path: string, appName: string | null) => __TAURI_INVOKE<null>("open_path", { path, appName }),
+	openToolLink: (url: string) => __TAURI_INVOKE<ToolLinkResult>("open_tool_link", { url }),
 };
 
 /** Events */
@@ -42,6 +43,8 @@ export type ServerReadyData = {
 
 export type SqliteMigrationProgress = { type: "InProgress"; value: number } | { type: "Done" };
 
+export type ToolLinkResult = { kind: "external" } | { kind: "downloaded"; path: string; file_name: string };
+
 export type WslConfig = {
 		enabled: boolean,
 	};
@@ -64,4 +67,3 @@ function makeEvent<T>(name: string) {
 
     return Object.assign(fn, base);
 }
-

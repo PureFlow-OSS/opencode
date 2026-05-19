@@ -7,6 +7,12 @@ export const dict = {
   "desktop.dialog.chooseFolder": "Ordner auswählen",
   "desktop.dialog.chooseFile": "Datei auswählen",
   "desktop.dialog.saveFile": "Datei speichern",
+  "desktop.download.open.title": "Download abgeschlossen",
+  "desktop.download.open.prompt": "{{file}} wurde heruntergeladen. Möchten Sie die Datei jetzt öffnen?",
+  "desktop.download.saved.title": "Download gespeichert",
+  "desktop.download.saved.message": "{{file}} wurde gespeichert unter:\n{{path}}",
+  "desktop.download.open.failed.title": "Öffnen fehlgeschlagen",
+  "desktop.download.open.failed.message": "{{file}} konnte nicht geöffnet werden",
 
   "desktop.updater.checkFailed.title": "Updateprüfung fehlgeschlagen",
   "desktop.updater.checkFailed.message": "Updates konnten nicht geprüft werden",

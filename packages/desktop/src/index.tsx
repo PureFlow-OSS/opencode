@@ -18,7 +18,7 @@ import type { AsyncStorage } from "@solid-primitives/storage"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { readImage } from "@tauri-apps/plugin-clipboard-manager"
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link"
-import { open, save } from "@tauri-apps/plugin-dialog"
+import { ask, message, open, save } from "@tauri-apps/plugin-dialog"
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http"
 import { isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification"
 import { type as ostype } from "@tauri-apps/plugin-os"
@@ -48,6 +48,11 @@ void initI18n()
 let update: Update | null = null
 
 const deepLinkEvent = "opencode:deep-link"
+const toolLinkSelector = [
+  '[data-component="tool-output"] a[href]',
+  '[data-component="exa-tool-output"] a[href]',
+].join(", ")
+const mcpDownloadPath = /\/[^?#]*download[^?#]*/i
 
 const emitDeepLinks = (urls: string[]) => {
   if (urls.length === 0) return
@@ -55,6 +60,42 @@ const emitDeepLinks = (urls: string[]) => {
   const pending = window.__OPENCODE__.deepLinks ?? []
   window.__OPENCODE__.deepLinks = [...pending, ...urls]
   window.dispatchEvent(new CustomEvent(deepLinkEvent, { detail: { urls } }))
+}
+
+const openDownloadedToolLink = async (url: string) => {
+  const result = await commands.openToolLink(url).catch(() => null)
+  if (!result || result.kind === "external") {
+    await shellOpen(url).catch(() => undefined)
+    return
+  }
+
+  const shouldOpen = await ask(t("desktop.download.open.prompt", { file: result.file_name }), {
+    title: t("desktop.download.open.title"),
+    kind: "info",
+  }).catch(() => false)
+  if (!shouldOpen) {
+    await message(t("desktop.download.saved.message", { file: result.file_name, path: result.path }), {
+      title: t("desktop.download.saved.title"),
+      kind: "info",
+    }).catch(() => undefined)
+    return
+  }
+
+  await commands.openPath(result.path, null).catch(async () => {
+    await message(t("desktop.download.open.failed.message", { file: result.file_name }), {
+      title: t("desktop.download.open.failed.title"),
+      kind: "error",
+    }).catch(() => undefined)
+  })
+}
+
+const isMcpDownloadLink = (href: string) => {
+  try {
+    const url = new URL(href)
+    return mcpDownloadPath.test(url.pathname)
+  } catch {
+    return false
+  }
 }
 
 const listenForDeepLinks = async () => {
@@ -466,11 +507,25 @@ render(() => {
     return [server] as ServerConnection.Any[]
   }
 
-  function handleClick(e: MouseEvent) {
-    const link = (e.target as HTMLElement).closest("a.external-link") as HTMLAnchorElement | null
-    if (link?.href) {
-      e.preventDefault()
-      platform.openLink(link.href)
+  function handleClick(event: MouseEvent) {
+    const target = event.target
+    if (!(target instanceof HTMLElement)) return
+
+    const toolLink = target.closest(toolLinkSelector) as HTMLAnchorElement | null
+    if (toolLink?.href) {
+      event.preventDefault()
+      if (isMcpDownloadLink(toolLink.href)) {
+        void openDownloadedToolLink(toolLink.href)
+        return
+      }
+      platform.openLink(toolLink.href)
+      return
+    }
+
+    const externalLink = target.closest("a.external-link") as HTMLAnchorElement | null
+    if (externalLink?.href) {
+      event.preventDefault()
+      platform.openLink(externalLink.href)
     }
   }
 

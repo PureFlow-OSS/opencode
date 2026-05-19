@@ -5,6 +5,7 @@ import { Button } from "@opencode-ai/ui/button"
 
 import { useFile } from "@/context/file"
 import { useLayout } from "@/context/layout"
+import { useLocal } from "@/context/local"
 import { useSync } from "@/context/sync"
 import { useLanguage } from "@/context/language"
 import { useProviders } from "@/hooks/use-providers"
@@ -30,6 +31,7 @@ function openSessionContext(args: {
 
 export function SessionContextUsage(props: SessionContextUsageProps) {
   const sync = useSync()
+  const local = useLocal()
   const file = useFile()
   const layout = useLayout()
   const language = useLanguage()
@@ -52,7 +54,19 @@ export function SessionContextUsage(props: SessionContextUsageProps) {
       }),
   )
 
-  const metrics = createMemo(() => getSessionContextMetrics(messages(), providers.all()))
+  const metrics = createMemo(() => {
+    const model = local.model.current()
+    return getSessionContextMetrics(
+      messages(),
+      providers.all(),
+      model
+        ? {
+            providerID: model.provider.id,
+            modelID: model.id,
+          }
+        : undefined,
+    )
+  })
   const context = createMemo(() => metrics().context)
   const cost = createMemo(() => {
     return usd().format(metrics().totalCost)

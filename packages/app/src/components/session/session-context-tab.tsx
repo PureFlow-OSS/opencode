@@ -1,6 +1,7 @@
 import { createMemo, createEffect, on, onCleanup, For, Show } from "solid-js"
 import type { JSX } from "solid-js"
 import { useSync } from "@/context/sync"
+import { useLocal } from "@/context/local"
 import { checksum } from "@opencode-ai/core/util/encode"
 import { findLast } from "@opencode-ai/core/util/array"
 import { same } from "@/utils/same"
@@ -92,6 +93,7 @@ const emptyUserMessages: UserMessage[] = []
 
 export function SessionContextTab() {
   const sync = useSync()
+  const local = useLocal()
   const language = useLanguage()
   const providers = useProviders()
   const { params, view } = useSessionLayout()
@@ -132,7 +134,19 @@ export function SessionContextTab() {
       }),
   )
 
-  const metrics = createMemo(() => getSessionContextMetrics(messages(), providers.all()))
+  const metrics = createMemo(() => {
+    const model = local.model.current()
+    return getSessionContextMetrics(
+      messages(),
+      providers.all(),
+      model
+        ? {
+            providerID: model.provider.id,
+            modelID: model.id,
+          }
+        : undefined,
+    )
+  })
   const ctx = createMemo(() => metrics().context)
   const formatter = createMemo(() => createSessionContextFormatter(language.intl()))
 

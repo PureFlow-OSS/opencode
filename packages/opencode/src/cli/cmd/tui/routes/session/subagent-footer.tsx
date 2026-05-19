@@ -1,5 +1,6 @@
 import { createMemo, createSignal, Show } from "solid-js"
 import { useRouteData } from "@tui/context/route"
+import { useLocal } from "@tui/context/local"
 import { useSync } from "@tui/context/sync"
 import { useTheme } from "@tui/context/theme"
 import { SplitBorder } from "@tui/component/border"
@@ -11,6 +12,7 @@ import { useTerminalDimensions } from "@opentui/solid"
 
 export function SubagentFooter() {
   const route = useRouteData("session")
+  const local = useLocal()
   const sync = useSync()
   const messages = createMemo(() => sync.data.message[route.sessionID] ?? [])
   const session = createMemo(() => sync.session.get(route.sessionID))
@@ -40,7 +42,10 @@ export function SubagentFooter() {
       last.tokens.input + last.tokens.output + last.tokens.reasoning + last.tokens.cache.read + last.tokens.cache.write
     if (tokens <= 0) return
 
-    const model = sync.data.provider.find((item) => item.id === last.providerID)?.models[last.modelID]
+    const current = local.model.current()
+    const model = current
+      ? sync.data.provider.find((item) => item.id === current.providerID)?.models[current.modelID]
+      : sync.data.provider.find((item) => item.id === last.providerID)?.models[last.modelID]
     const pct = model?.limit.context ? `${Math.round((tokens / model.limit.context) * 100)}%` : undefined
     const cost = msg.reduce((sum, item) => sum + (item.role === "assistant" ? item.cost : 0), 0)
 

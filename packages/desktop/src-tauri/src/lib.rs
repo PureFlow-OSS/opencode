@@ -22,7 +22,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tauri::{AppHandle, Listener, Manager, RunEvent, State, ipc::Channel};
+use tauri::{AppHandle, Listener, Manager, RunEvent, State, ipc::Channel, path::BaseDirectory};
 #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_specta::Event;
@@ -55,6 +55,13 @@ enum InitStep {
 enum WslPathMode {
     Windows,
     Linux,
+}
+
+#[derive(Clone, serde::Serialize, specta::Type, Debug)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum ToolLinkResult {
+    External,
+    Downloaded { path: String, file_name: String },
 }
 
 struct InitState {
@@ -190,6 +197,183 @@ fn open_path(_app: AppHandle, path: String, app_name: Option<String>) -> Result<
     #[cfg(not(target_os = "windows"))]
     tauri_plugin_opener::open_path(path, app_name.as_deref())
         .map_err(|e| format!("Failed to open path: {e}"))
+}
+
+fn percent_decode(input: &str) -> Option<String> {
+    let bytes = input.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' {
+            if index + 2 >= bytes.len() {
+                return None;
+            }
+            let hex = std::str::from_utf8(&bytes[index + 1..index + 3]).ok()?;
+            out.push(u8::from_str_radix(hex, 16).ok()?);
+            index += 3;
+            continue;
+        }
+        out.push(bytes[index]);
+        index += 1;
+    }
+    String::from_utf8(out).ok()
+}
+
+fn sanitize_file_name(input: &str) -> Option<String> {
+    let cleaned = input
+        .trim()
+        .trim_matches('"')
+        .chars()
+        .map(|char| match char {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            control if control.is_control() => '_',
+            value => value,
+        })
+        .collect::<String>()
+        .trim()
+        .trim_matches('.')
+        .to_string();
+
+    if cleaned.is_empty() {
+        return None;
+    }
+
+    Some(cleaned)
+}
+
+fn file_name_from_content_disposition(value: &str) -> Option<String> {
+    for part in value.split(';').map(str::trim) {
+        if let Some(raw) = part.strip_prefix("filename*=") {
+            let decoded = raw
+                .trim_matches('"')
+                .split("''")
+                .last()
+                .and_then(percent_decode);
+            if let Some(name) = decoded.and_then(|name| sanitize_file_name(&name)) {
+                return Some(name);
+            }
+        }
+    }
+
+    for part in value.split(';').map(str::trim) {
+        if let Some(raw) = part.strip_prefix("filename=") {
+            if let Some(name) = sanitize_file_name(raw) {
+                return Some(name);
+            }
+        }
+    }
+
+    None
+}
+
+fn file_name_from_url(url: &reqwest::Url) -> Option<String> {
+    url.path_segments()
+        .and_then(|mut segments| segments.next_back())
+        .and_then(sanitize_file_name)
+}
+
+fn inferred_extension(content_type: &str) -> &'static str {
+    let mime = content_type.split(';').next().unwrap_or("").trim().to_ascii_lowercase();
+    match mime.as_str() {
+        "application/pdf" => ".pdf",
+        "application/json" => ".json",
+        "application/zip" => ".zip",
+        "application/gzip" => ".gz",
+        "application/x-tar" => ".tar",
+        "image/png" => ".png",
+        "image/jpeg" => ".jpg",
+        "image/webp" => ".webp",
+        "image/gif" => ".gif",
+        "text/plain" => ".txt",
+        "text/csv" => ".csv",
+        "text/markdown" => ".md",
+        _ => "",
+    }
+}
+
+fn unique_download_path(path: PathBuf) -> PathBuf {
+    if !path.exists() {
+        return path;
+    }
+
+    let stem = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("download");
+    let ext = path.extension().and_then(|value| value.to_str()).unwrap_or("");
+
+    for index in 1.. {
+        let candidate = if ext.is_empty() {
+            path.with_file_name(format!("{stem} ({index})"))
+        } else {
+            path.with_file_name(format!("{stem} ({index}).{ext}"))
+        };
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+
+    path
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn open_tool_link(app: AppHandle, url: String) -> Result<ToolLinkResult, String> {
+    let url = reqwest::Url::parse(&url).map_err(|e| format!("Invalid URL: {e}"))?;
+    if !matches!(url.scheme(), "http" | "https") {
+        return Ok(ToolLinkResult::External);
+    }
+
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::limited(10))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {e}"))?;
+    let response = client
+        .get(url.clone())
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch URL: {e}"))?
+        .error_for_status()
+        .map_err(|e| format!("Download failed: {e}"))?;
+
+    let headers = response.headers().clone();
+    let content_type = headers
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("");
+    let from_header = headers
+        .get(reqwest::header::CONTENT_DISPOSITION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(file_name_from_content_disposition);
+    let from_url = file_name_from_url(&url);
+
+    if from_header.is_none() && from_url.is_none() && content_type.starts_with("text/html") {
+        return Ok(ToolLinkResult::External);
+    }
+
+    let file_name = from_header
+        .or(from_url)
+        .unwrap_or_else(|| format!("download{}", inferred_extension(content_type)));
+    let downloads_dir = app
+        .path()
+        .resolve("downloads", BaseDirectory::AppLocalData)
+        .map_err(|e| format!("Failed to resolve downloads directory: {e}"))?;
+    std::fs::create_dir_all(&downloads_dir)
+        .map_err(|e| format!("Failed to create downloads directory: {e}"))?;
+
+    let path = unique_download_path(downloads_dir.join(&file_name));
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read download: {e}"))?;
+    tokio::fs::write(&path, &bytes)
+        .await
+        .map_err(|e| format!("Failed to save download: {e}"))?;
+
+    Ok(ToolLinkResult::Downloaded {
+        path: path.to_string_lossy().to_string(),
+        file_name,
+    })
 }
 
 #[cfg(target_os = "macos")]
@@ -387,7 +571,8 @@ fn make_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             check_app_exists,
             wsl_path,
             resolve_app_path,
-            open_path
+            open_path,
+            open_tool_link
         ])
         .events(tauri_specta::collect_events![
             LoadingWindowComplete,

@@ -25,6 +25,12 @@ export const dict = {
   "desktop.dialog.chooseFolder": "Choose a folder",
   "desktop.dialog.chooseFile": "Choose a file",
   "desktop.dialog.saveFile": "Save file",
+  "desktop.download.open.title": "Download Complete",
+  "desktop.download.open.prompt": "{{file}} was downloaded. Would you like to open it?",
+  "desktop.download.saved.title": "Download Saved",
+  "desktop.download.saved.message": "{{file}} was saved to:\n{{path}}",
+  "desktop.download.open.failed.title": "Open Failed",
+  "desktop.download.open.failed.message": "Failed to open {{file}}",
 
   "desktop.updater.checkFailed.title": "Update Check Failed",
   "desktop.updater.checkFailed.message": "Failed to check for updates",

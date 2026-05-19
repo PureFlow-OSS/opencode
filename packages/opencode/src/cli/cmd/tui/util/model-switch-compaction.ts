@@ -2,6 +2,7 @@ import type { AssistantMessage, Message, Provider } from "@opencode-ai/sdk/v2"
 
 const COMPACTION_HEADROOM = 20_000
 const COMPACTION_USAGE_THRESHOLD = 0.9
+const UNKNOWN_LIMIT_THRESHOLD = 50_000
 
 function tokenTotal(message: AssistantMessage) {
   return (
@@ -35,7 +36,8 @@ export function shouldCompactOnModelSwitch(input: {
   const model = provider?.models[input.model.modelID]
   const limit = model?.limit.context
   const total = tokenTotal(last)
-  if (!limit || total <= 0) return { shouldCompact: false, total, limit }
+  if (total <= 0) return { shouldCompact: false, total, limit }
+  if (!limit) return { shouldCompact: total >= UNKNOWN_LIMIT_THRESHOLD, total, limit }
 
   const threshold = Math.max(Math.floor(limit * COMPACTION_USAGE_THRESHOLD), limit - COMPACTION_HEADROOM)
   return {

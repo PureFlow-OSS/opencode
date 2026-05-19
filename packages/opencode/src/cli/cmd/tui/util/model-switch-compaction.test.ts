@@ -58,4 +58,25 @@ describe("shouldCompactOnModelSwitch", () => {
 
     expect(result.shouldCompact).toBe(false)
   })
+
+  test("falls back to conservative compaction when target limit is unknown", () => {
+    const result = shouldCompactOnModelSwitch({
+      messages: [assistant(72_000)] as Message[],
+      providers: [
+        {
+          id: "openai",
+          models: {
+            "gpt-4.1": {
+              id: "gpt-4.1",
+              providerID: "openai",
+              limit: { context: 0 },
+            },
+          },
+        },
+      ] as unknown as Provider[],
+      model: { providerID: "openai", modelID: "gpt-4.1" },
+    })
+
+    expect(result.shouldCompact).toBe(true)
+  })
 })

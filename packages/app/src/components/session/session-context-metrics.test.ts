@@ -79,6 +79,35 @@ describe("getSessionContextMetrics", () => {
     expect(metrics.context?.usage).toBeNull()
   })
 
+  test("uses the currently selected model for limit and labels", () => {
+    const messages = [assistant("a1", { input: 300, output: 100, reasoning: 50, read: 25, write: 25 }, 1.25)]
+    const providers = [
+      {
+        id: "openai",
+        name: "OpenAI",
+        models: {
+          "gpt-4.1": {
+            name: "GPT-4.1",
+            limit: { context: 200000 },
+          },
+          "mistral-small": {
+            name: "Mistral Small",
+            limit: { context: 1000 },
+          },
+        },
+      },
+    ]
+
+    const metrics = getSessionContextMetrics(messages, providers, { providerID: "openai", modelID: "mistral-small" })
+
+    expect(metrics.context?.message.id).toBe("a1")
+    expect(metrics.context?.total).toBe(500)
+    expect(metrics.context?.usage).toBe(50)
+    expect(metrics.context?.providerLabel).toBe("OpenAI")
+    expect(metrics.context?.modelLabel).toBe("Mistral Small")
+    expect(metrics.context?.limit).toBe(1000)
+  })
+
   test("recomputes when message array is mutated in place", () => {
     const messages = [assistant("a1", { input: 10, output: 10, reasoning: 10, read: 10, write: 10 }, 0.25)]
     const providers = [{ id: "openai", models: {} }]
