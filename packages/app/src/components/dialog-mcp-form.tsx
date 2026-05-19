@@ -196,6 +196,9 @@ export function DialogMcpForm(props: Props) {
 
   return (
     <Dialog
+      size="large"
+      fit={form.type === "local"}
+      class={form.type === "local" ? "[&_[data-slot=dialog-body]]:overflow-visible" : undefined}
       title={
         <IconButton
           tabIndex={-1}
@@ -207,7 +210,13 @@ export function DialogMcpForm(props: Props) {
       }
       transition
     >
-      <div class="flex flex-col gap-6 px-2.5 pb-3 overflow-y-auto max-h-[70vh]">
+      <div
+        class={
+          form.type === "local"
+            ? "flex flex-col gap-6 px-2.5 pb-3"
+            : "flex flex-col gap-6 px-2.5 pb-3 overflow-y-auto max-h-[70vh]"
+        }
+      >
         <div class="px-2.5 text-16-medium text-text-strong">
           {language.t(isEditing() ? "settings.mcp.form.title.edit" : "settings.mcp.form.title.add")}
         </div>

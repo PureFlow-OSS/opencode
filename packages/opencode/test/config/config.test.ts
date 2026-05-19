@@ -204,6 +204,78 @@ test("updateGlobal replaces mcp block so removed servers stay deleted", async ()
   }
 })
 
+test("updateGlobal clears mcp entries from lower-priority global config files", async () => {
+  await using globalTmp = await tmpdir()
+  const prev = Global.Path.config
+  ;(Global.Path as { config: string }).config = globalTmp.path
+  await clear(true)
+
+  try {
+    await writeConfig(
+      globalTmp.path,
+      {
+        $schema: "https://opencode.ai/config.json",
+        mcp: {
+          excel: {
+            type: "remote",
+            url: "https://example.com/excel",
+            enabled: true,
+          },
+        },
+      },
+      "config.json",
+    )
+    await writeConfig(
+      globalTmp.path,
+      {
+        $schema: "https://opencode.ai/config.json",
+        mcp: {
+          azure: {
+            type: "remote",
+            url: "https://example.com/azure",
+            enabled: true,
+          },
+        },
+      },
+      "opencode.json",
+    )
+
+    const next = await saveGlobal({
+      mcp: {
+        azure: {
+          type: "remote",
+          url: "https://example.com/azure",
+          enabled: true,
+        },
+      },
+    })
+
+    expect(next.mcp).toEqual({
+      azure: {
+        type: "remote",
+        url: "https://example.com/azure",
+        enabled: true,
+      },
+    })
+    expect(await Bun.file(path.join(globalTmp.path, "config.json")).json()).toMatchObject({
+      $schema: "https://opencode.ai/config.json",
+    })
+    expect(await Bun.file(path.join(globalTmp.path, "opencode.json")).json()).toMatchObject({
+      $schema: "https://opencode.ai/config.json",
+      mcp: {
+        azure: {
+          type: "remote",
+          url: "https://example.com/azure",
+          enabled: true,
+        },
+      },
+    })
+  } finally {
+    ;(Global.Path as { config: string }).config = prev
+    await clear(true)
+  }
+})
+
 test("loads shell config field", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {

@@ -98,6 +98,7 @@ export const SettingsMcp: Component = () => {
   )
   const managed = createMemo(() => managedData.latest ?? {})
   const prompted = new Set<string>()
+  const [deleting, setDeleting] = createStore<Record<string, boolean>>({})
 
   const servers = createMemo<ServerItem[]>(() => {
     const items: ServerItem[] = []
@@ -108,6 +109,7 @@ export const SettingsMcp: Component = () => {
       ]),
     )
     for (const name of names) {
+      if (deleting[name]) continue
       const local = globalSync.data.config.mcp?.[name]
       const managedServer = managed()[name]
       if (managedServer) {
@@ -198,8 +200,10 @@ export const SettingsMcp: Component = () => {
   })
 
   const deleteServer = async (name: string) => {
+    if (deleting[name]) return
     const existing = { ...(globalSync.data.config.mcp ?? {}) }
     delete existing[name]
+    setDeleting(name, true)
     await globalSync
       .updateConfig({ mcp: existing })
       .then(() => {
@@ -211,6 +215,7 @@ export const SettingsMcp: Component = () => {
         })
       })
       .catch((err: unknown) => {
+        setDeleting(name, false)
         showToast({
           title: language.t("common.requestFailed"),
           description: err instanceof Error ? err.message : String(err),
@@ -231,7 +236,7 @@ export const SettingsMcp: Component = () => {
   return (
     <div class="flex flex-col h-full overflow-y-auto no-scrollbar px-4 pb-10 sm:px-10 sm:pb-10">
       <div class="sticky top-0 z-10 bg-[linear-gradient(to_bottom,var(--surface-stronger-non-alpha)_calc(100%_-_24px),transparent)]">
-        <div class="flex items-center justify-between pt-6 pb-8 max-w-[720px]">
+        <div class="flex items-center justify-between pt-6 pb-8 w-full">
           <h2 class="text-16-medium text-text-strong">{language.t("settings.mcp.title")}</h2>
           <Button
             size="large"
@@ -244,7 +249,7 @@ export const SettingsMcp: Component = () => {
         </div>
       </div>
 
-      <div class="flex flex-col gap-8 max-w-[720px]">
+      <div class="flex flex-col gap-8 w-full">
         <SettingsList>
           <Show
             when={servers().length > 0}
@@ -300,6 +305,7 @@ export const SettingsMcp: Component = () => {
                       <Button
                         size="large"
                         variant="ghost"
+                        disabled={deleting[item.name]}
                         onClick={() =>
                           showMcpForm({
                             name: item.name,
@@ -309,7 +315,12 @@ export const SettingsMcp: Component = () => {
                       >
                         {language.t("common.edit")}
                       </Button>
-                      <Button size="large" variant="ghost" onClick={() => void deleteServer(item.name)}>
+                      <Button
+                        size="large"
+                        variant="ghost"
+                        disabled={deleting[item.name]}
+                        onClick={() => void deleteServer(item.name)}
+                      >
                         {language.t("common.delete")}
                       </Button>
                     </div>
