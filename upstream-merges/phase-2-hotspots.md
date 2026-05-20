@@ -135,3 +135,18 @@
   - adapted the safe local subset: imported sessions now always overwrite `projectID` and `directory` with the current instance context
   - also update `directory` on conflict for re-imports of the same session id
   - upstream `path` handling was intentionally not ported because the local fork removed the session `path` column and no longer stores it in `Session.Info`
+
+### `e94d46af8` resolve agent and command names from relative paths
+
+- Status: `done`
+- Upstream files:
+  - `packages/opencode/src/config/agent.ts`
+  - `packages/opencode/src/config/command.ts`
+  - `packages/opencode/src/config/entry-name.ts`
+  - `packages/opencode/test/config/entry-name.test.ts`
+- Risk:
+  - config entries mis-keyed when parent path segments contain `agent`, `agents`, `command`, or `commands`
+  - wrong agent/command names loaded from nested config directories
+- Notes:
+  - adapted upstream relative-path approach and anchored prefix stripping at the scanned directory
+  - added regression coverage for basename fallback, nested keys, Windows separators, and parent-segment false matches
