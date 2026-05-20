@@ -122,3 +122,16 @@
 - Notes:
   - patched `ReasoningPartDisplay` to coerce missing text to an empty string before trimming
   - safe UI hardening with no session/backend interaction
+
+### `66d409d67` update imported session directory/path fields
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/import.ts`
+- Risk:
+  - imported sessions bound to stale source project/directory
+  - session visibility mismatch after import
+- Notes:
+  - adapted the safe local subset: imported sessions now always overwrite `projectID` and `directory` with the current instance context
+  - also update `directory` on conflict for re-imports of the same session id
+  - upstream `path` handling was intentionally not ported because the local fork removed the session `path` column and no longer stores it in `Session.Info`
