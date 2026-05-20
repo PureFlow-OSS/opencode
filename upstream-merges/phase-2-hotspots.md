@@ -150,3 +150,16 @@
 - Notes:
   - adapted upstream relative-path approach and anchored prefix stripping at the scanned directory
   - added regression coverage for basename fallback, nested keys, Windows separators, and parent-segment false matches
+
+### `9324ef0d0` default console login url
+
+- Status: `done`
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/account.ts`
+  - `packages/opencode/test/cli/account.test.ts`
+- Risk:
+  - CLI login flow requires an unnecessary URL argument
+  - wrong default target for console auth
+- Notes:
+  - adapted upstream default URL constant and made the login URL positional optional
+  - local CLI now defaults to `https://console.opencode.ai` when no URL is passed
