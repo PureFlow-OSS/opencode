@@ -391,6 +391,8 @@ function createGlobalSync() {
       .update({ config })
       .then(bootstrap)
       .then(() => {
+        queryClient.invalidateQueries({ queryKey: [null, "providers"] })
+        queryClient.invalidateQueries({ predicate: (query) => query.queryKey[1] === "providers" })
         queue.refresh()
         setGlobalStore("reload", undefined)
         queue.refresh()
