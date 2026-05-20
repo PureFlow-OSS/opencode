@@ -1514,7 +1514,7 @@ PART_MAPPING["reasoning"] = function ReasoningPartDisplay(props) {
   const streaming = createMemo(
     () => props.message.role === "assistant" && typeof (props.message as AssistantMessage).time.completed !== "number",
   )
-  const text = () => part().text.trim()
+  const text = () => (part().text ?? "").trim()
 
   return (
     <Show when={text()}>
