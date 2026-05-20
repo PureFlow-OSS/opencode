@@ -111,3 +111,14 @@
 - Notes:
   - patched local `updateConfig` flow to invalidate global and per-directory provider queries after successful config update
   - safe to adapt because it stays in app query/cache orchestration and does not alter session loading logic
+
+### `b396b71c6` guard reasoning renderer against undefined text
+
+- Status: `done`
+- Upstream files:
+  - `packages/ui/src/components/message-part.tsx`
+- Risk:
+  - UI crash when reasoning part text is absent
+- Notes:
+  - patched `ReasoningPartDisplay` to coerce missing text to an empty string before trimming
+  - safe UI hardening with no session/backend interaction
