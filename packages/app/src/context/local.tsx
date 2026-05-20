@@ -7,6 +7,7 @@ import { useModels } from "@/context/models"
 import { useProviders } from "@/hooks/use-providers"
 import { Persist, persisted } from "@/utils/persist"
 import { cycleModelVariant, getConfiguredAgentVariant, resolveModelVariant } from "./model-variant"
+import { resolveConfiguredModelKey } from "./model-selection"
 import { useSDK } from "./sdk"
 import { useSync } from "./sync"
 import { shouldCompactOnModelSwitch } from "./model-switch-compaction"
@@ -142,10 +143,12 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     })
 
     const configuredModel = () => {
-      if (!sync.data.config.model) return
-      const [providerID, modelID] = sync.data.config.model.split("/")
-      const model = { providerID, modelID }
-      if (validModel(model)) return model
+      return resolveConfiguredModelKey(
+        sync.data.config.model,
+        providers.connected().flatMap((provider) =>
+          Object.values(provider.models).map((model) => ({ providerID: provider.id, modelID: model.id })),
+        ),
+      )
     }
 
     const recentModel = () => {

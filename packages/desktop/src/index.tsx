@@ -48,11 +48,8 @@ void initI18n()
 let update: Update | null = null
 
 const deepLinkEvent = "opencode:deep-link"
-const toolLinkSelector = [
-  '[data-component="tool-output"] a[href]',
-  '[data-component="exa-tool-output"] a[href]',
-].join(", ")
-const mcpDownloadPath = /\/[^?#]*download[^?#]*/i
+const externalLinkSelector = "a[href]"
+const mcpDownloadPath = /download/i
 
 const emitDeepLinks = (urls: string[]) => {
   if (urls.length === 0) return
@@ -92,7 +89,7 @@ const openDownloadedToolLink = async (url: string) => {
 const isMcpDownloadLink = (href: string) => {
   try {
     const url = new URL(href)
-    return mcpDownloadPath.test(url.pathname)
+    return mcpDownloadPath.test(url.href)
   } catch {
     return false
   }
@@ -511,21 +508,14 @@ render(() => {
     const target = event.target
     if (!(target instanceof HTMLElement)) return
 
-    const toolLink = target.closest(toolLinkSelector) as HTMLAnchorElement | null
-    if (toolLink?.href) {
+    const link = target.closest(externalLinkSelector) as HTMLAnchorElement | null
+    if (link?.href) {
       event.preventDefault()
-      if (isMcpDownloadLink(toolLink.href)) {
-        void openDownloadedToolLink(toolLink.href)
+      if (isMcpDownloadLink(link.href)) {
+        void openDownloadedToolLink(link.href)
         return
       }
-      platform.openLink(toolLink.href)
-      return
-    }
-
-    const externalLink = target.closest("a.external-link") as HTMLAnchorElement | null
-    if (externalLink?.href) {
-      event.preventDefault()
-      platform.openLink(externalLink.href)
+      platform.openLink(link.href)
     }
   }
 

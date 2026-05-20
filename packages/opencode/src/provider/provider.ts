@@ -92,7 +92,7 @@ function globToRegExp(pattern: string) {
 function resolveAiFactoryModelOverrides(modelID: string, rules: AiFactoryModelLimitRule[] | undefined): AiFactoryModelOverrides {
   const fallback: AiFactoryModelOverrides = {
     limit: {
-      context: 200_000,
+      context: 100_000,
       output: 32_000,
     },
   }

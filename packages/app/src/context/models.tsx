@@ -12,8 +12,13 @@ import {
   readAiFactoryModelVisibilityRules,
   resolveAiFactoryModelVisibility,
 } from "./model-visibility"
-
-export type ModelKey = { providerID: string; modelID: string }
+import {
+  computeForcedVisibleModelKeys,
+  isModelVisibleBase,
+  modelKey,
+  resolveConfiguredModelKey,
+  type ModelKey,
+} from "./model-selection"
 
 type Visibility = "show" | "hide"
 type User = ModelKey & { visibility: Visibility; favorite?: boolean }
@@ -22,12 +27,7 @@ type Store = {
   recent: ModelKey[]
   variant?: Record<string, string | undefined>
 }
-
 const RECENT_LIMIT = 5
-
-function modelKey(model: ModelKey) {
-  return `${model.providerID}:${model.modelID}`
-}
 
 export const { use: useModels, provider: ModelsProvider } = createSimpleContext({
   name: "Models",
@@ -126,6 +126,9 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
       if (found?.provider.id !== "aifactory") return
       return resolveAiFactoryModelVisibility(found, defaultRules())
     }
+    const manageable = createMemo(() =>
+      list().filter((item) => policyVisibility({ providerID: item.provider.id, modelID: item.id }) !== false),
+    )
 
     function update(model: ModelKey, state: Visibility) {
       const index = store.user.findIndex((x) => x.modelID === model.modelID && x.providerID === model.providerID)
@@ -136,19 +139,27 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
       setStore("user", store.user.length, { ...model, visibility: state })
     }
 
-    const visible = (model: ModelKey) => {
-      const key = modelKey(model)
-      const policy = policyVisibility(model)
-      if (policy === false) return false
-      const state = visibility().get(key)
-      if (state === "hide") return false
-      if (state === "show") return true
-      if (policy === true) return true
-      if (latestSet().has(key)) return true
-      const date = release().get(key)
-      if (!date?.isValid) return true
-      return false
-    }
+    const baseVisible = (model: ModelKey) =>
+      isModelVisibleBase({
+        model,
+        latest: latestSet(),
+        release: release(),
+        visibility: visibility(),
+        policy: policyVisibility(model),
+      })
+    const forcedVisible = createMemo(() =>
+      computeForcedVisibleModelKeys({
+        items: manageable().map((item) => ({ providerID: item.provider.id, modelID: item.id })),
+        defaults: Object.entries(providers.default()).map(([providerID, modelID]) => ({ providerID, modelID })),
+        configured: resolveConfiguredModelKey(
+          globalSync.data.config.model,
+          manageable().map((item) => ({ providerID: item.provider.id, modelID: item.id })),
+        ),
+        visible: baseVisible,
+      }),
+    )
+    const visible = (model: ModelKey) =>
+      policyVisibility(model) === false ? false : forcedVisible().has(modelKey(model)) || baseVisible(model)
 
     const setVisibility = (model: ModelKey, state: boolean) => {
       update(model, state ? "show" : "hide")
@@ -175,9 +186,7 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
     return {
       ready,
       list,
-      manageable: createMemo(() =>
-        list().filter((item) => policyVisibility({ providerID: item.provider.id, modelID: item.id }) !== false),
-      ),
+      manageable,
       find,
       visible,
       setVisibility,
