@@ -99,3 +99,15 @@
 - Notes:
   - patched app event reducer with a safe guard
   - short-circuit only when session exists locally and archived state already matches incoming event
+
+### `2932a7a35` invalidate provider queries after config update
+
+- Status: `done`
+- Upstream files:
+  - `packages/app/src/context/global-sync.tsx`
+- Risk:
+  - provider list stale after config changes
+  - custom providers not showing immediately
+- Notes:
+  - patched local `updateConfig` flow to invalidate global and per-directory provider queries after successful config update
+  - safe to adapt because it stays in app query/cache orchestration and does not alter session loading logic
