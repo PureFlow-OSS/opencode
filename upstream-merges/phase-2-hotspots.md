@@ -42,22 +42,33 @@
 
 ### `0d6ff4252` Fix boot flicker while loading projects
 
-- Status: `pending`
+- Status: `covered`
 - Upstream files:
   - `packages/app/src/pages/home.tsx`
   - `packages/app/src/pages/layout.tsx`
+  - `packages/desktop-electron/src/renderer/index.tsx`
 - Risk:
   - UI flicker during initial project boot
+- Notes:
+  - current `home.tsx` already uses the later stricter loading/empty-state split from newer upstream work, so the temporary grace-delay patch from this commit is superseded
+  - current `layout.tsx` already gates sidebar empty states on `pageReady`, `layoutReady`, `server.ready`, `globalSync.ready`, and `!autoselecting.loading`
+  - current renderer already does not contain the removed `root?.replaceChildren()` call
+  - no additional code patch needed for this hotspot
 
 ### `ced906301` Delay empty states until autoselect settles
 
-- Status: `pending`
+- Status: `covered`
 - Upstream files:
   - `packages/app/src/context/global-sync/bootstrap.ts`
   - `packages/app/src/pages/home.tsx`
   - `packages/app/src/pages/layout.tsx`
 - Risk:
   - false empty states during startup/autoselect
+- Notes:
+  - current `home.tsx` and `layout.tsx` already match the later safer behavior by waiting on readiness and autoselect completion before showing empty states
+  - current `layout.tsx` also awaits startup restore navigation, which is stricter than the intermediate upstream state
+  - upstream removal of `waitForPaint()` in `bootstrap.ts` is intentionally not adapted because our bootstrap/session-loading path diverges and this spot is too close to prior session regressions
+  - no additional code patch applied for this hotspot
 
 ### `d7b7be190` Path mismatches cause sessions missing + strong ID + existing data fix
 
