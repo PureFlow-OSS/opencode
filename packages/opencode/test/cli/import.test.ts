@@ -1,5 +1,6 @@
 import { test, expect } from "bun:test"
 import {
+  normalizeImportedSessionInfo,
   parseShareUrl,
   shouldAttachShareAuthHeaders,
   transformShareData,
@@ -51,4 +52,28 @@ test("returns null for invalid share data", () => {
   expect(transformShareData([])).toBeNull()
   expect(transformShareData([{ type: "message", data: {} as any }])).toBeNull()
   expect(transformShareData([{ type: "session", data: { id: "s" } as any }])).toBeNull() // no messages
+})
+
+test("normalizes imported session to current project and directory", () => {
+  const result = normalizeImportedSessionInfo({
+    info: {
+      id: "session_12345678901234567890123456",
+      slug: "imported-session",
+      projectID: "project_old",
+      directory: "/old/worktree",
+      title: "Imported Session",
+      version: "1.0.0",
+      time: {
+        created: 1,
+        updated: 2,
+      },
+    } as any,
+    projectID: "project_current",
+    directory: "/current/worktree/apps/api",
+  })
+
+  expect(String(result.projectID)).toBe("project_current")
+  expect(result.directory).toBe("/current/worktree/apps/api")
+  expect(String(result.id)).toBe("session_12345678901234567890123456")
+  expect(result.title).toBe("Imported Session")
 })

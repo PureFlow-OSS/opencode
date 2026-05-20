@@ -78,6 +78,14 @@ export function transformShareData(shareData: ShareData[]): {
   }
 }
 
+export function normalizeImportedSessionInfo(input: { info: SDKSession; projectID: string; directory: string }) {
+  return Schema.decodeUnknownSync(Session.Info)({
+    ...input.info,
+    projectID: input.projectID,
+    directory: input.directory,
+  }) as Session.Info
+}
+
 export const ImportCommand = cmd({
   command: "import <file>",
   describe: "import session data from JSON file or URL",
@@ -158,16 +166,17 @@ export const ImportCommand = cmd({
         return
       }
 
-      const info = Schema.decodeUnknownSync(Session.Info)({
-        ...exportData.info,
+      const info = normalizeImportedSessionInfo({
+        info: exportData.info,
         projectID: Instance.project.id,
-      }) as Session.Info
+        directory: Instance.directory,
+      })
       const row = Session.toRow(info)
       Database.use((db) =>
         db
           .insert(SessionTable)
           .values(row)
-          .onConflictDoUpdate({ target: SessionTable.id, set: { project_id: row.project_id } })
+          .onConflictDoUpdate({ target: SessionTable.id, set: { project_id: row.project_id, directory: row.directory } })
           .run(),
       )
 
