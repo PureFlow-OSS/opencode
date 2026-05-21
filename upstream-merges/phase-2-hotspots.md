@@ -215,6 +215,20 @@
   - structured request failures are formatted through existing CLI error formatting and set `process.exitCode = 1`
   - local loop error handling and replay additions remain unchanged
 
+### `94564f358` prevent double auto-compaction after `filterCompacted` reorder
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/session/message-v2.ts`
+  - `packages/opencode/src/session/prompt.ts`
+- Risk:
+  - compaction-reordered message arrays can make `prompt.loop` pick the wrong "latest" user/assistant markers
+  - auto-compaction can trigger twice because the retained tail assistant is mistaken for the newest completed turn
+- Notes:
+  - added local `MessageV2.latest(...)` helper that derives latest user, latest assistant, latest finished assistant, and pending task parts by maximum message id instead of relying on array position
+  - updated `prompt.ts` to use the helper after `filterCompactedEffect(...)`
+  - added regression coverage for the compaction-reordered case where the retained tail sits between the summary pair and the newest user turn
+
 ### `6d2219e00` preserve instance context in async commands
 
 - Status: `covered`
