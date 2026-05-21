@@ -1454,15 +1454,7 @@ function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: Ass
   })
   return (
     <Show when={content() && ctx.showThinking()}>
-      <box
-        id={"text-" + props.part.id}
-        paddingLeft={2}
-        marginTop={1}
-        flexDirection="column"
-        border={["left"]}
-        customBorderChars={SplitBorder.customBorderChars}
-        borderColor={theme.backgroundElement}
-      >
+      <box id={"text-" + props.part.id} paddingLeft={3} marginTop={1} flexDirection="column">
         <code
           filetype="markdown"
           drawUnstyledText={false}
