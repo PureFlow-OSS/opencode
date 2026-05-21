@@ -196,3 +196,40 @@
   - upstream implementation depends on a modularized `run/` stack that the local fork does not have yet
   - direct port would require invasive refactor of the monolithic local `packages/opencode/src/cli/cmd/run.ts`
   - safest next step is a local minimal replay design or a prior `run` refactor, not a wholesale transplant
+
+### `6d2219e00` preserve instance context in async commands
+
+- Status: `covered`
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/agent.ts`
+  - `packages/opencode/src/cli/cmd/github.ts`
+- Risk:
+  - effect services lose instance context after async boundary
+- Notes:
+  - local `AppRuntime.runPromise` already wraps effects with `attach(...)`, which injects `InstanceRef` from ALS automatically
+  - this is already covered by the local runtime bridge and existing tests around `AppRuntime` + `InstanceRef`
+  - upstream patch shape also assumes `effectCmd` in these commands, while the local fork still uses plain `cmd` plus `Instance.provide`
+
+### `4d900b2f4` preserve target attribute in markdown sanitization
+
+- Status: `done`
+- Upstream files:
+  - `packages/ui/src/components/markdown.tsx`
+- Risk:
+  - sanitized markdown strips link targets, breaking intended new-tab behavior
+- Notes:
+  - added `target` to allowed DOMPurify attributes
+  - safe UI-only patch
+
+### `836a33198` fix question dock overflow and message part flex layout
+
+- Status: `done`
+- Upstream files:
+  - `packages/app/src/pages/session/composer/session-question-dock.tsx`
+  - `packages/ui/src/components/message-part.css`
+- Risk:
+  - long question text overflows the dock
+  - answer options flex sizing fights the dock layout
+- Notes:
+  - made question text container scrollable
+  - changed question options list from `flex: 1` to `flex-shrink: 0` to avoid layout collapse
