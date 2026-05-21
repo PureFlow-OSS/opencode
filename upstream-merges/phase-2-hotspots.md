@@ -195,7 +195,8 @@
 - Notes:
   - upstream implementation depends on a modularized `run/` stack that the local fork does not have yet
   - direct port would require invasive refactor of the monolithic local `packages/opencode/src/cli/cmd/run.ts`
-  - safest next step is a local minimal replay design or a prior `run` refactor, not a wholesale transplant
+  - local minimal subset adapted on `feat/merge-upstream`: `run` now supports `--replay` and `--replay-limit` for resumed CLI sessions and renders static visible history before the new turn
+  - deferred pieces remain the hard parts from upstream: live stream boot buffering, duplicate-delta suppression, blocker/subagent recovery, and footer/runtime state sync
 
 ### `6d2219e00` preserve instance context in async commands
 
