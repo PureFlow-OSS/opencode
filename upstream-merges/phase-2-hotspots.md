@@ -319,3 +319,16 @@
 - Notes:
   - local fork only needed the TUI question prompt spacing fix, plus the compatible test typing cleanup already reflected upstream
   - run-footer-specific changes were not ported in this pass
+
+### `f5a8202b4` simplify thinking toggle styling
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/tui/feature-plugins/system/session-v2.tsx`
+  - `packages/opencode/src/cli/cmd/tui/routes/session/index.tsx`
+- Risk:
+  - reasoning blocks visually overemphasize the left-border treatment
+  - styling drifts from newer TUI reasoning presentation
+- Notes:
+  - local fork does not have the same collapsed/expanded reasoning UI as upstream in this codepath
+  - adapted only the safe local subset: visible reasoning blocks now use the simpler indentation-only styling instead of the extra left border
