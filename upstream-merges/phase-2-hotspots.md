@@ -477,3 +477,31 @@
   - local fork still keeps the experimental HttpApi session surface in one file, so this was adapted in-place instead of following the upstream groups/handlers split
   - added a local `SessionBusyHttpApiError` with `409` status and mapped busy promise rejections on the affected routes: `shell`, `revert`, `unrevert`, and `deleteMessage`
   - added regression coverage for the busy-error mapping helper and kept the existing HttpApi session route suite green
+
+### `c79a9634d` tolerate plugin tool defs with missing args
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/tool/registry.ts`
+  - `packages/opencode/test/tool/registry.test.ts`
+- Risk:
+  - malformed custom/plugin tools with `args: undefined` can crash registry init
+  - one broken tool can poison the whole tool list
+- Notes:
+  - local registry now normalizes missing plugin/custom tool args to `{}` before building the Zod wrapper
+  - this preserves the older tolerant behavior where no-args tools still register instead of crashing the registry
+
+### `cb511f78f` preserve tool attachments from plugin/custom tools
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/tool/registry.ts`
+  - `packages/opencode/test/tool/registry.test.ts`
+  - `packages/plugin/src/tool.ts`
+- Risk:
+  - structured custom tool results lose attachments at the registry boundary
+  - plugin tools can return output text but silently drop file payloads
+- Notes:
+  - local plugin tool result type now allows optional `title` and `attachments`
+  - local tool registry now forwards those structured fields instead of collapsing everything to plain output + metadata
+  - verified with `bun typecheck` in `packages/plugin` and `packages/opencode`
