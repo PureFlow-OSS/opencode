@@ -1,4 +1,4 @@
-import type { Message, Part, ToolPart } from "@opencode-ai/sdk/v2"
+import type { Message, Part, PermissionRequest, QuestionRequest, ToolPart } from "@opencode-ai/sdk/v2"
 
 type WithParts = {
   info: Message
@@ -30,6 +30,20 @@ export type ReplayItem =
   | {
       type: "error"
       text: string
+    }
+
+export type ReplayBlocker =
+  | {
+      type: "permission"
+      id: string
+      permission: string
+      patterns: string[]
+    }
+  | {
+      type: "question"
+      id: string
+      header: string
+      question: string
     }
 
 function userText(message: WithParts) {
@@ -100,4 +114,36 @@ export function collectReplayItems(
   }
 
   return items
+}
+
+export function collectReplayBlockers(input: {
+  sessionID: string
+  permissions: PermissionRequest[]
+  questions: QuestionRequest[]
+}) {
+  const blockers: ReplayBlocker[] = []
+
+  for (const permission of input.permissions) {
+    if (permission.sessionID !== input.sessionID) continue
+    blockers.push({
+      type: "permission",
+      id: permission.id,
+      permission: permission.permission,
+      patterns: permission.patterns,
+    })
+  }
+
+  for (const question of input.questions) {
+    if (question.sessionID !== input.sessionID) continue
+    for (const item of question.questions) {
+      blockers.push({
+        type: "question",
+        id: question.id,
+        header: item.header,
+        question: item.question,
+      })
+    }
+  }
+
+  return blockers
 }

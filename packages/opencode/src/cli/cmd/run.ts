@@ -27,7 +27,7 @@ import { BashTool } from "../../tool/bash"
 import { TodoWriteTool } from "../../tool/todo"
 import { Locale } from "../../util"
 import { AppRuntime } from "@/effect/app-runtime"
-import { collectReplayItems } from "./run-replay"
+import { collectReplayBlockers, collectReplayItems } from "./run-replay"
 
 type ToolProps<T> = {
   input: Tool.InferParameters<T>
@@ -637,6 +637,48 @@ export const RunCommand = cmd({
         }
       }
 
+      async function settlePendingBlockers(sessionID: string) {
+        const [permissions, questions] = await Promise.all([sdk.permission.list(), sdk.question.list()])
+        const blockers = collectReplayBlockers({
+          sessionID,
+          permissions: permissions.data ?? [],
+          questions: questions.data ?? [],
+        })
+        if (blockers.length === 0) return
+
+        UI.empty()
+        UI.println(UI.Style.TEXT_WARNING_BOLD + "!" + UI.Style.TEXT_NORMAL + " pending blockers found on resumed session")
+        UI.empty()
+
+        for (const blocker of blockers) {
+          if (blocker.type === "permission") {
+            const message = `${blocker.permission} (${blocker.patterns.join(", ")})`
+            if (args["dangerously-skip-permissions"]) {
+              UI.println(UI.Style.TEXT_WARNING_BOLD + "~", UI.Style.TEXT_NORMAL + ` auto-approving pending permission: ${message}`)
+              await sdk.permission.reply({
+                requestID: blocker.id,
+                reply: "once",
+              })
+              continue
+            }
+
+            UI.println(UI.Style.TEXT_WARNING_BOLD + "!", UI.Style.TEXT_NORMAL + ` auto-rejecting pending permission: ${message}`)
+            await sdk.permission.reply({
+              requestID: blocker.id,
+              reply: "reject",
+            })
+            continue
+          }
+
+          UI.println(UI.Style.TEXT_WARNING_BOLD + "!", UI.Style.TEXT_NORMAL + ` auto-rejecting pending question: ${blocker.header} - ${blocker.question}`)
+          await sdk.question.reject({
+            requestID: blocker.id,
+          })
+        }
+
+        UI.empty()
+      }
+
       // Validate agent if specified
       const agent = await (async () => {
         if (!args.agent) return undefined
@@ -706,6 +748,7 @@ export const RunCommand = cmd({
         process.exit(1)
       }
       await share(sdk, sessionID)
+      await settlePendingBlockers(sessionID)
       await replay(sessionID)
 
       loop().catch((e) => {

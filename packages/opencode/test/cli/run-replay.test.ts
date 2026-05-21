@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { collectReplayItems } from "../../src/cli/cmd/run-replay"
+import { collectReplayBlockers, collectReplayItems } from "../../src/cli/cmd/run-replay"
 import type { MessageV2 } from "../../src/session/message-v2"
+import type { PermissionRequest, QuestionRequest } from "@opencode-ai/sdk/v2"
 
 function userMessage(id: string, text: string): MessageV2.WithParts {
   return {
@@ -90,5 +91,81 @@ describe("run replay", () => {
     )
 
     expect(items).toEqual([{ type: "user", text: "second" }])
+  })
+
+  test("collects pending blockers for the current session", () => {
+    const permissions: PermissionRequest[] = [
+      {
+        id: "perm_1",
+        sessionID: "ses_1",
+        permission: "edit",
+        patterns: ["src/**"],
+        metadata: {},
+        always: [],
+      },
+      {
+        id: "perm_2",
+        sessionID: "ses_2",
+        permission: "read",
+        patterns: ["docs/**"],
+        metadata: {},
+        always: [],
+      },
+    ]
+    const questions: QuestionRequest[] = [
+      {
+        id: "que_1",
+        sessionID: "ses_1",
+        questions: [
+          {
+            header: "Mode",
+            question: "Which mode?",
+            options: [],
+          },
+          {
+            header: "Color",
+            question: "Which color?",
+            options: [],
+          },
+        ],
+      },
+      {
+        id: "que_2",
+        sessionID: "ses_2",
+        questions: [
+          {
+            header: "Ignore",
+            question: "Other session",
+            options: [],
+          },
+        ],
+      },
+    ]
+    const blockers = collectReplayBlockers({
+      sessionID: "ses_1",
+      permissions,
+      questions,
+    })
+
+    expect(blockers).toEqual([
+      {
+        type: "permission",
+        id: "perm_1",
+        permission: "edit",
+        patterns: ["src/**"],
+      },
+      {
+        type: "question",
+        id: "que_1",
+        header: "Mode",
+        question: "Which mode?",
+      },
+      {
+        type: "question",
+        id: "que_1",
+        header: "Color",
+        question: "Which color?",
+      },
+    ])
   })
 })
