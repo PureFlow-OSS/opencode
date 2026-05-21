@@ -535,3 +535,17 @@
   - local schemas already tolerate numeric token values broadly, so upstream schema widening was effectively already covered
   - adapted missing runtime piece: `getUsage(...)` now clamps finite negative derived token counts back to `0`
   - verified with `bun typecheck` in `packages/opencode`
+
+### `20cec9155` restore model suggestions
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/provider/provider.ts`
+  - `packages/opencode/test/provider/provider.test.ts`
+- Risk:
+  - disabled or auth-missing providers disappear from active state, so model lookup errors lose useful suggestions
+  - partially loaded provider catalogs can suggest wrong provider IDs but no model IDs
+- Notes:
+  - local provider state now keeps raw `catalog` alongside active `providers`
+  - `ModelNotFoundError` suggestions now fall back to catalog models/providers, filtering deprecated and hidden alpha models same as upstream intent
+  - verified with `bun typecheck` in `packages/opencode`
