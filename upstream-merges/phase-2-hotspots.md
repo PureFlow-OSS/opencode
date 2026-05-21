@@ -305,3 +305,17 @@
   - local fork routes errors through the global Hono [server/middleware.ts](/C:/Users/Klaus/Desktop/PFH/opencode/packages/opencode/src/server/middleware.ts) instead of an HttpApi-only middleware
   - adapted the local equivalent: 500 unknown errors now return a safe message plus `ref`, and logs include the same reference id
   - config-special-case removal from upstream was already effectively covered locally because this middleware had no config-specific bypass
+
+### `ddd6eb449` separate question checkmark labels
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/run/footer.question.tsx`
+  - `packages/opencode/src/cli/cmd/tui/routes/session/question.tsx`
+  - `packages/opencode/test/cli/tui/use-event.test.tsx`
+- Risk:
+  - single-select checkmarks stick directly to labels in the TUI question prompt
+  - stale generic event typings drift from current `GlobalEvent["payload"]` shape
+- Notes:
+  - local fork only needed the TUI question prompt spacing fix, plus the compatible test typing cleanup already reflected upstream
+  - run-footer-specific changes were not ported in this pass
