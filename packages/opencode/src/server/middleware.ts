@@ -14,7 +14,9 @@ import { compress } from "hono/compress"
 const log = Log.create({ service: "server" })
 
 export const ErrorMiddleware: ErrorHandler = (err, c) => {
+  const ref = `err_${crypto.randomUUID().slice(0, 8)}`
   log.error("failed", {
+    ref,
     error: err,
   })
   if (err instanceof NamedError) {
@@ -30,8 +32,7 @@ export const ErrorMiddleware: ErrorHandler = (err, c) => {
     return c.json(new NamedError.Unknown({ message: err.message }).toObject(), { status: 400 })
   }
   if (err instanceof HTTPException) return err.getResponse()
-  const message = err instanceof Error && err.stack ? err.stack : err.toString()
-  return c.json(new NamedError.Unknown({ message }).toObject(), {
+  return c.json(new NamedError.Unknown({ message: "Unexpected server error. Check server logs for details.", ref }).toObject(), {
     status: 500,
   })
 }

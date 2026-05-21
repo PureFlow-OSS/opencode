@@ -55,6 +55,7 @@ export abstract class NamedError extends Error {
     "UnknownError",
     z.object({
       message: z.string(),
+      ref: z.string().optional(),
     }),
   )
 }
