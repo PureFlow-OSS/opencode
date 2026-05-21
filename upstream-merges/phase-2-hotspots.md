@@ -163,3 +163,36 @@
 - Notes:
   - adapted upstream default URL constant and made the login URL positional optional
   - local CLI now defaults to `https://console.opencode.ai` when no URL is passed
+
+### `c035c35eb` tolerate invalid OPENCODE_PERMISSION JSON
+
+- Status: `done`
+- Upstream files:
+  - `packages/opencode/src/config/config.ts`
+  - `packages/opencode/test/config/config.test.ts`
+- Risk:
+  - malformed `OPENCODE_PERMISSION` env var crashes config startup
+- Notes:
+  - wrapped env-var JSON parsing in a local `try/catch` and skip invalid values with a warning
+  - added regression coverage that config loading returns instead of throwing on malformed JSON
+
+### `5970c12d9` replay session history on interactive resume
+
+- Status: `pending`
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/run.ts`
+  - `packages/opencode/src/cli/cmd/run/runtime.ts`
+  - `packages/opencode/src/cli/cmd/run/session-replay.ts`
+  - `packages/opencode/src/cli/cmd/run/session.shared.ts`
+  - `packages/opencode/src/cli/cmd/run/stream.transport.ts`
+  - `packages/opencode/src/cli/cmd/run/subagent-data.ts`
+  - `packages/opencode/src/cli/cmd/run/types.ts`
+- Risk:
+  - session resume rendering
+  - duplicate streamed text
+  - question/permission blocker state
+  - subagent tab recovery
+- Notes:
+  - upstream implementation depends on a modularized `run/` stack that the local fork does not have yet
+  - direct port would require invasive refactor of the monolithic local `packages/opencode/src/cli/cmd/run.ts`
+  - safest next step is a local minimal replay design or a prior `run` refactor, not a wholesale transplant
