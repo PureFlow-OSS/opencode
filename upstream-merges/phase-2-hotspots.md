@@ -689,3 +689,14 @@
   - local session route now uses shared `collapseToolOutput(...)` helper for generic tool blocks and shell output
   - helper collapses on both line count and approximate character budget derived from current width
   - verified with `bun typecheck` in `packages/opencode`
+
+### `f3b0d3d7a` dedupe consecutive prompt history entries
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/tui/component/prompt/history.tsx`
+- Risk:
+  - repeated identical submits spam local prompt history and make arrow navigation noisy
+- Notes:
+  - local prompt history now skips appending an entry when it matches the latest stored item byte-for-byte
+  - verified with `bun typecheck` in `packages/opencode`
