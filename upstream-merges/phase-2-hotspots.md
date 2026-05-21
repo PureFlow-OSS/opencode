@@ -260,3 +260,17 @@
   - adapted only the terminal gating and regression coverage
   - intentionally skipped the unrelated `config-service` refactor from the same upstream commit
   - local TUI now only falls back to Zed DB selection when running inside a Zed terminal
+
+### `8bfa188e0` use colon for collapsed thinking labels
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/tui/feature-plugins/system/session-v2.tsx`
+  - `packages/opencode/src/cli/cmd/tui/routes/session/index.tsx`
+- Risk:
+  - completed reasoning still renders as active "thinking"
+  - wording mismatch in TUI reasoning labels
+- Notes:
+  - local fork only had the live reasoning renderer in `routes/session/index.tsx`
+  - adapted the safe local subset so completed reasoning uses `_Thought:_` while active reasoning stays `_Thinking:_`
+  - upstream collapsed-reasoning text path was not present locally, so there was nothing else to port
