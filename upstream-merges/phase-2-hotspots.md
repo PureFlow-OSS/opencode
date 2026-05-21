@@ -505,3 +505,17 @@
   - local plugin tool result type now allows optional `title` and `attachments`
   - local tool registry now forwards those structured fields instead of collapsing everything to plain output + metadata
   - verified with `bun typecheck` in `packages/plugin` and `packages/opencode`
+
+### `233fc5b91` preserve assistant message content when signed reasoning blocks are present
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/session/message-v2.ts`
+  - `packages/opencode/test/session/message-v2.test.ts`
+- Risk:
+  - replayed assistant turns with signed Anthropic/Bedrock reasoning can lose structural separators
+  - provider regrouping can shift signed reasoning/text positions and break downstream validation
+- Notes:
+  - local `message-v2.ts` now substitutes `" "` for empty assistant text separators when same turn contains signed Anthropic or Bedrock reasoning
+  - keeps replay/grouping positions stable without changing unsigned reasoning or ordinary assistant text behavior
+  - verified with `bun typecheck` in `packages/opencode`
