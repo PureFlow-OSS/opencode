@@ -6,7 +6,7 @@ import { PermissionID } from "../../src/permission/schema"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import { Instance } from "../../src/project/instance"
 import { InstanceRoutes } from "../../src/server/routes/instance"
-import { SessionPaths } from "../../src/server/routes/instance/httpapi/session"
+import { mapBusyError, SessionBusyHttpApiError, SessionPaths } from "../../src/server/routes/instance/httpapi/session"
 import { Session } from "../../src/session"
 import { MessageID, PartID, type SessionID } from "../../src/session/schema"
 import { MessageV2 } from "../../src/session/message-v2"
@@ -79,6 +79,17 @@ afterEach(async () => {
 })
 
 describe("session HttpApi", () => {
+  test("maps busy session failures to public 409 errors", async () => {
+    const sessionID = "session-busy" as SessionID
+    const error = mapBusyError(new Session.BusyError(sessionID), sessionID)
+    expect(error).toBeInstanceOf(SessionBusyHttpApiError)
+    expect(error).toMatchObject({
+      _tag: "SessionBusyError",
+      sessionID,
+      message: `Session is busy: ${sessionID}`,
+    })
+  })
+
   test("serves read routes through Hono bridge", async () => {
     await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
     const headers = { "x-opencode-directory": tmp.path }

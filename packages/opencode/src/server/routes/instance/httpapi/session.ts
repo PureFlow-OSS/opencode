@@ -89,6 +89,23 @@ const PermissionResponsePayload = Schema.Struct({
   response: Permission.Reply,
 }).annotate({ identifier: "SessionPermissionResponseInput" })
 
+export class SessionBusyHttpApiError extends Schema.TaggedErrorClass<SessionBusyHttpApiError>()(
+  "SessionBusyError",
+  {
+    sessionID: SessionID,
+    message: Schema.String,
+  },
+  { httpApiStatus: 409 },
+) {}
+
+export function mapBusyError(error: unknown, sessionID: SessionID) {
+  if (!(error instanceof Session.BusyError)) return error
+  return new SessionBusyHttpApiError({
+    sessionID,
+    message: `Session is busy: ${sessionID}`,
+  })
+}
+
 export const SessionPaths = {
   list: root,
   status: `${root}/status`,
@@ -336,6 +353,7 @@ export const SessionApi = HttpApi.make("session")
           params: { sessionID: SessionID },
           payload: ShellPayload,
           success: MessageV2.WithParts,
+          error: SessionBusyHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.shell",
@@ -347,6 +365,7 @@ export const SessionApi = HttpApi.make("session")
           params: { sessionID: SessionID },
           payload: RevertPayload,
           success: Session.Info,
+          error: SessionBusyHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.revert",
@@ -358,6 +377,7 @@ export const SessionApi = HttpApi.make("session")
         HttpApiEndpoint.post("unrevert", SessionPaths.unrevert, {
           params: { sessionID: SessionID },
           success: Session.Info,
+          error: SessionBusyHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.unrevert",
@@ -380,6 +400,7 @@ export const SessionApi = HttpApi.make("session")
         HttpApiEndpoint.delete("deleteMessage", SessionPaths.deleteMessage, {
           params: { sessionID: SessionID, messageID: MessageID },
           success: Schema.Boolean,
+          error: SessionBusyHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.deleteMessage",
@@ -777,7 +798,7 @@ export const sessionHandlers = Layer.unwrap(
             SessionPrompt.Service.use((svc) =>
               svc.shell({ ...ctx.payload, sessionID: ctx.params.sessionID } as SessionPrompt.ShellInput),
             ).pipe(Effect.provide(SessionPrompt.defaultLayer)),
-          ),
+          ).catch((error) => Promise.reject(mapBusyError(error, ctx.params.sessionID))),
         ),
       )
     })
@@ -794,7 +815,7 @@ export const sessionHandlers = Layer.unwrap(
             SessionRevert.Service.use((svc) => svc.revert({ sessionID: ctx.params.sessionID, ...ctx.payload })).pipe(
               Effect.provide(SessionRevert.defaultLayer),
             ),
-          ),
+          ).catch((error) => Promise.reject(mapBusyError(error, ctx.params.sessionID))),
         ),
       )
     })
@@ -807,7 +828,7 @@ export const sessionHandlers = Layer.unwrap(
             SessionRevert.Service.use((svc) => svc.unrevert({ sessionID: ctx.params.sessionID })).pipe(
               Effect.provide(SessionRevert.defaultLayer),
             ),
-          ),
+          ).catch((error) => Promise.reject(mapBusyError(error, ctx.params.sessionID))),
         ),
       )
     })
@@ -842,7 +863,7 @@ export const sessionHandlers = Layer.unwrap(
               yield* state.assertNotBusy(ctx.params.sessionID)
               yield* session.removeMessage(ctx.params)
             }).pipe(Effect.provide(SessionRunState.defaultLayer), Effect.provide(Session.defaultLayer)),
-          ),
+          ).catch((error) => Promise.reject(mapBusyError(error, ctx.params.sessionID))),
         ),
       )
       return true
