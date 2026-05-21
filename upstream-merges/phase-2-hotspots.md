@@ -733,3 +733,14 @@
 - Notes:
   - local `markup.heading.1` syntax scope now adds underline on top of existing bold heading styling
   - verified with `bun typecheck` in `packages/opencode`
+
+### `e94aecaa0` contrast-aware paste summary badge
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/tui/context/theme.tsx`
+- Risk:
+  - paste summary extmarks can become unreadable on themes where warning background and default background-adjacent foreground clash
+- Notes:
+  - local `extmark.paste` style now derives foreground via `selectedForeground(theme, theme.warning)`
+  - verified with `bun typecheck` in `packages/opencode`
