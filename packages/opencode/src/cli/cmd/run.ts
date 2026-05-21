@@ -27,6 +27,7 @@ import { BashTool } from "../../tool/bash"
 import { TodoWriteTool } from "../../tool/todo"
 import { Locale } from "../../util"
 import { AppRuntime } from "@/effect/app-runtime"
+import { collectReplayItems } from "./run-replay"
 
 type ToolProps<T> = {
   input: Tool.InferParameters<T>
@@ -294,6 +295,15 @@ export const RunCommand = cmd({
         describe: "show thinking blocks",
         default: false,
       })
+      .option("replay", {
+        type: "boolean",
+        describe: "replay recent session history before continuing",
+        default: false,
+      })
+      .option("replay-limit", {
+        type: "number",
+        describe: "cap replay to the newest N messages",
+      })
       .option("dangerously-skip-permissions", {
         type: "boolean",
         describe: "auto-approve permissions that are not explicitly denied (dangerous!)",
@@ -348,6 +358,24 @@ export const RunCommand = cmd({
 
     if (args.fork && !args.continue && !args.session) {
       UI.error("--fork requires --continue or --session")
+      process.exit(1)
+    }
+
+    if ((args.replay || args["replay-limit"] !== undefined) && !args.continue && !args.session) {
+      UI.error("--replay requires --continue or --session")
+      process.exit(1)
+    }
+
+    if ((args.replay || args["replay-limit"] !== undefined) && args.format === "json") {
+      UI.error("--replay is not supported with --format json")
+      process.exit(1)
+    }
+
+    if (
+      args["replay-limit"] !== undefined &&
+      (!Number.isInteger(args["replay-limit"]) || args["replay-limit"] <= 0)
+    ) {
+      UI.error("--replay-limit must be a positive integer")
       process.exit(1)
     }
 
@@ -561,6 +589,54 @@ export const RunCommand = cmd({
         }
       }
 
+      async function replay(sessionID: string) {
+        if (!args.replay && args["replay-limit"] === undefined) return
+        const history = await sdk.session.messages({ sessionID })
+        const items = collectReplayItems(history.data ?? [], {
+          thinking: args.thinking,
+          limit: args["replay-limit"],
+        })
+        if (items.length === 0) return
+
+        UI.empty()
+        UI.println(UI.Style.TEXT_DIM + "Replaying session history" + UI.Style.TEXT_NORMAL)
+        UI.empty()
+
+        for (const item of items) {
+          if (item.type === "assistant-header") {
+            UI.empty()
+            UI.println(`> ${item.agent} · ${item.modelID}`)
+            UI.empty()
+            continue
+          }
+
+          if (item.type === "user") {
+            UI.println(`${UI.Style.TEXT_DIM}> ${item.text}${UI.Style.TEXT_NORMAL}`)
+            UI.empty()
+            continue
+          }
+
+          if (item.type === "text") {
+            UI.println(item.text)
+            UI.empty()
+            continue
+          }
+
+          if (item.type === "reasoning") {
+            UI.println(`${UI.Style.TEXT_DIM}\u001b[3mThinking: ${item.text}\u001b[0m${UI.Style.TEXT_NORMAL}`)
+            UI.empty()
+            continue
+          }
+
+          if (item.type === "tool") {
+            tool(item.part)
+            continue
+          }
+
+          UI.error(item.text)
+        }
+      }
+
       // Validate agent if specified
       const agent = await (async () => {
         if (!args.agent) return undefined
@@ -630,6 +706,7 @@ export const RunCommand = cmd({
         process.exit(1)
       }
       await share(sdk, sessionID)
+      await replay(sessionID)
 
       loop().catch((e) => {
         console.error(e)
