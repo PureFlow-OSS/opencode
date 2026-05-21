@@ -1,7 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, test } from "bun:test"
 import { testRender } from "@opentui/solid"
-import type { Event, GlobalEvent } from "@opencode-ai/sdk/v2"
+import type { GlobalEvent } from "@opencode-ai/sdk/v2"
 import { onMount } from "solid-js"
 import { ProjectProvider, useProject } from "../../../src/cli/cmd/tui/context/project"
 import { SDKProvider } from "../../../src/cli/cmd/tui/context/sdk"
@@ -15,7 +15,7 @@ async function wait(fn: () => boolean, timeout = 2000) {
   }
 }
 
-function event(payload: Event, input: { directory: string; workspace?: string }): GlobalEvent {
+function event(payload: GlobalEvent["payload"], input: { directory: string; workspace?: string }): GlobalEvent {
   return {
     directory: input.directory,
     workspace: input.workspace,
@@ -23,7 +23,7 @@ function event(payload: Event, input: { directory: string; workspace?: string })
   }
 }
 
-function vcs(branch: string): Event {
+function vcs(branch: string): GlobalEvent["payload"] {
   return {
     type: "vcs.branch.updated",
     properties: {
@@ -32,7 +32,7 @@ function vcs(branch: string): Event {
   }
 }
 
-function update(version: string): Event {
+function update(version: string): GlobalEvent["payload"] {
   return {
     type: "installation.update-available",
     properties: {
@@ -62,7 +62,7 @@ function createSource() {
 
 async function mount() {
   const source = createSource()
-  const seen: Event[] = []
+  const seen: GlobalEvent["payload"][] = []
   let project!: ReturnType<typeof useProject>
   let done!: () => void
   const ready = new Promise<void>((resolve) => {
@@ -87,13 +87,13 @@ async function mount() {
   return { app, emit: source.emit, project, seen }
 }
 
-function Probe(props: { seen: Event[]; onReady: (ctx: { project: ReturnType<typeof useProject> }) => void }) {
+function Probe(props: { seen: GlobalEvent["payload"][]; onReady: (ctx: { project: ReturnType<typeof useProject> }) => void }) {
   const project = useProject()
   const event = useEvent()
 
   onMount(() => {
     event.subscribe((evt) => {
-      props.seen.push(evt)
+      props.seen.push(evt as GlobalEvent["payload"])
     })
     props.onReady({ project })
   })
