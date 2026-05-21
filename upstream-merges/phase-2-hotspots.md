@@ -574,3 +574,23 @@
 - Notes:
   - local provider transform now computes Gemini thinking levels and max budgets from model ID instead of using single hardcoded defaults
   - Google small-model defaults now choose `thinkingLevel` or `thinkingBudget` per family
+
+### `319498e2f` constrain OpenAI deep research efforts
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/provider/transform.ts`
+- Risk:
+  - deep-research models reject broader GPT-5 effort matrix, so generic OpenAI effort expansion can send invalid controls
+- Notes:
+  - local OpenAI effort derivation now special-cases `deep-research` models to `medium` only
+
+### `e0396b809` align Anthropic Opus 4.5 efforts
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/provider/transform.ts`
+- Risk:
+  - Opus 4.5 does not use same adaptive/max shape as newer Anthropic families, so generic fallback can advertise wrong effort controls
+- Notes:
+  - local Anthropic variant generation now maps Opus 4.5 to plain `low|medium|high` effort variants
