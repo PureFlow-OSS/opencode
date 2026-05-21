@@ -162,12 +162,21 @@ export const layer = Layer.effect(
       log.info("asking", { id, questions: input.questions.length })
 
       const deferred = yield* Deferred.make<ReadonlyArray<Answer>, RejectedError>()
-      const info = Schema.decodeUnknownSync(Request)({
+      const info = yield* Schema.decodeUnknownEffect(Request)({
         id,
         sessionID: input.sessionID,
         questions: input.questions,
         tool: input.tool,
-      })
+      }).pipe(
+        Effect.mapError(
+          (error) =>
+            new Error(
+              `The question tool was called with invalid arguments: ${error}.\nPlease rewrite the input so it satisfies the expected schema.`,
+              { cause: error },
+            ),
+        ),
+        Effect.orDie,
+      )
       pending.set(id, { info, deferred })
       yield* bus.publish(Event.Asked, info)
 

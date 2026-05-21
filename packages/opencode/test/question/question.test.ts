@@ -428,6 +428,33 @@ test("pending question rejects on instance dispose", async () => {
   expect(await result).toBeInstanceOf(Question.RejectedError)
 })
 
+test("ask - invalid payload surfaces as a friendly tool error", async () => {
+  await using tmp = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const promise = ask({
+        sessionID: SessionID.make("ses_invalid"),
+        questions: [
+          {
+            header: "Pick mode",
+            options: [
+              { label: "A", description: "x" },
+              { label: "B", description: "y" },
+            ],
+          } as unknown as Question.Info,
+        ],
+      })
+      await expect(
+        promise,
+      ).rejects.toThrow("invalid arguments")
+      await expect(
+        promise,
+      ).rejects.toThrow("Please rewrite the input")
+    },
+  })
+})
+
 test("pending question rejects on instance reload", async () => {
   await using tmp = await tmpdir({ git: true })
 
