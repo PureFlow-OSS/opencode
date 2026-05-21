@@ -370,3 +370,16 @@
 - Notes:
   - introduced a local `Tool.InvalidArgumentsError` and used it at the decode boundary inside tool wrapping
   - added regression coverage that the failure survives as a die defect with the expected friendly rewrite message
+
+### `c64ac905e` dedupe concurrent Codex OAuth refreshes
+
+- Status: `done`
+- Upstream files:
+  - `packages/opencode/src/plugin/codex.ts`
+  - `packages/opencode/test/plugin/codex.test.ts`
+- Risk:
+  - concurrent Codex requests can race a token refresh and issue duplicate refresh calls
+  - auth state can churn unnecessarily under parallel request load
+- Notes:
+  - added a shared in-flight refresh promise inside the OAuth fetch wrapper
+  - also exposed injectable issuer/API endpoint options for deterministic test coverage of the refresh path
