@@ -1468,7 +1468,7 @@ function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: Ass
           drawUnstyledText={false}
           streaming={true}
           syntaxStyle={subtleSyntax()}
-          content={"_Thinking:_ " + content()}
+          content={(props.message.time.completed ? "_Thought:_ " : "_Thinking:_ ") + content()}
           conceal={ctx.conceal()}
           fg={theme.textMuted}
         />
