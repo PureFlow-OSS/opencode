@@ -1253,6 +1253,7 @@ export interface Interface {
 interface State {
   models: Map<string, LanguageModelV3>
   providers: Record<ProviderID, Info>
+  catalog: Record<ProviderID, Info>
   proxy: Record<string, string | undefined>
   sdk: Map<string, BundledSDK>
   modelLoaders: Record<string, CustomModelLoader>
@@ -1368,6 +1369,38 @@ export function fromModelsDevProvider(provider: ModelsDev.Provider): Info {
   }
 }
 
+function suggestionModelIDs(provider: Info | undefined) {
+  if (!provider) return []
+  return Object.keys(provider.models).filter((id) => {
+    const model = provider.models[id]
+    if (model.status === "deprecated") return false
+    if (model.status === "alpha" && !Flag.OPENCODE_ENABLE_EXPERIMENTAL_MODELS) return false
+    return true
+  })
+}
+
+function modelSuggestions(provider: Info | undefined, modelID: ModelID) {
+  const available = suggestionModelIDs(provider)
+  const fuzzy = fuzzysort.go(modelID, available, { limit: 3, threshold: -10000 }).map((m) => m.target)
+  if (fuzzy.length) return fuzzy
+  const query = modelID
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((part) => part.length > 1)
+  return sortBy(
+    available
+      .map((id) => ({
+        id,
+        score: query.filter((part) => id.toLowerCase().includes(part)).length,
+      }))
+      .filter((item) => item.score > 0),
+    [(item) => item.score, "desc"],
+    [(item) => item.id, "asc"],
+  )
+    .slice(0, 3)
+    .map((item) => item.id)
+}
+
 const layer: Layer.Layer<
   Service,
   never,
@@ -1389,6 +1422,7 @@ const layer: Layer.Layer<
         applyProviderProxyConfig(cfg)
         const modelsDev = yield* Effect.promise(() => ModelsDev.get())
         const database = mapValues(modelsDev, fromModelsDevProvider)
+        const catalog = { ...database }
 
         const providers: Record<ProviderID, Info> = {} as Record<ProviderID, Info>
         const languages = new Map<string, LanguageModelV3>()
@@ -1708,6 +1742,7 @@ const layer: Layer.Layer<
         return {
           models: languages,
           providers,
+          catalog,
           proxy: Object.fromEntries(
             Object.keys(providers).map((providerID) => [providerID, resolveProviderProxy(cfg, ProviderID.make(providerID))]),
           ),
@@ -1868,16 +1903,20 @@ const layer: Layer.Layer<
       const s = yield* InstanceState.get(state)
       const provider = s.providers[providerID]
       if (!provider) {
-        const available = Object.keys(s.providers)
-        const matches = fuzzysort.go(providerID, available, { limit: 3, threshold: -10000 })
-        throw new ModelNotFoundError({ providerID, modelID, suggestions: matches.map((m) => m.target) })
+        const catalogProvider = s.catalog[providerID]
+        const suggestions = catalogProvider
+          ? modelSuggestions(catalogProvider, modelID)
+          : fuzzysort
+              .go(providerID, Object.keys({ ...s.catalog, ...s.providers }), { limit: 3, threshold: -10000 })
+              .map((m) => m.target)
+        throw new ModelNotFoundError({ providerID, modelID, suggestions })
       }
 
       const info = provider.models[modelID]
       if (!info) {
-        const available = Object.keys(provider.models)
-        const matches = fuzzysort.go(modelID, available, { limit: 3, threshold: -10000 })
-        throw new ModelNotFoundError({ providerID, modelID, suggestions: matches.map((m) => m.target) })
+        const current = modelSuggestions(provider, modelID)
+        const suggestions = current.length ? current : modelSuggestions(s.catalog[providerID], modelID)
+        throw new ModelNotFoundError({ providerID, modelID, suggestions })
       }
       return info
     })
