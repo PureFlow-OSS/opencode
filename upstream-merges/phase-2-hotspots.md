@@ -290,3 +290,18 @@
   - local prompt creation already passes `workspace: props.workspaceID` when `sessionID` is absent
   - adapted the safe local subset by stopping `home.tsx` from injecting the current workspace into the home prompt and related slot
   - left the broader prompt/plugin prop cleanup untouched because the local fork still uses `workspaceID` in other contexts
+
+### `fc0829213` add unknown error references
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/core/src/util/error.ts`
+  - `packages/opencode/src/server/routes/instance/httpapi/middleware/error.ts`
+  - `packages/opencode/test/server/httpapi-error-middleware.test.ts`
+- Risk:
+  - server 500 responses leak stack traces or internal details
+  - no stable error reference for correlating client failures with logs
+- Notes:
+  - local fork routes errors through the global Hono [server/middleware.ts](/C:/Users/Klaus/Desktop/PFH/opencode/packages/opencode/src/server/middleware.ts) instead of an HttpApi-only middleware
+  - adapted the local equivalent: 500 unknown errors now return a safe message plus `ref`, and logs include the same reference id
+  - config-special-case removal from upstream was already effectively covered locally because this middleware had no config-specific bypass
