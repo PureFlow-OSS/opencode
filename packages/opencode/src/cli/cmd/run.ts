@@ -27,6 +27,7 @@ import { BashTool } from "../../tool/bash"
 import { TodoWriteTool } from "../../tool/todo"
 import { Locale } from "../../util"
 import { AppRuntime } from "@/effect/app-runtime"
+import { FormatError, FormatUnknownError } from "../error"
 import { collectReplayBlockers, collectReplayItems } from "./run-replay"
 
 type ToolProps<T> = {
@@ -209,6 +210,10 @@ function normalizePath(input?: string) {
   if (!input) return ""
   if (path.isAbsolute(input)) return path.relative(process.cwd(), input) || "."
   return input
+}
+
+function formatRunError(error: unknown) {
+  return FormatError(error) ?? FormatUnknownError(error)
 }
 
 export const RunCommand = cmd({
@@ -757,7 +762,7 @@ export const RunCommand = cmd({
       })
 
       if (args.command) {
-        await sdk.session.command({
+        const result = await sdk.session.command({
           sessionID,
           agent,
           model: args.model,
@@ -765,15 +770,23 @@ export const RunCommand = cmd({
           arguments: message,
           variant: args.variant,
         })
+        if (result.error) {
+          if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
+          process.exitCode = 1
+        }
       } else {
         const model = args.model ? Provider.parseModel(args.model) : undefined
-        await sdk.session.prompt({
+        const result = await sdk.session.prompt({
           sessionID,
           agent,
           model,
           variant: args.variant,
           parts: [...files, { type: "text", text: message }],
         })
+        if (result.error) {
+          if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
+          process.exitCode = 1
+        }
       }
     }
 
