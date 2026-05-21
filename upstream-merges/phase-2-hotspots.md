@@ -202,6 +202,19 @@
     - pending questions are auto-rejected because local `run` has no interactive answer surface
   - deferred pieces remain the hardest upstream-only parts: live stream boot buffering, duplicate-delta suppression, subagent recovery, and footer/runtime state sync
 
+### `22a5e6cc5` restore non-interactive run exit behavior
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/run.ts`
+- Risk:
+  - non-interactive `run` can hide prompt or command request failures until after the event loop
+  - CLI can exit successfully even when the request itself returned an immediate structured error
+- Notes:
+  - local `run.ts` now checks the direct result of `sdk.session.command(...)` and `sdk.session.prompt(...)` in non-interactive mode
+  - structured request failures are formatted through existing CLI error formatting and set `process.exitCode = 1`
+  - local loop error handling and replay additions remain unchanged
+
 ### `6d2219e00` preserve instance context in async commands
 
 - Status: `covered`
