@@ -654,3 +654,14 @@
 - Notes:
   - local textarea selection copy now lets prompt renderables expand placeholder extmarks back to original pasted text before clipboard write
   - verified with `bun typecheck` in `packages/opencode`
+
+### `4b496066b` update spinner color logic
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/tui/component/prompt/index.tsx`
+- Risk:
+  - active spinner can inherit currently selected agent color instead of agent tied to last user turn, making in-flight status misleading after agent switches
+- Notes:
+  - local spinner color now prefers last user message agent while session is active, then falls back to current agent when idle
+  - verified with `bun typecheck` in `packages/opencode`
