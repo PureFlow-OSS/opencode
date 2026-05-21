@@ -31,11 +31,17 @@ function parse(tip: string): TipPart[] {
 }
 
 const NO_MODELS_TIP = "Run {highlight}/connect{/highlight} to add an AI provider and start coding"
+const NO_MODELS_PARTS = parse(NO_MODELS_TIP)
 
 export function Tips(props: { connected?: boolean }) {
   const theme = useTheme().theme
   const randomTip = TIPS[Math.floor(Math.random() * TIPS.length)]
-  const parts = createMemo(() => parse(props.connected === false ? NO_MODELS_TIP : randomTip))
+  const tip = createMemo(() => (props.connected === false ? NO_MODELS_TIP : randomTip), NO_MODELS_TIP)
+  const parts = createMemo(() => {
+    const value = tip()
+    if (typeof value === "string") return parse(value)
+    return NO_MODELS_PARTS
+  }, NO_MODELS_PARTS)
 
   return (
     <box flexDirection="row" maxWidth="100%">
