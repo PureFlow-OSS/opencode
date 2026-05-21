@@ -134,7 +134,8 @@ export const layer: Layer.Layer<
           // derived Zod object in a `Schema.declare` so it slots into the
           // Schema-typed framework, and annotate with `ZodOverride` so the
           // walker emits the original Zod object for LLM JSON Schema.
-          const zodParams = z.object(def.args)
+          const args = def.args ?? {}
+          const zodParams = z.object(args)
           const parameters = Schema.declare<unknown>((u): u is unknown => zodParams.safeParse(u).success).annotate({
             [ZodOverride]: zodParams,
           })
@@ -153,11 +154,13 @@ export const layer: Layer.Layer<
                 const result = yield* Effect.promise(() => def.execute(args as any, pluginCtx))
                 const output = typeof result === "string" ? result : result.output
                 const metadata = typeof result === "string" ? {} : (result.metadata ?? {})
+                const attachments = typeof result === "string" ? undefined : result.attachments
                 const info = yield* agent.get(toolCtx.agent)
                 const out = yield* truncate.output(output, {}, info)
                 return {
-                  title: "",
+                  title: typeof result === "string" ? "" : (result.title ?? ""),
                   output: out.truncated ? out.content : output,
+                  attachments,
                   metadata: {
                     ...metadata,
                     truncated: out.truncated,
