@@ -1481,6 +1481,7 @@ function TextPart(props: { last: boolean; part: TextPart; message: AssistantMess
               syntaxStyle={syntax()}
               streaming={true}
               content={props.part.text.trim()}
+              tableOptions={{ style: "grid" }}
               conceal={ctx.conceal()}
               fg={theme.markdownText}
               bg={theme.background}
