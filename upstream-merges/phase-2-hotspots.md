@@ -619,3 +619,25 @@
   - plugin tools now precompute `jsonSchema` from their original Zod instance
   - local tool registry prefers plugin-supplied schema and only falls back to local conversion when needed
   - verified with `bun typecheck` in `packages/plugin` and `packages/opencode`
+
+### `ff9d7cab5` fix file references in workspaces
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/tui/component/dialog-tag.tsx`
+  - `packages/opencode/src/cli/cmd/tui/component/prompt/autocomplete.tsx`
+- Risk:
+  - file search mentions can leak across workspaces and suggest wrong files when TUI is pointed at non-default project
+- Notes:
+  - local TUI file lookups now pass current workspace into `sdk.client.find.files(...)`
+
+### `d353a6bc2` accept missing worktree create payload
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/server/routes/instance/httpapi/experimental.ts`
+- Risk:
+  - clients posting `/experimental/worktree` without JSON body can fail schema decode before handler sees optional payload
+- Notes:
+  - local route now uses `disableCodecs: true` plus `Schema.UndefinedOr(Worktree.CreateInput)` to accept empty-body create requests
+  - verified with `bun typecheck` in `packages/opencode`
