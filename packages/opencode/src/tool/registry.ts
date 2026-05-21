@@ -51,6 +51,7 @@ import { Agent } from "../agent/agent"
 import { Skill } from "../skill"
 import { Permission } from "@/permission"
 import * as BashProcess from "./bash-process"
+import { EffectBridge } from "@/effect"
 
 const log = Log.create({ service: "tool.registry" })
 
@@ -136,8 +137,12 @@ export const layer: Layer.Layer<
           // walker emits the original Zod object for LLM JSON Schema.
           const args = def.args ?? {}
           const zodParams = z.object(args)
+          const jsonSchema =
+            def.jsonSchema && typeof def.jsonSchema === "object"
+              ? def.jsonSchema
+              : z.toJSONSchema(zodParams, { target: "draft-7", io: "input" })
           const parameters = Schema.declare<unknown>((u): u is unknown => zodParams.safeParse(u).success).annotate({
-            [ZodOverride]: zodParams,
+            [ZodOverride]: jsonSchema,
           })
           return {
             id,
@@ -145,13 +150,14 @@ export const layer: Layer.Layer<
             description: def.description,
             execute: (args, toolCtx) =>
               Effect.gen(function* () {
+                const bridge = yield* EffectBridge.make().pipe(Effect.orDie)
                 const pluginCtx: PluginToolContext = {
                   ...toolCtx,
-                  ask: (req) => toolCtx.ask(req),
+                  ask: (req) => bridge.promise(toolCtx.ask(req)),
                   directory: ctx.directory,
                   worktree: ctx.worktree,
                 }
-                const result = yield* Effect.promise(() => def.execute(args as any, pluginCtx))
+                const result = yield* Effect.promise(() => def.execute(args as any, pluginCtx)).pipe(Effect.orDie)
                 const output = typeof result === "string" ? result : result.output
                 const metadata = typeof result === "string" ? {} : (result.metadata ?? {})
                 const attachments = typeof result === "string" ? undefined : result.attachments
