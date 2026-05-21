@@ -446,3 +446,19 @@
 - Notes:
   - added a shared in-flight refresh promise inside the OAuth fetch wrapper
   - also exposed injectable issuer/API endpoint options for deterministic test coverage of the refresh path
+
+### `4487fbf52` support PDF attachments for xAI/Grok
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `package.json`
+  - `packages/opencode/src/session/message-v2.ts`
+  - `patches/@ai-sdk%2Fxai@3.0.82.patch`
+- Risk:
+  - tool-result attachments for xAI/Grok can send unsupported PDFs inline
+  - PDF attachments can fail later in the xAI responses adapter even though image attachments work
+- Notes:
+  - adapted local `message-v2.ts` to use MIME-aware tool-result attachment support instead of a single provider-wide boolean
+  - xAI and Bedrock now keep image tool-result attachments inline but replay unsupported PDFs as synthetic user file inputs
+  - added the upstream-style `@ai-sdk/xai@3.0.82` patch so `application/pdf` user file parts map to `input_file`
+  - verified with targeted `session/message-v2` regression coverage; no session-loading paths touched
