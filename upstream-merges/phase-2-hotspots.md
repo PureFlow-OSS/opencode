@@ -519,3 +519,19 @@
   - local `message-v2.ts` now substitutes `" "` for empty assistant text separators when same turn contains signed Anthropic or Bedrock reasoning
   - keeps replay/grouping positions stable without changing unsigned reasoning or ordinary assistant text behavior
   - verified with `bun typecheck` in `packages/opencode`
+
+### `c6e6bdf59` tolerate negative token counts in stored parts
+
+- Status: `done` with local partial adaptation
+- Upstream files:
+  - `packages/opencode/src/session/message-v2.ts`
+  - `packages/opencode/src/session/message.ts`
+  - `packages/opencode/src/session/session.ts`
+  - `packages/opencode/src/v2/session-event.ts`
+- Risk:
+  - derived token math can go negative with legacy or malformed provider usage payloads
+  - negative token counts can propagate into persisted assistant parts and cost display
+- Notes:
+  - local schemas already tolerate numeric token values broadly, so upstream schema widening was effectively already covered
+  - adapted missing runtime piece: `getUsage(...)` now clamps finite negative derived token counts back to `0`
+  - verified with `bun typecheck` in `packages/opencode`
