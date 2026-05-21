@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test"
-import { Effect, Layer, ManagedRuntime, Schema } from "effect"
+import { Cause, Effect, Exit, Layer, ManagedRuntime, Schema } from "effect"
 import { Agent } from "../../src/agent/agent"
 import { MessageID, SessionID } from "../../src/session/schema"
 import { Tool } from "../../src/tool"
@@ -8,6 +8,22 @@ import { Truncate } from "../../src/tool"
 const runtime = ManagedRuntime.make(Layer.mergeAll(Truncate.defaultLayer, Agent.defaultLayer))
 
 const params = Schema.Struct({ input: Schema.String })
+
+function makeCtx(): Tool.Context {
+  return {
+    sessionID: SessionID.descending(),
+    messageID: MessageID.ascending(),
+    agent: "build",
+    abort: new AbortController().signal,
+    messages: [],
+    metadata() {
+      return Effect.void
+    },
+    ask() {
+      return Effect.void
+    },
+  }
+}
 
 function makeTool(id: string, executeFn?: () => void) {
   return {
@@ -75,25 +91,50 @@ describe("Tool.define", () => {
         }),
       ),
     )
-    const ctx: Tool.Context = {
-      sessionID: SessionID.descending(),
-      messageID: MessageID.ascending(),
-      agent: "build",
-      abort: new AbortController().signal,
-      messages: [],
-      metadata() {
-        return Effect.void
-      },
-      ask() {
-        return Effect.void
-      },
-    }
     const tool = await Effect.runPromise(info.init())
     const execute = tool.execute as unknown as (args: unknown, ctx: Tool.Context) => ReturnType<typeof tool.execute>
 
-    await Effect.runPromise(execute({}, ctx))
-    await Effect.runPromise(execute({ count: "7" }, ctx))
+    await Effect.runPromise(execute({}, makeCtx()))
+    await Effect.runPromise(execute({ count: "7" }, makeCtx()))
 
     expect(calls).toEqual([{ count: 5 }, { count: 7 }])
+  })
+
+  test("invalid args surface as Tool.InvalidArgumentsError with friendly message", async () => {
+    const parameters = Schema.Struct({
+      questions: Schema.Array(
+        Schema.Struct({
+          question: Schema.String,
+          options: Schema.Array(Schema.String),
+        }),
+      ),
+    })
+    const info = await runtime.runPromise(
+      Tool.define(
+        "qtest",
+        Effect.succeed({
+          description: "test tool",
+          parameters,
+          execute() {
+            return Effect.succeed({ title: "ok", output: "ok", metadata: { truncated: false } })
+          },
+        }),
+      ),
+    )
+    const tool = await Effect.runPromise(info.init())
+    const execute = tool.execute as unknown as (args: unknown, ctx: Tool.Context) => ReturnType<typeof tool.execute>
+
+    const exit = await Effect.runPromise(execute({ questions: [{ options: ["a"] }] }, makeCtx()).pipe(Effect.exit))
+    expect(Exit.isFailure(exit)).toBe(true)
+    if (!Exit.isFailure(exit)) return
+
+    const die = exit.cause.reasons.find(Cause.isDieReason)
+    const error = die?.defect
+    expect(error).toBeInstanceOf(Tool.InvalidArgumentsError)
+    const args = error as Tool.InvalidArgumentsError
+    expect(args.tool).toBe("qtest")
+    expect(args.message).toContain("qtest tool was called with invalid arguments")
+    expect(args.message).toContain("Please rewrite the input")
+    expect(args.message).toContain(`["questions"][0]["question"]`)
   })
 })
