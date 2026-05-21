@@ -471,6 +471,8 @@ export const RunCommand = cmd({
       let error: string | undefined
       const replayedMessageIDs = new Set<string>()
       const replayedPartIDs = new Set<string>()
+      let turnArmed = false
+      let turnLive = false
 
       async function loop() {
         const toggles = new Map<string, boolean>()
@@ -482,6 +484,7 @@ export const RunCommand = cmd({
             args.format !== "json" &&
             toggles.get("start") !== true
           ) {
+            if (turnArmed) turnLive = true
             if (replayedMessageIDs.delete(event.properties.info.id)) continue
             UI.empty()
             UI.println(`> ${event.properties.info.agent} · ${event.properties.info.modelID}`)
@@ -492,6 +495,7 @@ export const RunCommand = cmd({
           if (event.type === "message.part.updated") {
             const part = event.properties.part
             if (part.sessionID !== sessionID) continue
+            if (turnArmed) turnLive = true
             if (replayedPartIDs.delete(part.id)) continue
 
             if (part.type === "tool" && (part.state.status === "completed" || part.state.status === "error")) {
@@ -557,6 +561,7 @@ export const RunCommand = cmd({
           if (event.type === "session.error") {
             const props = event.properties
             if (props.sessionID !== sessionID || !props.error) continue
+            if (turnArmed) turnLive = true
             let err = String(props.error.name)
             if ("data" in props.error && props.error.data && "message" in props.error.data) {
               err = String(props.error.data.message)
@@ -569,7 +574,9 @@ export const RunCommand = cmd({
           if (
             event.type === "session.status" &&
             event.properties.sessionID === sessionID &&
-            event.properties.status.type === "idle"
+            event.properties.status.type === "idle" &&
+            turnArmed &&
+            turnLive
           ) {
             break
           }
@@ -577,6 +584,7 @@ export const RunCommand = cmd({
           if (event.type === "permission.asked") {
             const permission = event.properties
             if (permission.sessionID !== sessionID) continue
+            if (turnArmed) turnLive = true
 
             if (args["dangerously-skip-permissions"]) {
               await sdk.permission.reply({
@@ -772,6 +780,8 @@ export const RunCommand = cmd({
       })
 
       if (args.command) {
+        turnArmed = true
+        turnLive = false
         const result = await sdk.session.command({
           sessionID,
           agent,
@@ -786,6 +796,8 @@ export const RunCommand = cmd({
         }
       } else {
         const model = args.model ? Provider.parseModel(args.model) : undefined
+        turnArmed = true
+        turnLive = false
         const result = await sdk.session.prompt({
           sessionID,
           agent,
