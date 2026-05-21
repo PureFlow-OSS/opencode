@@ -137,7 +137,8 @@ export const ExperimentalApi = HttpApi.make("experimental")
           }),
         ),
         HttpApiEndpoint.post("worktreeCreate", ExperimentalPaths.worktree, {
-          payload: Schema.optional(Worktree.CreateInput),
+          disableCodecs: true,
+          payload: Schema.UndefinedOr(Worktree.CreateInput),
           success: Worktree.Info,
         }).annotateMerge(
           OpenApi.annotations({
