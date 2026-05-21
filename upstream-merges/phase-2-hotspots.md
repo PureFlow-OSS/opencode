@@ -242,6 +242,7 @@
   - adapted the eager-subscription subset only: `Bus.Service.subscribe(...)` and `subscribeAll(...)` now acquire the underlying `PubSub` subscription in caller scope at `yield*` time
   - updated local effect-native call sites in plugin hooks, share cache listeners, VCS branch watcher, and HttpApi event route
   - added regression coverage for both direct `subscribe(...)` buffering and the `/event`-style concat-prefix handoff
+  - local follow-up: plugin hook fanout stayed on `subscribeAllCallback(...)` because the current plugin state init path is not fully `scoped` and otherwise stalled loader tests on this fork
 
 ### `6d2219e00` preserve instance context in async commands
 
