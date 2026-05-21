@@ -233,3 +233,15 @@
 - Notes:
   - made question text container scrollable
   - changed question options list from `flex: 1` to `flex-shrink: 0` to avoid layout collapse
+
+### `367665dba` render tagged config errors
+
+- Status: `done`
+- Upstream files:
+  - `packages/opencode/src/cli/error.ts`
+  - `packages/opencode/test/cli/error.test.ts`
+- Risk:
+  - tagged config errors render poorly or lose structured details in the CLI
+- Notes:
+  - expanded config error formatting to support both legacy `name + data` and tagged `_tag` error shapes
+  - added regression coverage for config json, directory typo, frontmatter, and schema-invalid cases
