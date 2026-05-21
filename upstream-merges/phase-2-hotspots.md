@@ -245,3 +245,18 @@
 - Notes:
   - expanded config error formatting to support both legacy `name + data` and tagged `_tag` error shapes
   - added regression coverage for config json, directory typo, frontmatter, and schema-invalid cases
+
+### `43c24d8d0` gate Zed context on terminal env
+
+- Status: `done`
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/tui/context/editor-zed.ts`
+  - `packages/opencode/src/cli/cmd/tui/context/editor.ts`
+  - `packages/opencode/test/cli/tui/editor-context-zed.test.ts`
+- Risk:
+  - non-Zed terminals probe Zed sqlite state unnecessarily
+  - false-positive editor context enablement outside Zed
+- Notes:
+  - adapted only the terminal gating and regression coverage
+  - intentionally skipped the unrelated `config-service` refactor from the same upstream commit
+  - local TUI now only falls back to Zed DB selection when running inside a Zed terminal

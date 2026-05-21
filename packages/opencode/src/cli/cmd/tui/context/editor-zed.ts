@@ -109,6 +109,10 @@ export function resolveZedDbPath() {
   return candidates.find((item) => Filesystem.stat(item)?.isFile())
 }
 
+export function isZedTerminal() {
+  return process.env.ZED_TERM === "true" || process.env.TERM_PROGRAM?.toLowerCase() === "zed"
+}
+
 function scoreZedWorkspace(workspacePaths: string | null, cwd: string) {
   return zedWorkspacePaths(workspacePaths).reduce((score, item) => {
     if (pathContains(item, cwd)) return Math.max(score, 2)
