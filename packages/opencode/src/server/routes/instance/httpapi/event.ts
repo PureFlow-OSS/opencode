@@ -19,7 +19,9 @@ export const eventRoute = HttpRouter.add(
   EventPaths.event,
   Effect.gen(function* () {
     const bus = yield* Bus.Service
-    const events = bus.subscribeAll().pipe(Stream.takeUntil((event) => event.type === Bus.InstanceDisposed.type))
+    const events = (yield* bus.subscribeAll()).pipe(
+      Stream.takeUntil((event) => event.type === Bus.InstanceDisposed.type),
+    )
     const heartbeat = Stream.tick("10 seconds").pipe(
       Stream.drop(1),
       Stream.map(() => ({ type: "server.heartbeat", properties: {} })),
