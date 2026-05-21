@@ -345,3 +345,15 @@
 - Notes:
   - switched `Question.ask` from sync decode to effectful decode with a friendly rewrite hint
   - invalid payloads now reject with a readable tool-facing error message instead of exploding at the decode boundary
+
+### `69eee26f3` drop redundant inner decode in permission ask
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/permission/index.ts`
+- Risk:
+  - redundant inner decode can throw unexpectedly despite already-typed ask input
+  - permission request creation does unnecessary schema work on the hot path
+- Notes:
+  - local fork kept the existing `Request` class shape, but removed the redundant `decodeUnknownSync` inside `Permission.ask`
+  - `Permission.ask` now builds the already-typed request object directly from validated input
