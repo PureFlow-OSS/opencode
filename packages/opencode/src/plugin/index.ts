@@ -240,17 +240,11 @@ export const layer = Layer.effect(
           }).pipe(Effect.ignore)
         }
 
-        // Subscribe to bus events, fiber interrupted when scope closes
-        yield* (yield* bus.subscribeAll()).pipe(
-          Stream.runForEach((input) =>
-            Effect.sync(() => {
-              for (const hook of hooks) {
-                void hook["event"]?.({ event: input as any })
-              }
-            }),
-          ),
-          Effect.forkScoped,
-        )
+        yield* bus.subscribeAllCallback((input) => {
+          for (const hook of hooks) {
+            void hook["event"]?.({ event: input as any })
+          }
+        })
 
         return { hooks }
       }),

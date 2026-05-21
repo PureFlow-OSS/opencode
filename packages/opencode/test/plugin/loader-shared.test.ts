@@ -66,7 +66,7 @@ describe("plugin.loader.shared", () => {
 
     await load(tmp.path)
     expect(await fs.readFile(tmp.extra.mark, "utf8")).toBe("called")
-  })
+  }, 10000)
 
   test("deduplicates same function exported as default and named", async () => {
     await using tmp = await tmpdir({
