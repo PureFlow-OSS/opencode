@@ -139,6 +139,7 @@ sealed class UpdaterBetaOptions
   public bool Enabled { get; set; }
   public string HeaderName { get; set; } = "X-OpenCode-AiFactory-Api-Key";
   public string[] Groups { get; set; } = [];
+  public string[] Users { get; set; } = [];
   public LiteLLMBetaOptions LiteLLM { get; set; } = new();
 }
 
@@ -146,6 +147,7 @@ sealed class LiteLLMBetaOptions
 {
   public string BaseUrl { get; set; } = "";
   public string KeyInfoPath { get; set; } = "/key/info";
+  public string ApiKey { get; set; } = "";
 }
 
 sealed record UpdaterRollout(UpdaterOptions Options, string Version, bool IsBeta, string? BetaToken = null);
@@ -346,7 +348,7 @@ sealed class UpdaterRolloutResolver(
     }
 
     var beta = betaOptions.Value;
-    if (!beta.Enabled || beta.Groups.Length == 0) return CreateRollout(options.CurrentValue, false, null);
+    if (!beta.Enabled || !HasBetaRules(beta)) return CreateRollout(options.CurrentValue, false, null);
     if (string.IsNullOrWhiteSpace(beta.LiteLLM.BaseUrl)) return CreateRollout(options.CurrentValue, false, null);
 
     var key = request.Headers[beta.HeaderName].FirstOrDefault()?.Trim();
@@ -384,8 +386,8 @@ sealed class UpdaterRolloutResolver(
     var cacheKey = $"beta:{ComputeHash(key)}";
     if (cache.TryGetValue(cacheKey, out bool cached)) return cached;
 
-    using var request = new HttpRequestMessage(HttpMethod.Get, BuildLiteLLMKeyInfoUrl(beta));
-    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", key);
+    using var request = new HttpRequestMessage(HttpMethod.Get, BuildLiteLLMKeyInfoUrl(beta, key));
+    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ResolveLiteLLMApiKey(beta, key));
 
     try
     {
@@ -399,8 +401,10 @@ sealed class UpdaterRolloutResolver(
       await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
       using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
       var groups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+      var users = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
       CollectGroupCandidates(document.RootElement, groups);
-      var match = beta.Groups.Any((group) => groups.Contains(group));
+      CollectUserCandidates(document.RootElement, users);
+      var match = MatchesGroups(beta, groups) || MatchesUsers(beta, users);
       cache.Set(cacheKey, match, TimeSpan.FromMinutes(5));
       return match;
     }
@@ -411,9 +415,31 @@ sealed class UpdaterRolloutResolver(
     }
   }
 
-  static string BuildLiteLLMKeyInfoUrl(UpdaterBetaOptions beta)
+  static bool HasBetaRules(UpdaterBetaOptions beta)
   {
-    return $"{beta.LiteLLM.BaseUrl.TrimEnd('/')}/{beta.LiteLLM.KeyInfoPath.TrimStart('/')}";
+    return beta.Groups.Length > 0 || beta.Users.Length > 0;
+  }
+
+  static bool MatchesGroups(UpdaterBetaOptions beta, HashSet<string> groups)
+  {
+    return beta.Groups.Any((group) => groups.Contains(group));
+  }
+
+  static bool MatchesUsers(UpdaterBetaOptions beta, HashSet<string> users)
+  {
+    return beta.Users.Any((user) => users.Contains(user));
+  }
+
+  static string ResolveLiteLLMApiKey(UpdaterBetaOptions beta, string userKey)
+  {
+    return string.IsNullOrWhiteSpace(beta.LiteLLM.ApiKey) ? userKey : beta.LiteLLM.ApiKey.Trim();
+  }
+
+  static string BuildLiteLLMKeyInfoUrl(UpdaterBetaOptions beta, string userKey)
+  {
+    var url = $"{beta.LiteLLM.BaseUrl.TrimEnd('/')}/{beta.LiteLLM.KeyInfoPath.TrimStart('/')}";
+    if (string.IsNullOrWhiteSpace(beta.LiteLLM.ApiKey)) return url;
+    return $"{url}?key={Uri.EscapeDataString(userKey)}";
   }
 
   static string ComputeHash(string value)
@@ -456,6 +482,46 @@ sealed class UpdaterRolloutResolver(
     }
   }
 
+  static void CollectUserCandidates(JsonElement value, HashSet<string> output)
+  {
+    switch (value.ValueKind)
+    {
+      case JsonValueKind.Object:
+        foreach (var property in value.EnumerateObject())
+        {
+          if (property.Value.ValueKind == JsonValueKind.String && IsUserField(property.Name))
+          {
+            AddCandidate(output, property.Value.GetString());
+            if (property.Name.Equals("key_alias", StringComparison.OrdinalIgnoreCase))
+              AddCandidate(output, property.Value.GetString()?.Split(" - ", 2, StringSplitOptions.TrimEntries)[0]);
+            continue;
+          }
+
+          if (property.Value.ValueKind == JsonValueKind.Array && IsUserField(property.Name))
+          {
+            foreach (var item in property.Value.EnumerateArray())
+            {
+              if (item.ValueKind != JsonValueKind.String) continue;
+              AddCandidate(output, item.GetString());
+            }
+            continue;
+          }
+
+          CollectUserCandidates(property.Value, output);
+        }
+        break;
+      case JsonValueKind.Array:
+        foreach (var item in value.EnumerateArray()) CollectUserCandidates(item, output);
+        break;
+    }
+  }
+
+  static void AddCandidate(HashSet<string> output, string? value)
+  {
+    var text = value?.Trim();
+    if (!string.IsNullOrWhiteSpace(text)) output.Add(text);
+  }
+
   static bool IsGroupField(string name)
   {
     return name.Equals("group", StringComparison.OrdinalIgnoreCase) ||
@@ -464,5 +530,16 @@ sealed class UpdaterRolloutResolver(
       name.Equals("team_alias", StringComparison.OrdinalIgnoreCase) ||
       name.Equals("team", StringComparison.OrdinalIgnoreCase) ||
       name.Equals("tags", StringComparison.OrdinalIgnoreCase);
+  }
+
+  static bool IsUserField(string name)
+  {
+    return name.Equals("user", StringComparison.OrdinalIgnoreCase) ||
+      name.Equals("users", StringComparison.OrdinalIgnoreCase) ||
+      name.Equals("username", StringComparison.OrdinalIgnoreCase) ||
+      name.Equals("user_name", StringComparison.OrdinalIgnoreCase) ||
+      name.Equals("display_name", StringComparison.OrdinalIgnoreCase) ||
+      name.Equals("key_alias", StringComparison.OrdinalIgnoreCase) ||
+      name.Equals("key_name", StringComparison.OrdinalIgnoreCase);
   }
 }
