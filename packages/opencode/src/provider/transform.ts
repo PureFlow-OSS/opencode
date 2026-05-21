@@ -466,6 +466,7 @@ function gpt5ChatReasoningEfforts(apiId: string) {
 
 function openaiReasoningEfforts(apiId: string, releaseDate: string) {
   const id = apiId.toLowerCase()
+  if (id.includes("deep-research")) return ["medium"]
   const chatEfforts = gpt5ChatReasoningEfforts(id)
   if (chatEfforts) return chatEfforts
   if (GPT5_PRO_RE.test(id)) return OPENAI_GPT5_PRO_EFFORTS
@@ -725,6 +726,10 @@ export function variants(model: Provider.Model): Record<string, Record<string, a
             },
           ]),
         )
+      }
+
+      if (["opus-4-5", "opus-4.5"].some((v) => model.api.id.includes(v))) {
+        return Object.fromEntries(WIDELY_SUPPORTED_EFFORTS.map((effort) => [effort, { effort }]))
       }
 
       return {
