@@ -244,6 +244,20 @@
   - added regression coverage for both direct `subscribe(...)` buffering and the `/event`-style concat-prefix handoff
   - local follow-up: plugin hook fanout stayed on `subscribeAllCallback(...)` because the current plugin state init path is not fully `scoped` and otherwise stalled loader tests on this fork
 
+### `5911bd532` show config error details on startup
+
+- Status: `done` with local partial adaptation
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/tui/context/aggregate-failures.ts`
+  - `packages/opencode/src/cli/error.ts`
+- Risk:
+  - startup/config failures collapse into generic transport errors
+  - nested config validation bodies from SDK/client calls lose their useful details in the TUI
+- Notes:
+  - local fork does not have the same `aggregate-failures.ts` structure, but `app.tsx` already routes startup errors through `FormatError(...)`
+  - adapted the compatible core subset in `cli/error.ts`: nested `Error.cause.body` payloads are now recursively formatted, especially for config validation/json errors
+  - added regression coverage that wrapped config bodies surface path + issue details instead of only the outer error label
+
 ### `6d2219e00` preserve instance context in async commands
 
 - Status: `covered`
