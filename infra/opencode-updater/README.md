@@ -18,10 +18,10 @@ If client sends `X-OpenCode-AiFactory-Api-Key`, updater can evaluate beta rollou
 
 1. Edit `appsettings.json`
 2. Optionally edit `appsettings.beta.json` for key-based beta rollout
-2. Put a `feed/latest.yml` with `version:` if you want stable version to come from local feed
-3. Optionally put beta artifacts under `feed/beta/` with its own `latest.yml`
-4. `Updater.Version` / `appsettings.beta.json -> Updater.Version` are fallback when no matching local `latest.yml` exists
-5. Restart container
+3. Put a `feed/latest.yml` with `version:` if you want stable version to come from local feed
+4. Optionally put beta artifacts under `feed/beta/` with its own `latest.yml`
+5. `Updater.Version` / `appsettings.beta.json -> Updater.Version` are fallback when no matching local `latest.yml` exists
+6. Restart container
 
 ## Provider config
 
@@ -31,7 +31,7 @@ Set `ProviderConfig.model` to provision the default model. Local or project conf
 Set `ProviderConfig.small_model` to provision the default small model.
 Set `ProviderConfig.aifactory.model_visibility` to override default visibility for AI Factory models in the client.
 
-Requests may include `X-OpenCode-AiFactory-Api-Key`. When `UpdaterBeta.Enabled` is `true`, server calls LiteLLM `key/info` with that key, collects common group fields like `groups`, `group`, `team_id`, `team_alias`, and serves `appsettings.beta.json` when any configured `UpdaterBeta.Groups` value matches.
+Requests may include `X-OpenCode-AiFactory-Api-Key`. When `UpdaterBeta.Enabled` is `true`, server calls LiteLLM `key/info`, collects common group fields like `groups`, `group`, `team_id`, `team_alias`, `team`, and `tags`, plus user-like fields such as `username`, `display_name`, `key_alias`, and `key_name`, and serves `appsettings.beta.json` when any configured `UpdaterBeta.Groups` or `UpdaterBeta.Users` value matches.
 
 `/opencode/url` and `/opencode/config` return a feed URL with a short-lived hashed `beta` token for matched beta users so downstream feed requests stay on beta config without exposing raw API keys.
 
@@ -47,6 +47,105 @@ When beta user is matched, updater first looks in `feed/beta/`. Stable users kee
 `GET /opencode/changelog.md` returns markdown changelog from matching feed directory using same stable/beta resolution as update files.
 
 ## Beta rollout
+
+The updater only switches a request to beta when all of these are true:
+
+1. `UpdaterBeta.Enabled` is `true`
+2. `UpdaterBeta.Groups` or `UpdaterBeta.Users` contains at least one match rule
+3. `UpdaterBeta.LiteLLM.BaseUrl` is configured
+4. Request contains the configured header, usually `X-OpenCode-AiFactory-Api-Key`
+5. `GET {LiteLLM.BaseUrl}{KeyInfoPath}` returns `2xx`
+6. At least one configured group or user matches a value found in LiteLLM `key/info`
+
+Important behavior:
+
+- `appsettings.json` stays the stable config
+- `appsettings.beta.json` is only used for requests that match beta rollout
+- for beta requests, `Updater` values from `appsettings.beta.json` override stable values
+- if `Updater.PublicBaseUrl` is missing in `appsettings.beta.json`, beta falls back to the stable `Updater.PublicBaseUrl`
+- if `feed/beta/latest.yml` exists, beta users get that version first
+- if `feed/beta/latest.yml` does not exist, beta users fall back to `appsettings.beta.json -> Updater.Version`
+- if `UpdaterBeta.LiteLLM.ApiKey` is set, updater calls LiteLLM with that admin key and passes the user key as `?key=<user-key>`
+- if `UpdaterBeta.LiteLLM.ApiKey` is empty, updater uses the user key itself as `Authorization: Bearer <user-key>`
+- URLs in JSON must be quoted strings
+
+### Matching logic
+
+The updater walks the LiteLLM `key/info` JSON recursively and collects string values from these field names:
+
+- `group`
+- `groups`
+- `team_id`
+- `team_alias`
+- `team`
+- `tags`
+
+It also collects user-like string values from:
+
+- `user`
+- `users`
+- `username`
+- `user_name`
+- `display_name`
+- `key_alias`
+- `key_name`
+
+Matching is case-insensitive.
+
+- `UpdaterBeta.Groups` should contain the exact group or tag names that LiteLLM returns for the API key
+- `UpdaterBeta.Users` should contain the exact user names you want to allow
+- for `key_alias`, updater also accepts the part before `" - "`, so `Klaus Scheiböck` matches `Klaus Scheiböck - DEV`
+
+### Minimal working setup
+
+Stable config in `appsettings.json`:
+
+```json
+{
+  "Updater": {
+    "Version": "1.14.31",
+    "PublicBaseUrl": "http://opencode.pfcicd.local.programmierfabrik.at",
+    "Motd": {
+      "text": "RRZ AI Factory",
+      "enabled": true
+    }
+  }
+}
+```
+
+Beta config in `appsettings.beta.json`:
+
+```json
+{
+  "Updater": {
+    "Version": "1.14.38",
+    "PublicBaseUrl": "http://opencode.pfcicd.local.programmierfabrik.at",
+    "Motd": {
+      "text": "RRZ AI Factory",
+      "enabled": true
+    }
+  },
+  "UpdaterBeta": {
+    "Enabled": true,
+    "HeaderName": "X-OpenCode-AiFactory-Api-Key",
+    "Groups": [],
+    "Users": ["Klaus Scheiböck"],
+    "LiteLLM": {
+      "BaseUrl": "http://10.53.7.23",
+      "KeyInfoPath": "/key/info",
+      "ApiKey": "sk-management-key"
+    }
+  }
+}
+```
+
+With that setup:
+
+- users without the header stay on stable
+- users with a non-matching key stay on stable
+- users with a matching key switch to beta and receive version `1.14.38` unless `feed/beta/latest.yml` overrides it
+
+This setup is useful when normal user keys are not allowed to call LiteLLM management routes directly. In that case the updater uses `LiteLLM.ApiKey` for `/key/info` and checks the end-user key passed in the updater header via `?key=<user-key>`.
 
 Example `appsettings.beta.json`:
 
@@ -70,15 +169,42 @@ Example `appsettings.beta.json`:
     "Enabled": true,
     "HeaderName": "X-OpenCode-AiFactory-Api-Key",
     "Groups": ["desktop-beta", "early-access"],
+    "Users": ["Klaus Scheiböck"],
     "LiteLLM": {
       "BaseUrl": "https://litellm.example.com",
-      "KeyInfoPath": "/key/info"
+      "KeyInfoPath": "/key/info",
+      "ApiKey": "sk-management-key"
     }
   }
 }
 ```
 
 Only AI Factory key is forwarded by client-side rollout fetches. Other provider keys are ignored.
+
+### Troubleshooting
+
+If beta does not activate, check these first:
+
+1. `PublicBaseUrl` and `LiteLLM.BaseUrl` are valid JSON strings with quotes
+2. client really sends the header named in `UpdaterBeta.HeaderName`
+3. LiteLLM `key/info` is reachable from the updater container
+4. LiteLLM `key/info` returns one of your expected values in `group`, `groups`, `team_id`, `team_alias`, `team`, `tags`, `username`, `display_name`, `key_alias`, or `key_name`
+5. `UpdaterBeta.Groups` or `UpdaterBeta.Users` contains that value exactly, apart from letter case
+6. `appsettings.beta.json` is mounted into the container and the service was restarted after the change
+
+Helpful checks:
+
+```powershell
+curl http://localhost:8080/opencode/version
+curl -H "X-OpenCode-AiFactory-Api-Key: <key>" http://localhost:8080/opencode/version
+curl -H "Authorization: Bearer <key>" http://opencode.pfcicd.local.programmierfabrik.at/key/info
+curl -H "Authorization: Bearer <admin-key>" "http://10.53.7.23/key/info?key=<user-key>"
+```
+
+Expected result:
+
+- first call returns stable version
+- second call returns beta version only when the key matches `UpdaterBeta.Groups` or `UpdaterBeta.Users`
 
 ## Full sample config
 
