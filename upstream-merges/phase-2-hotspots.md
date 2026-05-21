@@ -549,3 +549,28 @@
   - local provider state now keeps raw `catalog` alongside active `providers`
   - `ModelNotFoundError` suggestions now fall back to catalog models/providers, filtering deprecated and hidden alpha models same as upstream intent
   - verified with `bun typecheck` in `packages/opencode`
+
+### `1cf8123bc` align GPT-5 reasoning variants
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/provider/transform.ts`
+  - `packages/opencode/test/provider/transform.test.ts`
+- Risk:
+  - GPT-5 family variants drift across `gpt-5`, `gpt-5.1+`, `codex`, `pro`, and `chat`, causing bad default efforts or unsupported controls
+  - OpenAI-compatible and gateway providers can expose wrong reasoning tiers for newer GPT-5 variants
+- Notes:
+  - local provider transform now derives GPT-5 effort tiers from model family/version, including `pro`, `chat`, and `codex` exceptions
+  - small-model defaults now avoid forcing unsupported reasoning on `gpt-5-chat` and `search-api` variants
+
+### `c36ab3f93` align Gemini thinking controls
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/provider/transform.ts`
+  - `packages/opencode/test/provider/transform.test.ts`
+- Risk:
+  - Gemini 2.5/3 reasoning controls differ by family and image/flash/pro variants, so static defaults can send unsupported `thinkingLevel` or wrong budget caps
+- Notes:
+  - local provider transform now computes Gemini thinking levels and max budgets from model ID instead of using single hardcoded defaults
+  - Google small-model defaults now choose `thinkingLevel` or `thinkingBudget` per family
