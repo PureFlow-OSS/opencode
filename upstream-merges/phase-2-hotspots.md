@@ -462,3 +462,18 @@
   - xAI and Bedrock now keep image tool-result attachments inline but replay unsupported PDFs as synthetic user file inputs
   - added the upstream-style `@ai-sdk/xai@3.0.82` patch so `application/pdf` user file parts map to `input_file`
   - verified with targeted `session/message-v2` regression coverage; no session-loading paths touched
+
+### `82b796ce3` return session busy error bodies
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/server/routes/instance/httpapi/groups/session.ts`
+  - `packages/opencode/src/server/routes/instance/httpapi/handlers/session-errors.ts`
+  - `packages/opencode/test/server/httpapi-session.test.ts`
+- Risk:
+  - busy experimental session routes collapse into generic failures
+  - clients cannot distinguish retryable busy state from malformed requests
+- Notes:
+  - local fork still keeps the experimental HttpApi session surface in one file, so this was adapted in-place instead of following the upstream groups/handlers split
+  - added a local `SessionBusyHttpApiError` with `409` status and mapped busy promise rejections on the affected routes: `shell`, `revert`, `unrevert`, and `deleteMessage`
+  - added regression coverage for the busy-error mapping helper and kept the existing HttpApi session route suite green
