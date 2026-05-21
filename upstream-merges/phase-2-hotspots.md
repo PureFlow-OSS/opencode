@@ -332,3 +332,16 @@
 - Notes:
   - local fork does not have the same collapsed/expanded reasoning UI as upstream in this codepath
   - adapted only the safe local subset: visible reasoning blocks now use the simpler indentation-only styling instead of the extra left border
+
+### `26008696e` surface schema failures as friendly tool errors
+
+- Status: `done`
+- Upstream files:
+  - `packages/opencode/src/question/index.ts`
+  - `packages/opencode/test/question/question.test.ts`
+- Risk:
+  - invalid question-tool payloads can throw uncaught schema errors
+  - assistant turn dies instead of getting a retryable tool error
+- Notes:
+  - switched `Question.ask` from sync decode to effectful decode with a friendly rewrite hint
+  - invalid payloads now reject with a readable tool-facing error message instead of exploding at the decode boundary
