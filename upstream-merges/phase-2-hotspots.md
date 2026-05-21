@@ -676,3 +676,16 @@
 - Notes:
   - local session markdown renderer now passes `tableOptions={{ style: "grid" }}`
   - verified with `bun typecheck` in `packages/opencode`
+
+### `611e48c4a` collapse long tool output lines
+
+- Status: `done` with local partial adaptation
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/tui/routes/session/index.tsx`
+  - `packages/opencode/src/cli/cmd/tui/util/collapse-tool-output.ts`
+- Risk:
+  - tool output can fit within line-count caps but still explode horizontal width, making session view noisy and hard to scan
+- Notes:
+  - local session route now uses shared `collapseToolOutput(...)` helper for generic tool blocks and shell output
+  - helper collapses on both line count and approximate character budget derived from current width
+  - verified with `bun typecheck` in `packages/opencode`
