@@ -357,3 +357,16 @@
 - Notes:
   - local fork kept the existing `Request` class shape, but removed the redundant `decodeUnknownSync` inside `Permission.ask`
   - `Permission.ask` now builds the already-typed request object directly from validated input
+
+### `8fc02b013` tool argument errors at the boundary
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/tool/tool.ts`
+  - `packages/opencode/test/tool/tool-define.test.ts`
+- Risk:
+  - tool parameter schema failures surface as generic errors instead of a typed boundary error
+  - model retry flow gets less structured feedback for invalid tool calls
+- Notes:
+  - introduced a local `Tool.InvalidArgumentsError` and used it at the decode boundary inside tool wrapping
+  - added regression coverage that the failure survives as a die defect with the expected friendly rewrite message
