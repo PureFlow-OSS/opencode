@@ -641,3 +641,16 @@
 - Notes:
   - local route now uses `disableCodecs: true` plus `Schema.UndefinedOr(Worktree.CreateInput)` to accept empty-body create requests
   - verified with `bun typecheck` in `packages/opencode`
+
+### `564cde393` copy pasted prompt content
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/tui/component/prompt/index.tsx`
+  - `packages/opencode/src/cli/cmd/tui/component/prompt/part.ts`
+  - `packages/opencode/src/cli/cmd/tui/util/selection.ts`
+- Risk:
+  - copying prompt text from TUI can preserve placeholder markers instead of actual pasted text payloads
+- Notes:
+  - local textarea selection copy now lets prompt renderables expand placeholder extmarks back to original pasted text before clipboard write
+  - verified with `bun typecheck` in `packages/opencode`
