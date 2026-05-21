@@ -274,3 +274,19 @@
   - local fork only had the live reasoning renderer in `routes/session/index.tsx`
   - adapted the safe local subset so completed reasoning uses `_Thought:_` while active reasoning stays `_Thinking:_`
   - upstream collapsed-reasoning text path was not present locally, so there was nothing else to port
+
+### `a6e1aa085` default new sessions always to local project
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/tui/component/prompt/index.tsx`
+  - `packages/opencode/src/cli/cmd/tui/plugin/api.tsx`
+  - `packages/opencode/src/cli/cmd/tui/routes/home.tsx`
+  - `packages/plugin/src/tui.ts`
+- Risk:
+  - new home-screen prompts inherit the currently selected workspace implicitly
+  - fresh sessions start in the wrong project context
+- Notes:
+  - local prompt creation already passes `workspace: props.workspaceID` when `sessionID` is absent
+  - adapted the safe local subset by stopping `home.tsx` from injecting the current workspace into the home prompt and related slot
+  - left the broader prompt/plugin prop cleanup untouched because the local fork still uses `workspaceID` in other contexts
