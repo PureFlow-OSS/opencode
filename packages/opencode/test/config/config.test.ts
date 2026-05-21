@@ -2109,6 +2109,29 @@ test("wellknown URL with trailing slash is normalized", async () => {
   }
 })
 
+describe("OPENCODE_PERMISSION env var", () => {
+  test("does not crash when OPENCODE_PERMISSION contains invalid JSON", async () => {
+    const original = process.env["OPENCODE_PERMISSION"]
+    process.env["OPENCODE_PERMISSION"] = "{invalid"
+    try {
+      await using tmp = await tmpdir()
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const config = await load()
+          expect(config).toBeDefined()
+        },
+      })
+    } finally {
+      if (original !== undefined) {
+        process.env["OPENCODE_PERMISSION"] = original
+      } else {
+        delete process.env["OPENCODE_PERMISSION"]
+      }
+    }
+  })
+})
+
 describe("resolvePluginSpec", () => {
   test("keeps package specs unchanged", async () => {
     await using tmp = await tmpdir()
