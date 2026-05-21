@@ -594,3 +594,28 @@
   - Opus 4.5 does not use same adaptive/max shape as newer Anthropic families, so generic fallback can advertise wrong effort controls
 - Notes:
   - local Anthropic variant generation now maps Opus 4.5 to plain `low|medium|high` effort variants
+
+### `12ae22378` bridge plugin tool ask promises
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/tool/registry.ts`
+  - `packages/plugin/src/tool.ts`
+- Risk:
+  - plugin tools run outside host Effect world and can lose context or hang if `ask(...)` crosses boundary as raw Effect
+- Notes:
+  - local plugin `ToolContext.ask(...)` now returns `Promise<void>`
+  - local tool registry bridges host `toolCtx.ask(...)` through `EffectBridge` before exposing it to plugins
+
+### `ef7d80127` preserve custom tool arg descriptions
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/tool/registry.ts`
+  - `packages/plugin/src/tool.ts`
+- Risk:
+  - converting plugin/custom tool args to JSON Schema later can drop Zod `.describe()` metadata and weaken tool guidance
+- Notes:
+  - plugin tools now precompute `jsonSchema` from their original Zod instance
+  - local tool registry prefers plugin-supplied schema and only falls back to local conversion when needed
+  - verified with `bun typecheck` in `packages/plugin` and `packages/opencode`
