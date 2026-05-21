@@ -50,4 +50,21 @@ describe("cli.error", () => {
     expect(formatted).toContain("This failed before the server returned an HTTP response.")
     expect(formatted).toContain("Check your network, proxy, or VPN configuration and try again.")
   })
+
+  test("formats structured config errors hidden in error causes", () => {
+    const error = new Error("ConfigInvalidError", {
+      cause: {
+        body: {
+          _tag: "ConfigInvalidError",
+          path: "/tmp/opencode.json",
+          issues: [{ message: "Expected object", path: ["provider", "anthropic", "options"] }],
+        },
+      },
+    })
+
+    const formatted = FormatError(error)
+
+    expect(formatted).toContain("Configuration is invalid at /tmp/opencode.json")
+    expect(formatted).toContain("Expected object provider.anthropic.options")
+  })
 })
