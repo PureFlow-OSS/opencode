@@ -229,6 +229,20 @@
   - updated `prompt.ts` to use the helper after `filterCompactedEffect(...)`
   - added regression coverage for the compaction-reordered case where the retained tail sits between the summary pair and the newest user turn
 
+### `cb3549324` acquire PubSub subscription eagerly to close `/event` race
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/bus/index.ts`
+  - `packages/opencode/src/server/routes/instance/httpapi/handlers/event.ts`
+- Risk:
+  - publishes can be lost between `yield*`/route setup and first stream pull
+  - `/event` SSE can miss events that happen during the `Stream.concat(initial, subscribe)` handoff window
+- Notes:
+  - adapted the eager-subscription subset only: `Bus.Service.subscribe(...)` and `subscribeAll(...)` now acquire the underlying `PubSub` subscription in caller scope at `yield*` time
+  - updated local effect-native call sites in plugin hooks, share cache listeners, VCS branch watcher, and HttpApi event route
+  - added regression coverage for both direct `subscribe(...)` buffering and the `/event`-style concat-prefix handoff
+
 ### `6d2219e00` preserve instance context in async commands
 
 - Status: `covered`
