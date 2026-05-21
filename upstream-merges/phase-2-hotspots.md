@@ -700,3 +700,14 @@
 - Notes:
   - local prompt history now skips appending an entry when it matches the latest stored item byte-for-byte
   - verified with `bun typecheck` in `packages/opencode`
+
+### `af06e5270` ignore instruction lookup errors
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/session/instruction.ts`
+- Risk:
+  - broken or inaccessible upward config lookup can fail whole instruction resolution chain and break session boot/prompt prep
+- Notes:
+  - local `findUp(...)` project-instruction scan now degrades to empty matches on lookup failure instead of failing whole request
+  - verified with `bun typecheck` in `packages/opencode`
