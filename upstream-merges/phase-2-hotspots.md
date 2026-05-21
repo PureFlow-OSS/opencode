@@ -201,6 +201,7 @@
     - pending permissions are auto-approved only with `--dangerously-skip-permissions`, otherwise auto-rejected
     - pending questions are auto-rejected because local `run` has no interactive answer surface
   - local duplicate-after-replay subset also adapted: replay now seeds assistant message ids and completed part ids so the first matching `message.updated` / `message.part.updated` events are skipped instead of being printed twice
+  - local idle-handoff subset also adapted: stale pre-turn `session.status idle` events no longer terminate the event loop before the new turn has produced any live session activity
   - deferred pieces remain the hardest upstream-only parts: live stream boot buffering, true delta-stream suppression, subagent recovery, and footer/runtime state sync
 
 ### `22a5e6cc5` restore non-interactive run exit behavior
