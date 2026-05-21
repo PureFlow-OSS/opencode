@@ -665,3 +665,14 @@
 - Notes:
   - local spinner color now prefers last user message agent while session is active, then falls back to current agent when idle
   - verified with `bun typecheck` in `packages/opencode`
+
+### `c2ffd7cf1` markdown table rendering
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/tui/routes/session/index.tsx`
+- Risk:
+  - markdown tables can render poorly in session view without explicit grid table styling
+- Notes:
+  - local session markdown renderer now passes `tableOptions={{ style: "grid" }}`
+  - verified with `bun typecheck` in `packages/opencode`
