@@ -722,3 +722,14 @@
 - Notes:
   - local home tips view now carries explicit fallback tip string and parsed fallback parts
   - verified with `bun typecheck` in `packages/opencode`
+
+### `c0a8b509c` distinguish markdown h1 headings
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/tui/context/theme.tsx`
+- Risk:
+  - h1 headings can visually blend into lower heading levels in markdown-heavy session output
+- Notes:
+  - local `markup.heading.1` syntax scope now adds underline on top of existing bold heading styling
+  - verified with `bun typecheck` in `packages/opencode`
