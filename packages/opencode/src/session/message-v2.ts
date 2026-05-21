@@ -838,11 +838,15 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
         role: "assistant",
         parts: [],
       }
+      const hasSignedReasoning = msg.parts.some((part) => {
+        if (part.type !== "reasoning") return false
+        return part.metadata?.anthropic?.signature != null || part.metadata?.bedrock?.signature != null
+      })
       for (const part of msg.parts) {
         if (part.type === "text")
           assistantMessage.parts.push({
             type: "text",
-            text: part.text,
+            text: part.text === "" && hasSignedReasoning ? " " : part.text,
             ...(differentModel ? {} : { providerMetadata: part.metadata }),
           })
         if (part.type === "step-start")
