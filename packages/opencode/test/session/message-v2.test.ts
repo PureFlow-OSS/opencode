@@ -135,6 +135,62 @@ describe("session.message-v2.toModelMessage", () => {
     ])
   })
 
+  test("latest prefers max ids across compaction-reordered messages", () => {
+    const msgs: MessageV2.WithParts[] = [
+      {
+        info: userInfo("001"),
+        parts: [
+          {
+            ...basePart("001", "cp1"),
+            type: "compaction",
+            auto: true,
+          },
+        ] as MessageV2.Part[],
+      },
+      {
+        info: {
+          ...assistantInfo("002", "001"),
+          finish: "stop",
+          summary: true,
+        } as MessageV2.Assistant,
+        parts: [] as MessageV2.Part[],
+      },
+      {
+        info: assistantInfo("004", "003"),
+        parts: [
+          {
+            ...basePart("004", "txt1"),
+            type: "text",
+            text: "older tail assistant",
+          },
+        ] as MessageV2.Part[],
+      },
+      {
+        info: userInfo("005"),
+        parts: [
+          {
+            ...basePart("005", "sub1"),
+            type: "subtask",
+            sessionID: sessionID as never,
+            messageID: MessageID.make("005"),
+            id: PartID.make("sub1"),
+            agent: "helper",
+            model: { providerID, modelID: ModelID.make("test") },
+            description: "follow up",
+            prompt: "continue",
+          },
+        ] as MessageV2.Part[],
+      },
+    ]
+
+    const result = MessageV2.latest(msgs)
+
+    expect(result.user?.id).toBe(MessageID.make("005"))
+    expect(result.assistant?.id).toBe(MessageID.make("004"))
+    expect(result.finished?.id).toBe(MessageID.make("002"))
+    expect(result.tasks.map((part) => part.id)).toEqual([PartID.make("sub1")])
+  })
+
   test("filters out messages with only ignored parts", async () => {
     const messageID = "m-user"
 
