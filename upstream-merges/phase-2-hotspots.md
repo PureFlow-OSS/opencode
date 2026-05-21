@@ -711,3 +711,14 @@
 - Notes:
   - local `findUp(...)` project-instruction scan now degrades to empty matches on lookup failure instead of failing whole request
   - verified with `bun typecheck` in `packages/opencode`
+
+### `aa07e2194` handle undefined tips
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/tui/feature-plugins/home/tips-view.tsx`
+- Risk:
+  - home tips memo can expose transient undefined value and crash parse/render path during initial evaluation
+- Notes:
+  - local home tips view now carries explicit fallback tip string and parsed fallback parts
+  - verified with `bun typecheck` in `packages/opencode`
