@@ -46,6 +46,11 @@ export type ReplayBlocker =
       question: string
     }
 
+export type ReplaySnapshot = {
+  assistantMessageIDs: string[]
+  partIDs: string[]
+}
+
 function userText(message: WithParts) {
   return message.parts
     .filter((part): part is Extract<WithParts["parts"][number], { type: "text" }> => part.type === "text")
@@ -114,6 +119,44 @@ export function collectReplayItems(
   }
 
   return items
+}
+
+export function collectReplaySnapshot(
+  messages: WithParts[],
+  input: {
+    thinking: boolean
+    limit?: number
+  },
+): ReplaySnapshot {
+  const source = typeof input.limit === "number" ? messages.slice(-input.limit) : messages
+  const assistantMessageIDs: string[] = []
+  const partIDs: string[] = []
+
+  for (const message of source) {
+    if (message.info.role !== "assistant") continue
+
+    const assistant = assistantItems(message, input.thinking)
+    if (assistant.length === 0) continue
+    assistantMessageIDs.push(message.info.id)
+
+    for (const item of assistant) {
+      if (item.type !== "tool") continue
+      partIDs.push(item.part.id)
+    }
+
+    for (const part of message.parts) {
+      if (part.type === "text" && part.time?.end) {
+        partIDs.push(part.id)
+        continue
+      }
+
+      if (part.type === "reasoning" && part.time?.end && input.thinking) {
+        partIDs.push(part.id)
+      }
+    }
+  }
+
+  return { assistantMessageIDs, partIDs }
 }
 
 export function collectReplayBlockers(input: {

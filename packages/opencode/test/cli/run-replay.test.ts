@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { collectReplayBlockers, collectReplayItems } from "../../src/cli/cmd/run-replay"
+import { collectReplayBlockers, collectReplayItems, collectReplaySnapshot } from "../../src/cli/cmd/run-replay"
 import type { MessageV2 } from "../../src/session/message-v2"
 import type { PermissionRequest, QuestionRequest } from "@opencode-ai/sdk/v2"
 
@@ -167,5 +167,16 @@ describe("run replay", () => {
         question: "Which color?",
       },
     ])
+  })
+
+  test("collects replay snapshot ids for completed assistant output", () => {
+    const snapshot = collectReplaySnapshot([assistantMessage("ast_1")], {
+      thinking: true,
+    })
+
+    expect(snapshot).toEqual({
+      assistantMessageIDs: ["ast_1"],
+      partIDs: ["ast_1_reasoning", "ast_1_text"],
+    })
   })
 })

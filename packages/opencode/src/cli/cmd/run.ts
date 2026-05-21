@@ -28,7 +28,7 @@ import { TodoWriteTool } from "../../tool/todo"
 import { Locale } from "../../util"
 import { AppRuntime } from "@/effect/app-runtime"
 import { FormatError, FormatUnknownError } from "../error"
-import { collectReplayBlockers, collectReplayItems } from "./run-replay"
+import { collectReplayBlockers, collectReplayItems, collectReplaySnapshot } from "./run-replay"
 
 type ToolProps<T> = {
   input: Tool.InferParameters<T>
@@ -469,6 +469,8 @@ export const RunCommand = cmd({
 
       const events = await sdk.event.subscribe()
       let error: string | undefined
+      const replayedMessageIDs = new Set<string>()
+      const replayedPartIDs = new Set<string>()
 
       async function loop() {
         const toggles = new Map<string, boolean>()
@@ -480,6 +482,7 @@ export const RunCommand = cmd({
             args.format !== "json" &&
             toggles.get("start") !== true
           ) {
+            if (replayedMessageIDs.delete(event.properties.info.id)) continue
             UI.empty()
             UI.println(`> ${event.properties.info.agent} · ${event.properties.info.modelID}`)
             UI.empty()
@@ -489,6 +492,7 @@ export const RunCommand = cmd({
           if (event.type === "message.part.updated") {
             const part = event.properties.part
             if (part.sessionID !== sessionID) continue
+            if (replayedPartIDs.delete(part.id)) continue
 
             if (part.type === "tool" && (part.state.status === "completed" || part.state.status === "error")) {
               if (emit("tool_use", { part })) continue
@@ -597,11 +601,17 @@ export const RunCommand = cmd({
       async function replay(sessionID: string) {
         if (!args.replay && args["replay-limit"] === undefined) return
         const history = await sdk.session.messages({ sessionID })
+        const snapshot = collectReplaySnapshot(history.data ?? [], {
+          thinking: args.thinking,
+          limit: args["replay-limit"],
+        })
         const items = collectReplayItems(history.data ?? [], {
           thinking: args.thinking,
           limit: args["replay-limit"],
         })
         if (items.length === 0) return
+        for (const id of snapshot.assistantMessageIDs) replayedMessageIDs.add(id)
+        for (const id of snapshot.partIDs) replayedPartIDs.add(id)
 
         UI.empty()
         UI.println(UI.Style.TEXT_DIM + "Replaying session history" + UI.Style.TEXT_NORMAL)
