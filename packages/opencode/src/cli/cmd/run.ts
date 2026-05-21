@@ -603,6 +603,22 @@ export const RunCommand = cmd({
               })
             }
           }
+
+          if (event.type === "question.asked") {
+            const question = event.properties
+            if (question.sessionID !== sessionID) continue
+            if (turnArmed) turnLive = true
+
+            for (const item of question.questions) {
+              UI.println(
+                UI.Style.TEXT_WARNING_BOLD + "!",
+                UI.Style.TEXT_NORMAL + `question requested: ${item.header} - ${item.question}; auto-rejecting`,
+              )
+            }
+            await sdk.question.reject({
+              requestID: question.id,
+            })
+          }
         }
       }
 
