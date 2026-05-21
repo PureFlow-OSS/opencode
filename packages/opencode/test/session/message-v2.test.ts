@@ -499,6 +499,125 @@ describe("session.message-v2.toModelMessage", () => {
     })
   })
 
+  test("extracts PDF tool-result attachments for xai while preserving image attachments", async () => {
+    const xaiModel: Provider.Model = {
+      ...model,
+      id: ModelID.make("xai/grok-4"),
+      providerID: ProviderID.make("xai"),
+      api: {
+        id: "grok-4",
+        url: "https://api.x.ai",
+        npm: "@ai-sdk/xai",
+      },
+      capabilities: {
+        ...model.capabilities,
+        attachment: true,
+        input: {
+          ...model.capabilities.input,
+          image: true,
+          pdf: true,
+        },
+      },
+    }
+    const userID = "m-user-xai"
+    const assistantID = "m-assistant-xai"
+    const input: MessageV2.WithParts[] = [
+      {
+        info: userInfo(userID),
+        parts: [
+          {
+            ...basePart(userID, "u1-xai"),
+            type: "text",
+            text: "run tool",
+          },
+        ] as MessageV2.Part[],
+      },
+      {
+        info: assistantInfo(assistantID, userID),
+        parts: [
+          {
+            ...basePart(assistantID, "a1-xai"),
+            type: "tool",
+            callID: "call-xai-1",
+            tool: "read",
+            state: {
+              status: "completed",
+              input: { filePath: "/tmp/manual.pdf" },
+              output: "Read both files",
+              title: "Read",
+              metadata: {},
+              time: { start: 0, end: 1 },
+              attachments: [
+                {
+                  ...basePart(assistantID, "file-xai-image"),
+                  type: "file",
+                  mime: "image/png",
+                  filename: "preview.png",
+                  url: "data:image/png;base64,Zm9v",
+                },
+                {
+                  ...basePart(assistantID, "file-xai-pdf"),
+                  type: "file",
+                  mime: "application/pdf",
+                  filename: "manual.pdf",
+                  url: "data:application/pdf;base64,JVBERi0xLjcK",
+                },
+              ],
+            },
+          },
+        ] as MessageV2.Part[],
+      },
+    ]
+
+    expect(await MessageV2.toModelMessages(input, xaiModel)).toStrictEqual([
+      {
+        role: "user",
+        content: [{ type: "text", text: "run tool" }],
+      },
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "tool-call",
+            toolCallId: "call-xai-1",
+            toolName: "read",
+            input: { filePath: "/tmp/manual.pdf" },
+            providerExecuted: undefined,
+          },
+        ],
+      },
+      {
+        role: "tool",
+        content: [
+          {
+            type: "tool-result",
+            toolCallId: "call-xai-1",
+            toolName: "read",
+            output: {
+              type: "content",
+              value: [
+                { type: "text", text: "Read both files" },
+                { type: "media", mediaType: "image/png", data: "Zm9v" },
+              ],
+            },
+          },
+        ],
+      },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: MessageV2.SYNTHETIC_ATTACHMENT_PROMPT },
+          {
+            type: "file",
+            mediaType: "application/pdf",
+            data: "data:application/pdf;base64,JVBERi0xLjcK",
+            filename: undefined,
+          },
+        ],
+      },
+    ])
+  })
+
   test("omits provider metadata when assistant model differs", async () => {
     const userID = "m-user"
     const assistantID = "m-assistant"

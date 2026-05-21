@@ -725,17 +725,18 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
   //
   // Only apply this workaround if the model actually supports image input -
   // otherwise there's no point extracting images.
-  const supportsMediaInToolResults = (() => {
+  const supportsToolResultAttachment = (attachment: FilePart) => {
     if (model.api.npm === "@ai-sdk/anthropic") return true
     if (model.api.npm === "@ai-sdk/openai") return true
-    if (model.api.npm === "@ai-sdk/amazon-bedrock") return true
+    if (model.api.npm === "@ai-sdk/amazon-bedrock") return attachment.mime.startsWith("image/")
+    if (model.api.npm === "@ai-sdk/xai") return attachment.mime.startsWith("image/")
     if (model.api.npm === "@ai-sdk/google-vertex/anthropic") return true
     if (model.api.npm === "@ai-sdk/google") {
       const id = model.api.id.toLowerCase()
       return id.includes("gemini-3") && !id.includes("gemini-2")
     }
     return false
-  })()
+  }
 
   const toModelOutput = (options: { toolCallId: string; input: unknown; output: unknown }) => {
     const output = options.output
@@ -860,10 +861,10 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
             // (images, PDFs) to be sent as a separate user message
             const mediaAttachments = attachments.filter((a) => isMedia(a.mime))
             const nonMediaAttachments = attachments.filter((a) => !isMedia(a.mime))
-            if (!supportsMediaInToolResults && mediaAttachments.length > 0) {
-              media.push(...mediaAttachments)
-            }
-            const finalAttachments = supportsMediaInToolResults ? attachments : nonMediaAttachments
+            const supportedMediaAttachments = mediaAttachments.filter((a) => supportsToolResultAttachment(a))
+            const unsupportedMediaAttachments = mediaAttachments.filter((a) => !supportsToolResultAttachment(a))
+            if (unsupportedMediaAttachments.length > 0) media.push(...unsupportedMediaAttachments)
+            const finalAttachments = [...nonMediaAttachments, ...supportedMediaAttachments]
 
             const output =
               finalAttachments.length > 0
