@@ -487,6 +487,8 @@ export const RunCommand = cmd({
       const messageRoles = new Map<string, "user" | "assistant">()
       const pendingParts = new Map<string, Extract<Part, { type: "text" | "reasoning" }>>()
       const streamedPartText = new Map<string, string>()
+      const sentPartText = new Map<string, number>()
+      const echoOutputs = new Map<string, Set<string>>()
       const recoveringQuestions = new Set<string>()
       const runningQuestionParts = new Set<string>()
       const settledBlockers = new Set<string>()
@@ -517,6 +519,7 @@ export const RunCommand = cmd({
       function clearPartState(partID: string) {
         pendingParts.delete(partID)
         streamedPartText.delete(partID)
+        sentPartText.delete(partID)
       }
 
       function mergeBufferedText(part: Extract<Part, { type: "text" | "reasoning" }>) {
@@ -525,7 +528,54 @@ export const RunCommand = cmd({
         return { ...part, text }
       }
 
+      function stashEcho(part: ToolPart) {
+        if (part.tool !== "bash" || typeof part.messageID !== "string") return
+        const output = part.state.status === "completed" ? part.state.output : undefined
+        if (typeof output !== "string") return
+        const text = output.replace(/^\n+/, "")
+        if (!text.trim()) return
+        const values = echoOutputs.get(part.messageID) ?? new Set<string>()
+        values.add(text)
+        const trimmed = text.replace(/\n+$/, "")
+        if (trimmed && trimmed !== text) values.add(trimmed)
+        echoOutputs.set(part.messageID, values)
+      }
+
+      function stripEcho(messageID: string | undefined, chunk: string) {
+        if (!messageID) return chunk
+        const values = echoOutputs.get(messageID)
+        if (!values || values.size === 0) return chunk
+        for (const value of values) {
+          if (!chunk.startsWith(value)) continue
+          return chunk.slice(value.length).replace(/^\n+/, "")
+        }
+        return chunk
+      }
+
       function printPart(part: Extract<Part, { type: "text" | "reasoning" }>) {
+        if (args.format !== "json") {
+          const full = part.type === "reasoning" ? part.text.replace(/\[REDACTED\]/g, "") : part.text
+          const sent = sentPartText.get(part.id) ?? 0
+          let chunk = full.slice(sent)
+          if (sent === 0) {
+            chunk = chunk.replace(/^\n+/, "")
+            if (part.type === "text") chunk = stripEcho(part.messageID, chunk)
+            if (part.type === "reasoning" && chunk) chunk = `Thinking: ${chunk}`
+          }
+          if (chunk) {
+            const target = process.stdout.isTTY ? process.stderr : process.stdout
+            if (sent === 0) target.write(EOL)
+            target.write(chunk)
+            sentPartText.set(part.id, full.length)
+          }
+          if (part.time?.end && sentPartText.has(part.id)) {
+            const target = process.stdout.isTTY ? process.stderr : process.stdout
+            target.write(EOL + EOL)
+            sentPartText.delete(part.id)
+          }
+          if (chunk || part.time?.end) return
+        }
+
         if (part.type === "text" && part.time?.end) {
           if (emit("text", { part })) return
           const text = part.text.trim()
@@ -633,6 +683,11 @@ export const RunCommand = cmd({
           const text = syncStreamedText(event.properties.partID, event.properties.delta, true)
           const pending = pendingParts.get(event.properties.partID)
           if (pending) pendingParts.set(event.properties.partID, { ...pending, text })
+          const role = (() => {
+            if (pending) return messageRoles.get(pending.messageID)
+            return undefined
+          })()
+          if (pending && role === "assistant") printPart({ ...pending, text })
         }
 
         if (event.type === "message.part.updated") {
@@ -649,6 +704,7 @@ export const RunCommand = cmd({
             if (part.tool === "question") runningQuestionParts.delete(part.id)
             if (emit("tool_use", { part })) return false
             if (part.state.status === "completed") {
+              stashEcho(part)
               tool(part)
               return false
             }
