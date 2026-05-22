@@ -49,6 +49,7 @@ export type ReplayBlocker =
 export type ReplaySnapshot = {
   assistantMessageIDs: string[]
   partIDs: string[]
+  partText: Record<string, string>
 }
 
 function userText(message: WithParts) {
@@ -131,6 +132,7 @@ export function collectReplaySnapshot(
   const source = typeof input.limit === "number" ? messages.slice(-input.limit) : messages
   const assistantMessageIDs: string[] = []
   const partIDs: string[] = []
+  const partText: Record<string, string> = {}
 
   for (const message of source) {
     if (message.info.role !== "assistant") continue
@@ -147,16 +149,18 @@ export function collectReplaySnapshot(
     for (const part of message.parts) {
       if (part.type === "text" && part.time?.end) {
         partIDs.push(part.id)
+        partText[part.id] = part.text
         continue
       }
 
       if (part.type === "reasoning" && part.time?.end && input.thinking) {
         partIDs.push(part.id)
+        partText[part.id] = part.text
       }
     }
   }
 
-  return { assistantMessageIDs, partIDs }
+  return { assistantMessageIDs, partIDs, partText }
 }
 
 export function collectReplayBlockers(input: {

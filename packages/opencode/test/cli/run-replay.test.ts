@@ -177,6 +177,10 @@ describe("run replay", () => {
     expect(snapshot).toEqual({
       assistantMessageIDs: ["ast_1"],
       partIDs: ["ast_1_reasoning", "ast_1_text"],
+      partText: {
+        ast_1_reasoning: "Reasoning output",
+        ast_1_text: "Assistant output",
+      },
     })
   })
 })

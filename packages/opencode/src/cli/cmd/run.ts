@@ -7,7 +7,7 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { bootstrap } from "../bootstrap"
 import { EOL } from "os"
 import { Filesystem } from "../../util"
-import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@opencode-ai/sdk/v2"
+import { createOpencodeClient, type Event, type OpencodeClient, type ToolPart } from "@opencode-ai/sdk/v2"
 import { Server } from "../../server/server"
 import { Provider } from "../../provider"
 import { Agent } from "../../agent/agent"
@@ -214,6 +214,17 @@ function normalizePath(input?: string) {
 
 function formatRunError(error: unknown) {
   return FormatError(error) ?? FormatUnknownError(error)
+}
+
+function eventSessionID(event: Event) {
+  if (event.type === "message.updated") return event.properties.info.sessionID
+  if (event.type === "message.part.delta") return event.properties.sessionID
+  if (event.type === "message.part.updated") return event.properties.part.sessionID
+  if (event.type === "session.error") return event.properties.sessionID
+  if (event.type === "session.status") return event.properties.sessionID
+  if (event.type === "permission.asked") return event.properties.sessionID
+  if (event.type === "question.asked") return event.properties.sessionID
+  return undefined
 }
 
 export const RunCommand = cmd({
@@ -472,6 +483,11 @@ export const RunCommand = cmd({
       let error: string | undefined
       const replayedMessageIDs = new Set<string>()
       const replayedPartIDs = new Set<string>()
+      const replayedPartText = new Map<string, string>()
+      const settledBlockers = new Set<string>()
+      const buffered: Event[] = []
+      const toggles = new Map<string, boolean>()
+      let booting = true
       let turnArmed = false
       let turnLive = false
 
@@ -486,152 +502,177 @@ export const RunCommand = cmd({
           .catch(() => fallback)
       }
 
-      async function loop() {
-        const toggles = new Map<string, boolean>()
+      async function handle(event: Event) {
+        if (
+          event.type === "message.updated" &&
+          event.properties.info.role === "assistant" &&
+          args.format !== "json" &&
+          toggles.get("start") !== true
+        ) {
+          if (turnArmed) turnLive = true
+          if (replayedMessageIDs.delete(event.properties.info.id)) return false
+          UI.empty()
+          UI.println(`> ${event.properties.info.agent} · ${event.properties.info.modelID}`)
+          UI.empty()
+          toggles.set("start", true)
+        }
 
-        for await (const event of events.stream) {
-          if (
-            event.type === "message.updated" &&
-            event.properties.info.role === "assistant" &&
-            args.format !== "json" &&
-            toggles.get("start") !== true
-          ) {
-            if (turnArmed) turnLive = true
-            if (replayedMessageIDs.delete(event.properties.info.id)) continue
-            UI.empty()
-            UI.println(`> ${event.properties.info.agent} · ${event.properties.info.modelID}`)
-            UI.empty()
-            toggles.set("start", true)
+        if (event.type === "message.part.delta") {
+          if (event.properties.sessionID !== sessionID) return false
+          if (turnArmed) turnLive = true
+          if (replayedPartText.has(event.properties.partID)) {
+            const seen = replayedPartText.get(event.properties.partID) ?? ""
+            if (seen.endsWith(event.properties.delta)) return false
+            replayedPartText.delete(event.properties.partID)
+            replayedPartIDs.delete(event.properties.partID)
           }
+        }
 
-          if (event.type === "message.part.updated") {
-            const part = event.properties.part
-            if (part.sessionID !== sessionID) continue
-            if (turnArmed) turnLive = true
-            if (replayedPartIDs.delete(part.id)) continue
+        if (event.type === "message.part.updated") {
+          const part = event.properties.part
+          if (part.sessionID !== sessionID) return false
+          if (turnArmed) turnLive = true
+          replayedPartText.delete(part.id)
+          if (replayedPartIDs.delete(part.id)) return false
 
-            if (part.type === "tool" && (part.state.status === "completed" || part.state.status === "error")) {
-              if (emit("tool_use", { part })) continue
-              if (part.state.status === "completed") {
-                tool(part)
-                continue
-              }
-              inline({
-                icon: "✗",
-                title: `${part.tool} failed`,
-              })
-              UI.error(part.state.error)
+          if (part.type === "tool" && (part.state.status === "completed" || part.state.status === "error")) {
+            if (emit("tool_use", { part })) return false
+            if (part.state.status === "completed") {
+              tool(part)
+              return false
             }
-
-            if (
-              part.type === "tool" &&
-              part.tool === "task" &&
-              part.state.status === "running" &&
-              args.format !== "json"
-            ) {
-              if (toggles.get(part.id) === true) continue
-              task(props<typeof TaskTool>(part))
-              toggles.set(part.id, true)
-            }
-
-            if (part.type === "step-start") {
-              if (emit("step_start", { part })) continue
-            }
-
-            if (part.type === "step-finish") {
-              if (emit("step_finish", { part })) continue
-            }
-
-            if (part.type === "text" && part.time?.end) {
-              if (emit("text", { part })) continue
-              const text = part.text.trim()
-              if (!text) continue
-              if (!process.stdout.isTTY) {
-                process.stdout.write(text + EOL)
-                continue
-              }
-              UI.empty()
-              UI.println(text)
-              UI.empty()
-            }
-
-            if (part.type === "reasoning" && part.time?.end && args.thinking) {
-              if (emit("reasoning", { part })) continue
-              const text = part.text.trim()
-              if (!text) continue
-              const line = `Thinking: ${text}`
-              if (process.stdout.isTTY) {
-                UI.empty()
-                UI.println(`${UI.Style.TEXT_DIM}\u001b[3m${line}\u001b[0m${UI.Style.TEXT_NORMAL}`)
-                UI.empty()
-                continue
-              }
-              process.stdout.write(line + EOL)
-            }
-          }
-
-          if (event.type === "session.error") {
-            const props = event.properties
-            if (props.sessionID !== sessionID || !props.error) continue
-            if (turnArmed) turnLive = true
-            let err = String(props.error.name)
-            if ("data" in props.error && props.error.data && "message" in props.error.data) {
-              err = String(props.error.data.message)
-            }
-            error = error ? error + EOL + err : err
-            if (emit("error", { error: props.error })) continue
-            UI.error(err)
-          }
-
-          if (
-            event.type === "session.status" &&
-            event.properties.sessionID === sessionID &&
-            event.properties.status.type === "idle" &&
-            turnArmed &&
-            turnLive &&
-            (await sessionIdle(true))
-          ) {
-            break
-          }
-
-          if (event.type === "permission.asked") {
-            const permission = event.properties
-            if (permission.sessionID !== sessionID) continue
-            if (turnArmed) turnLive = true
-
-            if (args["dangerously-skip-permissions"]) {
-              await sdk.permission.reply({
-                requestID: permission.id,
-                reply: "once",
-              })
-            } else {
-              UI.println(
-                UI.Style.TEXT_WARNING_BOLD + "!",
-                UI.Style.TEXT_NORMAL +
-                  `permission requested: ${permission.permission} (${permission.patterns.join(", ")}); auto-rejecting`,
-              )
-              await sdk.permission.reply({
-                requestID: permission.id,
-                reply: "reject",
-              })
-            }
-          }
-
-          if (event.type === "question.asked") {
-            const question = event.properties
-            if (question.sessionID !== sessionID) continue
-            if (turnArmed) turnLive = true
-
-            for (const item of question.questions) {
-              UI.println(
-                UI.Style.TEXT_WARNING_BOLD + "!",
-                UI.Style.TEXT_NORMAL + `question requested: ${item.header} - ${item.question}; auto-rejecting`,
-              )
-            }
-            await sdk.question.reject({
-              requestID: question.id,
+            inline({
+              icon: "✗",
+              title: `${part.tool} failed`,
             })
+            UI.error(part.state.error)
           }
+
+          if (part.type === "tool" && part.tool === "task" && part.state.status === "running" && args.format !== "json") {
+            if (toggles.get(part.id) === true) return false
+            task(props<typeof TaskTool>(part))
+            toggles.set(part.id, true)
+          }
+
+          if (part.type === "step-start") {
+            if (emit("step_start", { part })) return false
+          }
+
+          if (part.type === "step-finish") {
+            if (emit("step_finish", { part })) return false
+          }
+
+          if (part.type === "text" && part.time?.end) {
+            if (emit("text", { part })) return false
+            const text = part.text.trim()
+            if (!text) return false
+            if (!process.stdout.isTTY) {
+              process.stdout.write(text + EOL)
+              return false
+            }
+            UI.empty()
+            UI.println(text)
+            UI.empty()
+          }
+
+          if (part.type === "reasoning" && part.time?.end && args.thinking) {
+            if (emit("reasoning", { part })) return false
+            const text = part.text.trim()
+            if (!text) return false
+            const line = `Thinking: ${text}`
+            if (process.stdout.isTTY) {
+              UI.empty()
+              UI.println(`${UI.Style.TEXT_DIM}\u001b[3m${line}\u001b[0m${UI.Style.TEXT_NORMAL}`)
+              UI.empty()
+              return false
+            }
+            process.stdout.write(line + EOL)
+          }
+        }
+
+        if (event.type === "session.error") {
+          const props = event.properties
+          if (props.sessionID !== sessionID || !props.error) return false
+          if (turnArmed) turnLive = true
+          let err = String(props.error.name)
+          if ("data" in props.error && props.error.data && "message" in props.error.data) {
+            err = String(props.error.data.message)
+          }
+          error = error ? error + EOL + err : err
+          if (emit("error", { error: props.error })) return false
+          UI.error(err)
+        }
+
+        if (
+          event.type === "session.status" &&
+          event.properties.sessionID === sessionID &&
+          event.properties.status.type === "idle" &&
+          turnArmed &&
+          turnLive &&
+          (await sessionIdle(true))
+        ) {
+          return true
+        }
+
+        if (event.type === "permission.asked") {
+          const permission = event.properties
+          if (permission.sessionID !== sessionID || settledBlockers.has(permission.id)) return false
+          if (turnArmed) turnLive = true
+
+          if (args["dangerously-skip-permissions"]) {
+            await sdk.permission.reply({
+              requestID: permission.id,
+              reply: "once",
+            })
+            return false
+          }
+          UI.println(
+            UI.Style.TEXT_WARNING_BOLD + "!",
+            UI.Style.TEXT_NORMAL +
+              `permission requested: ${permission.permission} (${permission.patterns.join(", ")}); auto-rejecting`,
+          )
+          await sdk.permission.reply({
+            requestID: permission.id,
+            reply: "reject",
+          })
+          return false
+        }
+
+        if (event.type === "question.asked") {
+          const question = event.properties
+          if (question.sessionID !== sessionID || settledBlockers.has(question.id)) return false
+          if (turnArmed) turnLive = true
+
+          for (const item of question.questions) {
+            UI.println(
+              UI.Style.TEXT_WARNING_BOLD + "!",
+              UI.Style.TEXT_NORMAL + `question requested: ${item.header} - ${item.question}; auto-rejecting`,
+            )
+          }
+          await sdk.question.reject({
+            requestID: question.id,
+          })
+        }
+
+        return false
+      }
+
+      async function drainBuffered() {
+        const pending = buffered.splice(0)
+        for (const event of pending) {
+          if ((await handle(event)) === true) return true
+        }
+        return false
+      }
+
+      async function loop() {
+        for await (const event of events.stream) {
+          if (booting) {
+            if (eventSessionID(event) === sessionID) buffered.push(event)
+            continue
+          }
+          if (eventSessionID(event) !== sessionID) continue
+          if ((await handle(event)) === true) break
         }
 
         return error
@@ -651,6 +692,7 @@ export const RunCommand = cmd({
         if (items.length === 0) return
         for (const id of snapshot.assistantMessageIDs) replayedMessageIDs.add(id)
         for (const id of snapshot.partIDs) replayedPartIDs.add(id)
+        for (const [id, text] of Object.entries(snapshot.partText)) replayedPartText.set(id, text)
 
         UI.empty()
         UI.println(UI.Style.TEXT_DIM + "Replaying session history" + UI.Style.TEXT_NORMAL)
@@ -709,6 +751,7 @@ export const RunCommand = cmd({
             const message = `${blocker.permission} (${blocker.patterns.join(", ")})`
             if (args["dangerously-skip-permissions"]) {
               UI.println(UI.Style.TEXT_WARNING_BOLD + "~", UI.Style.TEXT_NORMAL + ` auto-approving pending permission: ${message}`)
+              settledBlockers.add(blocker.id)
               await sdk.permission.reply({
                 requestID: blocker.id,
                 reply: "once",
@@ -717,6 +760,7 @@ export const RunCommand = cmd({
             }
 
             UI.println(UI.Style.TEXT_WARNING_BOLD + "!", UI.Style.TEXT_NORMAL + ` auto-rejecting pending permission: ${message}`)
+            settledBlockers.add(blocker.id)
             await sdk.permission.reply({
               requestID: blocker.id,
               reply: "reject",
@@ -725,6 +769,7 @@ export const RunCommand = cmd({
           }
 
           UI.println(UI.Style.TEXT_WARNING_BOLD + "!", UI.Style.TEXT_NORMAL + ` auto-rejecting pending question: ${blocker.header} - ${blocker.question}`)
+          settledBlockers.add(blocker.id)
           await sdk.question.reject({
             requestID: blocker.id,
           })
@@ -802,13 +847,18 @@ export const RunCommand = cmd({
         process.exit(1)
       }
       await share(sdk, sessionID)
-      await settlePendingBlockers(sessionID)
-      await replay(sessionID)
-
       const completed = loop().catch((e) => {
         console.error(e)
         process.exit(1)
       })
+      await settlePendingBlockers(sessionID)
+      await replay(sessionID)
+      booting = false
+      if (await drainBuffered()) {
+        const loopError = await completed
+        if (loopError) process.exitCode = 1
+        return
+      }
 
       if (args.command) {
         turnArmed = true
