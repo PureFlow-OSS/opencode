@@ -219,7 +219,7 @@
 - Notes:
   - local `run.ts` now checks the direct result of `sdk.session.command(...)` and `sdk.session.prompt(...)` in non-interactive mode
   - structured request failures are formatted through existing CLI error formatting and set `process.exitCode = 1`
-  - local loop error handling and replay additions remain unchanged
+  - local event stream now aborts on immediate turn failure and successful turn starts await loop completion again, so stream-side errors still affect exit behavior
 
 ### `94564f358` prevent double auto-compaction after `filterCompacted` reorder
 
