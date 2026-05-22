@@ -633,6 +633,8 @@ export const RunCommand = cmd({
             })
           }
         }
+
+        return error
       }
 
       async function replay(sessionID: string) {
@@ -803,7 +805,7 @@ export const RunCommand = cmd({
       await settlePendingBlockers(sessionID)
       await replay(sessionID)
 
-      loop().catch((e) => {
+      const completed = loop().catch((e) => {
         console.error(e)
         process.exit(1)
       })
@@ -823,7 +825,11 @@ export const RunCommand = cmd({
           eventsAbort.abort()
           if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
           process.exitCode = 1
+          await completed.catch(() => undefined)
+          return
         }
+        const loopError = await completed
+        if (loopError) process.exitCode = 1
       } else {
         const model = args.model ? Provider.parseModel(args.model) : undefined
         turnArmed = true
@@ -839,7 +845,11 @@ export const RunCommand = cmd({
           eventsAbort.abort()
           if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
           process.exitCode = 1
+          await completed.catch(() => undefined)
+          return
         }
+        const loopError = await completed
+        if (loopError) process.exitCode = 1
       }
     }
 
