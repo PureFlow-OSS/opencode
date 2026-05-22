@@ -474,6 +474,17 @@ export const RunCommand = cmd({
       let turnArmed = false
       let turnLive = false
 
+      async function sessionIdle(fallback: boolean) {
+        if (!sessionID) return fallback
+        return sdk.session
+          .status()
+          .then((result) => {
+            const item = result.data?.[sessionID]
+            return !item || item.type === "idle"
+          })
+          .catch(() => fallback)
+      }
+
       async function loop() {
         const toggles = new Map<string, boolean>()
 
@@ -576,7 +587,8 @@ export const RunCommand = cmd({
             event.properties.sessionID === sessionID &&
             event.properties.status.type === "idle" &&
             turnArmed &&
-            turnLive
+            turnLive &&
+            (await sessionIdle(true))
           ) {
             break
           }
