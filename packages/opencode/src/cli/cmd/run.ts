@@ -7,7 +7,7 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { bootstrap } from "../bootstrap"
 import { EOL } from "os"
 import { Filesystem } from "../../util"
-import { createOpencodeClient, type Event, type OpencodeClient, type ToolPart } from "@opencode-ai/sdk/v2"
+import { createOpencodeClient, type Event, type OpencodeClient, type Part, type ToolPart } from "@opencode-ai/sdk/v2"
 import { Server } from "../../server/server"
 import { Provider } from "../../provider"
 import { Agent } from "../../agent/agent"
@@ -484,6 +484,8 @@ export const RunCommand = cmd({
       const replayedMessageIDs = new Set<string>()
       const replayedPartIDs = new Set<string>()
       const replayedPartText = new Map<string, string>()
+      const messageRoles = new Map<string, "user" | "assistant">()
+      const pendingParts = new Map<string, Extract<Part, { type: "text" | "reasoning" }>>()
       const settledBlockers = new Set<string>()
       const buffered: Event[] = []
       const toggles = new Map<string, boolean>()
@@ -502,19 +504,63 @@ export const RunCommand = cmd({
           .catch(() => fallback)
       }
 
+      function printPart(part: Extract<Part, { type: "text" | "reasoning" }>) {
+        if (part.type === "text" && part.time?.end) {
+          if (emit("text", { part })) return
+          const text = part.text.trim()
+          if (!text) return
+          if (!process.stdout.isTTY) {
+            process.stdout.write(text + EOL)
+            return
+          }
+          UI.empty()
+          UI.println(text)
+          UI.empty()
+          return
+        }
+
+        if (part.type === "reasoning" && part.time?.end && args.thinking) {
+          if (emit("reasoning", { part })) return
+          const text = part.text.trim()
+          if (!text) return
+          const line = `Thinking: ${text}`
+          if (process.stdout.isTTY) {
+            UI.empty()
+            UI.println(`${UI.Style.TEXT_DIM}\u001b[3m${line}\u001b[0m${UI.Style.TEXT_NORMAL}`)
+            UI.empty()
+            return
+          }
+          process.stdout.write(line + EOL)
+        }
+      }
+
+      function flushPending(messageID: string, role: "user" | "assistant") {
+        for (const [id, part] of pendingParts.entries()) {
+          if (part.messageID !== messageID) continue
+          pendingParts.delete(id)
+          if (role !== "assistant") continue
+          printPart(part)
+        }
+      }
+
       async function handle(event: Event) {
         if (
           event.type === "message.updated" &&
-          event.properties.info.role === "assistant" &&
-          args.format !== "json" &&
-          toggles.get("start") !== true
+          (event.properties.info.role === "assistant" || event.properties.info.role === "user")
         ) {
+          messageRoles.set(event.properties.info.id, event.properties.info.role)
           if (turnArmed) turnLive = true
-          if (replayedMessageIDs.delete(event.properties.info.id)) return false
-          UI.empty()
-          UI.println(`> ${event.properties.info.agent} · ${event.properties.info.modelID}`)
-          UI.empty()
-          toggles.set("start", true)
+          if (event.properties.info.role === "assistant" && args.format !== "json" && toggles.get("start") !== true) {
+            if (replayedMessageIDs.delete(event.properties.info.id)) {
+              flushPending(event.properties.info.id, "assistant")
+              return false
+            }
+            UI.empty()
+            UI.println(`> ${event.properties.info.agent} · ${event.properties.info.modelID}`)
+            UI.empty()
+            toggles.set("start", true)
+          }
+          flushPending(event.properties.info.id, event.properties.info.role)
         }
 
         if (event.type === "message.part.delta") {
@@ -562,31 +608,15 @@ export const RunCommand = cmd({
             if (emit("step_finish", { part })) return false
           }
 
-          if (part.type === "text" && part.time?.end) {
-            if (emit("text", { part })) return false
-            const text = part.text.trim()
-            if (!text) return false
-            if (!process.stdout.isTTY) {
-              process.stdout.write(text + EOL)
+          if (part.type === "text" || part.type === "reasoning") {
+            const role = messageRoles.get(part.messageID)
+            if (!role) {
+              pendingParts.set(part.id, part)
               return false
             }
-            UI.empty()
-            UI.println(text)
-            UI.empty()
-          }
-
-          if (part.type === "reasoning" && part.time?.end && args.thinking) {
-            if (emit("reasoning", { part })) return false
-            const text = part.text.trim()
-            if (!text) return false
-            const line = `Thinking: ${text}`
-            if (process.stdout.isTTY) {
-              UI.empty()
-              UI.println(`${UI.Style.TEXT_DIM}\u001b[3m${line}\u001b[0m${UI.Style.TEXT_NORMAL}`)
-              UI.empty()
-              return false
-            }
-            process.stdout.write(line + EOL)
+            if (role !== "assistant") return false
+            printPart(part)
+            return false
           }
         }
 
