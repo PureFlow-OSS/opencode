@@ -43,6 +43,7 @@ const getBase = (): Configuration => ({
     output: outputDir,
     buildResources: "resources",
   },
+  asarUnpack: ["**/*.node"],
   artifactBuildCompleted: async () => {
     await copyChangelog()
   },
