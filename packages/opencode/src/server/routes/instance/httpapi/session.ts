@@ -35,6 +35,7 @@ import {
   OpenApi,
 } from "effect/unstable/httpapi"
 import { Authorization } from "./auth"
+import { invalidRequest, InvalidRequestHttpApiError } from "./handlers/request-errors"
 import { mapBusyError, mapNotFoundError, mapSessionRouteError, SessionBusyHttpApiError } from "./handlers/session-errors"
 
 const log = Log.create({ service: "server" })
@@ -189,7 +190,7 @@ export const SessionApi = HttpApi.make("session")
           params: { sessionID: SessionID },
           query: MessagesQuery,
           success: Schema.Array(MessageV2.WithParts),
-          error: HttpApiError.NotFound,
+          error: Schema.Union([HttpApiError.NotFound, InvalidRequestHttpApiError]),
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.messages",
@@ -469,8 +470,8 @@ export const sessionHandlers = Layer.unwrap(
     })
 
     const get = Effect.fn("SessionHttpApi.get")(function* (ctx: { params: { sessionID: SessionID } }) {
-      return yield* session.get(ctx.params.sessionID).pipe(
-        Effect.catchIf(NotFoundError.isInstance, () => Effect.fail(new HttpApiError.NotFound({}))),
+      return yield* Effect.promise(() =>
+        Effect.runPromise(session.get(ctx.params.sessionID)).catch((error) => Promise.reject(mapNotFoundError(error))),
       )
     })
 
@@ -493,17 +494,28 @@ export const sessionHandlers = Layer.unwrap(
       params: { sessionID: SessionID }
       query: typeof MessagesQuery.Type
     }) {
-      if (ctx.query.before !== undefined && ctx.query.limit === undefined) return yield* new HttpApiError.BadRequest({})
+      if (ctx.query.before !== undefined && ctx.query.limit === undefined) {
+        return HttpServerResponse.jsonUnsafe(
+          invalidRequest("The 'before' cursor requires a positive 'limit' query parameter.", "Query"),
+          { status: 400 },
+        )
+      }
       if (ctx.query.before !== undefined) {
-        const before = ctx.query.before
-        yield* Effect.try({
-          try: () => MessageV2.cursor.decode(before),
-          catch: () => new HttpApiError.BadRequest({}),
-        })
+        let valid = true
+        try {
+          MessageV2.cursor.decode(ctx.query.before)
+        } catch {
+          valid = false
+        }
+        if (!valid) {
+          return HttpServerResponse.jsonUnsafe(invalidRequest("The 'before' cursor is invalid.", "Query"), {
+            status: 400,
+          })
+        }
       }
       if (ctx.query.limit === undefined || ctx.query.limit === 0) {
-        yield* session.get(ctx.params.sessionID).pipe(
-          Effect.catchIf(NotFoundError.isInstance, () => Effect.fail(new HttpApiError.NotFound({}))),
+        yield* Effect.promise(() =>
+          Effect.runPromise(session.get(ctx.params.sessionID)).catch((error) => Promise.reject(mapNotFoundError(error))),
         )
         return yield* session.messages({ sessionID: ctx.params.sessionID })
       }
@@ -531,9 +543,9 @@ export const sessionHandlers = Layer.unwrap(
     const message = Effect.fn("SessionHttpApi.message")(function* (ctx: {
       params: { sessionID: SessionID; messageID: MessageID }
     }) {
-      return yield* Effect.sync(() =>
-        MessageV2.get({ sessionID: ctx.params.sessionID, messageID: ctx.params.messageID }),
-      ).pipe(Effect.catchIf(NotFoundError.isInstance, () => Effect.fail(new HttpApiError.NotFound({}))))
+      return yield* Effect.promise(() =>
+        Promise.resolve().then(() => MessageV2.get({ sessionID: ctx.params.sessionID, messageID: ctx.params.messageID })).catch((error) => Promise.reject(mapNotFoundError(error))),
+      )
     })
 
     const create = Effect.fn("SessionHttpApi.create")(function* (ctx: { payload: Session.CreateInput }) {
@@ -876,7 +888,13 @@ export const sessionHandlers = Layer.unwrap(
       yield* Effect.promise(() =>
         Instance.restore(instance, () =>
           AppRuntime.runPromise(
-            Session.Service.use((svc) => svc.removePart(ctx.params)).pipe(Effect.provide(Session.defaultLayer)),
+            Session.Service.use((svc) =>
+              Effect.gen(function* () {
+                const part = yield* svc.getPart(ctx.params)
+                if (!part) throw new NotFoundError({ message: `Part not found: ${ctx.params.partID}` })
+                return yield* svc.removePart(ctx.params)
+              }),
+            ).pipe(Effect.provide(Session.defaultLayer)),
           ),
         ).catch((error) => Promise.reject(mapNotFoundError(error))),
       )

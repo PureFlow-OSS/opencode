@@ -99,9 +99,11 @@ describe("mcp HttpApi", () => {
 
     const start = await request("/mcp/demo/auth", tmp.path, { method: "POST" })
     expect(start.status).toBe(400)
+    expect(await start.json()).toMatchObject({ _tag: "InvalidRequestError" })
 
     const authenticate = await request("/mcp/demo/auth/authenticate", tmp.path, { method: "POST" })
     expect(authenticate.status).toBe(400)
+    expect(await authenticate.json()).toMatchObject({ _tag: "InvalidRequestError" })
 
     const removed = await request("/mcp/demo/auth", tmp.path, { method: "DELETE" })
     expect(removed.status).toBe(200)

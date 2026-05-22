@@ -12,7 +12,7 @@ import {
   SessionBusyHttpApiError,
 } from "../../src/server/routes/instance/httpapi/handlers/session-errors"
 import { Session } from "../../src/session"
-import { MessageID, PartID, type SessionID } from "../../src/session/schema"
+import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { MessageV2 } from "../../src/session/message-v2"
 import { Log } from "../../src/util"
 import { resetDatabase } from "../fixture/db"
@@ -138,20 +138,19 @@ describe("session HttpApi", () => {
     expect(nextCursor).toBeTruthy()
     expect(messagePage[0]?.parts[0]).toMatchObject({ type: "text" })
 
-    expect(
-      (
-        await app().request(`${pathFor(SessionPaths.messages, { sessionID: parent.id })}?before=${nextCursor}`, {
-          headers,
-        })
-      ).status,
-    ).toBe(400)
-    expect(
-      (
-        await app().request(`${pathFor(SessionPaths.messages, { sessionID: parent.id })}?limit=1&before=invalid`, {
-          headers,
-        })
-      ).status,
-    ).toBe(400)
+    const missingLimit = await app().request(`${pathFor(SessionPaths.messages, { sessionID: parent.id })}?before=${nextCursor}`, {
+      headers,
+    })
+    expect(missingLimit.status).toBe(400)
+    const invalidCursor = await app().request(
+      `${pathFor(SessionPaths.messages, { sessionID: parent.id })}?limit=1&before=invalid`,
+      { headers },
+    )
+    expect(invalidCursor.status).toBe(400)
+    expect(await invalidCursor.json()).toMatchObject({
+      _tag: "InvalidRequestError",
+      kind: "Query",
+    })
 
     expect(
       await json<MessageV2.WithParts>(
@@ -161,15 +160,18 @@ describe("session HttpApi", () => {
       ),
     ).toMatchObject({ info: { id: message.info.id } })
 
-    expect(
-      (await app().request(pathFor(SessionPaths.get, { sessionID: "missing-session" }), { headers })).status,
-    ).toBe(404)
+    const missingSession = await app().request(
+      pathFor(SessionPaths.get, { sessionID: SessionID.descending() }),
+      { headers },
+    )
+    expect(missingSession.status).toBe(404)
 
     expect(
       (
-        await app().request(pathFor(SessionPaths.message, { sessionID: parent.id, messageID: "missing-message" }), {
-          headers,
-        })
+        await app().request(
+          pathFor(SessionPaths.message, { sessionID: parent.id, messageID: MessageID.ascending() }),
+          { headers },
+        )
       ).status,
     ).toBe(404)
   })
@@ -268,7 +270,7 @@ describe("session HttpApi", () => {
         await app().request(pathFor(SessionPaths.deletePart, {
           sessionID: session.id,
           messageID: first.info.id,
-          partID: "missing-part",
+          partID: PartID.ascending(),
         }), {
           method: "DELETE",
           headers,

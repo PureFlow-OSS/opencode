@@ -14,6 +14,7 @@ import { Effect, Layer, Option, Schema } from "effect"
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse"
 import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "./auth"
+import { invalidRequest, InvalidRequestHttpApiError } from "./handlers/request-errors"
 
 const ConsoleStateResponse = Schema.Struct({
   consoleManagedProviders: Schema.mutable(Schema.Array(Schema.String)),
@@ -99,6 +100,7 @@ export const ExperimentalApi = HttpApi.make("experimental")
         HttpApiEndpoint.post("consoleSwitch", ExperimentalPaths.consoleSwitch, {
           payload: ConsoleSwitchPayload,
           success: Schema.Boolean,
+          error: InvalidRequestHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "experimental.console.switchOrg",
@@ -255,7 +257,7 @@ export const experimentalHandlers = Layer.unwrap(
     }) {
       yield* account
         .use(ctx.payload.accountID, Option.some(ctx.payload.orgID))
-        .pipe(Effect.catch(() => Effect.fail(new HttpApiError.BadRequest({}))))
+        .pipe(Effect.catch(() => Effect.fail(invalidRequest("Console account/org selection is invalid."))))
       return true
     })
 

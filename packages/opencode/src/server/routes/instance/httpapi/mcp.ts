@@ -1,8 +1,9 @@
 import { MCP } from "@/mcp"
 import { ConfigMCP } from "@/config/mcp"
 import { Effect, Layer, Schema } from "effect"
-import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
+import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "./auth"
+import { invalidRequest, InvalidRequestHttpApiError } from "./handlers/request-errors"
 
 const AddPayload = Schema.Struct({
   name: Schema.String,
@@ -56,6 +57,7 @@ export const McpApi = HttpApi.make("mcp")
         HttpApiEndpoint.post("add", McpPaths.status, {
           payload: AddPayload,
           success: StatusMap,
+          error: InvalidRequestHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "mcp.add",
@@ -66,6 +68,7 @@ export const McpApi = HttpApi.make("mcp")
         HttpApiEndpoint.post("authStart", McpPaths.auth, {
           params: { name: Schema.String },
           success: AuthStartResponse,
+          error: InvalidRequestHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "mcp.auth.start",
@@ -88,6 +91,7 @@ export const McpApi = HttpApi.make("mcp")
         HttpApiEndpoint.post("authAuthenticate", McpPaths.authAuthenticate, {
           params: { name: Schema.String },
           success: MCP.Status,
+          error: InvalidRequestHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "mcp.auth.authenticate",
@@ -156,11 +160,13 @@ export const mcpHandlers = Layer.unwrap(
       const result = (yield* mcp.add(ctx.payload.name, ctx.payload.config)).status
       return yield* Schema.decodeUnknownEffect(StatusMap)(
         "status" in result ? { [ctx.payload.name]: result } : result,
-      ).pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
+      ).pipe(Effect.mapError(() => invalidRequest("MCP server status payload is invalid.")))
     })
 
     const authStart = Effect.fn("McpHttpApi.authStart")(function* (ctx: { params: { name: string } }) {
-      if (!(yield* mcp.supportsOAuth(ctx.params.name))) return yield* new HttpApiError.BadRequest({})
+      if (!(yield* mcp.supportsOAuth(ctx.params.name))) {
+        return yield* invalidRequest(`MCP server '${ctx.params.name}' does not support OAuth.`)
+      }
       return yield* mcp.startAuth(ctx.params.name)
     })
 
@@ -172,7 +178,9 @@ export const mcpHandlers = Layer.unwrap(
     })
 
     const authAuthenticate = Effect.fn("McpHttpApi.authAuthenticate")(function* (ctx: { params: { name: string } }) {
-      if (!(yield* mcp.supportsOAuth(ctx.params.name))) return yield* new HttpApiError.BadRequest({})
+      if (!(yield* mcp.supportsOAuth(ctx.params.name))) {
+        return yield* invalidRequest(`MCP server '${ctx.params.name}' does not support OAuth.`)
+      }
       return yield* mcp.authenticate(ctx.params.name)
     })
 

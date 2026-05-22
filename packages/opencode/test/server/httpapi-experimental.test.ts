@@ -136,6 +136,19 @@ describe("experimental HttpApi", () => {
     expect(await switched.json()).toBe(true)
   })
 
+  test("returns structured invalid request errors for bad Console org switch input", async () => {
+    await using tmp = await tmpdir({ config: { formatter: false, lsp: false } })
+
+    const switched = await app().request(ExperimentalPaths.consoleSwitch, {
+      method: "POST",
+      headers: { "x-opencode-directory": tmp.path, "content-type": "application/json" },
+      body: JSON.stringify({ accountID: "missing-account", orgID: "missing-org" }),
+    })
+
+    expect(switched.status).toBe(400)
+    expect(await switched.json()).toMatchObject({ _tag: "InvalidRequestError" })
+  })
+
   test("serves global session list through Hono bridge", async () => {
     await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
 
