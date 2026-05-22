@@ -6,7 +6,11 @@ import { PermissionID } from "../../src/permission/schema"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import { Instance } from "../../src/project/instance"
 import { InstanceRoutes } from "../../src/server/routes/instance"
-import { mapBusyError, SessionBusyHttpApiError, SessionPaths } from "../../src/server/routes/instance/httpapi/session"
+import { SessionPaths } from "../../src/server/routes/instance/httpapi/session"
+import {
+  mapBusyError,
+  SessionBusyHttpApiError,
+} from "../../src/server/routes/instance/httpapi/handlers/session-errors"
 import { Session } from "../../src/session"
 import { MessageID, PartID, type SessionID } from "../../src/session/schema"
 import { MessageV2 } from "../../src/session/message-v2"

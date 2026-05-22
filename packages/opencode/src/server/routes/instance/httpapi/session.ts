@@ -34,6 +34,7 @@ import {
   OpenApi,
 } from "effect/unstable/httpapi"
 import { Authorization } from "./auth"
+import { mapBusyError, SessionBusyHttpApiError } from "./handlers/session-errors"
 
 const log = Log.create({ service: "server" })
 const root = "/session"
@@ -88,23 +89,6 @@ const RevertPayload = Schema.Struct(Struct.omit(SessionRevert.RevertInput.fields
 const PermissionResponsePayload = Schema.Struct({
   response: Permission.Reply,
 }).annotate({ identifier: "SessionPermissionResponseInput" })
-
-export class SessionBusyHttpApiError extends Schema.TaggedErrorClass<SessionBusyHttpApiError>()(
-  "SessionBusyError",
-  {
-    sessionID: SessionID,
-    message: Schema.String,
-  },
-  { httpApiStatus: 409 },
-) {}
-
-export function mapBusyError(error: unknown, sessionID: SessionID) {
-  if (!(error instanceof Session.BusyError)) return error
-  return new SessionBusyHttpApiError({
-    sessionID,
-    message: `Session is busy: ${sessionID}`,
-  })
-}
 
 export const SessionPaths = {
   list: root,
