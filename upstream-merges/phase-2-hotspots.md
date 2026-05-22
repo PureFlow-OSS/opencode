@@ -208,6 +208,8 @@
   - local streamed-part merge subset also adapted: `message.part.delta` text is now retained across resume and merged back into later `message.part.updated` payloads so shorter update payloads cannot truncate visible assistant/reasoning output
   - local question-recovery subset also adapted: if a running `question` tool does not surface a matching `question.asked` event, non-interactive `run` now polls `sdk.question.list()` for the current session and auto-rejects recovered questions instead of hanging indefinitely
   - duplicate replayed `message.part.updated` events now also clear local buffered text state for completed text/reasoning parts, preventing stale carry-over after resume
+  - local live-stream subset also adapted: default-format non-interactive `run` now writes assistant/reasoning chunks incrementally from `message.part.delta` / merged `message.part.updated` state instead of waiting for the final `time.end` payload
+  - local bash-echo subset also adapted: completed bash tool output is now stashed and stripped from the beginning of the next assistant text chunk, reducing duplicated shell output in streamed resumes
   - local idle-handoff subset also adapted:
     - stale pre-turn `session.status idle` events no longer terminate the event loop before the new turn has produced any live session activity
     - idle completion now re-checks live `sdk.session.status()` before breaking, reducing delayed-idle races from older turns
