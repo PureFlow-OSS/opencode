@@ -19,6 +19,7 @@ import { SessionSummary } from "@/session/summary"
 import { Todo } from "@/session/todo"
 import { MessageID, PartID, SessionID } from "@/session/schema"
 import { Snapshot } from "@/snapshot"
+import { NotFoundError } from "@/storage"
 import { Log } from "@/util"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { Effect, Layer, Schema, Struct } from "effect"
@@ -34,7 +35,7 @@ import {
   OpenApi,
 } from "effect/unstable/httpapi"
 import { Authorization } from "./auth"
-import { mapBusyError, SessionBusyHttpApiError } from "./handlers/session-errors"
+import { mapBusyError, mapNotFoundError, mapSessionRouteError, SessionBusyHttpApiError } from "./handlers/session-errors"
 
 const log = Log.create({ service: "server" })
 const root = "/session"
@@ -145,6 +146,7 @@ export const SessionApi = HttpApi.make("session")
         HttpApiEndpoint.get("get", SessionPaths.get, {
           params: { sessionID: SessionID },
           success: Session.Info,
+          error: HttpApiError.NotFound,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.get",
@@ -187,6 +189,7 @@ export const SessionApi = HttpApi.make("session")
           params: { sessionID: SessionID },
           query: MessagesQuery,
           success: Schema.Array(MessageV2.WithParts),
+          error: HttpApiError.NotFound,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.messages",
@@ -197,6 +200,7 @@ export const SessionApi = HttpApi.make("session")
         HttpApiEndpoint.get("message", SessionPaths.message, {
           params: { sessionID: SessionID, messageID: MessageID },
           success: MessageV2.WithParts,
+          error: HttpApiError.NotFound,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.message",
@@ -217,6 +221,7 @@ export const SessionApi = HttpApi.make("session")
         HttpApiEndpoint.delete("remove", SessionPaths.remove, {
           params: { sessionID: SessionID },
           success: Schema.Boolean,
+          error: HttpApiError.NotFound,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.delete",
@@ -228,6 +233,7 @@ export const SessionApi = HttpApi.make("session")
           params: { sessionID: SessionID },
           payload: UpdatePayload,
           success: Session.Info,
+          error: HttpApiError.NotFound,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.update",
@@ -239,6 +245,7 @@ export const SessionApi = HttpApi.make("session")
           params: { sessionID: SessionID },
           payload: ForkPayload,
           success: Session.Info,
+          error: HttpApiError.NotFound,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.fork",
@@ -271,6 +278,7 @@ export const SessionApi = HttpApi.make("session")
         HttpApiEndpoint.post("share", SessionPaths.share, {
           params: { sessionID: SessionID },
           success: Session.Info,
+          error: HttpApiError.NotFound,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.share",
@@ -281,6 +289,7 @@ export const SessionApi = HttpApi.make("session")
         HttpApiEndpoint.delete("unshare", SessionPaths.share, {
           params: { sessionID: SessionID },
           success: Session.Info,
+          error: HttpApiError.NotFound,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.unshare",
@@ -292,6 +301,7 @@ export const SessionApi = HttpApi.make("session")
           params: { sessionID: SessionID },
           payload: SummarizePayload,
           success: Schema.Boolean,
+          error: HttpApiError.NotFound,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.summarize",
@@ -384,7 +394,7 @@ export const SessionApi = HttpApi.make("session")
         HttpApiEndpoint.delete("deleteMessage", SessionPaths.deleteMessage, {
           params: { sessionID: SessionID, messageID: MessageID },
           success: Schema.Boolean,
-          error: SessionBusyHttpApiError,
+          error: Schema.Union([SessionBusyHttpApiError, HttpApiError.NotFound]),
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "session.deleteMessage",
@@ -396,6 +406,7 @@ export const SessionApi = HttpApi.make("session")
         HttpApiEndpoint.delete("deletePart", SessionPaths.deletePart, {
           params: { sessionID: SessionID, messageID: MessageID, partID: PartID },
           success: Schema.Boolean,
+          error: HttpApiError.NotFound,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "part.delete",
@@ -406,6 +417,7 @@ export const SessionApi = HttpApi.make("session")
           params: { sessionID: SessionID, messageID: MessageID, partID: PartID },
           payload: MessageV2.Part,
           success: MessageV2.Part,
+          error: HttpApiError.NotFound,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "part.update",
@@ -457,7 +469,9 @@ export const sessionHandlers = Layer.unwrap(
     })
 
     const get = Effect.fn("SessionHttpApi.get")(function* (ctx: { params: { sessionID: SessionID } }) {
-      return yield* session.get(ctx.params.sessionID)
+      return yield* session.get(ctx.params.sessionID).pipe(
+        Effect.catchIf(NotFoundError.isInstance, () => Effect.fail(new HttpApiError.NotFound({}))),
+      )
     })
 
     const children = Effect.fn("SessionHttpApi.children")(function* (ctx: { params: { sessionID: SessionID } }) {
@@ -488,7 +502,9 @@ export const sessionHandlers = Layer.unwrap(
         })
       }
       if (ctx.query.limit === undefined || ctx.query.limit === 0) {
-        yield* session.get(ctx.params.sessionID)
+        yield* session.get(ctx.params.sessionID).pipe(
+          Effect.catchIf(NotFoundError.isInstance, () => Effect.fail(new HttpApiError.NotFound({}))),
+        )
         return yield* session.messages({ sessionID: ctx.params.sessionID })
       }
 
@@ -517,7 +533,7 @@ export const sessionHandlers = Layer.unwrap(
     }) {
       return yield* Effect.sync(() =>
         MessageV2.get({ sessionID: ctx.params.sessionID, messageID: ctx.params.messageID }),
-      )
+      ).pipe(Effect.catchIf(NotFoundError.isInstance, () => Effect.fail(new HttpApiError.NotFound({}))))
     })
 
     const create = Effect.fn("SessionHttpApi.create")(function* (ctx: { payload: Session.CreateInput }) {
@@ -538,7 +554,7 @@ export const sessionHandlers = Layer.unwrap(
           AppRuntime.runPromise(
             Session.Service.use((svc) => svc.remove(ctx.params.sessionID)).pipe(Effect.provide(Session.defaultLayer)),
           ),
-        ),
+        ).catch((error) => Promise.reject(mapNotFoundError(error))),
       )
       return true
     })
@@ -570,7 +586,7 @@ export const sessionHandlers = Layer.unwrap(
               }),
             ).pipe(Effect.provide(Session.defaultLayer)),
           ),
-        ),
+        ).catch((error) => Promise.reject(mapNotFoundError(error))),
       )
     })
 
@@ -586,7 +602,7 @@ export const sessionHandlers = Layer.unwrap(
               svc.fork({ sessionID: ctx.params.sessionID, messageID: ctx.payload.messageID }),
             ).pipe(Effect.provide(Session.defaultLayer)),
           ),
-        ),
+        ).catch((error) => Promise.reject(mapNotFoundError(error))),
       )
     })
 
@@ -639,7 +655,7 @@ export const sessionHandlers = Layer.unwrap(
               return yield* session.get(ctx.params.sessionID)
             }).pipe(Effect.provide(SessionShare.defaultLayer)),
           ),
-        ),
+        ).catch((error) => Promise.reject(mapNotFoundError(error))),
       )
     })
 
@@ -655,7 +671,7 @@ export const sessionHandlers = Layer.unwrap(
               return yield* session.get(ctx.params.sessionID)
             }).pipe(Effect.provide(SessionShare.defaultLayer)),
           ),
-        ),
+        ).catch((error) => Promise.reject(mapNotFoundError(error))),
       )
     })
 
@@ -698,7 +714,7 @@ export const sessionHandlers = Layer.unwrap(
               Effect.provide(Session.defaultLayer),
             ),
           ),
-        ),
+        ).catch((error) => Promise.reject(mapNotFoundError(error))),
       )
       return true
     })
@@ -847,7 +863,7 @@ export const sessionHandlers = Layer.unwrap(
               yield* state.assertNotBusy(ctx.params.sessionID)
               yield* session.removeMessage(ctx.params)
             }).pipe(Effect.provide(SessionRunState.defaultLayer), Effect.provide(Session.defaultLayer)),
-          ).catch((error) => Promise.reject(mapBusyError(error, ctx.params.sessionID))),
+          ).catch((error) => Promise.reject(mapSessionRouteError(error, ctx.params.sessionID))),
         ),
       )
       return true
@@ -862,7 +878,7 @@ export const sessionHandlers = Layer.unwrap(
           AppRuntime.runPromise(
             Session.Service.use((svc) => svc.removePart(ctx.params)).pipe(Effect.provide(Session.defaultLayer)),
           ),
-        ),
+        ).catch((error) => Promise.reject(mapNotFoundError(error))),
       )
       return true
     })
@@ -887,7 +903,7 @@ export const sessionHandlers = Layer.unwrap(
           AppRuntime.runPromise(
             Session.Service.use((svc) => svc.updatePart(payload)).pipe(Effect.provide(Session.defaultLayer)),
           ),
-        ),
+        ).catch((error) => Promise.reject(mapNotFoundError(error))),
       )
     })
 

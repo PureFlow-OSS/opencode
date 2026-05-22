@@ -160,6 +160,18 @@ describe("session HttpApi", () => {
         }),
       ),
     ).toMatchObject({ info: { id: message.info.id } })
+
+    expect(
+      (await app().request(pathFor(SessionPaths.get, { sessionID: "missing-session" }), { headers })).status,
+    ).toBe(404)
+
+    expect(
+      (
+        await app().request(pathFor(SessionPaths.message, { sessionID: parent.id, messageID: "missing-message" }), {
+          headers,
+        })
+      ).status,
+    ).toBe(404)
   })
 
   test("serves lifecycle mutation routes through Hono bridge", async () => {
@@ -250,6 +262,19 @@ describe("session HttpApi", () => {
         }),
       ),
     ).toBe(true)
+
+    expect(
+      (
+        await app().request(pathFor(SessionPaths.deletePart, {
+          sessionID: session.id,
+          messageID: first.info.id,
+          partID: "missing-part",
+        }), {
+          method: "DELETE",
+          headers,
+        })
+      ).status,
+    ).toBe(404)
   })
 
   test("serves remaining non-LLM session mutation routes through Hono bridge", async () => {
