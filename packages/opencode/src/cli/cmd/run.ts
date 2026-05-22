@@ -486,6 +486,9 @@ export const RunCommand = cmd({
       const replayedPartText = new Map<string, string>()
       const messageRoles = new Map<string, "user" | "assistant">()
       const pendingParts = new Map<string, Extract<Part, { type: "text" | "reasoning" }>>()
+      const streamedPartText = new Map<string, string>()
+      const recoveringQuestions = new Set<string>()
+      const runningQuestionParts = new Set<string>()
       const settledBlockers = new Set<string>()
       const buffered: Event[] = []
       const toggles = new Map<string, boolean>()
@@ -502,6 +505,24 @@ export const RunCommand = cmd({
             return !item || item.type === "idle"
           })
           .catch(() => fallback)
+      }
+
+      function syncStreamedText(partID: string, next: string, append = false) {
+        const previous = streamedPartText.get(partID) ?? ""
+        const value = append ? previous + next : !previous || next.length >= previous.length ? next : previous
+        streamedPartText.set(partID, value)
+        return value
+      }
+
+      function clearPartState(partID: string) {
+        pendingParts.delete(partID)
+        streamedPartText.delete(partID)
+      }
+
+      function mergeBufferedText(part: Extract<Part, { type: "text" | "reasoning" }>) {
+        const text = syncStreamedText(part.id, part.text)
+        if (text === part.text) return part
+        return { ...part, text }
       }
 
       function printPart(part: Extract<Part, { type: "text" | "reasoning" }>) {
@@ -538,8 +559,44 @@ export const RunCommand = cmd({
         for (const [id, part] of pendingParts.entries()) {
           if (part.messageID !== messageID) continue
           pendingParts.delete(id)
-          if (role !== "assistant") continue
+          if (role !== "assistant") {
+            clearPartState(id)
+            continue
+          }
           printPart(part)
+          if (part.time?.end) clearPartState(id)
+        }
+      }
+
+      async function recoverQuestion(partID: string) {
+        if (recoveringQuestions.has(partID)) return
+        recoveringQuestions.add(partID)
+        try {
+          while (runningQuestionParts.has(partID) && !eventsAbort.signal.aborted) {
+            const pending = await sdk.question
+              .list()
+              .then((result) => (result.data ?? []).filter((item) => item.sessionID === sessionID))
+              .catch(() => [])
+            const next = pending.filter((item) => !settledBlockers.has(item.id))
+            if (next.length > 0) {
+              for (const question of next) {
+                settledBlockers.add(question.id)
+                for (const item of question.questions) {
+                  UI.println(
+                    UI.Style.TEXT_WARNING_BOLD + "!",
+                    UI.Style.TEXT_NORMAL + `recovered question: ${item.header} - ${item.question}; auto-rejecting`,
+                  )
+                }
+                await sdk.question.reject({
+                  requestID: question.id,
+                })
+              }
+              return
+            }
+            await Bun.sleep(250)
+          }
+        } finally {
+          recoveringQuestions.delete(partID)
         }
       }
 
@@ -572,6 +629,10 @@ export const RunCommand = cmd({
             replayedPartText.delete(event.properties.partID)
             replayedPartIDs.delete(event.properties.partID)
           }
+          if (event.properties.field !== "text") return false
+          const text = syncStreamedText(event.properties.partID, event.properties.delta, true)
+          const pending = pendingParts.get(event.properties.partID)
+          if (pending) pendingParts.set(event.properties.partID, { ...pending, text })
         }
 
         if (event.type === "message.part.updated") {
@@ -579,9 +640,13 @@ export const RunCommand = cmd({
           if (part.sessionID !== sessionID) return false
           if (turnArmed) turnLive = true
           replayedPartText.delete(part.id)
-          if (replayedPartIDs.delete(part.id)) return false
+          if (replayedPartIDs.delete(part.id)) {
+            if (part.type === "text" || part.type === "reasoning") clearPartState(part.id)
+            return false
+          }
 
           if (part.type === "tool" && (part.state.status === "completed" || part.state.status === "error")) {
+            if (part.tool === "question") runningQuestionParts.delete(part.id)
             if (emit("tool_use", { part })) return false
             if (part.state.status === "completed") {
               tool(part)
@@ -600,6 +665,11 @@ export const RunCommand = cmd({
             toggles.set(part.id, true)
           }
 
+          if (part.type === "tool" && part.tool === "question" && part.state.status === "running") {
+            runningQuestionParts.add(part.id)
+            void recoverQuestion(part.id)
+          }
+
           if (part.type === "step-start") {
             if (emit("step_start", { part })) return false
           }
@@ -609,13 +679,18 @@ export const RunCommand = cmd({
           }
 
           if (part.type === "text" || part.type === "reasoning") {
+            const merged = mergeBufferedText(part)
             const role = messageRoles.get(part.messageID)
             if (!role) {
-              pendingParts.set(part.id, part)
+              pendingParts.set(part.id, merged)
               return false
             }
-            if (role !== "assistant") return false
-            printPart(part)
+            if (role !== "assistant") {
+              clearPartState(part.id)
+              return false
+            }
+            printPart(merged)
+            if (merged.time?.end) clearPartState(merged.id)
             return false
           }
         }
