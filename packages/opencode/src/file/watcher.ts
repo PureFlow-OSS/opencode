@@ -39,7 +39,7 @@ const watcher = lazy((): typeof import("@parcel/watcher") | undefined => {
     )
     return createWrapper(binding) as typeof import("@parcel/watcher")
   } catch (error) {
-    log.error("failed to load watcher binding", { error })
+    log.warn("failed to load watcher binding, falling back to chokidar", { error })
     return
   }
 })
@@ -58,6 +58,43 @@ function protecteds(dir: string) {
 }
 
 export const hasNativeBinding = () => !!watcher()
+
+function ignored(dir: string, ignore: string[], filepath: string) {
+  const rel = path.relative(dir, filepath)
+  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) return false
+  return FileIgnore.match(rel, {
+    extra: ignore.map((item) => (path.isAbsolute(item) ? path.relative(dir, item) : item)),
+  })
+}
+
+async function startSubscription(
+  dir: string,
+  ignore: string[],
+  backend: NonNullable<ReturnType<typeof getBackend>>,
+  cb: ParcelWatcher.SubscribeCallback,
+) {
+  const native = watcher()
+  if (native) {
+    try {
+      return await native.subscribe(dir, cb, { ignore, backend })
+    } catch (error) {
+      log.warn("native watcher subscribe failed, falling back to chokidar", { dir, error })
+    }
+  }
+
+  const { default: chokidar } = await import("chokidar")
+  const instance = chokidar.watch(dir, {
+    ignoreInitial: true,
+    ignored: (filepath) => ignored(dir, ignore, filepath),
+  })
+  const publish = (event: "create" | "update" | "delete") => (filepath: string) => cb(null, [{ path: filepath, type: event }])
+  instance.on("add", publish("create"))
+  instance.on("change", publish("update"))
+  instance.on("unlink", publish("delete"))
+  return {
+    unsubscribe: () => instance.close(),
+  } satisfies Pick<ParcelWatcher.AsyncSubscription, "unsubscribe">
+}
 
 export interface Interface {
   readonly init: () => Effect.Effect<void>
@@ -84,12 +121,14 @@ export const layer = Layer.effect(
             return
           }
 
-          const w = watcher()
-          if (!w) return
+          log.info("watcher backend", {
+            directory: Instance.directory,
+            platform: process.platform,
+            backend,
+            native: hasNativeBinding(),
+          })
 
-          log.info("watcher backend", { directory: Instance.directory, platform: process.platform, backend })
-
-          const subs: ParcelWatcher.AsyncSubscription[] = []
+          const subs: Pick<ParcelWatcher.AsyncSubscription, "unsubscribe">[] = []
           yield* Effect.addFinalizer(() =>
             Effect.promise(() => Promise.allSettled(subs.map((sub) => sub.unsubscribe()))),
           )
@@ -104,7 +143,7 @@ export const layer = Layer.effect(
           })
 
           const subscribe = (dir: string, ignore: string[]) => {
-            const pending = w.subscribe(dir, cb, { ignore, backend })
+            const pending = startSubscription(dir, ignore, backend, cb)
             return Effect.gen(function* () {
               const sub = yield* Effect.promise(() => pending)
               subs.push(sub)

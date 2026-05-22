@@ -1421,10 +1421,11 @@ export default function Layout(props: ParentProps) {
         navigateWithSidebarReset(`/${base64Encode(target.directory)}/session/${target.id}`)
         return true
       }
-      const resolved = await globalSDK.client.session
-        .get({ sessionID: target.id })
-        .then((x) => x.data)
-        .catch(() => undefined)
+      const listed = await globalSDK.client.session
+        .list({ directory: target.directory })
+        .then((x) => x.data ?? [])
+        .catch(() => [])
+      const resolved = listed.find((item) => item.id === target.id)
       if (!resolved?.directory) return false
       if (!canOpen(resolved.directory)) return false
       setStore("lastProjectSession", root, { directory: resolved.directory, id: resolved.id, at: Date.now() })

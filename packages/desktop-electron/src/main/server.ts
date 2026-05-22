@@ -1,4 +1,6 @@
 import { app } from "electron"
+import { existsSync } from "node:fs"
+import { join } from "node:path"
 import { DEFAULT_SERVER_URL_KEY, WSL_ENABLED_KEY } from "./constants"
 import { getUserShell, loadShellEnv } from "./shell-env"
 import { getStore } from "./store"
@@ -61,6 +63,7 @@ export async function spawnLocalServer(hostname: string, port: number, password:
 function prepareServerEnv(password: string) {
   const shell = process.platform === "win32" ? null : getUserShell()
   const shellEnv = shell ? (loadShellEnv(shell) ?? {}) : {}
+  const ripgrepPath = resolveBundledRipgrepPath()
   const env = {
     ...process.env,
     ...shellEnv,
@@ -69,9 +72,18 @@ function prepareServerEnv(password: string) {
     OPENCODE_CLIENT: "desktop",
     OPENCODE_SERVER_USERNAME: "opencode",
     OPENCODE_SERVER_PASSWORD: password,
+    ...(ripgrepPath ? { OPENCODE_RIPGREP_PATH: ripgrepPath } : {}),
     XDG_STATE_HOME: app.getPath("userData"),
   }
   Object.assign(process.env, env)
+}
+
+function resolveBundledRipgrepPath() {
+  const file = process.platform === "win32" ? "rg.exe" : "rg"
+  const candidate = app.isPackaged
+    ? join(process.resourcesPath, "bin", file)
+    : join(app.getAppPath(), "resources", "bin", file)
+  return existsSync(candidate) ? candidate : undefined
 }
 
 export async function checkHealth(url: string, password?: string | null): Promise<boolean> {
