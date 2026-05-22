@@ -485,8 +485,9 @@
   - busy experimental session routes collapse into generic failures
   - clients cannot distinguish retryable busy state from malformed requests
 - Notes:
-  - local fork still keeps the experimental HttpApi session surface in one file, so this was adapted in-place instead of following the upstream groups/handlers split
+  - local fork still keeps the experimental HttpApi session surface in one file, but the busy-error helper now also follows the upstream `handlers/session-errors.ts` split
   - added a local `SessionBusyHttpApiError` with `409` status and mapped busy promise rejections on the affected routes: `shell`, `revert`, `unrevert`, and `deleteMessage`
+  - session route imports now use the extracted helper module, which reduces `session.ts` surface area and makes later HttpApi error ports easier
   - added regression coverage for the busy-error mapping helper and kept the existing HttpApi session route suite green
 
 ### `c79a9634d` tolerate plugin tool defs with missing args
