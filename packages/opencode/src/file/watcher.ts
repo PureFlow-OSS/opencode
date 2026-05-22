@@ -74,7 +74,13 @@ async function startSubscription(
   cb: ParcelWatcher.SubscribeCallback,
 ) {
   const native = watcher()
-  if (native) return native.subscribe(dir, cb, { ignore, backend })
+  if (native) {
+    try {
+      return await native.subscribe(dir, cb, { ignore, backend })
+    } catch (error) {
+      log.warn("native watcher subscribe failed, falling back to chokidar", { dir, error })
+    }
+  }
 
   const { default: chokidar } = await import("chokidar")
   const instance = chokidar.watch(dir, {

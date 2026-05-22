@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("OpenCode.UpdaterHelper")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+614d948b6ed769ae7dfa15682e33e19b1a7d1e24")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d283a06286f0b73009ed55eebb9a5524e7f46cbd")]
 [assembly: System.Reflection.AssemblyProductAttribute("OpenCode.UpdaterHelper")]
 [assembly: System.Reflection.AssemblyTitleAttribute("OpenCode.UpdaterHelper")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
