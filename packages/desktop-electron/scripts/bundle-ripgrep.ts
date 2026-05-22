@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import fs from "node:fs/promises"
+import os from "node:os"
 import path from "node:path"
 
 const VERSION = "15.1.0"
@@ -19,7 +20,7 @@ if (await Bun.file(target).exists()) {
 
 const filename = `ripgrep-${VERSION}-${config.platform}.${config.extension}`
 const url = `https://github.com/BurntSushi/ripgrep/releases/download/${VERSION}/${filename}`
-const temp = path.join(root, ".artifacts", "ripgrep")
+const temp = path.join(os.tmpdir(), "opencode-ripgrep")
 const archive = path.join(temp, filename)
 const extracted = path.join(temp, `ripgrep-${VERSION}-${config.platform}`, "rg.exe")
 
