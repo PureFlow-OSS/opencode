@@ -467,7 +467,8 @@ export const RunCommand = cmd({
         return false
       }
 
-      const events = await sdk.event.subscribe()
+      const eventsAbort = new AbortController()
+      const events = await sdk.event.subscribe(undefined, { signal: eventsAbort.signal })
       let error: string | undefined
       const replayedMessageIDs = new Set<string>()
       const replayedPartIDs = new Set<string>()
@@ -819,6 +820,7 @@ export const RunCommand = cmd({
           variant: args.variant,
         })
         if (result.error) {
+          eventsAbort.abort()
           if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
           process.exitCode = 1
         }
@@ -834,6 +836,7 @@ export const RunCommand = cmd({
           parts: [...files, { type: "text", text: message }],
         })
         if (result.error) {
+          eventsAbort.abort()
           if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
           process.exitCode = 1
         }
