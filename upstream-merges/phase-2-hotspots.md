@@ -259,6 +259,26 @@
   - added regression coverage for both direct `subscribe(...)` buffering and the `/event`-style concat-prefix handoff
   - local follow-up: plugin hook fanout stayed on `subscribeAllCallback(...)` because the current plugin state init path is not fully `scoped` and otherwise stalled loader tests on this fork
 
+### `40e73c491` structured invalid request errors on HttpApi routes
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/server/routes/instance/httpapi/session.ts`
+  - `packages/opencode/src/server/routes/instance/httpapi/provider.ts`
+  - `packages/opencode/src/server/routes/instance/httpapi/mcp.ts`
+  - `packages/opencode/src/server/routes/instance/httpapi/experimental.ts`
+- Risk:
+  - invalid query/payload cases leaking generic 500s
+  - inconsistent 400 bodies across HttpApi routes
+  - session route regressions hidden behind stricter id schema
+- Notes:
+  - added local `InvalidRequestHttpApiError` helper in `handlers/request-errors.ts`
+  - provider OAuth, MCP OAuth, and Console org switch now return structured `InvalidRequestError` bodies for user-caused bad requests
+  - `session.messages` now returns explicit 400 JSON responses for missing `limit` on `before` and for malformed cursors, because local mixed-error schema mapping dropped the 400 status on this fork
+  - `session.deletePart` now pre-checks part existence before delete so missing parts return 404 instead of silently succeeding
+  - session read routes (`get`, `message`, `messages` session precheck) now use the same promise-side `mapNotFoundError(...)` bridge as the already working mutation routes, avoiding defect-style `NotFoundError` leaks from local session service code
+  - local regression coverage also switched `missing-*` route tests to valid branded ids, because current upstream/dev id schema rejects arbitrary strings before route logic runs
+
 ### `5911bd532` show config error details on startup
 
 - Status: `done` with local partial adaptation
