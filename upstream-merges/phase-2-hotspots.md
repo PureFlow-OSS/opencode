@@ -205,6 +205,7 @@
   - local idle-handoff subset also adapted:
     - stale pre-turn `session.status idle` events no longer terminate the event loop before the new turn has produced any live session activity
     - idle completion now re-checks live `sdk.session.status()` before breaking, reducing delayed-idle races from older turns
+  - local failure-exit subset also adapted: background SSE subscription now aborts when `sdk.session.prompt(...)` / `sdk.session.command(...)` returns an immediate error, so non-interactive resumed runs do not hang on a failed turn
   - deferred pieces remain the hardest upstream-only parts: live stream boot buffering, true delta-stream suppression, subagent recovery, and footer/runtime state sync
 
 ### `22a5e6cc5` restore non-interactive run exit behavior
