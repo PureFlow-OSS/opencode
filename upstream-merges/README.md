@@ -32,3 +32,15 @@ Phase 2:
 - `strategy.md`: merge method and guardrails
 - `phase-2-hotspots.md`: hotspot-by-hotspot status
 - `upstream-candidates.md`: our changes that may be worth upstream PRs
+
+## Local Dev Syncs
+
+- `2026-05-22`: merged local `origin/dev` into `feat/merge-upstream`
+- Included noteworthy new local-base changes:
+  - `b44e8ba51` `fix project session fallback`
+  - `614d948b6` `fix: bundle native watchers and ripgrep for Windows`
+  - `2e9005922` `fix: use proper PowerShell invocation for bundled ripgrep`
+  - `d283a0628` `fix: bundle watcher and ripgrep for Windows builds`
+- Post-merge sanity:
+  - `bun typecheck` in `packages/opencode`
+  - `bun typecheck` in `packages/app`
