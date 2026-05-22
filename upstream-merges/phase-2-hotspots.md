@@ -204,6 +204,7 @@
   - local duplicate-after-replay subset also adapted: replay now seeds assistant message ids and completed part ids so the first matching `message.updated` / `message.part.updated` events are skipped instead of being printed twice
   - local boot-buffering subset also adapted: the resumed CLI now starts the event stream before blocker settlement/replay, buffers same-session events during boot, then drains them after replay so early live events are not handled out of order against the restored scrollback
   - local delta-suppression subset also adapted for replayed text/reasoning parts: replay snapshots now retain completed part text and skip matching `message.part.delta` suffixes that would otherwise duplicate already replayed output
+  - local role-buffering subset also adapted: visible text/reasoning output now waits for `message.updated` role confirmation before printing, so user-role message parts are dropped instead of being echoed back during non-interactive resume
   - local idle-handoff subset also adapted:
     - stale pre-turn `session.status idle` events no longer terminate the event loop before the new turn has produced any live session activity
     - idle completion now re-checks live `sdk.session.status()` before breaking, reducing delayed-idle races from older turns
