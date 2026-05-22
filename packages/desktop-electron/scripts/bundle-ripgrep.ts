@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-import { $ } from "bun"
 import fs from "node:fs/promises"
 import path from "node:path"
 
@@ -31,7 +30,22 @@ const response = await fetch(url)
 if (!response.ok) throw new Error(`Failed to download ripgrep from ${url}: ${response.status} ${response.statusText}`)
 
 await Bun.write(archive, new Uint8Array(await response.arrayBuffer()))
-await $`powershell -NoProfile -NonInteractive -Command $global:ProgressPreference = 'SilentlyContinue'; Expand-Archive -LiteralPath ${archive} -DestinationPath ${temp} -Force`
+const powershell = Bun.spawn(
+  [
+    "powershell",
+    "-NoProfile",
+    "-NonInteractive",
+    "-Command",
+    "& { param([string]$archive, [string]$destination) $ProgressPreference = 'SilentlyContinue'; Expand-Archive -LiteralPath $archive -DestinationPath $destination -Force }",
+    archive,
+    temp,
+  ],
+  {
+    stdout: "inherit",
+    stderr: "inherit",
+  },
+)
+if ((await powershell.exited) !== 0) throw new Error("Failed to extract ripgrep archive")
 
 if (!(await Bun.file(extracted).exists())) {
   throw new Error(`ripgrep archive did not contain rg.exe at ${extracted}`)
