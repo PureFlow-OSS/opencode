@@ -202,11 +202,14 @@
     - pending questions are auto-rejected because local `run` has no interactive answer surface
     - live `question.asked` events are also auto-rejected during non-interactive `run`
   - local duplicate-after-replay subset also adapted: replay now seeds assistant message ids and completed part ids so the first matching `message.updated` / `message.part.updated` events are skipped instead of being printed twice
+  - local boot-buffering subset also adapted: the resumed CLI now starts the event stream before blocker settlement/replay, buffers same-session events during boot, then drains them after replay so early live events are not handled out of order against the restored scrollback
+  - local delta-suppression subset also adapted for replayed text/reasoning parts: replay snapshots now retain completed part text and skip matching `message.part.delta` suffixes that would otherwise duplicate already replayed output
   - local idle-handoff subset also adapted:
     - stale pre-turn `session.status idle` events no longer terminate the event loop before the new turn has produced any live session activity
     - idle completion now re-checks live `sdk.session.status()` before breaking, reducing delayed-idle races from older turns
   - local failure-exit subset also adapted: background SSE subscription now aborts when `sdk.session.prompt(...)` / `sdk.session.command(...)` returns an immediate error, so non-interactive resumed runs do not hang on a failed turn
-  - deferred pieces remain the hardest upstream-only parts: live stream boot buffering, true delta-stream suppression, subagent recovery, and footer/runtime state sync
+  - boot-time blocker replies are deduped against already settled pending blockers so buffered `permission.asked` / `question.asked` events do not trigger double replies during resume
+  - deferred pieces remain the hardest upstream-only parts: deeper streamed-part rendering parity, subagent recovery, and footer/runtime state sync
 
 ### `22a5e6cc5` restore non-interactive run exit behavior
 
