@@ -492,6 +492,22 @@
   - session route imports now use the extracted helper module, which reduces `session.ts` surface area and makes later HttpApi error ports easier
   - added regression coverage for the busy-error mapping helper and kept the existing HttpApi session route suite green
 
+### `b275b12e9` expose session not found errors
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/server/routes/instance/httpapi/groups/v2/session.ts`
+  - `packages/opencode/src/server/routes/instance/httpapi/handlers/v2/session.ts`
+  - `packages/opencode/test/server/httpapi-session.test.ts`
+- Risk:
+  - missing sessions/messages collapse into generic 500s
+  - clients cannot distinguish retryable/server faults from missing resources
+- Notes:
+  - local fork does not yet share the upstream `groups/v2/session.ts` shape, so the intent was adapted onto the existing experimental session HttpApi surface
+  - extracted `mapNotFoundError(...)` and `mapSessionRouteError(...)` into `handlers/session-errors.ts`
+  - added explicit `404` route metadata and mapping on key session routes including `get`, `messages`, `message`, `remove`, `update`, `fork`, `share`, `unshare`, `summarize`, `deleteMessage`, `deletePart`, and `updatePart`
+  - added route-level regression checks for missing session/message/part responses in the existing Hono bridge session test
+
 ### `c79a9634d` tolerate plugin tool defs with missing args
 
 - Status: `done` with local adaptation
