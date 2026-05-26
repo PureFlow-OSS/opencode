@@ -893,3 +893,17 @@
   - local `Editor.open(...)` now accepts optional `cwd`
   - prompt editor and session transcript editor now pass `project.instance.path().worktree || project.instance.directory() || process.cwd()`
   - verified with `bun typecheck` in `packages/opencode`
+
+### `5f4235115` type default model failures
+
+- Status: `done` with local partial adaptation
+- Upstream files:
+  - `packages/opencode/src/provider/provider.ts`
+  - `packages/opencode/test/provider/provider.test.ts`
+- Risk:
+  - `defaultModel()` can fail with generic runtime errors when config excludes all providers or selected provider has no models
+  - generic failures are harder to map cleanly at server boundary
+- Notes:
+  - local provider now throws typed `ProviderNoProvidersError` and `ProviderNoModelsError`
+  - server middleware maps both errors to `400`
+  - verified with `bun typecheck` and targeted `bun test test/provider/provider.test.ts -t "defaultModel returns typed error when config excludes every provider" --timeout 20000` in `packages/opencode`
