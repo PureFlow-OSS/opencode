@@ -990,6 +990,30 @@ test("enabled_providers with empty array allows no providers", async () => {
   })
 })
 
+test("defaultModel returns typed error when config excludes every provider", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await Bun.write(
+        path.join(dir, "opencode.json"),
+        JSON.stringify({
+          $schema: "https://opencode.ai/config.json",
+          enabled_providers: [],
+        }),
+      )
+    },
+  })
+  await Instance.provide({
+    directory: tmp.path,
+    init: async () => {
+      set("ANTHROPIC_API_KEY", "test-api-key")
+      set("OPENAI_API_KEY", "test-openai-key")
+    },
+    fn: async () => {
+      await expect(defaultModel()).rejects.toBeInstanceOf(Provider.NoProvidersError)
+    },
+  })
+})
+
 test("whitelist and blacklist can be combined", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {

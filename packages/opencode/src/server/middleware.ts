@@ -23,6 +23,8 @@ export const ErrorMiddleware: ErrorHandler = (err, c) => {
     let status: ContentfulStatusCode
     if (err instanceof NotFoundError) status = 404
     else if (err instanceof Provider.ModelNotFoundError) status = 400
+    else if (err instanceof Provider.NoProvidersError) status = 400
+    else if (err instanceof Provider.NoModelsError) status = 400
     else if (err.name === "ProviderAuthValidationFailed") status = 400
     else if (err.name.startsWith("Worktree")) status = 400
     else status = 500

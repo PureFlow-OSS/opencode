@@ -2047,9 +2047,9 @@ const layer: Layer.Layer<
       }
 
       const provider = Object.values(s.providers).find((p) => !cfg.provider || Object.keys(cfg.provider).includes(p.id))
-      if (!provider) throw new Error("no providers found")
+      if (!provider) throw new NoProvidersError({})
       const [model] = sort(Object.values(provider.models))
-      if (!model) throw new Error("no models found")
+      if (!model) throw new NoModelsError({ providerID: provider.id })
       return {
         providerID: provider.id,
         modelID: model.id,
@@ -2092,6 +2092,12 @@ export const ModelNotFoundError = namedSchemaError("ProviderModelNotFoundError",
   providerID: ProviderID,
   modelID: ModelID,
   suggestions: Schema.optional(Schema.Array(Schema.String)),
+})
+
+export const NoProvidersError = namedSchemaError("ProviderNoProvidersError", {})
+
+export const NoModelsError = namedSchemaError("ProviderNoModelsError", {
+  providerID: ProviderID,
 })
 
 export const InitError = namedSchemaError("ProviderInitError", {
