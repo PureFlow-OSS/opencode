@@ -1,8 +1,10 @@
 import { Question } from "@/question"
 import { QuestionID } from "@/question/schema"
 import { Effect, Layer, Schema } from "effect"
+import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse"
 import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "./auth"
+import { requestNotFound, RequestNotFoundHttpApiError } from "./handlers/request-errors"
 
 const root = "/question"
 
@@ -23,6 +25,7 @@ export const QuestionApi = HttpApi.make("question")
           params: { requestID: QuestionID },
           payload: Question.Reply,
           success: Schema.Boolean,
+          error: RequestNotFoundHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "question.reply",
@@ -33,6 +36,7 @@ export const QuestionApi = HttpApi.make("question")
         HttpApiEndpoint.post("reject", `${root}/:requestID/reject`, {
           params: { requestID: QuestionID },
           success: Schema.Boolean,
+          error: RequestNotFoundHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "question.reject",
@@ -69,6 +73,11 @@ export const questionHandlers = Layer.unwrap(
       params: { requestID: QuestionID }
       payload: Question.Reply
     }) {
+      if (!(yield* svc.list()).find((item) => item.id === ctx.params.requestID)) {
+        return HttpServerResponse.jsonUnsafe(requestNotFound("question", String(ctx.params.requestID)), {
+          status: 404,
+        })
+      }
       yield* svc.reply({
         requestID: ctx.params.requestID,
         answers: ctx.payload.answers,
@@ -77,6 +86,11 @@ export const questionHandlers = Layer.unwrap(
     })
 
     const reject = Effect.fn("QuestionHttpApi.reject")(function* (ctx: { params: { requestID: QuestionID } }) {
+      if (!(yield* svc.list()).find((item) => item.id === ctx.params.requestID)) {
+        return HttpServerResponse.jsonUnsafe(requestNotFound("question", String(ctx.params.requestID)), {
+          status: 404,
+        })
+      }
       yield* svc.reject(ctx.params.requestID)
       return true
     })

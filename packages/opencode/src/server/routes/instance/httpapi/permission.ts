@@ -1,8 +1,10 @@
 import { Permission } from "@/permission"
 import { PermissionID } from "@/permission/schema"
 import { Effect, Layer, Schema } from "effect"
+import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse"
 import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "./auth"
+import { requestNotFound, RequestNotFoundHttpApiError } from "./handlers/request-errors"
 
 const root = "/permission"
 
@@ -23,6 +25,7 @@ export const PermissionApi = HttpApi.make("permission")
           params: { requestID: PermissionID },
           payload: Permission.ReplyBody,
           success: Schema.Boolean,
+          error: RequestNotFoundHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "permission.reply",
@@ -59,6 +62,11 @@ export const permissionHandlers = Layer.unwrap(
       params: { requestID: PermissionID }
       payload: Permission.ReplyBody
     }) {
+      if (!(yield* svc.list()).find((item) => item.id === ctx.params.requestID)) {
+        return HttpServerResponse.jsonUnsafe(requestNotFound("permission", String(ctx.params.requestID)), {
+          status: 404,
+        })
+      }
       yield* svc.reply({
         requestID: ctx.params.requestID,
         reply: ctx.payload.reply,
