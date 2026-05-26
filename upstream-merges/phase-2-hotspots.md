@@ -866,3 +866,14 @@
 - Notes:
   - local PTY HttpApi now returns structured `PtyNotFoundError` bodies for `get`, `update`, `remove`, and pre-upgrade `connect`
   - verified with `bun typecheck` and `bun test test/server/httpapi-pty.test.ts` in `packages/opencode`
+
+### `f01c6b3e3` tolerate stale sessions in stats aggregation
+
+- Status: `done` with local partial adaptation
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/stats.ts`
+- Risk:
+  - stats aggregation can hard-fail if a session row still exists while its message storage was already removed or migrated away
+- Notes:
+  - local `stats` now catches `NotFoundError` from `svc.messages(...)` and treats that session as empty instead of aborting the whole report
+  - verified with `bun typecheck` in `packages/opencode`
