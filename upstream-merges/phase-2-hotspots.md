@@ -279,6 +279,26 @@
   - session read routes (`get`, `message`, `messages` session precheck) now use the same promise-side `mapNotFoundError(...)` bridge as the already working mutation routes, avoiding defect-style `NotFoundError` leaks from local session service code
   - local regression coverage also switched `missing-*` route tests to valid branded ids, because current upstream/dev id schema rejects arbitrary strings before route logic runs
 
+### `fed043a1a` + `f01c6b3e3` typed message lookup wrappers and message list not-found errors
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/session/message-v2.ts`
+  - `packages/opencode/src/session/session.ts`
+  - `packages/opencode/src/session/prompt.ts`
+  - `packages/opencode/src/session/revert.ts`
+  - `packages/opencode/src/session/summary.ts`
+- Risk:
+  - sync message helpers throwing plain defects instead of typed not-found errors
+  - `Session.messages` / `findMessage` bypassing typed pagination and hiding missing-session cases
+  - callers assuming session existence without making that assumption explicit
+- Notes:
+  - added local `MessageV2.pageEffect(...)` and `MessageV2.getEffect(...)` wrappers that preserve `NotFoundError` as typed failure and die on unexpected defects
+  - `Session.messages(...)` and `Session.findMessage(...)` now page through `pageEffect(...)` instead of raw sync generators, so missing sessions stay in the typed error channel
+  - local callers that logically require an existing session now make that assumption explicit with `.pipe(Effect.orDie)` in `prompt`, `revert`, and `summary`
+  - local `session.messages` HttpApi route now bridges paged message lookups through the same `mapNotFoundError(...)` pattern as other session read routes, so `limit` pagination no longer leaks raw storage/session not-found errors
+  - added regression coverage for `pageEffect(...)` and `getEffect(...)` not-found behavior in `messages-pagination.test.ts`
+
 ### `5911bd532` show config error details on startup
 
 - Status: `done` with local partial adaptation
