@@ -1,8 +1,11 @@
 import type { Argv } from "yargs"
+import { Effect } from "effect"
 import { cmd } from "./cmd"
 import { Session } from "../../session"
+import { MessageV2 } from "../../session/message-v2"
 import { bootstrap } from "../bootstrap"
 import { Database } from "../../storage"
+import { NotFoundError } from "../../storage"
 import { SessionTable } from "../../session/session.sql"
 import { Project } from "../../project"
 import { Instance } from "../../project/instance"
@@ -169,7 +172,11 @@ export async function aggregateSessionStats(days?: number, projectFilter?: strin
 
     const batchPromises = batch.map(async (session) => {
       const messages = await AppRuntime.runPromise(
-        Session.Service.use((svc) => svc.messages({ sessionID: session.id })),
+        Session.Service.use((svc) =>
+          svc
+            .messages({ sessionID: session.id })
+            .pipe(Effect.catchIf(NotFoundError.isInstance, () => Effect.succeed([] as MessageV2.WithParts[]))),
+        ),
       )
 
       let sessionCost = 0
