@@ -907,3 +907,16 @@
   - local provider now throws typed `ProviderNoProvidersError` and `ProviderNoModelsError`
   - server middleware maps both errors to `400`
   - verified with `bun typecheck` and targeted `bun test test/provider/provider.test.ts -t "defaultModel returns typed error when config excludes every provider" --timeout 20000` in `packages/opencode`
+
+### `748fcb7eb` exclude orphaned interrupted tools from run-loop continuation
+
+- Status: `done`
+- Upstream files:
+  - `packages/opencode/src/session/prompt.ts`
+- Risk:
+  - cleanup-marked interrupted tool parts can look like pending tool work and force an unnecessary continuation loop
+  - resumed or retried sessions can keep spinning instead of exiting cleanly
+- Notes:
+  - local prompt loop now ignores tool parts with `state.status === "error"` and `state.metadata?.interrupted === true` when deciding whether another loop pass is needed
+  - local loop also logs orphaned interrupted tool metadata before exiting
+  - verified with `bun typecheck` in `packages/opencode`
