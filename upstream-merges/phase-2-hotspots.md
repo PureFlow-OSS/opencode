@@ -842,3 +842,16 @@
   - local `Project.update(...)` now fails with typed `NotFoundError`
   - project HttpApi `update` maps the typed error to `HttpApiError.NotFound`
   - verified with `bun typecheck` and `bun test test/server/httpapi-instance.test.ts -t "returns not found for missing project update"` in `packages/opencode`
+
+### `4ce247eab` expose request not found errors
+
+- Status: `done` with local partial adaptation
+- Upstream files:
+  - `packages/opencode/src/server/routes/instance/httpapi/permission.ts`
+  - `packages/opencode/src/server/routes/instance/httpapi/question.ts`
+- Risk:
+  - replying to already cleared or unknown permission/question requests currently no-ops, which hides stale UI races and makes API retries ambiguous
+- Notes:
+  - local `permission` and `question` reply/reject routes now precheck pending requests and return structured `RequestNotFoundError` `404` bodies
+  - shared helper lives in `handlers/request-errors.ts`
+  - verified with `bun typecheck` and `bun test test/server/httpapi-requests.test.ts` in `packages/opencode`
