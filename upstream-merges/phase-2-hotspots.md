@@ -297,6 +297,9 @@
   - `Session.messages(...)` and `Session.findMessage(...)` now page through `pageEffect(...)` instead of raw sync generators, so missing sessions stay in the typed error channel
   - local callers that logically require an existing session now make that assumption explicit with `.pipe(Effect.orDie)` in `prompt`, `revert`, and `summary`
   - local `session.messages` HttpApi route now bridges paged message lookups through the same `mapNotFoundError(...)` pattern as other session read routes, so `limit` pagination no longer leaks raw storage/session not-found errors
+  - follow-up local call-sites also moved onto the wrappers:
+    - `tool/task.ts` now resolves the parent assistant message via `getEffect(...).pipe(Effect.orDie)`
+    - legacy Hono session routes now use `pageEffect(...)` / `getEffect(...)` instead of raw sync reads
   - added regression coverage for `pageEffect(...)` and `getEffect(...)` not-found behavior in `messages-pagination.test.ts`
 
 ### `5911bd532` show config error details on startup
