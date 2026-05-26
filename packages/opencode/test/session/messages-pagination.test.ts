@@ -204,6 +204,18 @@ describe("MessageV2.page", () => {
     })
   })
 
+  test("pageEffect fails with NotFoundError for non-existent session", async () => {
+    await Instance.provide({
+      directory: root,
+      fn: async () => {
+        const fake = "non-existent-session" as SessionID
+        await expect(Effect.runPromise(MessageV2.pageEffect({ sessionID: fake, limit: 10 }))).rejects.toThrow(
+          "NotFoundError",
+        )
+      },
+    })
+  })
+
   test("handles exact limit boundary", async () => {
     await Instance.provide({
       directory: root,
@@ -565,6 +577,21 @@ describe("MessageV2.get", () => {
         expect(() => MessageV2.get({ sessionID: session.id, messageID: MessageID.ascending() })).toThrow(
           "NotFoundError",
         )
+
+        await svc.remove(session.id)
+      },
+    })
+  })
+
+  test("getEffect fails with NotFoundError for non-existent message", async () => {
+    await Instance.provide({
+      directory: root,
+      fn: async () => {
+        const session = await svc.create({})
+
+        await expect(
+          Effect.runPromise(MessageV2.getEffect({ sessionID: session.id, messageID: MessageID.ascending() })),
+        ).rejects.toThrow("NotFoundError")
 
         await svc.remove(session.id)
       },

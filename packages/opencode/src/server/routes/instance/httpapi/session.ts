@@ -517,19 +517,26 @@ export const sessionHandlers = Layer.unwrap(
         yield* Effect.promise(() =>
           Effect.runPromise(session.get(ctx.params.sessionID)).catch((error) => Promise.reject(mapNotFoundError(error))),
         )
-        return yield* session.messages({ sessionID: ctx.params.sessionID })
+        return yield* session.messages({ sessionID: ctx.params.sessionID }).pipe(Effect.orDie)
       }
 
-      const page = MessageV2.page({
-        sessionID: ctx.params.sessionID,
-        limit: ctx.query.limit,
-        before: ctx.query.before,
-      })
+      const limit = ctx.query.limit
+      const page = yield* Effect.promise(() =>
+        Promise.resolve()
+          .then(() =>
+            MessageV2.page({
+              sessionID: ctx.params.sessionID,
+              limit,
+              before: ctx.query.before,
+            }),
+          )
+          .catch((error) => Promise.reject(mapNotFoundError(error))),
+      )
       if (!page.cursor) return page.items
 
       const request = yield* HttpServerRequest.HttpServerRequest
       const url = new URL(request.url, "http://localhost")
-      url.searchParams.set("limit", ctx.query.limit.toString())
+      url.searchParams.set("limit", limit.toString())
       url.searchParams.set("before", page.cursor)
       return HttpServerResponse.jsonUnsafe(page.items, {
         headers: {
