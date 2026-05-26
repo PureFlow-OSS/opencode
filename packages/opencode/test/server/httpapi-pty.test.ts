@@ -62,13 +62,27 @@ describe("pty HttpApi bridge", () => {
 
     const missing = await app().request(PtyPaths.get.replace(":ptyID", info.id), { headers })
     expect(missing.status).toBe(404)
+    expect(await missing.json()).toMatchObject({ _tag: "PtyNotFoundError", ptyID: info.id })
   })
 
   test("returns 404 for missing PTY websocket before upgrade", async () => {
     await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
-    const response = await app().request(PtyPaths.connect.replace(":ptyID", PtyID.ascending()), {
+    const missingID = PtyID.ascending()
+    const response = await app().request(PtyPaths.connect.replace(":ptyID", missingID), {
       headers: { "x-opencode-directory": tmp.path },
     })
     expect(response.status).toBe(404)
+    expect(await response.json()).toMatchObject({ _tag: "PtyNotFoundError", ptyID: missingID })
+  })
+
+  test("returns 404 for removing a missing PTY", async () => {
+    await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
+    const missingID = PtyID.ascending()
+    const response = await app().request(PtyPaths.remove.replace(":ptyID", missingID), {
+      method: "DELETE",
+      headers: { "x-opencode-directory": tmp.path },
+    })
+    expect(response.status).toBe(404)
+    expect(await response.json()).toMatchObject({ _tag: "PtyNotFoundError", ptyID: missingID })
   })
 })

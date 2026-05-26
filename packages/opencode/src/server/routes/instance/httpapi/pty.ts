@@ -7,6 +7,15 @@ import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiError, HttpApiGroup, O
 import * as Socket from "effect/unstable/socket/Socket"
 import { Authorization } from "./auth"
 
+export class PtyNotFoundHttpApiError extends Schema.TaggedErrorClass<PtyNotFoundHttpApiError>()(
+  "PtyNotFoundError",
+  {
+    ptyID: Schema.String,
+    message: Schema.String,
+  },
+  { httpApiStatus: 404 },
+) {}
+
 const root = "/pty"
 const Params = Schema.Struct({
   ptyID: PtyID,
@@ -50,7 +59,7 @@ export const PtyApi = HttpApi.make("pty")
         HttpApiEndpoint.get("get", PtyPaths.get, {
           params: { ptyID: PtyID },
           success: Pty.Info,
-          error: HttpApiError.NotFound,
+          error: PtyNotFoundHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "pty.get",
@@ -62,7 +71,7 @@ export const PtyApi = HttpApi.make("pty")
           params: { ptyID: PtyID },
           payload: Pty.UpdateInput,
           success: Pty.Info,
-          error: HttpApiError.NotFound,
+          error: PtyNotFoundHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "pty.update",
@@ -73,6 +82,7 @@ export const PtyApi = HttpApi.make("pty")
         HttpApiEndpoint.delete("remove", PtyPaths.remove, {
           params: { ptyID: PtyID },
           success: Schema.Boolean,
+          error: PtyNotFoundHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "pty.remove",
@@ -120,7 +130,11 @@ export const ptyHandlers = Layer.unwrap(
 
     const get = Effect.fn("PtyHttpApi.get")(function* (ctx: { params: { ptyID: PtyID } }) {
       const info = yield* pty.get(ctx.params.ptyID)
-      if (!info) return yield* new HttpApiError.NotFound({})
+      if (!info)
+        return yield* new PtyNotFoundHttpApiError({
+          ptyID: String(ctx.params.ptyID),
+          message: `PTY session not found: ${ctx.params.ptyID}`,
+        })
       return info
     })
 
@@ -132,11 +146,20 @@ export const ptyHandlers = Layer.unwrap(
         ...ctx.payload,
         size: ctx.payload.size ? { ...ctx.payload.size } : undefined,
       })
-      if (!info) return yield* new HttpApiError.NotFound({})
+      if (!info)
+        return yield* new PtyNotFoundHttpApiError({
+          ptyID: String(ctx.params.ptyID),
+          message: `PTY session not found: ${ctx.params.ptyID}`,
+        })
       return info
     })
 
     const remove = Effect.fn("PtyHttpApi.remove")(function* (ctx: { params: { ptyID: PtyID } }) {
+      if (!(yield* pty.get(ctx.params.ptyID)))
+        return yield* new PtyNotFoundHttpApiError({
+          ptyID: String(ctx.params.ptyID),
+          message: `PTY session not found: ${ctx.params.ptyID}`,
+        })
       yield* pty.remove(ctx.params.ptyID)
       return true
     })
@@ -158,7 +181,15 @@ export const ptyConnectRoute = HttpRouter.add(
   Effect.gen(function* () {
     const pty = yield* Pty.Service
     const params = yield* HttpRouter.schemaPathParams(Params)
-    if (!(yield* pty.get(params.ptyID))) return HttpServerResponse.empty({ status: 404 })
+    if (!(yield* pty.get(params.ptyID))) {
+      return HttpServerResponse.jsonUnsafe(
+        new PtyNotFoundHttpApiError({
+          ptyID: String(params.ptyID),
+          message: `PTY session not found: ${params.ptyID}`,
+        }),
+        { status: 404 },
+      )
+    }
 
     const query = yield* HttpServerRequest.schemaSearchParams(CursorQuery)
     const parsedCursor = query.cursor === undefined ? undefined : Number(query.cursor)
