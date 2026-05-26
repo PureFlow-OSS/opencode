@@ -227,6 +227,38 @@ function eventSessionID(event: Event) {
   return undefined
 }
 
+function taskSessionID(part: unknown) {
+  if (!part || typeof part !== "object" || Array.isArray(part)) return
+  if (!("tool" in part) || part.tool !== "task") return
+  const state = "state" in part && part.state && typeof part.state === "object" && !Array.isArray(part.state) ? part.state : undefined
+  const metadata =
+    "metadata" in part && part.metadata && typeof part.metadata === "object" && !Array.isArray(part.metadata)
+      ? part.metadata
+      : undefined
+  const stateMetadata =
+    state && "metadata" in state && state.metadata && typeof state.metadata === "object" && !Array.isArray(state.metadata)
+      ? (state.metadata as Record<string, unknown>)
+      : undefined
+  const meta = metadata as Record<string, unknown> | undefined
+  const value =
+    ("sessionId" in (stateMetadata ?? {}) ? stateMetadata?.sessionId : undefined) ??
+    ("sessionID" in (stateMetadata ?? {}) ? stateMetadata?.sessionID : undefined) ??
+    ("sessionId" in (meta ?? {}) ? meta?.sessionId : undefined) ??
+    ("sessionID" in (meta ?? {}) ? meta?.sessionID : undefined)
+  return typeof value === "string" && value.trim() ? value : undefined
+}
+
+function collectTaskSessionIDs(messages: Array<{ parts: unknown[] }>) {
+  const result = new Set<string>()
+  for (const message of messages) {
+    for (const part of message.parts) {
+      const sessionID = taskSessionID(part)
+      if (sessionID) result.add(sessionID)
+    }
+  }
+  return result
+}
+
 export const RunCommand = cmd({
   command: "run [message..]",
   describe: "run opencode with a message",
@@ -484,6 +516,7 @@ export const RunCommand = cmd({
       const replayedMessageIDs = new Set<string>()
       const replayedPartIDs = new Set<string>()
       const replayedPartText = new Map<string, string>()
+      const trackedSessionIDs = new Set<string>()
       const messageRoles = new Map<string, "user" | "assistant">()
       const pendingParts = new Map<string, Extract<Part, { type: "text" | "reasoning" }>>()
       const streamedPartText = new Map<string, string>()
@@ -507,6 +540,12 @@ export const RunCommand = cmd({
             return !item || item.type === "idle"
           })
           .catch(() => fallback)
+      }
+
+      function trackTaskSession(part: ToolPart) {
+        const next = taskSessionID(part)
+        if (!next) return
+        trackedSessionIDs.add(next)
       }
 
       function syncStreamedText(partID: string, next: string, append = false) {
@@ -625,7 +664,7 @@ export const RunCommand = cmd({
           while (runningQuestionParts.has(partID) && !eventsAbort.signal.aborted) {
             const pending = await sdk.question
               .list()
-              .then((result) => (result.data ?? []).filter((item) => item.sessionID === sessionID))
+              .then((result) => (result.data ?? []).filter((item) => trackedSessionIDs.has(item.sessionID)))
               .catch(() => [])
             const next = pending.filter((item) => !settledBlockers.has(item.id))
             if (next.length > 0) {
@@ -692,13 +731,14 @@ export const RunCommand = cmd({
 
         if (event.type === "message.part.updated") {
           const part = event.properties.part
-          if (part.sessionID !== sessionID) return false
+          if (!trackedSessionIDs.has(part.sessionID)) return false
           if (turnArmed) turnLive = true
           replayedPartText.delete(part.id)
           if (replayedPartIDs.delete(part.id)) {
             if (part.type === "text" || part.type === "reasoning") clearPartState(part.id)
             return false
           }
+          if (part.type === "tool") trackTaskSession(part)
 
           if (part.type === "tool" && (part.state.status === "completed" || part.state.status === "error")) {
             if (part.tool === "question") runningQuestionParts.delete(part.id)
@@ -753,7 +793,7 @@ export const RunCommand = cmd({
 
         if (event.type === "session.error") {
           const props = event.properties
-          if (props.sessionID !== sessionID || !props.error) return false
+          if (!trackedSessionIDs.has(props.sessionID ?? "") || !props.error) return false
           if (turnArmed) turnLive = true
           let err = String(props.error.name)
           if ("data" in props.error && props.error.data && "message" in props.error.data) {
@@ -761,7 +801,7 @@ export const RunCommand = cmd({
           }
           error = error ? error + EOL + err : err
           if (emit("error", { error: props.error })) return false
-          UI.error(err)
+          UI.error(props.sessionID === sessionID ? err : `subagent ${props.sessionID}: ${err}`)
         }
 
         if (
@@ -777,7 +817,7 @@ export const RunCommand = cmd({
 
         if (event.type === "permission.asked") {
           const permission = event.properties
-          if (permission.sessionID !== sessionID || settledBlockers.has(permission.id)) return false
+          if (!trackedSessionIDs.has(permission.sessionID ?? "") || settledBlockers.has(permission.id)) return false
           if (turnArmed) turnLive = true
 
           if (args["dangerously-skip-permissions"]) {
@@ -790,7 +830,7 @@ export const RunCommand = cmd({
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL +
-              `permission requested: ${permission.permission} (${permission.patterns.join(", ")}); auto-rejecting`,
+              `${permission.sessionID === sessionID ? "" : `subagent ${permission.sessionID}: `}permission requested: ${permission.permission} (${permission.patterns.join(", ")}); auto-rejecting`,
           )
           await sdk.permission.reply({
             requestID: permission.id,
@@ -801,13 +841,14 @@ export const RunCommand = cmd({
 
         if (event.type === "question.asked") {
           const question = event.properties
-          if (question.sessionID !== sessionID || settledBlockers.has(question.id)) return false
+          if (!trackedSessionIDs.has(question.sessionID ?? "") || settledBlockers.has(question.id)) return false
           if (turnArmed) turnLive = true
 
           for (const item of question.questions) {
             UI.println(
               UI.Style.TEXT_WARNING_BOLD + "!",
-              UI.Style.TEXT_NORMAL + `question requested: ${item.header} - ${item.question}; auto-rejecting`,
+              UI.Style.TEXT_NORMAL +
+                `${question.sessionID === sessionID ? "" : `subagent ${question.sessionID}: `}question requested: ${item.header} - ${item.question}; auto-rejecting`,
             )
           }
           await sdk.question.reject({
@@ -829,10 +870,10 @@ export const RunCommand = cmd({
       async function loop() {
         for await (const event of events.stream) {
           if (booting) {
-            if (eventSessionID(event) === sessionID) buffered.push(event)
+            if (trackedSessionIDs.has(eventSessionID(event) ?? "")) buffered.push(event)
             continue
           }
-          if (eventSessionID(event) !== sessionID) continue
+          if (!trackedSessionIDs.has(eventSessionID(event) ?? "")) continue
           if ((await handle(event)) === true) break
         }
 
@@ -842,6 +883,7 @@ export const RunCommand = cmd({
       async function replay(sessionID: string) {
         if (!args.replay && args["replay-limit"] === undefined) return
         const history = await sdk.session.messages({ sessionID })
+        for (const childSessionID of collectTaskSessionIDs(history.data ?? [])) trackedSessionIDs.add(childSessionID)
         const snapshot = collectReplaySnapshot(history.data ?? [], {
           thinking: args.thinking,
           limit: args["replay-limit"],
@@ -896,11 +938,31 @@ export const RunCommand = cmd({
 
       async function settlePendingBlockers(sessionID: string) {
         const [permissions, questions] = await Promise.all([sdk.permission.list(), sdk.question.list()])
-        const blockers = collectReplayBlockers({
-          sessionID,
-          permissions: permissions.data ?? [],
-          questions: questions.data ?? [],
-        })
+        const blockers = [
+          ...collectReplayBlockers({
+            sessionID,
+            permissions: (permissions.data ?? []).filter((item) => item.sessionID === sessionID),
+            questions: (questions.data ?? []).filter((item) => item.sessionID === sessionID),
+          }),
+          ...(permissions.data ?? [])
+            .filter((item) => item.sessionID !== sessionID && trackedSessionIDs.has(item.sessionID))
+            .map((item) => ({
+              type: "permission" as const,
+              id: item.id,
+              permission: `subagent ${item.sessionID}: ${item.permission}`,
+              patterns: item.patterns,
+            })),
+          ...(questions.data ?? [])
+            .filter((item) => item.sessionID !== sessionID && trackedSessionIDs.has(item.sessionID))
+            .flatMap((item) =>
+              item.questions.map((question) => ({
+                type: "question" as const,
+                id: item.id,
+                header: `subagent ${item.sessionID}: ${question.header}`,
+                question: question.question,
+              })),
+            ),
+        ]
         if (blockers.length === 0) return
 
         UI.empty()
@@ -1007,6 +1069,7 @@ export const RunCommand = cmd({
         UI.error("Session not found")
         process.exit(1)
       }
+      trackedSessionIDs.add(sessionID)
       await share(sdk, sessionID)
       const completed = loop().catch((e) => {
         console.error(e)
