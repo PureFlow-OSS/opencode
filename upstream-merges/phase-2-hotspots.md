@@ -855,3 +855,14 @@
   - local `permission` and `question` reply/reject routes now precheck pending requests and return structured `RequestNotFoundError` `404` bodies
   - shared helper lives in `handlers/request-errors.ts`
   - verified with `bun typecheck` and `bun test test/server/httpapi-requests.test.ts` in `packages/opencode`
+
+### `5cf597d58` expose PTY not found error bodies
+
+- Status: `done` with local partial adaptation
+- Upstream files:
+  - `packages/opencode/src/server/routes/instance/httpapi/pty.ts`
+- Risk:
+  - missing PTY sessions currently mix naked `404` responses and silent success on remove, which makes reconnect/retry flows brittle
+- Notes:
+  - local PTY HttpApi now returns structured `PtyNotFoundError` bodies for `get`, `update`, `remove`, and pre-upgrade `connect`
+  - verified with `bun typecheck` and `bun test test/server/httpapi-pty.test.ts` in `packages/opencode`
