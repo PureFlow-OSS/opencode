@@ -215,6 +215,8 @@
     - idle completion now re-checks live `sdk.session.status()` before breaking, reducing delayed-idle races from older turns
   - local failure-exit subset also adapted: background SSE subscription now aborts when `sdk.session.prompt(...)` / `sdk.session.command(...)` returns an immediate error, so non-interactive resumed runs do not hang on a failed turn
   - boot-time blocker replies are deduped against already settled pending blockers so buffered `permission.asked` / `question.asked` events do not trigger double replies during resume
+  - local child-session tracking subset also adapted: `task` tool metadata now seeds tracked subagent session ids during replay and live updates, so resumed non-interactive `run` also auto-rejects pending/live child-session permissions and questions instead of only watching the root session
+  - local child-session error subset also adapted: tracked subagent `session.error` events now surface in CLI output with a `subagent <sessionID>` prefix instead of being silently ignored
   - deferred pieces remain the hardest upstream-only parts: deeper streamed-part rendering parity, subagent recovery, and footer/runtime state sync
 
 ### `22a5e6cc5` restore non-interactive run exit behavior
