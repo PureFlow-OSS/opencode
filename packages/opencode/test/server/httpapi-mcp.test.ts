@@ -109,4 +109,36 @@ describe("mcp HttpApi", () => {
     expect(removed.status).toBe(200)
     expect(await removed.json()).toEqual({ success: true })
   })
+
+  test("returns not found for unknown MCP server routes", async () => {
+    await using tmp = await tmpdir({
+      config: {
+        mcp: {
+          demo: {
+            type: "local",
+            command: ["echo", "demo"],
+            enabled: false,
+          },
+        },
+      },
+    })
+
+    const [start, callback, authenticate, removed, connect, disconnect] = await Promise.all([
+      request("/mcp/missing/auth", tmp.path, { method: "POST" }),
+      request("/mcp/missing/auth/callback", tmp.path, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code: "demo" }),
+      }),
+      request("/mcp/missing/auth/authenticate", tmp.path, { method: "POST" }),
+      request("/mcp/missing/auth", tmp.path, { method: "DELETE" }),
+      request("/mcp/missing/connect", tmp.path, { method: "POST" }),
+      request("/mcp/missing/disconnect", tmp.path, { method: "POST" }),
+    ])
+
+    for (const response of [start, callback, authenticate, removed, connect, disconnect]) {
+      expect(response.status).toBe(404)
+      expect(await response.json()).toMatchObject({ _tag: "McpServerNotFoundError", name: "missing" })
+    }
+  })
 })

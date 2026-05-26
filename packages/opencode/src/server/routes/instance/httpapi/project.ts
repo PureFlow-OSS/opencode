@@ -4,7 +4,7 @@ import { Project } from "@/project"
 import { InstanceBootstrap } from "@/project/bootstrap"
 import { ProjectID } from "@/project/schema"
 import { Effect, Layer, Schema } from "effect"
-import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
+import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "./auth"
 import { markInstanceForReload } from "./lifecycle"
 
@@ -45,6 +45,7 @@ export const ProjectApi = HttpApi.make("project")
           params: { projectID: ProjectID },
           payload: Project.UpdatePayload,
           success: Project.Info,
+          error: HttpApiError.NotFound,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "project.update",
@@ -99,6 +100,7 @@ export const projectHandlers = Layer.unwrap(
       params: { projectID: ProjectID }
       payload: Project.UpdatePayload
     }) {
+      if (!(yield* svc.get(ctx.params.projectID))) return yield* Effect.fail(new HttpApiError.NotFound({}))
       return yield* svc.update({ ...Project.UpdatePayload.zod.parse(ctx.payload), projectID: ctx.params.projectID })
     })
 

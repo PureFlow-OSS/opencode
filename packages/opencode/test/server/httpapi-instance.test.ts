@@ -142,6 +142,19 @@ describe("instance HttpApi", () => {
     )
   })
 
+  test("returns not found for missing project update", async () => {
+    await using tmp = await tmpdir({ config: { formatter: false, lsp: false } })
+
+    const response = await app().request("/project/project_missing", {
+      method: "PATCH",
+      headers: { "x-opencode-directory": tmp.path, "content-type": "application/json" },
+      body: JSON.stringify({ name: "patched-project" }),
+    })
+
+    expect(response.status).toBe(404)
+    expect(await response.json()).toMatchObject({ _tag: "NotFound" })
+  })
+
   test("serves instance dispose through Hono bridge", async () => {
     await using tmp = await tmpdir()
 

@@ -1,6 +1,7 @@
 import { MCP } from "@/mcp"
 import { ConfigMCP } from "@/config/mcp"
 import { Effect, Layer, Schema } from "effect"
+import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse"
 import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "./auth"
 import { invalidRequest, InvalidRequestHttpApiError } from "./handlers/request-errors"
@@ -21,6 +22,15 @@ const AuthCallbackPayload = Schema.Struct({
 const AuthRemoveResponse = Schema.Struct({
   success: Schema.Literal(true),
 }).annotate({ identifier: "McpAuthRemoveResponse" })
+
+export class McpServerNotFoundHttpApiError extends Schema.TaggedErrorClass<McpServerNotFoundHttpApiError>()(
+  "McpServerNotFoundError",
+  {
+    name: Schema.String,
+    message: Schema.String,
+  },
+  { httpApiStatus: 404 },
+) {}
 
 export const McpPaths = {
   status: "/mcp",
@@ -68,7 +78,7 @@ export const McpApi = HttpApi.make("mcp")
         HttpApiEndpoint.post("authStart", McpPaths.auth, {
           params: { name: Schema.String },
           success: AuthStartResponse,
-          error: InvalidRequestHttpApiError,
+          error: Schema.Union([McpServerNotFoundHttpApiError, InvalidRequestHttpApiError]),
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "mcp.auth.start",
@@ -80,6 +90,7 @@ export const McpApi = HttpApi.make("mcp")
           params: { name: Schema.String },
           payload: AuthCallbackPayload,
           success: MCP.Status,
+          error: McpServerNotFoundHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "mcp.auth.callback",
@@ -91,7 +102,7 @@ export const McpApi = HttpApi.make("mcp")
         HttpApiEndpoint.post("authAuthenticate", McpPaths.authAuthenticate, {
           params: { name: Schema.String },
           success: MCP.Status,
-          error: InvalidRequestHttpApiError,
+          error: Schema.Union([McpServerNotFoundHttpApiError, InvalidRequestHttpApiError]),
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "mcp.auth.authenticate",
@@ -102,6 +113,7 @@ export const McpApi = HttpApi.make("mcp")
         HttpApiEndpoint.delete("authRemove", McpPaths.auth, {
           params: { name: Schema.String },
           success: AuthRemoveResponse,
+          error: McpServerNotFoundHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "mcp.auth.remove",
@@ -112,6 +124,7 @@ export const McpApi = HttpApi.make("mcp")
         HttpApiEndpoint.post("connect", McpPaths.connect, {
           params: { name: Schema.String },
           success: Schema.Boolean,
+          error: McpServerNotFoundHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "mcp.connect",
@@ -121,6 +134,7 @@ export const McpApi = HttpApi.make("mcp")
         HttpApiEndpoint.post("disconnect", McpPaths.disconnect, {
           params: { name: Schema.String },
           success: Schema.Boolean,
+          error: McpServerNotFoundHttpApiError,
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "mcp.disconnect",
@@ -163,9 +177,27 @@ export const mcpHandlers = Layer.unwrap(
       ).pipe(Effect.mapError(() => invalidRequest("MCP server status payload is invalid.")))
     })
 
+    const notFound = (name: string) =>
+      HttpServerResponse.jsonUnsafe(
+        new McpServerNotFoundHttpApiError({
+          name,
+          message: `MCP server not found: ${name}`,
+        }),
+        { status: 404 },
+      )
+
+    const ensureServer = Effect.fn("McpHttpApi.ensureServer")(function* (name: string) {
+      if ((yield* mcp.status())[name]) return true as const
+      return notFound(name)
+    })
+
     const authStart = Effect.fn("McpHttpApi.authStart")(function* (ctx: { params: { name: string } }) {
+      const found = yield* ensureServer(ctx.params.name)
+      if (found !== true) return found
       if (!(yield* mcp.supportsOAuth(ctx.params.name))) {
-        return yield* invalidRequest(`MCP server '${ctx.params.name}' does not support OAuth.`)
+        return HttpServerResponse.jsonUnsafe(invalidRequest(`MCP server '${ctx.params.name}' does not support OAuth.`), {
+          status: 400,
+        })
       }
       return yield* mcp.startAuth(ctx.params.name)
     })
@@ -174,27 +206,39 @@ export const mcpHandlers = Layer.unwrap(
       params: { name: string }
       payload: typeof AuthCallbackPayload.Type
     }) {
+      const found = yield* ensureServer(ctx.params.name)
+      if (found !== true) return found
       return yield* mcp.finishAuth(ctx.params.name, ctx.payload.code)
     })
 
     const authAuthenticate = Effect.fn("McpHttpApi.authAuthenticate")(function* (ctx: { params: { name: string } }) {
+      const found = yield* ensureServer(ctx.params.name)
+      if (found !== true) return found
       if (!(yield* mcp.supportsOAuth(ctx.params.name))) {
-        return yield* invalidRequest(`MCP server '${ctx.params.name}' does not support OAuth.`)
+        return HttpServerResponse.jsonUnsafe(invalidRequest(`MCP server '${ctx.params.name}' does not support OAuth.`), {
+          status: 400,
+        })
       }
       return yield* mcp.authenticate(ctx.params.name)
     })
 
     const authRemove = Effect.fn("McpHttpApi.authRemove")(function* (ctx: { params: { name: string } }) {
+      const found = yield* ensureServer(ctx.params.name)
+      if (found !== true) return found
       yield* mcp.removeAuth(ctx.params.name)
       return { success: true as const }
     })
 
     const connect = Effect.fn("McpHttpApi.connect")(function* (ctx: { params: { name: string } }) {
+      const found = yield* ensureServer(ctx.params.name)
+      if (found !== true) return found
       yield* mcp.connect(ctx.params.name)
       return true
     })
 
     const disconnect = Effect.fn("McpHttpApi.disconnect")(function* (ctx: { params: { name: string } }) {
+      const found = yield* ensureServer(ctx.params.name)
+      if (found !== true) return found
       yield* mcp.disconnect(ctx.params.name)
       return true
     })
