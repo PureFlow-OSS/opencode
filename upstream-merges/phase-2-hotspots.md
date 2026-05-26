@@ -879,3 +879,17 @@
 - Notes:
   - local `stats` now catches `NotFoundError` from `svc.messages(...)` and treats that session as empty instead of aborting the whole report
   - verified with `bun typecheck` in `packages/opencode`
+
+### `d5f397a2d` open external editor in worktree cwd
+
+- Status: `done`
+- Upstream files:
+  - `packages/opencode/src/cli/cmd/tui/util/editor.ts`
+  - `packages/opencode/src/cli/cmd/tui/component/prompt/index.tsx`
+  - `packages/opencode/src/cli/cmd/tui/routes/session/index.tsx`
+- Risk:
+  - external editor launches from process cwd instead of active project/worktree, so relative paths and editor session state can target wrong workspace
+- Notes:
+  - local `Editor.open(...)` now accepts optional `cwd`
+  - prompt editor and session transcript editor now pass `project.instance.path().worktree || project.instance.directory() || process.cwd()`
+  - verified with `bun typecheck` in `packages/opencode`
