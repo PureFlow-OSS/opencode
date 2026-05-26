@@ -817,3 +817,28 @@
 - Notes:
   - local `extmark.paste` style now derives foreground via `selectedForeground(theme, theme.warning)`
   - verified with `bun typecheck` in `packages/opencode`
+
+### `0beb4de3e` expose MCP server not found errors
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/server/routes/instance/httpapi/mcp.ts`
+- Risk:
+  - unknown MCP names can currently fall through to invalid request or silent no-op behavior, which makes client retries and error handling ambiguous
+- Notes:
+  - local MCP HttpApi routes now guard action endpoints with a status-backed server existence check
+  - unknown server names now return `HttpApiError.NotFound` for auth, connect, disconnect, and auth removal/callback routes
+  - verified with `bun typecheck` and `bun test test/server/httpapi-mcp.test.ts` in `packages/opencode`
+
+### `3e1972fd9` expose project not found errors
+
+- Status: `done` with local adaptation
+- Upstream files:
+  - `packages/opencode/src/project/project.ts`
+  - `packages/opencode/src/server/routes/instance/httpapi/project.ts`
+- Risk:
+  - patching a missing project currently degrades to a generic server error instead of a stable client-visible 404
+- Notes:
+  - local `Project.update(...)` now fails with typed `NotFoundError`
+  - project HttpApi `update` maps the typed error to `HttpApiError.NotFound`
+  - verified with `bun typecheck` and `bun test test/server/httpapi-instance.test.ts -t "returns not found for missing project update"` in `packages/opencode`
