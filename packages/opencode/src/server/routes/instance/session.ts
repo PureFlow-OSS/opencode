@@ -670,11 +670,13 @@ export const SessionRoutes = lazy(() =>
           return c.json(messages)
         }
 
-        const page = await MessageV2.page({
-          sessionID,
-          limit: query.limit,
-          before: query.before,
-        })
+        const page = await Effect.runPromise(
+          MessageV2.pageEffect({
+            sessionID,
+            limit: query.limit,
+            before: query.before,
+          }),
+        )
         if (page.cursor) {
           const url = new URL(c.req.url)
           url.searchParams.set("limit", query.limit.toString())
@@ -718,10 +720,12 @@ export const SessionRoutes = lazy(() =>
       ),
       async (c) => {
         const params = c.req.valid("param")
-        const message = await MessageV2.get({
-          sessionID: params.sessionID,
-          messageID: params.messageID,
-        })
+        const message = await Effect.runPromise(
+          MessageV2.getEffect({
+            sessionID: params.sessionID,
+            messageID: params.messageID,
+          }),
+        )
         return c.json(message)
       },
     )
