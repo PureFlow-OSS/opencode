@@ -1221,7 +1221,7 @@ export function Prompt(props: PromptProps) {
                         return
                       }
                     }
-                    if (mime.startsWith("image/") || mime === "application/pdf") {
+                    if (mime.startsWith("image/")) {
                       const content = await Filesystem.readArrayBuffer(filepath)
                         .then((buffer) => Buffer.from(buffer).toString("base64"))
                         .catch(() => {})

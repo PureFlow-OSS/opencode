@@ -1744,6 +1744,52 @@ it.live("copies unsupported dropped files for MCP processing", () =>
   ),
 )
 
+it.live("copies pdf dropped files for MCP processing", () =>
+  provideTmpdirInstance(
+    (dir) =>
+      Effect.gen(function* () {
+        const source = path.join(dir, "document.pdf")
+        yield* Effect.promise(() => Bun.write(source, "%PDF-1.7\nfake pdf"))
+
+        const prompt = yield* SessionPrompt.Service
+        const sessions = yield* Session.Service
+        const session = yield* sessions.create({})
+        const msg = yield* prompt.prompt({
+          sessionID: session.id,
+          agent: "build",
+          noReply: true,
+          parts: [
+            {
+              type: "file",
+              mime: "application/pdf",
+              url: `file://${source}`,
+              filename: "document.pdf",
+            },
+          ],
+        })
+
+        const target = path.join(
+          process.platform === "win32" ? "C:\\Temp" : path.join(os.tmpdir(), "opencode-unsupported"),
+          "document.pdf",
+        )
+        expect(yield* Effect.promise(() => Bun.file(target).text())).toBe("%PDF-1.7\nfake pdf")
+        expect(
+          msg.parts.some(
+            (part) =>
+              part.type === "text" &&
+              part.synthetic &&
+              part.text.includes(`It was copied to ${target}`) &&
+              part.text.includes("application/pdf"),
+          ),
+        ).toBe(true)
+        expect(msg.parts.some((part) => part.type === "file")).toBe(false)
+
+        yield* sessions.remove(session.id)
+      }),
+    { git: true, config: cfg },
+  ),
+)
+
 it.live("copies unsupported data attachments for MCP processing", () =>
   provideTmpdirInstance(
     () =>

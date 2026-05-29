@@ -74,7 +74,6 @@ function isModelReadableFile(mime: string) {
   return (
     mime === "text/plain" ||
     mime === "application/x-directory" ||
-    mime === "application/pdf" ||
     mime.startsWith("image/")
   )
 }
