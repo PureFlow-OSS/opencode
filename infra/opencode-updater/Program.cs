@@ -3,6 +3,8 @@ using Microsoft.Extensions.Configuration;
 using System.Text.Json.Serialization;
 using System.Text.Json;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Sqlite;
 
 var builder = WebApplication.CreateBuilder(args);
 var betaConfiguration = new ConfigurationBuilder()
@@ -25,6 +27,13 @@ builder.Services.AddCors((options) =>
 builder.Services.AddSingleton(new LocalFeed(Path.Combine(builder.Environment.ContentRootPath, "feed")));
 builder.Services.AddSingleton<UpdaterVersionResolver>();
 builder.Services.AddSingleton<UpdaterRolloutResolver>();
+builder.Services.AddDbContext<FeedbackContext>(options =>
+{
+  var dataDir = Path.Combine(builder.Environment.ContentRootPath, "data");
+  Directory.CreateDirectory(dataDir);
+  options.UseSqlite($"Data Source={Path.Combine(dataDir, "feedback.db")}");
+});
+builder.Services.AddSingleton<FeedbackKeyResolver>();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
   options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
@@ -33,6 +42,71 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 var app = builder.Build();
 
 app.UseCors();
+
+using (var scope = app.Services.CreateScope())
+{
+  scope.ServiceProvider.GetRequiredService<FeedbackContext>().Database.EnsureCreated();
+}
+
+app.MapPost("/opencode/feedback", async (
+  HttpRequest request,
+  FeedbackContext db,
+  FeedbackKeyResolver keyResolver,
+  IOptions<UpdaterBetaOptions> betaOptions,
+  IHttpClientFactory clientFactory
+) =>
+{
+  var body = await JsonSerializer.DeserializeAsync<FeedbackRequest>(
+    request.Body,
+    new JsonSerializerOptions { PropertyNameCaseInsensitive = true },
+    request.HttpContext.RequestAborted
+  );
+
+  if (body is null || string.IsNullOrWhiteSpace(body.Text))
+    return Results.BadRequest(new { error = "Feedback text is required" });
+
+  var key = body.Key ?? request.Headers["X-OpenCode-AiFactory-Api-Key"].FirstOrDefault()?.Trim();
+  var userName = string.Empty;
+
+  if (!string.IsNullOrWhiteSpace(key))
+  {
+    userName = await keyResolver.ResolveUserNameAsync(key, betaOptions.Value, clientFactory, request.HttpContext.RequestAborted);
+  }
+
+  var entry = new FeedbackEntry
+  {
+    Text = body.Text!.Trim(),
+    Category = body.Category?.Trim() ?? "general",
+    UserName = userName,
+    AppVersion = body.AppVersion?.Trim(),
+    Platform = body.Platform?.Trim(),
+    CreatedAt = DateTimeOffset.UtcNow,
+  };
+
+  db.Feedbacks.Add(entry);
+  await db.SaveChangesAsync(request.HttpContext.RequestAborted);
+
+  return Results.Ok(new { id = entry.Id });
+});
+
+app.MapGet("/opencode/feedback", async (FeedbackContext db) =>
+{
+  var items = await db.Feedbacks
+    .OrderByDescending(f => f.CreatedAt)
+    .Select(f => new
+    {
+      id = f.Id,
+      text = f.Text,
+      category = f.Category,
+      user_name = f.UserName,
+      app_version = f.AppVersion,
+      platform = f.Platform,
+      created_at = f.CreatedAt,
+    })
+    .ToListAsync();
+
+  return Results.Json(items);
+});
 
 app.MapGet("/", () => Results.Redirect("/opencode/version"));
 
@@ -541,5 +615,127 @@ sealed class UpdaterRolloutResolver(
       name.Equals("display_name", StringComparison.OrdinalIgnoreCase) ||
       name.Equals("key_alias", StringComparison.OrdinalIgnoreCase) ||
       name.Equals("key_name", StringComparison.OrdinalIgnoreCase);
+  }
+}
+
+sealed class FeedbackRequest
+{
+  [JsonPropertyName("text")]
+  public string? Text { get; set; }
+
+  [JsonPropertyName("category")]
+  public string? Category { get; set; }
+
+  [JsonPropertyName("key")]
+  public string? Key { get; set; }
+
+  [JsonPropertyName("app_version")]
+  public string? AppVersion { get; set; }
+
+  [JsonPropertyName("platform")]
+  public string? Platform { get; set; }
+}
+
+sealed class FeedbackEntry
+{
+  public int Id { get; set; }
+  public string Text { get; set; } = "";
+  public string Category { get; set; } = "general";
+  public string UserName { get; set; } = "";
+  public string? AppVersion { get; set; }
+  public string? Platform { get; set; }
+  public DateTimeOffset CreatedAt { get; set; }
+}
+
+sealed class FeedbackContext(DbContextOptions options) : DbContext(options)
+{
+  public DbSet<FeedbackEntry> Feedbacks => Set<FeedbackEntry>();
+}
+
+sealed class FeedbackKeyResolver(IMemoryCache cache)
+{
+  public async Task<string> ResolveUserNameAsync(string key, UpdaterBetaOptions beta, IHttpClientFactory clientFactory, CancellationToken cancellationToken)
+  {
+    var cacheKey = $"username:{ComputeHash(key)}";
+    if (cache.TryGetValue(cacheKey, out string? cachedName)) return cachedName ?? string.Empty;
+
+    if (string.IsNullOrWhiteSpace(beta.LiteLLM.BaseUrl))
+      return string.Empty;
+
+    using var request = new HttpRequestMessage(HttpMethod.Get, BuildLiteLLMKeyInfoUrl(beta, key));
+    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ResolveLiteLLMApiKey(beta, key));
+
+    try
+    {
+      using var response = await clientFactory.CreateClient().SendAsync(request, cancellationToken);
+      if (!response.IsSuccessStatusCode)
+      {
+        cache.Set(cacheKey, "", TimeSpan.FromMinutes(5));
+        return string.Empty;
+      }
+
+      await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+      using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+      var name = ExtractUserName(document.RootElement);
+
+      cache.Set(cacheKey, name ?? "", TimeSpan.FromMinutes(10));
+      return name ?? string.Empty;
+    }
+    catch
+    {
+      cache.Set(cacheKey, "", TimeSpan.FromMinutes(2));
+      return string.Empty;
+    }
+  }
+
+  static string? ExtractUserName(JsonElement element)
+  {
+    if (element.ValueKind != JsonValueKind.Object) return null;
+
+    foreach (var property in element.EnumerateObject())
+    {
+      if (property.Value.ValueKind != JsonValueKind.String) continue;
+
+      var fieldName = property.Name.ToLowerInvariant();
+      if (fieldName == "display_name" || fieldName == "user_name" || fieldName == "username" || fieldName == "user" || fieldName == "key_alias")
+      {
+        var value = property.Value.GetString()?.Trim();
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+          if (fieldName == "key_alias")
+          {
+            var parts = value.Split(" - ", 2, StringSplitOptions.TrimEntries);
+            return parts[0];
+          }
+          return value;
+        }
+      }
+    }
+
+    foreach (var property in element.EnumerateObject())
+    {
+      var name = ExtractUserName(property.Value);
+      if (!string.IsNullOrEmpty(name)) return name;
+    }
+
+    return null;
+  }
+
+  static string ResolveLiteLLMApiKey(UpdaterBetaOptions beta, string userKey)
+  {
+    return string.IsNullOrWhiteSpace(beta.LiteLLM.ApiKey) ? userKey : beta.LiteLLM.ApiKey.Trim();
+  }
+
+  static string BuildLiteLLMKeyInfoUrl(UpdaterBetaOptions beta, string userKey)
+  {
+    var url = $"{beta.LiteLLM.BaseUrl.TrimEnd('/')}/{beta.LiteLLM.KeyInfoPath.TrimStart('/')}";
+    if (string.IsNullOrWhiteSpace(beta.LiteLLM.ApiKey)) return url;
+    return $"{url}?key={Uri.EscapeDataString(userKey)}";
+  }
+
+  static string ComputeHash(string value)
+  {
+    var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value));
+    return Convert.ToHexString(bytes);
   }
 }
