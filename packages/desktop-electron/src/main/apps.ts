@@ -1,19 +1,24 @@
-import { execFileSync } from "node:child_process"
-import { existsSync, readFileSync, readdirSync } from "node:fs"
+import { execFile } from "node:child_process"
+import { existsSync } from "node:fs"
+import { readdir, readFile } from "node:fs/promises"
 import { dirname, extname, join } from "node:path"
+import { promisify } from "node:util"
 
-export function checkAppExists(appName: string): boolean {
+const execFileAsync = promisify(execFile)
+const EXEC_TIMEOUT = 3_000
+
+export async function checkAppExists(appName: string): Promise<boolean> {
   if (process.platform === "win32") return true
   if (process.platform === "linux") return true
   return checkMacosApp(appName)
 }
 
-export function resolveAppPath(appName: string): string | null {
+export async function resolveAppPath(appName: string): Promise<string | null> {
   if (process.platform !== "win32") return appName
   return resolveWindowsAppPath(appName)
 }
 
-export function wslPath(path: string, mode: "windows" | "linux" | null): string {
+export async function wslPath(path: string, mode: "windows" | "linux" | null): Promise<string> {
   if (process.platform !== "win32") return path
 
   const flag = mode === "windows" ? "-w" : "-u"
@@ -21,18 +26,18 @@ export function wslPath(path: string, mode: "windows" | "linux" | null): string 
     if (path.startsWith("~")) {
       const suffix = path.slice(1)
       const cmd = `wslpath ${flag} "$HOME${suffix.replace(/"/g, '\\"')}"`
-      const output = execFileSync("wsl", ["-e", "sh", "-lc", cmd])
-      return output.toString().trim()
+      const { stdout } = await execFileAsync("wsl", ["-e", "sh", "-lc", cmd], { timeout: EXEC_TIMEOUT })
+      return stdout.trim()
     }
 
-    const output = execFileSync("wsl", ["-e", "wslpath", flag, path])
-    return output.toString().trim()
+    const { stdout } = await execFileAsync("wsl", ["-e", "wslpath", flag, path], { timeout: EXEC_TIMEOUT })
+    return stdout.trim()
   } catch (error) {
     throw new Error(`Failed to run wslpath: ${String(error)}`, { cause: error })
   }
 }
 
-function checkMacosApp(appName: string) {
+async function checkMacosApp(appName: string): Promise<boolean> {
   const locations = [`/Applications/${appName}.app`, `/System/Applications/${appName}.app`]
 
   const home = process.env.HOME
@@ -41,17 +46,18 @@ function checkMacosApp(appName: string) {
   if (locations.some((location) => existsSync(location))) return true
 
   try {
-    execFileSync("which", [appName])
+    await execFileAsync("which", [appName], { timeout: EXEC_TIMEOUT })
     return true
   } catch {
     return false
   }
 }
 
-function resolveWindowsAppPath(appName: string): string | null {
+async function resolveWindowsAppPath(appName: string): Promise<string | null> {
   let output: string
   try {
-    output = execFileSync("where", [appName]).toString()
+    const result = await execFileAsync("where", [appName], { timeout: EXEC_TIMEOUT })
+    output = result.stdout
   } catch {
     return null
   }
@@ -66,8 +72,13 @@ function resolveWindowsAppPath(appName: string): string | null {
   const exe = paths.find((path) => hasExt(path, "exe"))
   if (exe) return exe
 
-  const resolveCmd = (path: string) => {
-    const content = readFileSync(path, "utf8")
+  const resolveCmd = async (path: string): Promise<string | null> => {
+    let content: string
+    try {
+      content = await readFile(path, "utf8")
+    } catch {
+      return null
+    }
     for (const token of content.split('"').map((value: string) => value.trim())) {
       const lower = token.toLowerCase()
       if (!lower.includes(".exe")) continue
@@ -96,20 +107,20 @@ function resolveWindowsAppPath(appName: string): string | null {
 
   for (const path of paths) {
     if (hasExt(path, "cmd") || hasExt(path, "bat")) {
-      const resolved = resolveCmd(path)
+      const resolved = await resolveCmd(path)
       if (resolved) return resolved
     }
 
     if (!extname(path)) {
       const cmd = `${path}.cmd`
       if (existsSync(cmd)) {
-        const resolved = resolveCmd(cmd)
+        const resolved = await resolveCmd(cmd)
         if (resolved) return resolved
       }
 
       const bat = `${path}.bat`
       if (existsSync(bat)) {
-        const resolved = resolveCmd(bat)
+        const resolved = await resolveCmd(bat)
         if (resolved) return resolved
       }
     }
@@ -126,7 +137,8 @@ function resolveWindowsAppPath(appName: string): string | null {
       const dirs = [dirname(path), dirname(dirname(path)), dirname(dirname(dirname(path)))]
       for (const dir of dirs) {
         try {
-          for (const entry of readdirSync(dir)) {
+          const entries = await readdir(dir)
+          for (const entry of entries) {
             const candidate = join(dir, entry)
             if (!hasExt(candidate, "exe")) continue
             const stem = entry.replace(/\.exe$/i, "")

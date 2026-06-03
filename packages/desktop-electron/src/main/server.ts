@@ -33,7 +33,7 @@ export function setWslConfig(config: WslConfig) {
 }
 
 export async function spawnLocalServer(hostname: string, port: number, password: string) {
-  prepareServerEnv(password)
+  await prepareServerEnv(password)
   const { Log, Server } = await import("virtual:opencode-server")
   await Log.init({ level: "WARN" })
   const listener = await Server.listen({
@@ -60,9 +60,9 @@ export async function spawnLocalServer(hostname: string, port: number, password:
   return { listener, health: { wait } }
 }
 
-function prepareServerEnv(password: string) {
+async function prepareServerEnv(password: string) {
   const shell = process.platform === "win32" ? null : getUserShell()
-  const shellEnv = shell ? (loadShellEnv(shell) ?? {}) : {}
+  const shellEnv = shell ? ((await loadShellEnv(shell)) ?? {}) : {}
   const ripgrepPath = resolveBundledRipgrepPath()
   const env = {
     ...process.env,
