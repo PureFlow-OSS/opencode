@@ -145,11 +145,14 @@ app.MapGet("/opencode/admin/releases", async (UpdaterAdminStore store) => Result
 
 app.MapGet("/opencode/admin/releases/status", async (
   UpdaterAdminStore store,
-  UpdaterChannelStateStore channelState
+  UpdaterChannelStateStore channelState,
+  IOptions<UpdaterBetaOptions> betaOptions
 ) => Results.Json(new
 {
   releases = await store.ListReleasesAsync(),
   normalStopped = await channelState.IsNormalStoppedAsync(),
+  betaUserCount = betaOptions.Value.Users.Length,
+  betaPositiveThreshold = (int)Math.Ceiling(betaOptions.Value.Users.Length / 2.0),
 }));
 
 app.MapPost("/opencode/admin/releases/upload", async (

@@ -38,6 +38,8 @@ type AuditRecord = {
 type ReleaseStatus = {
   releases: ReleaseRecord[]
   normalStopped: boolean
+  betaUserCount: number
+  betaPositiveThreshold: number
 }
 
 @Injectable({ providedIn: "root" })

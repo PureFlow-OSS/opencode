@@ -32,6 +32,11 @@ type ReleaseRecord = {
           <strong>{{ normalVersion || 'none' }}</strong>
           <small>{{ normalStopped ? 'stopped' : 'active' }}</small>
         </section>
+        <section class="status-box">
+          <span>Beta testers</span>
+          <strong>{{ betaUserCount }}</strong>
+          <small>{{ betaPositiveThreshold }} positive approvals needed</small>
+        </section>
       </div>
       <form (submit)="submit($event)">
         <label>
@@ -54,6 +59,8 @@ export class UploadPanelComponent {
   betaNotes = ""
   normalVersion = ""
   normalStopped = false
+  betaUserCount = 0
+  betaPositiveThreshold = 0
   statusText = ""
   statusError = ""
 
@@ -65,6 +72,8 @@ export class UploadPanelComponent {
     try {
       const status = await this.api.listReleaseStatus()
       this.normalStopped = status.normalStopped
+      this.betaUserCount = status.betaUserCount
+      this.betaPositiveThreshold = status.betaPositiveThreshold
       const beta = status.releases.find((release) => release.channel === "beta")
       const normal = status.releases.find((release) => release.channel === "normal")
       this.betaVersion = beta?.version ?? ""
