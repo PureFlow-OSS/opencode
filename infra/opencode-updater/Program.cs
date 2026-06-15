@@ -5,6 +5,11 @@ using System.Text.Json;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Sqlite;
+using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Data.Sqlite;
+using System.Data.Common;
+using System.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 var betaConfiguration = new ConfigurationBuilder()
@@ -34,6 +39,7 @@ builder.Services.AddDbContext<FeedbackContext>(options =>
   options.UseSqlite($"Data Source={Path.Combine(dataDir, "feedback.db")}");
 });
 builder.Services.AddSingleton<FeedbackKeyResolver>();
+builder.Services.AddSingleton<UpdaterAdminStore>();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
   options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
@@ -49,7 +55,26 @@ using (var scope = app.Services.CreateScope())
   db.Database.EnsureCreated();
   if (!await HasColumnAsync(db.Database, "Feedbacks", "AttachmentsJson"))
     db.Database.ExecuteSqlRaw(@"ALTER TABLE ""Feedbacks"" ADD COLUMN ""AttachmentsJson"" TEXT NULL");
+  await EnsureAdminTablesAsync(db.Database.GetDbConnection(), scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>());
 }
+
+app.UseDefaultFiles(new DefaultFilesOptions
+{
+  FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "admin-ui", "dist", "admin-ui")),
+});
+app.UseStaticFiles(new StaticFileOptions
+{
+  FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "admin-ui", "dist", "admin-ui")),
+});
+
+app.MapGet("/opencode/admin", () => Results.Redirect("/opencode/admin/"));
+
+app.MapGet("/opencode/admin/", () =>
+{
+  var root = Path.Combine(app.Environment.ContentRootPath, "admin-ui", "dist", "admin-ui");
+  var index = Path.Combine(root, "index.html");
+  return File.Exists(index) ? Results.File(index, "text/html; charset=utf-8") : Results.NotFound();
+});
 
 app.MapPost("/opencode/feedback", async (
   HttpRequest request,
@@ -112,6 +137,58 @@ app.MapGet("/opencode/feedback", async (FeedbackContext db) =>
 
   return Results.Json(items);
 });
+
+app.MapGet("/opencode/admin/releases", async (UpdaterAdminStore store) => Results.Json(await store.ListReleasesAsync()));
+
+app.MapPost("/opencode/admin/releases/upload", async (
+  HttpRequest request,
+  UpdaterAdminStore store
+) =>
+{
+  var body = await JsonSerializer.DeserializeAsync<UploadReleaseRequest>(
+    request.Body,
+    new JsonSerializerOptions { PropertyNameCaseInsensitive = true },
+    request.HttpContext.RequestAborted
+  );
+
+  if (body is null || string.IsNullOrWhiteSpace(body.Version))
+    return Results.BadRequest(new { error = "Version is required" });
+
+  var release = await store.UploadReleaseAsync(body);
+  return Results.Ok(release);
+});
+
+app.MapPost("/opencode/admin/releases/{id}/promote", async (
+  string id,
+  UpdaterAdminStore store,
+  HttpRequest request
+) =>
+{
+  var promoted = await store.PromoteReleaseAsync(id, request.HttpContext.RequestAborted);
+  return promoted is null ? Results.NotFound() : Results.Ok(promoted);
+});
+
+app.MapGet("/opencode/admin/feedback", async (UpdaterAdminStore store) => Results.Json(await store.ListFeedbackAsync()));
+
+app.MapPost("/opencode/admin/feedback", async (
+  HttpRequest request,
+  UpdaterAdminStore store
+) =>
+{
+  var body = await JsonSerializer.DeserializeAsync<CreateFeedbackRequest>(
+    request.Body,
+    new JsonSerializerOptions { PropertyNameCaseInsensitive = true },
+    request.HttpContext.RequestAborted
+  );
+
+  if (body is null || string.IsNullOrWhiteSpace(body.Message))
+    return Results.BadRequest(new { error = "Message is required" });
+
+  var feedback = await store.CreateFeedbackAsync(body);
+  return Results.Ok(feedback);
+});
+
+app.MapGet("/opencode/admin/audit", async (UpdaterAdminStore store) => Results.Json(await store.ListAuditAsync()));
 
 app.MapGet("/", () => Results.Redirect("/opencode/version"));
 
@@ -203,6 +280,65 @@ static async Task<IResult> LocalFileAsync(HttpContext context, string path)
   await stream.CopyToAsync(context.Response.Body, context.RequestAborted);
 
   return Results.Empty;
+}
+
+static async Task EnsureAdminTablesAsync(DbConnection connection, IWebHostEnvironment env)
+{
+  Directory.CreateDirectory(Path.Combine(env.ContentRootPath, "data"));
+  if (connection.State != ConnectionState.Open) await connection.OpenAsync();
+  await using var command = connection.CreateCommand();
+  command.CommandText = """
+    CREATE TABLE IF NOT EXISTS UpdaterReleases (
+      Id TEXT PRIMARY KEY NOT NULL,
+      Version TEXT NOT NULL,
+      Channel TEXT NOT NULL,
+      ZipName TEXT NOT NULL,
+      ZipSha256 TEXT NOT NULL,
+      ZipSize INTEGER NOT NULL,
+      Notes TEXT NULL,
+      Promoted INTEGER NOT NULL DEFAULT 0,
+      PositiveCount INTEGER NOT NULL DEFAULT 0,
+      TotalCount INTEGER NOT NULL DEFAULT 0,
+      CreatedAt TEXT NOT NULL,
+      PromotedAt TEXT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS UpdaterFeedback (
+      Id TEXT PRIMARY KEY NOT NULL,
+      Channel TEXT NOT NULL,
+      ReleaseId TEXT NULL,
+      UserName TEXT NULL,
+      UserEmail TEXT NULL,
+      Rating TEXT NOT NULL,
+      Message TEXT NOT NULL,
+      CreatedAt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS UpdaterAudit (
+      Id TEXT PRIMARY KEY NOT NULL,
+      FeedbackId TEXT NOT NULL,
+      Actor TEXT NOT NULL,
+      Action TEXT NOT NULL,
+      Details TEXT NOT NULL,
+      CreatedAt TEXT NOT NULL
+    );
+    """;
+  await command.ExecuteNonQueryAsync();
+}
+
+static async Task<bool> HasColumnAsync(Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade database, string table, string column)
+{
+  await database.OpenConnectionAsync();
+  await using var command = database.GetDbConnection().CreateCommand();
+  command.CommandText = $"PRAGMA table_info(\"{table}\")";
+  await using var reader = await command.ExecuteReaderAsync();
+  while (await reader.ReadAsync())
+  {
+    if (!reader.IsDBNull(1) && string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+      return true;
+  }
+
+  return false;
 }
 
 sealed class UpdaterOptions
@@ -673,20 +809,173 @@ sealed class FeedbackContext(DbContextOptions options) : DbContext(options)
   public DbSet<FeedbackEntry> Feedbacks => Set<FeedbackEntry>();
 }
 
-static async Task<bool> HasColumnAsync(DatabaseFacade database, string table, string column)
+sealed class UpdaterAdminStore(IWebHostEnvironment env)
 {
-  await database.OpenConnectionAsync();
-  await using var command = database.GetDbConnection().CreateCommand();
-  command.CommandText = $"PRAGMA table_info(\"{table}\")";
-  await using var reader = await command.ExecuteReaderAsync();
-  while (await reader.ReadAsync())
+  readonly string dbPath = Path.Combine(env.ContentRootPath, "data", "feedback.db");
+
+  async Task<SqliteConnection> OpenAsync()
   {
-    if (!reader.IsDBNull(1) && string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
-      return true;
+    Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+    var connection = new SqliteConnection($"Data Source={dbPath}");
+    await connection.OpenAsync();
+    return connection;
   }
 
-  return false;
+  public async Task<List<ReleaseRecord>> ListReleasesAsync()
+  {
+    await using var connection = await OpenAsync();
+    await using var command = connection.CreateCommand();
+    command.CommandText = """
+      SELECT Id, Version, Channel, ZipName, ZipSha256, ZipSize, Notes, Promoted, PositiveCount, TotalCount, CreatedAt, PromotedAt
+      FROM UpdaterReleases
+      ORDER BY CreatedAt DESC
+      """;
+    await using var reader = await command.ExecuteReaderAsync();
+    var items = new List<ReleaseRecord>();
+    while (await reader.ReadAsync()) items.Add(ReadRelease(reader));
+    return items;
+  }
+
+  public async Task<ReleaseRecord> UploadReleaseAsync(UploadReleaseRequest body)
+  {
+    await using var connection = await OpenAsync();
+    await using var command = connection.CreateCommand();
+    command.CommandText = """
+      INSERT INTO UpdaterReleases (Id, Version, Channel, ZipName, ZipSha256, ZipSize, Notes, Promoted, PositiveCount, TotalCount, CreatedAt)
+      VALUES ($id, $version, 'beta', $zipName, $zipSha256, $zipSize, $notes, 0, 0, 0, $createdAt)
+      """;
+    command.Parameters.AddWithValue("$id", Guid.NewGuid().ToString("N"));
+    command.Parameters.AddWithValue("$version", body.Version.Trim());
+    command.Parameters.AddWithValue("$zipName", body.ZipName?.Trim() ?? "");
+    command.Parameters.AddWithValue("$zipSha256", body.ZipSha256?.Trim() ?? "");
+    command.Parameters.AddWithValue("$zipSize", body.ZipSize);
+    command.Parameters.AddWithValue("$notes", string.IsNullOrWhiteSpace(body.Notes) ? DBNull.Value : body.Notes.Trim());
+    command.Parameters.AddWithValue("$createdAt", DateTimeOffset.UtcNow.ToString("O"));
+    await command.ExecuteNonQueryAsync();
+    return (await ListReleasesAsync()).First();
+  }
+
+  public async Task<ReleaseRecord?> PromoteReleaseAsync(string id, CancellationToken cancellationToken)
+  {
+    await using var connection = await OpenAsync();
+    await using var lookup = connection.CreateCommand();
+    lookup.CommandText = """
+      SELECT Id, Version, Channel, ZipName, ZipSha256, ZipSize, Notes, Promoted, PositiveCount, TotalCount, CreatedAt, PromotedAt
+      FROM UpdaterReleases
+      WHERE Id = $id
+      LIMIT 1
+      """;
+    lookup.Parameters.AddWithValue("$id", id);
+    await using var reader = await lookup.ExecuteReaderAsync(cancellationToken);
+    if (!await reader.ReadAsync(cancellationToken)) return null;
+
+    var release = ReadRelease(reader);
+    if (release.TotalCount == 0 || release.PositiveCount * 2 < release.TotalCount) return release;
+
+    await using var update = connection.CreateCommand();
+    update.CommandText = """
+      UPDATE UpdaterReleases
+      SET Channel = 'normal', Promoted = 1, PromotedAt = $promotedAt
+      WHERE Id = $id
+      """;
+    update.Parameters.AddWithValue("$id", id);
+    update.Parameters.AddWithValue("$promotedAt", DateTimeOffset.UtcNow.ToString("O"));
+    await update.ExecuteNonQueryAsync(cancellationToken);
+    return (await ListReleasesAsync()).FirstOrDefault(item => item.Id == id);
+  }
+
+  public async Task<List<FeedbackRecord>> ListFeedbackAsync()
+  {
+    await using var connection = await OpenAsync();
+    await using var command = connection.CreateCommand();
+    command.CommandText = """
+      SELECT Id, Channel, ReleaseId, UserName, UserEmail, Rating, Message, CreatedAt
+      FROM UpdaterFeedback
+      ORDER BY CreatedAt DESC
+      """;
+    await using var reader = await command.ExecuteReaderAsync();
+    var items = new List<FeedbackRecord>();
+    while (await reader.ReadAsync()) items.Add(ReadFeedback(reader));
+    return items;
+  }
+
+  public async Task<FeedbackRecord> CreateFeedbackAsync(CreateFeedbackRequest body)
+  {
+    await using var connection = await OpenAsync();
+    var id = Guid.NewGuid().ToString("N");
+    await using var command = connection.CreateCommand();
+    command.CommandText = """
+      INSERT INTO UpdaterFeedback (Id, Channel, ReleaseId, UserName, UserEmail, Rating, Message, CreatedAt)
+      VALUES ($id, $channel, $releaseId, $userName, $userEmail, $rating, $message, $createdAt)
+      """;
+    command.Parameters.AddWithValue("$id", id);
+    command.Parameters.AddWithValue("$channel", body.Channel?.Trim() == "beta" ? "beta" : "general");
+    command.Parameters.AddWithValue("$releaseId", string.IsNullOrWhiteSpace(body.ReleaseId) ? DBNull.Value : body.ReleaseId.Trim());
+    command.Parameters.AddWithValue("$userName", string.IsNullOrWhiteSpace(body.UserName) ? DBNull.Value : body.UserName.Trim());
+    command.Parameters.AddWithValue("$userEmail", string.IsNullOrWhiteSpace(body.UserEmail) ? DBNull.Value : body.UserEmail.Trim());
+    command.Parameters.AddWithValue("$rating", body.Rating?.Trim() is "positive" or "negative" ? body.Rating.Trim() : "neutral");
+    command.Parameters.AddWithValue("$message", body.Message.Trim());
+    command.Parameters.AddWithValue("$createdAt", DateTimeOffset.UtcNow.ToString("O"));
+    await command.ExecuteNonQueryAsync();
+    return (await ListFeedbackAsync()).First(item => item.Id == id);
+  }
+
+  public async Task<List<AuditRecord>> ListAuditAsync()
+  {
+    await using var connection = await OpenAsync();
+    await using var command = connection.CreateCommand();
+    command.CommandText = """
+      SELECT Id, FeedbackId, Actor, Action, Details, CreatedAt
+      FROM UpdaterAudit
+      ORDER BY CreatedAt DESC
+      """;
+    await using var reader = await command.ExecuteReaderAsync();
+    var items = new List<AuditRecord>();
+    while (await reader.ReadAsync()) items.Add(ReadAudit(reader));
+    return items;
+  }
+
+  static ReleaseRecord ReadRelease(SqliteDataReader reader) => new(
+    reader.GetString(0),
+    reader.GetString(1),
+    reader.GetString(2),
+    reader.GetString(3),
+    reader.GetString(4),
+    reader.GetInt64(5),
+    reader.IsDBNull(6) ? null : reader.GetString(6),
+    reader.GetInt64(7) > 0,
+    reader.GetInt64(8),
+    reader.GetInt64(9),
+    DateTimeOffset.Parse(reader.GetString(10)),
+    reader.IsDBNull(11) ? null : DateTimeOffset.Parse(reader.GetString(11))
+  );
+
+  static FeedbackRecord ReadFeedback(SqliteDataReader reader) => new(
+    reader.GetString(0),
+    reader.GetString(1),
+    reader.IsDBNull(2) ? null : reader.GetString(2),
+    reader.IsDBNull(3) ? null : reader.GetString(3),
+    reader.IsDBNull(4) ? null : reader.GetString(4),
+    reader.GetString(5),
+    reader.GetString(6),
+    DateTimeOffset.Parse(reader.GetString(7))
+  );
+
+  static AuditRecord ReadAudit(SqliteDataReader reader) => new(
+    reader.GetString(0),
+    reader.GetString(1),
+    reader.GetString(2),
+    reader.GetString(3),
+    reader.GetString(4),
+    DateTimeOffset.Parse(reader.GetString(5))
+  );
 }
+
+sealed record UploadReleaseRequest(string Version, string? ZipName, string? ZipSha256, long ZipSize, string? Notes);
+sealed record CreateFeedbackRequest(string? Channel, string? ReleaseId, string? UserName, string? UserEmail, string? Rating, string Message);
+sealed record ReleaseRecord(string Id, string Version, string Channel, string ZipName, string ZipSha256, long ZipSize, string? Notes, bool Promoted, long PositiveCount, long TotalCount, DateTimeOffset CreatedAt, DateTimeOffset? PromotedAt);
+sealed record FeedbackRecord(string Id, string Channel, string? ReleaseId, string? UserName, string? UserEmail, string Rating, string Message, DateTimeOffset CreatedAt);
+sealed record AuditRecord(string Id, string FeedbackId, string Actor, string Action, string Details, DateTimeOffset CreatedAt);
 
 sealed class FeedbackKeyResolver(IMemoryCache cache)
 {
