@@ -24,9 +24,13 @@ type AuditRecord = {
   standalone: true,
   template: `
     <article class="card">
-      <h2>Beta Promotion</h2>
-      <p>Promote only after 50% positive beta feedback. Audit trail sits below.</p>
-      <button type="button" class="secondary" (click)="refresh()">Refresh</button>
+      <h2>Beta Feedback</h2>
+      <p>Promote only after 50% positive beta feedback. Normal channel can be stopped here.</p>
+      <div class="controls">
+        <button type="button" class="secondary" (click)="refresh()">Refresh</button>
+        <button type="button" class="secondary" (click)="stopNormal()" [disabled]="normalStopped">Stop normal</button>
+        <button type="button" class="secondary" (click)="clearNormal()" [disabled]="!normalStopped">Clear stop</button>
+      </div>
       <div class="list">
         @for (release of releases; track release.id) {
           <section class="item">
@@ -71,13 +75,16 @@ export class AuditPanelComponent {
   readonly api = inject(ApiService)
   releases: ReleaseRecord[] = []
   audit: AuditRecord[] = []
+  normalStopped = false
 
   constructor() {
     void this.refresh()
   }
 
   async refresh() {
-    this.releases = await this.api.listReleases()
+    const status = await this.api.listReleaseStatus()
+    this.releases = status.releases
+    this.normalStopped = status.normalStopped
     this.audit = await this.api.listAudit()
   }
 
@@ -88,5 +95,13 @@ export class AuditPanelComponent {
 
   promote(id: string) {
     void this.api.promoteRelease(id).then(() => this.refresh())
+  }
+
+  stopNormal() {
+    void this.api.stopNormalChannel().then(() => this.refresh())
+  }
+
+  clearNormal() {
+    void this.api.clearNormalChannel().then(() => this.refresh())
   }
 }

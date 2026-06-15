@@ -8,12 +8,21 @@ using Microsoft.EntityFrameworkCore.Sqlite;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Data.Sqlite;
+using Microsoft.AspNetCore.Http.Features;
 using System.Data.Common;
 using System.Data;
 using System.IO.Compression;
 using System.Text.RegularExpressions;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.ConfigureKestrel(options =>
+{
+  options.Limits.MaxRequestBodySize = null;
+});
+builder.Services.Configure<FormOptions>(options =>
+{
+  options.MultipartBodyLengthLimit = long.MaxValue;
+});
 var betaConfiguration = new ConfigurationBuilder()
   .SetBasePath(builder.Environment.ContentRootPath)
   .AddJsonFile("appsettings.beta.json", optional: true, reloadOnChange: true)
@@ -32,6 +41,7 @@ builder.Services.AddCors((options) =>
     .AllowAnyMethod());
 });
 builder.Services.AddSingleton(new LocalFeed(Path.Combine(builder.Environment.ContentRootPath, "feed")));
+builder.Services.AddSingleton<UpdaterChannelStateStore>();
 builder.Services.AddSingleton<UpdaterVersionResolver>();
 builder.Services.AddSingleton<UpdaterRolloutResolver>();
 builder.Services.AddDbContext<FeedbackContext>(options =>
@@ -133,6 +143,15 @@ app.MapGet("/opencode/feedback", async (FeedbackContext db) =>
 
 app.MapGet("/opencode/admin/releases", async (UpdaterAdminStore store) => Results.Json(await store.ListReleasesAsync()));
 
+app.MapGet("/opencode/admin/releases/status", async (
+  UpdaterAdminStore store,
+  UpdaterChannelStateStore channelState
+) => Results.Json(new
+{
+  releases = await store.ListReleasesAsync(),
+  normalStopped = await channelState.IsNormalStoppedAsync(),
+}));
+
 app.MapPost("/opencode/admin/releases/upload", async (
   HttpRequest request,
   UpdaterAdminStore store
@@ -168,6 +187,18 @@ app.MapPost("/opencode/admin/releases/{id}/promote", async (
 {
   var promoted = await store.PromoteReleaseAsync(id, request.HttpContext.RequestAborted);
   return promoted is null ? Results.NotFound() : Results.Ok(promoted);
+});
+
+app.MapPost("/opencode/admin/releases/normal/stop", async (UpdaterChannelStateStore channelState) =>
+{
+  await channelState.SetNormalStoppedAsync(true);
+  return Results.Ok(new { normalStopped = true });
+});
+
+app.MapPost("/opencode/admin/releases/normal/clear", async (UpdaterChannelStateStore channelState) =>
+{
+  await channelState.SetNormalStoppedAsync(false);
+  return Results.Ok(new { normalStopped = false });
 });
 
 app.MapGet("/opencode/admin/feedback", async (UpdaterAdminStore store) => Results.Json(await store.ListFeedbackAsync()));
@@ -344,6 +375,12 @@ static async Task EnsureAdminTablesAsync(DbConnection connection, IWebHostEnviro
       Action TEXT NOT NULL,
       Details TEXT NOT NULL,
       CreatedAt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS UpdaterChannelState (
+      Name TEXT PRIMARY KEY NOT NULL,
+      Value INTEGER NOT NULL,
+      UpdatedAt TEXT NOT NULL
     );
     """;
   await command.ExecuteNonQueryAsync();
@@ -572,6 +609,7 @@ sealed class UpdaterRolloutResolver(
   IOptions<UpdaterBetaOptions> betaOptions,
   UpdaterVersionResolver versionResolver,
   LocalFeed feed,
+  UpdaterChannelStateStore channelState,
   IHttpClientFactory clientFactory,
   IMemoryCache cache
 )
@@ -599,11 +637,14 @@ sealed class UpdaterRolloutResolver(
   UpdaterRollout CreateRollout(UpdaterOptions resolved, bool isBeta, string? betaToken)
   {
     var fallback = options.CurrentValue;
+    var normalStopped = channelState.IsNormalStopped();
     var localVersion = feed.TryReadVersionFromLatestYml(isBeta);
     var version = localVersion ??
       (isBeta
         ? (string.IsNullOrWhiteSpace(resolved.Version) ? fallback.Version.Trim() : resolved.Version.Trim())
-        : versionResolver.Resolve());
+        : normalStopped
+          ? fallback.Version.Trim()
+          : versionResolver.Resolve());
     var selected = new UpdaterOptions
     {
       Version = string.IsNullOrWhiteSpace(resolved.Version) ? fallback.Version : resolved.Version,
@@ -999,6 +1040,31 @@ sealed record CreateFeedbackRequest(string? Channel, string? ReleaseId, string? 
 sealed record ReleaseRecord(string Id, string Version, string Channel, string ZipName, string ZipSha256, long ZipSize, string? Notes, bool Promoted, long PositiveCount, long TotalCount, DateTimeOffset CreatedAt, DateTimeOffset? PromotedAt);
 sealed record FeedbackRecord(string Id, string Channel, string? ReleaseId, string? UserName, string? UserEmail, string Rating, string Message, DateTimeOffset CreatedAt);
 sealed record AuditRecord(string Id, string FeedbackId, string Actor, string Action, string Details, DateTimeOffset CreatedAt);
+
+sealed class UpdaterChannelStateStore(IWebHostEnvironment env)
+{
+  readonly string flagPath = Path.Combine(env.ContentRootPath, "data", "normal-channel-stopped.flag");
+
+  bool Exists()
+  {
+    Directory.CreateDirectory(Path.GetDirectoryName(flagPath)!);
+    return File.Exists(flagPath);
+  }
+
+  public Task<bool> IsNormalStoppedAsync() => Task.FromResult(Exists());
+
+  public bool IsNormalStopped() => Exists();
+
+  public Task SetNormalStoppedAsync(bool stopped)
+  {
+    Directory.CreateDirectory(Path.GetDirectoryName(flagPath)!);
+    if (stopped)
+      File.WriteAllText(flagPath, DateTimeOffset.UtcNow.ToString("O"));
+    else if (File.Exists(flagPath))
+      File.Delete(flagPath);
+    return Task.CompletedTask;
+  }
+}
 
 sealed class FeedbackKeyResolver(IMemoryCache cache)
 {

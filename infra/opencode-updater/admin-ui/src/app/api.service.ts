@@ -35,10 +35,19 @@ type AuditRecord = {
   createdAt: string
 }
 
+type ReleaseStatus = {
+  releases: ReleaseRecord[]
+  normalStopped: boolean
+}
+
 @Injectable({ providedIn: "root" })
 export class ApiService {
   async listReleases() {
     return (await fetch("/opencode/admin/releases")).json() as Promise<ReleaseRecord[]>
+  }
+
+  async listReleaseStatus() {
+    return (await fetch("/opencode/admin/releases/status")).json() as Promise<ReleaseStatus>
   }
 
   async uploadRelease(payload: { archive: File; notes?: string }) {
@@ -50,6 +59,14 @@ export class ApiService {
 
   async promoteRelease(id: string) {
     return fetch(`/opencode/admin/releases/${id}/promote`, { method: "POST" })
+  }
+
+  async stopNormalChannel() {
+    return fetch("/opencode/admin/releases/normal/stop", { method: "POST" })
+  }
+
+  async clearNormalChannel() {
+    return fetch("/opencode/admin/releases/normal/clear", { method: "POST" })
   }
 
   async listFeedback() {
