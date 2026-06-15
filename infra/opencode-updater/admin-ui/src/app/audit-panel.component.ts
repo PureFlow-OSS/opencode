@@ -7,6 +7,7 @@ type ReleaseRecord = {
   channel: string
   positiveCount: number
   totalCount: number
+  notes?: string | null
 }
 
 type AuditRecord = {
@@ -23,8 +24,8 @@ type AuditRecord = {
   standalone: true,
   template: `
     <article class="card">
-      <h2>Promotion Control</h2>
-      <p>Release health and audit trail. Promotion is only enabled when the 50% bar is met.</p>
+      <h2>Beta Promotion</h2>
+      <p>Promote only after 50% positive beta feedback. Audit trail sits below.</p>
       <button type="button" class="secondary" (click)="refresh()">Refresh</button>
       <div class="list">
         @for (release of releases; track release.id) {
@@ -34,6 +35,9 @@ type AuditRecord = {
               <span>{{ release.channel }}</span>
             </div>
             <p>{{ release.positiveCount }}/{{ release.totalCount }} positive beta feedback</p>
+            @if (release.notes) {
+              <small>{{ release.notes }}</small>
+            }
             <div class="progress">
               <span [style.width.%]="progress(release)"></span>
             </div>

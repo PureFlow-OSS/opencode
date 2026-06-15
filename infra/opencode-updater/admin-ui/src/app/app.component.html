@@ -2,39 +2,51 @@
   <section class="hero">
     <div class="hero-copy">
       <p class="eyebrow">OpenCode Updater</p>
-      <h1>Release Console</h1>
+      <h1>Admin Console</h1>
       <p class="lede">
-        Upload beta ZIPs, watch the 50% promotion threshold, and audit feedback without writing into the inbox here.
+        One screen per job. Upload ZIP, review beta feedback, or inspect inbox and audit trail.
       </p>
-      <div class="pill-row">
-        <span class="pill">ZIP upload</span>
-        <span class="pill">Beta only</span>
-        <span class="pill">Audit trail</span>
-        <span class="pill">Read-only inbox</span>
-      </div>
+      <nav class="nav">
+        <button type="button" [class.active]="page === 'upload'" (click)="show('upload')">ZIP Upload</button>
+        <button type="button" [class.active]="page === 'beta-feedback'" (click)="show('beta-feedback')">Beta Feedback</button>
+        <button type="button" [class.active]="page === 'inbox'" (click)="show('inbox')">Feedback Inbox</button>
+      </nav>
     </div>
-    <div class="hero-metrics">
-      <div class="metric">
-        <span class="metric-label">Flow</span>
-        <strong>Beta upload</strong>
-        <span>ZIP only</span>
-      </div>
-      <div class="metric">
-        <span class="metric-label">Promotion</span>
-        <strong>50%+</strong>
-        <span>positive beta</span>
-      </div>
-      <div class="metric">
-        <span class="metric-label">Feedback</span>
-        <strong>OpenCode UI</strong>
-        <span>read-only here</span>
-      </div>
+    <div class="hero-panel">
+      <div class="hero-kicker">Flow</div>
+      <strong>
+        @if (page === 'upload') {
+          ZIP only
+        } @else if (page === 'beta-feedback') {
+          Beta review
+        } @else {
+          Inbox + audit
+        }
+      </strong>
+      <p>
+        @if (page === 'upload') {
+          latest.yml drives version. Notes tell testers what to check.
+        } @else if (page === 'beta-feedback') {
+          Beta feedback gets promoted only after 50% positive.
+        } @else {
+          General inbox plus audit trail for team review.
+        }
+      </p>
     </div>
   </section>
 
-  <section class="grid">
-    <app-upload-panel />
-    <app-feedback-panel />
-    <app-audit-panel />
-  </section>
+  @if (page === 'upload') {
+    <section class="single">
+      <app-upload-panel />
+    </section>
+  } @else if (page === 'beta-feedback') {
+    <section class="single">
+      <app-feedback-panel mode="beta" />
+      <app-audit-panel />
+    </section>
+  } @else {
+    <section class="single">
+      <app-feedback-panel mode="inbox" />
+    </section>
+  }
 </main>

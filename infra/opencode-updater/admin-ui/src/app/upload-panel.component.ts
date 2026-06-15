@@ -7,7 +7,7 @@ import { ApiService } from "./api.service"
   template: `
     <article class="card">
       <h2>Beta Upload</h2>
-      <p>Upload a ZIP release and publish it into the beta channel. The version is read from <code>latest.yml</code>.</p>
+      <p>Upload a ZIP release into beta. Version comes from <code>latest.yml</code>.</p>
       <form (submit)="submit($event)">
         <label>
           ZIP file

@@ -3,6 +3,8 @@ import { UploadPanelComponent } from "./upload-panel.component"
 import { FeedbackPanelComponent } from "./feedback-panel.component"
 import { AuditPanelComponent } from "./audit-panel.component"
 
+type Page = "upload" | "beta-feedback" | "inbox"
+
 @Component({
   selector: "app-root",
   standalone: true,
@@ -10,4 +12,10 @@ import { AuditPanelComponent } from "./audit-panel.component"
   templateUrl: "./app.component.html",
   styleUrl: "./app.component.css",
 })
-export class AppComponent {}
+export class AppComponent {
+  page: Page = "upload"
+
+  show(page: Page) {
+    this.page = page
+  }
+}
