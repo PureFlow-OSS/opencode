@@ -1,4 +1,4 @@
-import { Component } from "solid-js"
+import { Component, Show } from "solid-js"
 import { Dialog } from "@opencode-ai/ui/dialog"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -15,6 +15,7 @@ import { SettingsFeedback } from "./settings-feedback"
 export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
   const language = useLanguage()
   const platform = usePlatform()
+  const betaTester = () => !!window.__OPENCODE__?.betaTester
 
   return (
     <Dialog size="x-large" class="h-full" transition>
@@ -42,6 +43,12 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
                       <Icon name="bubble-5" />
                       {language.t("settings.tab.feedback")}
                     </Tabs.Trigger>
+                    <Show when={betaTester()}>
+                      <Tabs.Trigger value="beta-feedback">
+                        <Icon name="bubble-5" />
+                        Beta Feedback
+                      </Tabs.Trigger>
+                    </Show>
                   </div>
                 </div>
 
@@ -82,6 +89,11 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
         <Tabs.Content value="feedback" class="no-scrollbar">
           <SettingsFeedback />
         </Tabs.Content>
+        <Show when={betaTester()}>
+          <Tabs.Content value="beta-feedback" class="no-scrollbar">
+            <SettingsFeedback mode="beta" />
+          </Tabs.Content>
+        </Show>
         <Tabs.Content value="providers" class="no-scrollbar">
           <SettingsProviders />
         </Tabs.Content>

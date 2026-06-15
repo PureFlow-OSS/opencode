@@ -147,13 +147,47 @@ app.MapGet("/opencode/admin/releases/status", async (
   UpdaterAdminStore store,
   UpdaterChannelStateStore channelState,
   IOptions<UpdaterBetaOptions> betaOptions
-) => Results.Json(new
+) =>
 {
-  releases = await store.ListReleasesAsync(),
-  normalStopped = await channelState.IsNormalStoppedAsync(),
-  betaUserCount = betaOptions.Value.Users.Length,
-  betaPositiveThreshold = (int)Math.Ceiling(betaOptions.Value.Users.Length / 2.0),
-}));
+  var releases = await store.ListReleasesAsync();
+  return Results.Json(new
+  {
+    releases,
+    normalStopped = await channelState.IsNormalStoppedAsync(),
+    betaUserCount = betaOptions.Value.Users.Length,
+    betaPositiveThreshold = (int)Math.Ceiling(betaOptions.Value.Users.Length / 2.0),
+    betaRelease = releases.FirstOrDefault((release) => release.Channel == "beta"),
+    normalRelease = releases.FirstOrDefault((release) => release.Channel == "normal"),
+  });
+});
+
+app.MapGet("/opencode/admin/beta/status", async (
+  HttpRequest request,
+  FeedbackKeyResolver keyResolver,
+  IOptions<UpdaterBetaOptions> betaOptions,
+  IHttpClientFactory clientFactory
+) =>
+{
+  var key = request.Headers["X-OpenCode-AiFactory-Api-Key"].FirstOrDefault()?.Trim();
+  if (string.IsNullOrWhiteSpace(key))
+    return Results.Json(new
+    {
+      betaTester = false,
+      userName = (string?)null,
+      betaUserCount = betaOptions.Value.Users.Length,
+      betaPositiveThreshold = (int)Math.Ceiling(betaOptions.Value.Users.Length / 2.0),
+    });
+
+  var userName = await keyResolver.ResolveUserNameAsync(key, betaOptions.Value, clientFactory, request.HttpContext.RequestAborted);
+  var betaTester = await keyResolver.IsBetaMemberAsync(key, betaOptions.Value, clientFactory, request.HttpContext.RequestAborted);
+  return Results.Json(new
+  {
+    betaTester,
+    userName,
+    betaUserCount = betaOptions.Value.Users.Length,
+    betaPositiveThreshold = (int)Math.Ceiling(betaOptions.Value.Users.Length / 2.0),
+  });
+});
 
 app.MapPost("/opencode/admin/releases/upload", async (
   HttpRequest request,
@@ -1105,6 +1139,32 @@ sealed class FeedbackKeyResolver(IMemoryCache cache)
     }
   }
 
+  public async Task<bool> IsBetaMemberAsync(string key, UpdaterBetaOptions beta, IHttpClientFactory clientFactory, CancellationToken cancellationToken)
+  {
+    if (string.IsNullOrWhiteSpace(beta.LiteLLM.BaseUrl))
+      return false;
+
+    using var request = new HttpRequestMessage(HttpMethod.Get, BuildLiteLLMKeyInfoUrl(beta, key));
+    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ResolveLiteLLMApiKey(beta, key));
+
+    try
+    {
+      using var response = await clientFactory.CreateClient().SendAsync(request, cancellationToken);
+      if (!response.IsSuccessStatusCode)
+        return false;
+
+      await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+      using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+      var groups = ExtractStrings(document.RootElement, "groups");
+      var users = ExtractStrings(document.RootElement, "users");
+      return MatchesGroups(beta, groups) || MatchesUsers(beta, users);
+    }
+    catch
+    {
+      return false;
+    }
+  }
+
   static string? ExtractUserName(JsonElement element)
   {
     if (element.ValueKind != JsonValueKind.Object) return null;
@@ -1154,5 +1214,29 @@ sealed class FeedbackKeyResolver(IMemoryCache cache)
   {
     var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value));
     return Convert.ToHexString(bytes);
+  }
+
+  static HashSet<string> ExtractStrings(JsonElement element, string name)
+  {
+    var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(name, out var property)) return result;
+    if (property.ValueKind != JsonValueKind.Array) return result;
+    foreach (var item in property.EnumerateArray())
+    {
+      if (item.ValueKind != JsonValueKind.String) continue;
+      var value = item.GetString()?.Trim();
+      if (!string.IsNullOrWhiteSpace(value)) result.Add(value);
+    }
+    return result;
+  }
+
+  static bool MatchesGroups(UpdaterBetaOptions beta, HashSet<string> groups)
+  {
+    return beta.Groups.Any((group) => !string.IsNullOrWhiteSpace(group) && groups.Contains(group.Trim()));
+  }
+
+  static bool MatchesUsers(UpdaterBetaOptions beta, HashSet<string> users)
+  {
+    return beta.Users.Any((user) => !string.IsNullOrWhiteSpace(user) && users.Contains(user.Trim()));
   }
 }

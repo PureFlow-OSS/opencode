@@ -28,6 +28,11 @@ type UpdateServerConfig = {
   motd?: UpdateServerMotd
 }
 
+type UpdateServerBetaStatus = {
+  betaTester: boolean
+  betaUserName?: string | null
+}
+
 type ParsedUpdateServerConfig = {
   version?: string
   url?: string
@@ -101,6 +106,7 @@ export const updateServer = {
   configUrl: `${UPDATE_SERVER_BASE_URL}/config`,
   versionUrl: `${UPDATE_SERVER_BASE_URL}/version`,
   feedUrl: `${UPDATE_SERVER_BASE_URL}/url`,
+  betaStatusUrl: `${UPDATE_SERVER_BASE_URL}/admin/beta/status`,
   compareVersions(current: string, next: string) {
     const left = parseVersion(current)
     const right = parseVersion(next)
@@ -140,5 +146,23 @@ export const updateServer = {
     const legacy = await this.fetchLegacy()
     if (!legacy) return null
     return { ...legacy, motd: config?.motd }
+  },
+  async fetchBetaStatus(): Promise<UpdateServerBetaStatus | null> {
+    const init = await requestInit()
+    return net.fetch(this.betaStatusUrl, init)
+      .then((result) => (result.ok ? (result.json() as Promise<unknown>) : undefined))
+      .then((result) => {
+        if (!isRecord(result)) return null
+        return {
+          betaTester: result["betaTester"] === true,
+          betaUserName:
+            typeof result["betaUserName"] === "string"
+              ? result["betaUserName"]
+              : typeof result["userName"] === "string"
+                ? result["userName"]
+                : null,
+        }
+      })
+      .catch(() => null)
   },
 }

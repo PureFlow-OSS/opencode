@@ -42,12 +42,12 @@ function requestInit(apiKey?: string, body?: Record<string, unknown>) {
   } satisfies RequestInit
 }
 
-export const SettingsFeedback: Component = () => {
+export const SettingsFeedback: Component<{ mode?: "general" | "beta" }> = (props) => {
   const language = useLanguage()
   const platform = usePlatform()
   const globalSync = useGlobalSync()
   const [store, setStore] = createStore({
-    category: "general" as FeedbackCategory,
+    category: (props.mode === "beta" ? "bug" : "general") as FeedbackCategory,
     text: "",
     files: [] as FeedbackFile[],
     sending: false,
@@ -60,11 +60,18 @@ export const SettingsFeedback: Component = () => {
 
   const categories = createMemo(
     () =>
-      [
+      (
+        props.mode === "beta"
+          ? [
+              { value: "bug" as const, label: "Fehler gefunden" },
+              { value: "general" as const, label: "Version erfolgreich getestet" },
+            ]
+          : [
         { value: "general" as const, label: language.t("settings.feedback.category.general") },
         { value: "bug" as const, label: language.t("settings.feedback.category.bug") },
         { value: "idea" as const, label: language.t("settings.feedback.category.idea") },
-      ] satisfies { value: FeedbackCategory; label: string }[],
+            ]
+      ) satisfies { value: FeedbackCategory; label: string }[],
   )
 
   const canSubmit = createMemo(() => store.text.trim().length > 0 && !store.sending)
@@ -95,7 +102,7 @@ export const SettingsFeedback: Component = () => {
       FEEDBACK_URL,
       requestInit(aifactoryApiKey(), {
         text: text.slice(0, FEEDBACK_TEXT_LIMIT),
-        category: store.category,
+        category: props.mode === "beta" ? "beta" : store.category,
         key: aifactoryApiKey(),
         app_version: platform.version,
         platform: platform.platform,
@@ -105,7 +112,7 @@ export const SettingsFeedback: Component = () => {
       .then((result) => {
         if (!result.ok) return Promise.reject(new Error(`Request failed (${result.status})`))
         setStore("text", "")
-        setStore("category", "general")
+        setStore("category", props.mode === "beta" ? "bug" : "general")
         setStore("files", [])
         showToast({
           variant: "success",
@@ -125,7 +132,9 @@ export const SettingsFeedback: Component = () => {
     <div class="flex flex-col h-full overflow-y-auto no-scrollbar px-4 pb-10 sm:px-10 sm:pb-10">
       <div class="sticky top-0 z-10 bg-[linear-gradient(to_bottom,var(--surface-stronger-non-alpha)_calc(100%_-_24px),transparent)]">
         <div class="flex flex-col gap-1 pt-6 pb-8 w-full">
-          <h2 class="text-16-medium text-text-strong">{language.t("settings.feedback.title")}</h2>
+          <h2 class="text-16-medium text-text-strong">
+            {props.mode === "beta" ? "Beta Feedback" : language.t("settings.feedback.title")}
+          </h2>
         </div>
       </div>
 
@@ -133,22 +142,44 @@ export const SettingsFeedback: Component = () => {
         <SettingsList>
           <form class="flex flex-col gap-4 py-4" onSubmit={submit}>
             <div class="flex flex-col gap-1">
-              <div class="text-14-medium text-text-strong">{language.t("settings.feedback.description")}</div>
+              <div class="text-14-medium text-text-strong">
+                {props.mode === "beta"
+                  ? "Only for beta testers. Send test result, bugs, free text, and screenshots."
+                  : language.t("settings.feedback.description")}
+              </div>
             </div>
 
-            <Select
-              options={categories()}
-              current={categories().find((item) => item.value === store.category)}
-              value={(item) => item.value}
-              label={(item) => item.label}
-              onSelect={(item) => item && setStore("category", item.value)}
-              variant="secondary"
-              size="small"
-              triggerVariant="settings"
-            />
+            <Show
+              when={props.mode !== "beta"}
+              fallback={<input type="hidden" name="channel" value="beta" />}
+            >
+              <Select
+                options={categories()}
+                current={categories().find((item) => item.value === store.category)}
+                value={(item) => item.value}
+                label={(item) => item.label}
+                onSelect={(item) => item && setStore("category", item.value)}
+                variant="secondary"
+                size="small"
+                triggerVariant="settings"
+              />
+            </Show>
+
+            <Show when={props.mode === "beta"}>
+              <div class="flex flex-wrap gap-2">
+                <Button type="button" variant="secondary" size="small" onClick={() => setStore("text", "Version erfolgreich getestet\n" + store.text)}>
+                  Version erfolgreich getestet
+                </Button>
+                <Button type="button" variant="secondary" size="small" onClick={() => setStore("text", "Fehler gefunden\n" + store.text)}>
+                  Fehler gefunden
+                </Button>
+              </div>
+            </Show>
 
             <div class="flex flex-col gap-2">
-              <label class="text-14-medium text-text-strong">{language.t("settings.feedback.field.attachments.label")}</label>
+              <label class="text-14-medium text-text-strong">
+                {props.mode === "beta" ? "Screenshots" : language.t("settings.feedback.field.attachments.label")}
+              </label>
               <input
                 type="file"
                 multiple
@@ -166,7 +197,9 @@ export const SettingsFeedback: Component = () => {
               <div class="text-12-regular text-text-weak">
                 {store.files.length > 0
                   ? language.t("settings.feedback.field.attachments.count", { count: store.files.length })
-                  : language.t("settings.feedback.field.attachments.empty")}
+                  : props.mode === "beta"
+                    ? "No screenshots selected."
+                    : language.t("settings.feedback.field.attachments.empty")}
               </div>
               <Show when={store.files.length > 0}>
                 <div class="flex flex-wrap gap-2">
@@ -190,19 +223,21 @@ export const SettingsFeedback: Component = () => {
 
             <TextField
               label={language.t("settings.feedback.field.text.label")}
-              description={language.t("settings.feedback.field.text.description")}
+              description={props.mode === "beta" ? "Describe the result or issue." : language.t("settings.feedback.field.text.description")}
               value={store.text}
               onChange={(value) => setStore("text", value.slice(0, FEEDBACK_TEXT_LIMIT))}
-              placeholder={language.t("settings.feedback.field.text.placeholder")}
+              placeholder={props.mode === "beta" ? "Write details or reproduce steps..." : language.t("settings.feedback.field.text.placeholder")}
               multiline
               class="min-h-32 text-14-regular"
             />
 
             <div class="flex items-center justify-between gap-3">
               <span class="text-12-regular text-text-weak">
-                {language.t("settings.feedback.field.text.counter", {
-                  count: FEEDBACK_TEXT_LIMIT - store.text.length,
-                })}
+                {props.mode === "beta"
+                  ? `${FEEDBACK_TEXT_LIMIT - store.text.length} characters left`
+                  : language.t("settings.feedback.field.text.counter", {
+                      count: FEEDBACK_TEXT_LIMIT - store.text.length,
+                    })}
               </span>
               <Button size="small" variant="secondary" type="submit" disabled={!canSubmit()}>
                 {store.sending ? language.t("common.saving") : language.t("settings.feedback.action.send")}

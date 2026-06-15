@@ -1183,6 +1183,13 @@ export default function Layout(props: ParentProps) {
         onSelect: () => openSettings(),
       },
       {
+        id: "feedback.beta.open",
+        title: "Beta Feedback",
+        category: language.t("command.category.settings"),
+        disabled: !window.__OPENCODE__?.betaTester,
+        onSelect: () => openSettings("beta-feedback"),
+      },
+      {
         id: "session.previous",
         title: language.t("command.session.previous"),
         category: language.t("command.category.session"),
@@ -1334,11 +1341,11 @@ export default function Layout(props: ParentProps) {
     })
   }
 
-  function openSettings() {
+  function openSettings(defaultValue?: string) {
     const run = ++dialogRun
     void import("@/components/dialog-settings").then((x) => {
       if (dialogDead || dialogRun !== run) return
-      dialog.show(() => <x.DialogSettings />)
+      dialog.show(() => <x.DialogSettings defaultValue={defaultValue} />)
     })
   }
 

@@ -22,6 +22,8 @@ export type TitlebarTheme = {
 
 export type WindowConfig = {
   updaterEnabled: boolean
+  betaTester?: boolean
+  betaUserName?: string | null
 }
 
 export type ElectronAPI = {

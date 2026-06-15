@@ -39,7 +39,7 @@ type ReleaseRecord = {
           <small>{{ betaPositiveThreshold }} positive approvals needed</small>
         </section>
       </div>
-      <form (submit)="submit($event)">
+      <form class="form" (submit)="submit($event)">
         <label>
           ZIP file
           <input name="archive" type="file" accept=".zip,application/zip" />
@@ -72,28 +72,42 @@ export class UploadPanelComponent {
     })
   }
 
+  private get status() {
+    return this.statusQuery.data()
+  }
+
+  private get betaRelease() {
+    return this.status?.betaRelease ?? [...(this.status?.releases ?? [])].reverse().find((release) => release.channel === "beta")
+  }
+
+  private get normalRelease() {
+    return this.status?.normalRelease ?? [...(this.status?.releases ?? [])].reverse().find((release) => release.channel === "normal")
+  }
+
   get betaVersionText() {
-    return this.statusQuery.data()?.betaRelease?.version || "No beta release yet"
+    return this.betaRelease?.version || "No beta release yet"
   }
 
   get betaNotesText() {
-    return this.statusQuery.data()?.betaRelease?.notes || "Waiting for first beta ZIP"
+    if (!this.betaRelease) return "Waiting for first beta ZIP"
+    return this.betaRelease.notes || "No notes yet"
   }
 
   get normalVersionText() {
-    return this.statusQuery.data()?.normalRelease?.version || "No normal release yet"
+    return this.normalRelease?.version || "No normal release yet"
   }
 
   get normalStateText() {
-    return this.statusQuery.data()?.normalStopped ? "Delivery stopped" : "Delivery active"
+    if (!this.status) return "Loading status..."
+    return this.status.normalStopped ? "Delivery stopped" : "Delivery active"
   }
 
   get betaUserCount() {
-    return this.statusQuery.data()?.betaUserCount ?? 0
+    return this.status?.betaUserCount ?? 0
   }
 
   get betaPositiveThreshold() {
-    return this.statusQuery.data()?.betaPositiveThreshold ?? 0
+    return this.status?.betaPositiveThreshold ?? 0
   }
 
   submit(event: SubmitEvent) {

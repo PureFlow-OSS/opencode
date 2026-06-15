@@ -85,6 +85,8 @@ const serverReady = defer<ServerReadyData>()
 const logger = initLogging()
 let updateServerConfig: Awaited<ReturnType<typeof updateServer.fetch>> | undefined
 let updateServerConfigPromise: ReturnType<typeof updateServer.fetch> | undefined
+let betaStatus: Awaited<ReturnType<typeof updateServer.fetchBetaStatus>> | undefined
+let betaStatusPromise: ReturnType<typeof updateServer.fetchBetaStatus> | undefined
 const defaultMotd = { enabled: true, text: "RRZ AI Factory" }
 
 logger.log("app starting", {
@@ -149,6 +151,7 @@ function setupApp() {
     setDockIcon()
     setupAutoUpdater()
     void getUpdateServerConfig()
+    void getBetaStatusConfig()
     await initialize()
   })
 }
@@ -264,6 +267,7 @@ function wireMenu() {
         app.exit(0)
       })
     },
+    betaTester: betaStatus?.betaTester ?? false,
   })
 }
 
@@ -287,7 +291,14 @@ registerIpcHandlers({
     if (motd?.enabled === false) return null
     return motd ?? defaultMotd
   },
-  getWindowConfig: () => ({ updaterEnabled: UPDATER_ENABLED }),
+  getWindowConfig: async () => {
+    const beta = await getBetaStatusConfig().catch(() => null)
+    return {
+      updaterEnabled: UPDATER_ENABLED,
+      betaTester: beta?.betaTester ?? false,
+      betaUserName: beta?.betaUserName ?? null,
+    }
+  },
   consumeInitialDeepLinks: () => pendingDeepLinks.splice(0),
   getDefaultServerUrl: () => getDefaultServerUrl(),
   setDefaultServerUrl: (url) => setDefaultServerUrl(url),
@@ -406,6 +417,15 @@ async function getUpdateServerConfig(refresh = false) {
   updateServerConfig = await updateServerConfigPromise
   updateServerConfigPromise = undefined
   return updateServerConfig
+}
+
+async function getBetaStatusConfig(refresh = false) {
+  if (!refresh && betaStatus !== undefined) return betaStatus
+  if (!refresh && betaStatusPromise) return betaStatusPromise
+  betaStatusPromise = updateServer.fetchBetaStatus()
+  betaStatus = await betaStatusPromise
+  betaStatusPromise = undefined
+  return betaStatus
 }
 
 async function checkUpdate() {
