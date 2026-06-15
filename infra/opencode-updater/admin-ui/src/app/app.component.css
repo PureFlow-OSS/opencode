@@ -155,6 +155,15 @@ h1 {
   margin-bottom: 14px;
 }
 
+.status-text {
+  margin-top: 14px;
+  color: rgba(242, 244, 248, 0.72);
+}
+
+.status-text.error {
+  color: #ff9aa9;
+}
+
 @media (max-width: 980px) {
   .hero,
   .grid,

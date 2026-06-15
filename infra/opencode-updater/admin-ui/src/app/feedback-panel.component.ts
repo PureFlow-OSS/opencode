@@ -86,6 +86,10 @@ export class FeedbackPanelComponent {
   }
 
   async refresh() {
-    this.feedback = await this.api.listFeedback()
+    try {
+      this.feedback = await this.api.listFeedback()
+    } catch {
+      this.feedback = []
+    }
   }
 }

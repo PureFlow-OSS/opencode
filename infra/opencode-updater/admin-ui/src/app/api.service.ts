@@ -42,35 +42,42 @@ type ReleaseStatus = {
 
 @Injectable({ providedIn: "root" })
 export class ApiService {
+  async readJson<T>(response: Response) {
+    if (!response.ok) throw new Error(await response.text())
+    return response.json() as Promise<T>
+  }
+
   async listReleases() {
-    return (await fetch("/opencode/admin/releases")).json() as Promise<ReleaseRecord[]>
+    return this.readJson<ReleaseRecord[]>(await fetch("/opencode/admin/releases"))
   }
 
   async listReleaseStatus() {
-    return (await fetch("/opencode/admin/releases/status")).json() as Promise<ReleaseStatus>
+    return this.readJson<ReleaseStatus>(await fetch("/opencode/admin/releases/status"))
   }
 
   async uploadRelease(payload: { archive: File; notes?: string }) {
     const form = new FormData()
     form.set("archive", payload.archive)
     if (payload.notes) form.set("notes", payload.notes)
-    return fetch("/opencode/admin/releases/upload", { method: "POST", body: form })
+    return this.readJson<ReleaseRecord>(
+      await fetch("/opencode/admin/releases/upload", { method: "POST", body: form }),
+    )
   }
 
   async promoteRelease(id: string) {
-    return fetch(`/opencode/admin/releases/${id}/promote`, { method: "POST" })
+    return this.readJson<ReleaseRecord>(await fetch(`/opencode/admin/releases/${id}/promote`, { method: "POST" }))
   }
 
   async stopNormalChannel() {
-    return fetch("/opencode/admin/releases/normal/stop", { method: "POST" })
+    return this.readJson<{ normalStopped: boolean }>(await fetch("/opencode/admin/releases/normal/stop", { method: "POST" }))
   }
 
   async clearNormalChannel() {
-    return fetch("/opencode/admin/releases/normal/clear", { method: "POST" })
+    return this.readJson<{ normalStopped: boolean }>(await fetch("/opencode/admin/releases/normal/clear", { method: "POST" }))
   }
 
   async listFeedback() {
-    return (await fetch("/opencode/admin/feedback")).json() as Promise<FeedbackRecord[]>
+    return this.readJson<FeedbackRecord[]>(await fetch("/opencode/admin/feedback"))
   }
 
   async createFeedback(payload: { channel: string; releaseId?: string; userName?: string; userEmail?: string; rating: string; message: string }) {
@@ -82,6 +89,6 @@ export class ApiService {
   }
 
   async listAudit() {
-    return (await fetch("/opencode/admin/audit")).json() as Promise<AuditRecord[]>
+    return this.readJson<AuditRecord[]>(await fetch("/opencode/admin/audit"))
   }
 }

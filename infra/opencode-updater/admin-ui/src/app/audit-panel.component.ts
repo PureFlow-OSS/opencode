@@ -82,10 +82,15 @@ export class AuditPanelComponent {
   }
 
   async refresh() {
-    const status = await this.api.listReleaseStatus()
-    this.releases = status.releases
-    this.normalStopped = status.normalStopped
-    this.audit = await this.api.listAudit()
+    try {
+      const status = await this.api.listReleaseStatus()
+      this.releases = status.releases
+      this.normalStopped = status.normalStopped
+      this.audit = await this.api.listAudit()
+    } catch {
+      this.releases = []
+      this.audit = []
+    }
   }
 
   progress(release: ReleaseRecord) {

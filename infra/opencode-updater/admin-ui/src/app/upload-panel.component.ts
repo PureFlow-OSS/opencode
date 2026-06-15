@@ -44,6 +44,7 @@ type ReleaseRecord = {
         </label>
         <button type="submit">Publish beta</button>
       </form>
+      <p class="status-text" [class.error]="!!statusError">{{ statusText }}</p>
     </article>
   `,
 })
@@ -53,19 +54,25 @@ export class UploadPanelComponent {
   betaNotes = ""
   normalVersion = ""
   normalStopped = false
+  statusText = ""
+  statusError = ""
 
   constructor() {
     void this.refresh()
   }
 
   async refresh() {
-    const status = await this.api.listReleaseStatus()
-    this.normalStopped = status.normalStopped
-    const beta = status.releases.find((release) => release.channel === "beta")
-    const normal = status.releases.find((release) => release.channel === "normal")
-    this.betaVersion = beta?.version ?? ""
-    this.betaNotes = beta?.notes ?? ""
-    this.normalVersion = normal?.version ?? ""
+    try {
+      const status = await this.api.listReleaseStatus()
+      this.normalStopped = status.normalStopped
+      const beta = status.releases.find((release) => release.channel === "beta")
+      const normal = status.releases.find((release) => release.channel === "normal")
+      this.betaVersion = beta?.version ?? ""
+      this.betaNotes = beta?.notes ?? ""
+      this.normalVersion = normal?.version ?? ""
+    } catch {
+      this.statusText = "Status unavailable"
+    }
   }
 
   submit(event: SubmitEvent) {
@@ -73,9 +80,20 @@ export class UploadPanelComponent {
     const form = event.currentTarget as HTMLFormElement
     const archive = form.elements.namedItem("archive") as HTMLInputElement
     if (!archive.files?.[0]) return
-    void this.api.uploadRelease({
-      archive: archive.files[0],
-      notes: (form.elements.namedItem("notes") as HTMLTextAreaElement).value,
-    }).then(() => this.refresh())
+    this.statusText = "Uploading..."
+    this.statusError = ""
+    void this.api
+      .uploadRelease({
+        archive: archive.files[0],
+        notes: (form.elements.namedItem("notes") as HTMLTextAreaElement).value,
+      })
+      .then((release) => {
+        this.statusText = `Uploaded ${release.version}`
+        void this.refresh()
+      })
+      .catch((error: Error) => {
+        this.statusError = error.message
+        this.statusText = "Upload failed"
+      })
   }
 }
