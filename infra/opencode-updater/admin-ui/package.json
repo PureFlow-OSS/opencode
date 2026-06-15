@@ -1,0 +1,9 @@
+{
+  "name": "@opencode-ai/updater-admin-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "ng serve",
+    "build": "ng build"
+  }
+}
