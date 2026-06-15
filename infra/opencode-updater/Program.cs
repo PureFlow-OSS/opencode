@@ -10,6 +10,8 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Data.Sqlite;
 using System.Data.Common;
 using System.Data;
+using System.IO.Compression;
+using System.Text.RegularExpressions;
 
 var builder = WebApplication.CreateBuilder(args);
 var betaConfiguration = new ConfigurationBuilder()
@@ -144,9 +146,9 @@ app.MapPost("/opencode/admin/releases/upload", async (
   if (file is null)
     return Results.BadRequest(new { error = "ZIP archive is required" });
 
-  var version = form["version"].ToString().Trim();
+  var version = await ReadVersionFromLatestYmlAsync(file, request.HttpContext.RequestAborted);
   if (string.IsNullOrWhiteSpace(version))
-    return Results.BadRequest(new { error = "Version is required" });
+    return Results.BadRequest(new { error = "latest.yml with a version field is required inside the ZIP" });
 
   var release = await store.UploadReleaseAsync(new UploadReleaseRequest(
     version,
@@ -287,6 +289,20 @@ static async Task<string> ComputeSha256Async(IFormFile file, CancellationToken c
   await using var stream = file.OpenReadStream();
   var hash = await System.Security.Cryptography.SHA256.HashDataAsync(stream, cancellationToken);
   return Convert.ToHexString(hash).ToLowerInvariant();
+}
+
+static async Task<string?> ReadVersionFromLatestYmlAsync(IFormFile file, CancellationToken cancellationToken)
+{
+  await using var stream = file.OpenReadStream();
+  using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false);
+  var latest = archive.GetEntry("latest.yml") ?? archive.GetEntry("latest.yaml");
+  if (latest is null) return null;
+
+  await using var latestStream = latest.Open();
+  using var reader = new StreamReader(latestStream);
+  var content = await reader.ReadToEndAsync(cancellationToken);
+  var match = Regex.Match(content, @"(?m)^\s*version:\s*[""']?(?<version>[^""'\r\n#]+)");
+  return match.Success ? match.Groups["version"].Value.Trim() : null;
 }
 
 static async Task EnsureAdminTablesAsync(DbConnection connection, IWebHostEnvironment env)

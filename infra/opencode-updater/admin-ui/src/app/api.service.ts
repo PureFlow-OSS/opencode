@@ -41,9 +41,8 @@ export class ApiService {
     return (await fetch("/opencode/admin/releases")).json() as Promise<ReleaseRecord[]>
   }
 
-  async uploadRelease(payload: { version: string; archive: File; notes?: string }) {
+  async uploadRelease(payload: { archive: File; notes?: string }) {
     const form = new FormData()
-    form.set("version", payload.version)
     form.set("archive", payload.archive)
     if (payload.notes) form.set("notes", payload.notes)
     return fetch("/opencode/admin/releases/upload", { method: "POST", body: form })
