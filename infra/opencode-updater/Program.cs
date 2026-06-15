@@ -45,7 +45,10 @@ app.UseCors();
 
 using (var scope = app.Services.CreateScope())
 {
-  scope.ServiceProvider.GetRequiredService<FeedbackContext>().Database.EnsureCreated();
+  var db = scope.ServiceProvider.GetRequiredService<FeedbackContext>();
+  db.Database.EnsureCreated();
+  if (!await HasColumnAsync(db.Database, "Feedbacks", "AttachmentsJson"))
+    db.Database.ExecuteSqlRaw(@"ALTER TABLE ""Feedbacks"" ADD COLUMN ""AttachmentsJson"" TEXT NULL");
 }
 
 app.MapPost("/opencode/feedback", async (
@@ -80,6 +83,7 @@ app.MapPost("/opencode/feedback", async (
     UserName = userName,
     AppVersion = body.AppVersion?.Trim(),
     Platform = body.Platform?.Trim(),
+    AttachmentsJson = body.Attachments is { Length: > 0 } ? JsonSerializer.Serialize(body.Attachments) : null,
     CreatedAt = DateTimeOffset.UtcNow,
   };
 
@@ -101,6 +105,7 @@ app.MapGet("/opencode/feedback", async (FeedbackContext db) =>
       user_name = f.UserName,
       app_version = f.AppVersion,
       platform = f.Platform,
+      attachments = f.AttachmentsJson,
       created_at = f.CreatedAt,
     })
     .ToListAsync();
@@ -634,6 +639,21 @@ sealed class FeedbackRequest
 
   [JsonPropertyName("platform")]
   public string? Platform { get; set; }
+
+  [JsonPropertyName("attachments")]
+  public FeedbackAttachment[]? Attachments { get; set; }
+}
+
+sealed class FeedbackAttachment
+{
+  [JsonPropertyName("name")]
+  public string? Name { get; set; }
+
+  [JsonPropertyName("type")]
+  public string? Type { get; set; }
+
+  [JsonPropertyName("data")]
+  public string? Data { get; set; }
 }
 
 sealed class FeedbackEntry
@@ -644,12 +664,28 @@ sealed class FeedbackEntry
   public string UserName { get; set; } = "";
   public string? AppVersion { get; set; }
   public string? Platform { get; set; }
+  public string? AttachmentsJson { get; set; }
   public DateTimeOffset CreatedAt { get; set; }
 }
 
 sealed class FeedbackContext(DbContextOptions options) : DbContext(options)
 {
   public DbSet<FeedbackEntry> Feedbacks => Set<FeedbackEntry>();
+}
+
+static async Task<bool> HasColumnAsync(DatabaseFacade database, string table, string column)
+{
+  await database.OpenConnectionAsync();
+  await using var command = database.GetDbConnection().CreateCommand();
+  command.CommandText = $"PRAGMA table_info(\"{table}\")";
+  await using var reader = await command.ExecuteReaderAsync();
+  while (await reader.ReadAsync())
+  {
+    if (!reader.IsDBNull(1) && string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+      return true;
+  }
+
+  return false;
 }
 
 sealed class FeedbackKeyResolver(IMemoryCache cache)

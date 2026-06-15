@@ -10,6 +10,7 @@ import { SettingsMcp } from "./settings-mcp"
 import { SettingsModels } from "./settings-models"
 import { SettingsProviders } from "./settings-providers"
 import { SettingsChangelog } from "./settings-changelog"
+import { SettingsFeedback } from "./settings-feedback"
 
 export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
   const language = useLanguage()
@@ -36,6 +37,10 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
                     <Tabs.Trigger value="changelog">
                       <Icon name="bullet-list" />
                       {language.t("settings.tab.changelog")}
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="feedback">
+                      <Icon name="bubble-5" />
+                      {language.t("settings.tab.feedback")}
                     </Tabs.Trigger>
                   </div>
                 </div>
@@ -73,6 +78,9 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
         </Tabs.Content>
         <Tabs.Content value="changelog" class="no-scrollbar">
           <SettingsChangelog />
+        </Tabs.Content>
+        <Tabs.Content value="feedback" class="no-scrollbar">
+          <SettingsFeedback />
         </Tabs.Content>
         <Tabs.Content value="providers" class="no-scrollbar">
           <SettingsProviders />
