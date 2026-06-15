@@ -41,12 +41,12 @@ export class ApiService {
     return (await fetch("/opencode/admin/releases")).json() as Promise<ReleaseRecord[]>
   }
 
-  async uploadRelease(payload: { version: string; zipName?: string; zipSha256?: string; zipSize: number; notes?: string }) {
-    return fetch("/opencode/admin/releases/upload", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    })
+  async uploadRelease(payload: { version: string; archive: File; notes?: string }) {
+    const form = new FormData()
+    form.set("version", payload.version)
+    form.set("archive", payload.archive)
+    if (payload.notes) form.set("notes", payload.notes)
+    return fetch("/opencode/admin/releases/upload", { method: "POST", body: form })
   }
 
   async promoteRelease(id: string) {

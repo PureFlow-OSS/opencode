@@ -14,16 +14,8 @@ import { ApiService } from "./api.service"
           <input name="version" placeholder="1.14.36-beta.1" />
         </label>
         <label>
-          ZIP name
-          <input name="zipName" placeholder="opencode-mac.zip" />
-        </label>
-        <label>
-          SHA-256
-          <input name="zipSha256" placeholder="..." />
-        </label>
-        <label>
-          Size
-          <input name="zipSize" type="number" min="0" />
+          ZIP file
+          <input name="archive" type="file" accept=".zip,application/zip" />
         </label>
         <label>
           Notes
@@ -40,11 +32,11 @@ export class UploadPanelComponent {
   submit(event: SubmitEvent) {
     event.preventDefault()
     const form = event.currentTarget as HTMLFormElement
+    const archive = form.elements.namedItem("archive") as HTMLInputElement
+    if (!archive.files?.[0]) return
     void this.api.uploadRelease({
       version: (form.elements.namedItem("version") as HTMLInputElement).value,
-      zipName: (form.elements.namedItem("zipName") as HTMLInputElement).value,
-      zipSha256: (form.elements.namedItem("zipSha256") as HTMLInputElement).value,
-      zipSize: Number((form.elements.namedItem("zipSize") as HTMLInputElement).value || 0),
+      archive: archive.files[0],
       notes: (form.elements.namedItem("notes") as HTMLTextAreaElement).value,
     })
   }

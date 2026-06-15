@@ -58,15 +58,6 @@ using (var scope = app.Services.CreateScope())
   await EnsureAdminTablesAsync(db.Database.GetDbConnection(), scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>());
 }
 
-app.UseDefaultFiles(new DefaultFilesOptions
-{
-  FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "admin-ui", "dist", "admin-ui")),
-});
-app.UseStaticFiles(new StaticFileOptions
-{
-  FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "admin-ui", "dist", "admin-ui")),
-});
-
 app.MapGet("/opencode/admin", () => Results.Redirect("/opencode/admin/"));
 
 app.MapGet("/opencode/admin/", () =>
@@ -145,16 +136,25 @@ app.MapPost("/opencode/admin/releases/upload", async (
   UpdaterAdminStore store
 ) =>
 {
-  var body = await JsonSerializer.DeserializeAsync<UploadReleaseRequest>(
-    request.Body,
-    new JsonSerializerOptions { PropertyNameCaseInsensitive = true },
-    request.HttpContext.RequestAborted
-  );
+  if (!request.HasFormContentType)
+    return Results.BadRequest(new { error = "Multipart form data is required" });
 
-  if (body is null || string.IsNullOrWhiteSpace(body.Version))
+  var form = await request.ReadFormAsync(request.HttpContext.RequestAborted);
+  var file = form.Files.GetFile("archive");
+  if (file is null)
+    return Results.BadRequest(new { error = "ZIP archive is required" });
+
+  var version = form["version"].ToString().Trim();
+  if (string.IsNullOrWhiteSpace(version))
     return Results.BadRequest(new { error = "Version is required" });
 
-  var release = await store.UploadReleaseAsync(body);
+  var release = await store.UploadReleaseAsync(new UploadReleaseRequest(
+    version,
+    file.FileName,
+    await ComputeSha256Async(file, request.HttpContext.RequestAborted),
+    file.Length,
+    form["notes"].ToString()
+  ));
   return Results.Ok(release);
 });
 
@@ -280,6 +280,13 @@ static async Task<IResult> LocalFileAsync(HttpContext context, string path)
   await stream.CopyToAsync(context.Response.Body, context.RequestAborted);
 
   return Results.Empty;
+}
+
+static async Task<string> ComputeSha256Async(IFormFile file, CancellationToken cancellationToken)
+{
+  await using var stream = file.OpenReadStream();
+  var hash = await System.Security.Cryptography.SHA256.HashDataAsync(stream, cancellationToken);
+  return Convert.ToHexString(hash).ToLowerInvariant();
 }
 
 static async Task EnsureAdminTablesAsync(DbConnection connection, IWebHostEnvironment env)
