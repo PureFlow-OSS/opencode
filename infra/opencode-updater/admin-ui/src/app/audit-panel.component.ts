@@ -1,4 +1,5 @@
 import { Component, inject } from "@angular/core"
+import { injectMutation, injectQuery } from "@tanstack/angular-query-experimental"
 import { ApiService } from "./api.service"
 
 type ReleaseRecord = {
@@ -28,11 +29,11 @@ type AuditRecord = {
       <p>Promote only after 50% positive beta feedback. Normal channel can be stopped here.</p>
       <div class="controls">
         <button type="button" class="secondary" (click)="refresh()">Refresh</button>
-        <button type="button" class="secondary" (click)="stopNormal()" [disabled]="normalStopped">Stop normal</button>
-        <button type="button" class="secondary" (click)="clearNormal()" [disabled]="!normalStopped">Clear stop</button>
+        <button type="button" class="secondary" (click)="stopNormal()" [disabled]="statusQuery.data()?.normalStopped">Stop normal</button>
+        <button type="button" class="secondary" (click)="clearNormal()" [disabled]="!statusQuery.data()?.normalStopped">Clear stop</button>
       </div>
       <div class="list">
-        @for (release of releases; track release.id) {
+        @for (release of statusQuery.data()?.releases ?? []; track release.id) {
           <section class="item">
             <div class="item-top">
               <strong>{{ release.version }}</strong>
@@ -57,7 +58,7 @@ type AuditRecord = {
       </div>
       <h3>Audit trail</h3>
       <div class="list">
-        @for (event of audit; track event.id) {
+        @for (event of auditQuery.data() ?? []; track event.id) {
           <section class="item">
             <div class="item-top">
               <strong>{{ event.action }}</strong>
@@ -73,24 +74,31 @@ type AuditRecord = {
 })
 export class AuditPanelComponent {
   readonly api = inject(ApiService)
-  releases: ReleaseRecord[] = []
-  audit: AuditRecord[] = []
-  normalStopped = false
+  readonly statusQuery = injectQuery(() => ({
+    queryKey: ["release-status"],
+    queryFn: () => this.api.listReleaseStatus(),
+  }))
+  readonly auditQuery = injectQuery(() => ({
+    queryKey: ["audit-trail"],
+    queryFn: () => this.api.listAudit(),
+  }))
+  readonly promoteMutation = injectMutation(() => ({
+    mutationFn: (id: string) => this.api.promoteRelease(id),
+  }))
+  readonly stopMutation = injectMutation(() => ({
+    mutationFn: () => this.api.stopNormalChannel(),
+  }))
+  readonly clearMutation = injectMutation(() => ({
+    mutationFn: () => this.api.clearNormalChannel(),
+  }))
 
   constructor() {
     void this.refresh()
   }
 
-  async refresh() {
-    try {
-      const status = await this.api.listReleaseStatus()
-      this.releases = status.releases
-      this.normalStopped = status.normalStopped
-      this.audit = await this.api.listAudit()
-    } catch {
-      this.releases = []
-      this.audit = []
-    }
+  refresh() {
+    void this.statusQuery.refetch()
+    void this.auditQuery.refetch()
   }
 
   progress(release: ReleaseRecord) {
@@ -99,14 +107,14 @@ export class AuditPanelComponent {
   }
 
   promote(id: string) {
-    void this.api.promoteRelease(id).then(() => this.refresh())
+    void this.promoteMutation.mutateAsync(id).then(() => this.statusQuery.refetch())
   }
 
   stopNormal() {
-    void this.api.stopNormalChannel().then(() => this.refresh())
+    void this.stopMutation.mutateAsync().then(() => this.statusQuery.refetch())
   }
 
   clearNormal() {
-    void this.api.clearNormalChannel().then(() => this.refresh())
+    void this.clearMutation.mutateAsync().then(() => this.statusQuery.refetch())
   }
 }

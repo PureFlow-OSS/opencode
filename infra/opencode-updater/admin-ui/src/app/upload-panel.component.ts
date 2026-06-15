@@ -1,4 +1,5 @@
-import { Component, inject } from "@angular/core"
+import { Component, effect, inject } from "@angular/core"
+import { injectMutation, injectQuery } from "@tanstack/angular-query-experimental"
 import { ApiService } from "./api.service"
 
 type ReleaseRecord = {
@@ -24,13 +25,13 @@ type ReleaseRecord = {
       <div class="status-row">
         <section class="status-box">
           <span>Beta Channel</span>
-          <strong>{{ betaVersion || 'none' }}</strong>
-          <small>{{ betaNotes || 'no beta release yet' }}</small>
+          <strong>{{ betaVersionText }}</strong>
+          <small>{{ betaNotesText }}</small>
         </section>
         <section class="status-box">
           <span>Normal Channel</span>
-          <strong>{{ normalVersion || 'none' }}</strong>
-          <small>{{ normalStopped ? 'stopped' : 'active' }}</small>
+          <strong>{{ normalVersionText }}</strong>
+          <small>{{ normalStateText }}</small>
         </section>
         <section class="status-box">
           <span>Beta testers</span>
@@ -55,33 +56,44 @@ type ReleaseRecord = {
 })
 export class UploadPanelComponent {
   readonly api = inject(ApiService)
-  betaVersion = ""
-  betaNotes = ""
-  normalVersion = ""
-  normalStopped = false
-  betaUserCount = 0
-  betaPositiveThreshold = 0
+  readonly statusQuery = injectQuery(() => ({
+    queryKey: ["release-status"],
+    queryFn: () => this.api.listReleaseStatus(),
+  }))
+  readonly uploadMutation = injectMutation(() => ({
+    mutationFn: (payload: { archive: File; notes?: string }) => this.api.uploadRelease(payload),
+  }))
   statusText = ""
   statusError = ""
 
   constructor() {
-    void this.refresh()
+    effect(() => {
+      if (this.statusQuery.isError()) this.statusText = "Status unavailable"
+    })
   }
 
-  async refresh() {
-    try {
-      const status = await this.api.listReleaseStatus()
-      this.normalStopped = status.normalStopped
-      this.betaUserCount = status.betaUserCount
-      this.betaPositiveThreshold = status.betaPositiveThreshold
-      const beta = status.releases.find((release) => release.channel === "beta")
-      const normal = status.releases.find((release) => release.channel === "normal")
-      this.betaVersion = beta?.version ?? ""
-      this.betaNotes = beta?.notes ?? ""
-      this.normalVersion = normal?.version ?? ""
-    } catch {
-      this.statusText = "Status unavailable"
-    }
+  get betaVersionText() {
+    return this.statusQuery.data()?.betaRelease?.version || "No beta release yet"
+  }
+
+  get betaNotesText() {
+    return this.statusQuery.data()?.betaRelease?.notes || "Waiting for first beta ZIP"
+  }
+
+  get normalVersionText() {
+    return this.statusQuery.data()?.normalRelease?.version || "No normal release yet"
+  }
+
+  get normalStateText() {
+    return this.statusQuery.data()?.normalStopped ? "Delivery stopped" : "Delivery active"
+  }
+
+  get betaUserCount() {
+    return this.statusQuery.data()?.betaUserCount ?? 0
+  }
+
+  get betaPositiveThreshold() {
+    return this.statusQuery.data()?.betaPositiveThreshold ?? 0
   }
 
   submit(event: SubmitEvent) {
@@ -91,18 +103,21 @@ export class UploadPanelComponent {
     if (!archive.files?.[0]) return
     this.statusText = "Uploading..."
     this.statusError = ""
-    void this.api
-      .uploadRelease({
+    this.uploadMutation.mutate(
+      {
         archive: archive.files[0],
         notes: (form.elements.namedItem("notes") as HTMLTextAreaElement).value,
-      })
-      .then((release) => {
-        this.statusText = `Uploaded ${release.version}`
-        void this.refresh()
-      })
-      .catch((error: Error) => {
-        this.statusError = error.message
-        this.statusText = "Upload failed"
-      })
+      },
+      {
+        onSuccess: (release) => {
+          this.statusText = `Uploaded ${release.version}`
+          void this.statusQuery.refetch()
+        },
+        onError: (error) => {
+          this.statusError = error instanceof Error ? error.message : String(error)
+          this.statusText = "Upload failed"
+        },
+      },
+    )
   }
 }

@@ -1,4 +1,5 @@
 import { Component, Input, inject } from "@angular/core"
+import { injectQuery } from "@tanstack/angular-query-experimental"
 import { ApiService } from "./api.service"
 
 type FeedbackRecord = {
@@ -44,7 +45,10 @@ type FeedbackRecord = {
 export class FeedbackPanelComponent {
   readonly api = inject(ApiService)
   @Input() mode: "beta" | "inbox" = "inbox"
-  feedback: FeedbackRecord[] = []
+  readonly feedbackQuery = injectQuery(() => ({
+    queryKey: ["feedback-inbox"],
+    queryFn: () => this.api.listFeedback(),
+  }))
 
   readonly demoFeedback: FeedbackRecord[] = [
     {
@@ -77,19 +81,16 @@ export class FeedbackPanelComponent {
   ]
 
   constructor() {
-    void this.refresh()
+    void this.feedbackQuery.refetch()
   }
 
   get visibleFeedback() {
-    const source = this.feedback.length > 0 ? this.feedback : this.demoFeedback
+    const current = this.feedbackQuery.data()
+    const source = current && current.length > 0 ? current : this.demoFeedback
     return this.mode === "beta" ? source.filter((item) => item.channel === "beta") : source.filter((item) => item.channel === "general")
   }
 
-  async refresh() {
-    try {
-      this.feedback = await this.api.listFeedback()
-    } catch {
-      this.feedback = []
-    }
+  refresh() {
+    void this.feedbackQuery.refetch()
   }
 }
