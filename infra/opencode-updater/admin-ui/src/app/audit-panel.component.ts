@@ -11,6 +11,7 @@ type ReleaseRecord = {
 
 type AuditRecord = {
   id: string
+  feedbackId: string
   actor: string
   action: string
   details: string
@@ -22,27 +23,40 @@ type AuditRecord = {
   standalone: true,
   template: `
     <article class="card">
-      <h2>Promotion & Audit</h2>
-      <p>Review release health and the full feedback trail.</p>
-      <button type="button" (click)="refresh()">Refresh</button>
+      <h2>Promotion Control</h2>
+      <p>Release health and audit trail. Promotion is only enabled when the 50% bar is met.</p>
+      <button type="button" class="secondary" (click)="refresh()">Refresh</button>
       <div class="list">
         @for (release of releases; track release.id) {
           <section class="item">
-            <strong>{{ release.version }}</strong>
-            <span>{{ release.channel }}</span>
-            <p>{{ release.positiveCount }}/{{ release.totalCount }} positive</p>
-            <button type="button" [disabled]="release.channel === 'normal' || release.totalCount === 0 || release.positiveCount * 2 < release.totalCount" (click)="promote(release.id)">
-              Promote
+            <div class="item-top">
+              <strong>{{ release.version }}</strong>
+              <span>{{ release.channel }}</span>
+            </div>
+            <p>{{ release.positiveCount }}/{{ release.totalCount }} positive beta feedback</p>
+            <div class="progress">
+              <span [style.width.%]="progress(release)"></span>
+            </div>
+            <button
+              type="button"
+              [disabled]="release.channel === 'normal' || release.totalCount === 0 || release.positiveCount * 2 < release.totalCount"
+              (click)="promote(release.id)"
+            >
+              Promote to normal
             </button>
           </section>
         }
       </div>
+      <h3>Audit trail</h3>
       <div class="list">
         @for (event of audit; track event.id) {
           <section class="item">
-            <strong>{{ event.action }}</strong>
+            <div class="item-top">
+              <strong>{{ event.action }}</strong>
+              <span>{{ event.createdAt }}</span>
+            </div>
             <p>{{ event.details }}</p>
-            <small>{{ event.actor }} · {{ event.createdAt }}</small>
+            <small>{{ event.actor }} · {{ event.feedbackId }}</small>
           </section>
         }
       </div>
@@ -61,6 +75,11 @@ export class AuditPanelComponent {
   async refresh() {
     this.releases = await this.api.listReleases()
     this.audit = await this.api.listAudit()
+  }
+
+  progress(release: ReleaseRecord) {
+    if (release.totalCount === 0) return 0
+    return Math.min(100, (release.positiveCount / release.totalCount) * 100)
   }
 
   promote(id: string) {

@@ -1,11 +1,36 @@
 <main class="shell">
-  <header class="hero">
-    <p class="eyebrow">OpenCode Updater</p>
-    <h1>Admin UI</h1>
-    <p class="lede">
-      Upload beta ZIPs, promote releases after the 50% threshold, and review feedback and audit history.
-    </p>
-  </header>
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">OpenCode Updater</p>
+      <h1>Release Console</h1>
+      <p class="lede">
+        Upload beta ZIPs, watch the 50% promotion threshold, and audit feedback without writing into the inbox here.
+      </p>
+      <div class="pill-row">
+        <span class="pill">ZIP upload</span>
+        <span class="pill">Beta only</span>
+        <span class="pill">Audit trail</span>
+        <span class="pill">Read-only inbox</span>
+      </div>
+    </div>
+    <div class="hero-metrics">
+      <div class="metric">
+        <span class="metric-label">Flow</span>
+        <strong>Beta upload</strong>
+        <span>ZIP only</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Promotion</span>
+        <strong>50%+</strong>
+        <span>positive beta</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Feedback</span>
+        <strong>OpenCode UI</strong>
+        <span>read-only here</span>
+      </div>
+    </div>
+  </section>
 
   <section class="grid">
     <app-upload-panel />

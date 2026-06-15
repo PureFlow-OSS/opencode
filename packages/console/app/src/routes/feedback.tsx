@@ -9,6 +9,7 @@ const submitFeedback = action(async (form: FormData) => {
   const userEmail = String(form.get("userEmail") ?? "").trim()
   const message = String(form.get("message") ?? "").trim()
   const rating = String(form.get("rating") ?? "neutral")
+  const channel = String(form.get("channel") ?? "general")
 
   if (!message) throw new Error("Message is required")
 
@@ -16,7 +17,7 @@ const submitFeedback = action(async (form: FormData) => {
     const feedbackID = crypto.randomUUID()
     await db.insert(UpdaterFeedbackTable).values({
       id: feedbackID,
-      channel: "general",
+      channel: channel === "beta" ? "beta" : "general",
       userName: userName || undefined,
       userEmail: userEmail || undefined,
       rating: rating === "positive" || rating === "negative" ? rating : "neutral",
@@ -27,7 +28,7 @@ const submitFeedback = action(async (form: FormData) => {
       feedbackID,
       actor: userEmail || userName || "anonymous",
       action: "created",
-      details: JSON.stringify({ channel: "general", rating, message }),
+      details: JSON.stringify({ channel: channel === "beta" ? "beta" : "general", rating, message }),
     })
   })
 })
@@ -38,8 +39,12 @@ export default function Feedback() {
       <Title>OpenCode Feedback</Title>
       <section data-card>
         <h1>Feedback senden</h1>
-        <p>Normal user feedback for the team review queue.</p>
+        <p>Send general or beta feedback directly from OpenCode.</p>
         <form action={submitFeedback}>
+          <select name="channel">
+            <option value="general">general</option>
+            <option value="beta">beta</option>
+          </select>
           <input name="userName" placeholder="Name" />
           <input name="userEmail" placeholder="Email" />
           <select name="rating">
