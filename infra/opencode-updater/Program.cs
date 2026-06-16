@@ -1219,7 +1219,7 @@ sealed class UpdaterChannelStateStore(IWebHostEnvironment env)
   }
 }
 
-sealed class FeedbackKeyResolver(IMemoryCache cache)
+sealed class FeedbackKeyResolver(IMemoryCache cache, ILogger<FeedbackKeyResolver> logger)
 {
   public async Task<string> ResolveBetaUserNameAsync(string key, UpdaterBetaOptions beta, IHttpClientFactory clientFactory, CancellationToken cancellationToken)
   {
@@ -1231,12 +1231,14 @@ sealed class FeedbackKeyResolver(IMemoryCache cache)
 
     using var request = new HttpRequestMessage(HttpMethod.Get, BuildLiteLLMKeyInfoUrl(beta, key));
     request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ResolveLiteLLMApiKey(beta, key));
+    logger.LogDebug("beta username lookup request {Url}", request.RequestUri);
 
     try
     {
       using var response = await clientFactory.CreateClient().SendAsync(request, cancellationToken);
       if (!response.IsSuccessStatusCode)
       {
+        logger.LogWarning("beta username lookup failed {StatusCode} {Url}", response.StatusCode, request.RequestUri);
         cache.Set(cacheKey, "", TimeSpan.FromMinutes(5));
         return string.Empty;
       }
@@ -1244,12 +1246,14 @@ sealed class FeedbackKeyResolver(IMemoryCache cache)
       await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
       using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
       var name = ExtractBetaUserName(document.RootElement, beta);
+      logger.LogDebug("beta username lookup result {UserName} {Url}", name ?? "", request.RequestUri);
 
       cache.Set(cacheKey, name ?? "", TimeSpan.FromMinutes(10));
       return name ?? string.Empty;
     }
-    catch
+    catch (Exception error)
     {
+      logger.LogWarning(error, "beta username lookup error {Url}", request.RequestUri);
       cache.Set(cacheKey, "", TimeSpan.FromMinutes(2));
       return string.Empty;
     }
@@ -1262,21 +1266,29 @@ sealed class FeedbackKeyResolver(IMemoryCache cache)
 
     using var request = new HttpRequestMessage(HttpMethod.Get, BuildLiteLLMKeyInfoUrl(beta, key));
     request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ResolveLiteLLMApiKey(beta, key));
+    logger.LogDebug("beta membership lookup request {Url}", request.RequestUri);
 
     try
     {
       using var response = await clientFactory.CreateClient().SendAsync(request, cancellationToken);
       if (!response.IsSuccessStatusCode)
+      {
+        logger.LogWarning("beta membership lookup failed {StatusCode} {Url}", response.StatusCode, request.RequestUri);
         return false;
+      }
 
       await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
       using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
       var groups = ExtractStrings(document.RootElement, "groups");
       var users = ExtractStrings(document.RootElement, "users");
-      return MatchesGroups(beta, groups) || MatchesUsers(beta, users);
+      var userName = ExtractBetaUserName(document.RootElement, beta);
+      var match = MatchesGroups(beta, groups) || MatchesUsers(beta, users) || MatchesAlias(beta, userName);
+      logger.LogDebug("beta membership lookup result {Match} {UserName} {Url}", match, userName ?? "", request.RequestUri);
+      return match;
     }
-    catch
+    catch (Exception error)
     {
+      logger.LogWarning(error, "beta membership lookup error {Url}", request.RequestUri);
       return false;
     }
   }
@@ -1371,5 +1383,11 @@ sealed class FeedbackKeyResolver(IMemoryCache cache)
   static bool MatchesUsers(UpdaterBetaOptions beta, HashSet<string> users)
   {
     return beta.Users.Any((user) => !string.IsNullOrWhiteSpace(user) && users.Contains(user.Trim()));
+  }
+
+  static bool MatchesAlias(UpdaterBetaOptions beta, string? userName)
+  {
+    if (string.IsNullOrWhiteSpace(userName)) return false;
+    return beta.Users.Any((user) => string.Equals(user.Trim(), userName.Trim(), StringComparison.OrdinalIgnoreCase));
   }
 }
