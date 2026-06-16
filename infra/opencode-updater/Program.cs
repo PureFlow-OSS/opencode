@@ -123,8 +123,7 @@ app.MapPost("/opencode/feedback", async (
 
 app.MapGet("/opencode/feedback", async (FeedbackContext db) =>
 {
-  var items = await db.Feedbacks
-    .OrderByDescending(f => f.CreatedAt)
+  var items = (await db.Feedbacks
     .Select(f => new
     {
       id = f.Id,
@@ -136,7 +135,9 @@ app.MapGet("/opencode/feedback", async (FeedbackContext db) =>
       attachments = f.AttachmentsJson,
       created_at = f.CreatedAt,
     })
-    .ToListAsync();
+    .ToListAsync())
+    .OrderByDescending((item) => item.created_at)
+    .ToList();
 
   return Results.Json(items);
 });
@@ -1221,6 +1222,8 @@ sealed class UpdaterChannelStateStore(IWebHostEnvironment env)
 
 sealed class FeedbackKeyResolver(IMemoryCache cache, ILogger<FeedbackKeyResolver> logger)
 {
+  const string LiteLLMApiKeyHeader = "x-litellm-api-key";
+
   public async Task<string> ResolveBetaUserNameAsync(string key, UpdaterBetaOptions beta, IHttpClientFactory clientFactory, CancellationToken cancellationToken)
   {
     var cacheKey = $"username:{ComputeHash(key)}";
@@ -1230,7 +1233,7 @@ sealed class FeedbackKeyResolver(IMemoryCache cache, ILogger<FeedbackKeyResolver
       return string.Empty;
 
     using var request = new HttpRequestMessage(HttpMethod.Get, BuildLiteLLMKeyInfoUrl(beta, key));
-    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ResolveLiteLLMApiKey(beta, key));
+    request.Headers.TryAddWithoutValidation(LiteLLMApiKeyHeader, ResolveLiteLLMApiKey(beta, key));
     logger.LogDebug("beta username lookup request {Url}", request.RequestUri);
 
     try
@@ -1265,7 +1268,7 @@ sealed class FeedbackKeyResolver(IMemoryCache cache, ILogger<FeedbackKeyResolver
       return false;
 
     using var request = new HttpRequestMessage(HttpMethod.Get, BuildLiteLLMKeyInfoUrl(beta, key));
-    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ResolveLiteLLMApiKey(beta, key));
+    request.Headers.TryAddWithoutValidation(LiteLLMApiKeyHeader, ResolveLiteLLMApiKey(beta, key));
     logger.LogDebug("beta membership lookup request {Url}", request.RequestUri);
 
     try

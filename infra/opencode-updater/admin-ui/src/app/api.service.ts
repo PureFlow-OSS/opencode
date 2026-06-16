@@ -83,7 +83,7 @@ export class ApiService {
   }
 
   async listFeedback() {
-    return this.readJson<FeedbackRecord[]>(await fetch("/opencode/admin/feedback"))
+    return this.readJson<FeedbackRecord[]>(await fetch("/opencode/feedback"))
   }
 
   async createFeedback(payload: { channel: string; releaseId?: string; userName?: string; userEmail?: string; rating: string; message: string }) {
