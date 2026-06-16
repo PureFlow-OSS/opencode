@@ -21,22 +21,22 @@ type ReleaseRecord = {
   template: `
     <article class="card">
       <h2>Beta Upload</h2>
-      <p>Upload ZIP into beta. Version comes from <code>latest.yml</code>.</p>
+      <p>Upload a ZIP into the beta feed. The version is read from <code>latest.yml</code> inside the archive.</p>
       <div class="status-row">
         <section class="status-box">
           <span>Beta Channel</span>
-          <strong>{{ betaVersionText }}</strong>
-          <small>{{ betaNotesText }}</small>
+          <strong>{{ betaFeedVersion }}</strong>
+          <small>{{ betaReleaseLabel }}</small>
         </section>
         <section class="status-box">
           <span>Normal Channel</span>
-          <strong>{{ normalVersionText }}</strong>
+          <strong>{{ normalFeedVersion }}</strong>
           <small>{{ normalStateText }}</small>
         </section>
         <section class="status-box">
           <span>Beta testers</span>
           <strong>{{ betaUserCount }}</strong>
-          <small>{{ betaPositiveThreshold }} positive approvals needed</small>
+          <small>{{ betaPositiveThreshold }} positive approvals required</small>
         </section>
       </div>
       <form class="form" (submit)="submit($event)">
@@ -84,17 +84,17 @@ export class UploadPanelComponent {
     return this.status?.normalRelease ?? [...(this.status?.releases ?? [])].reverse().find((release) => release.channel === "normal")
   }
 
-  get betaVersionText() {
-    return this.betaRelease?.version || "No beta release yet"
+  get betaFeedVersion() {
+    return this.status?.betaFeedVersion || this.betaRelease?.version || "No beta release yet"
   }
 
-  get betaNotesText() {
+  get betaReleaseLabel() {
     if (!this.betaRelease) return "Waiting for first beta ZIP"
-    return this.betaRelease.notes || "No notes yet"
+    return this.betaRelease.notes || "No notes provided"
   }
 
-  get normalVersionText() {
-    return this.normalRelease?.version || "No normal release yet"
+  get normalFeedVersion() {
+    return this.status?.normalFeedVersion || this.normalRelease?.version || "No normal release yet"
   }
 
   get normalStateText() {
@@ -124,7 +124,7 @@ export class UploadPanelComponent {
       },
       {
         onSuccess: (release) => {
-          this.statusText = `Uploaded ${release.version}`
+          this.statusText = `Uploaded ${release.version} to beta feed`
           void this.statusQuery.refetch()
         },
         onError: (error) => {

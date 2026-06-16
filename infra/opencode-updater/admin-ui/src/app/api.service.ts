@@ -42,6 +42,8 @@ type ReleaseStatus = {
   betaPositiveThreshold: number
   betaRelease?: ReleaseRecord | null
   normalRelease?: ReleaseRecord | null
+  betaFeedVersion?: string | null
+  normalFeedVersion?: string | null
 }
 
 @Injectable({ providedIn: "root" })

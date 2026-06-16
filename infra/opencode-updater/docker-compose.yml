@@ -4,8 +4,6 @@ services:
     ports:
       - "80:8080"
     restart: unless-stopped
-    volumes:
-      - feedback-data:/app/data
 
   opencode-updater-admin-ui:
     build:
@@ -15,6 +13,3 @@ services:
     restart: unless-stopped
     depends_on:
       - opencode-updater
-
-volumes:
-  feedback-data:

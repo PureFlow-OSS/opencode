@@ -21,13 +21,25 @@ type FeedbackRecord = {
       <h2>{{ mode === 'beta' ? 'Beta Feedback Inbox' : 'Feedback Inbox' }}</h2>
       <p>
         @if (mode === 'beta') {
-          Beta feedback. Positive items can later move into normal channel.
+          Live beta feedback from OpenCode. Positive items can later move into normal channel.
         } @else {
-          General inbox. Demo entries show how reviews look before live feedback arrives.
+          General inbox. Live feedback from OpenCode lands here.
         }
       </p>
       <button type="button" class="secondary" (click)="refresh()">Refresh inbox</button>
       <div class="list">
+        @if (visibleFeedback.length === 0) {
+          <section class="item empty">
+            <strong>No feedback yet</strong>
+            <p>
+              @if (mode === 'beta') {
+                Beta testers have not submitted any feedback yet.
+              } @else {
+                OpenCode has not sent any general feedback yet.
+              }
+            </p>
+          </section>
+        }
         @for (item of visibleFeedback; track item.id) {
           <section class="item">
             <div class="item-top">
@@ -50,44 +62,13 @@ export class FeedbackPanelComponent {
     queryFn: () => this.api.listFeedback(),
   }))
 
-  readonly demoFeedback: FeedbackRecord[] = [
-    {
-      id: "demo-1",
-      channel: "general",
-      userName: "Mara",
-      userEmail: "mara@test.local",
-      rating: "positive",
-      message: "Search feels faster. Please keep the new command palette behavior.",
-      createdAt: "demo",
-    },
-    {
-      id: "demo-2",
-      channel: "general",
-      userName: "Jonas",
-      userEmail: "jonas@test.local",
-      rating: "neutral",
-      message: "Would love a clearer error state when upload is empty.",
-      createdAt: "demo",
-    },
-    {
-      id: "demo-3",
-      channel: "beta",
-      userName: "Tina",
-      userEmail: "tina@test.local",
-      rating: "positive",
-      message: "Beta build starts clean. Please test changelog link and restart flow.",
-      createdAt: "demo",
-    },
-  ]
-
   constructor() {
     void this.feedbackQuery.refetch()
   }
 
   get visibleFeedback() {
-    const current = this.feedbackQuery.data()
-    const source = current && current.length > 0 ? current : this.demoFeedback
-    return this.mode === "beta" ? source.filter((item) => item.channel === "beta") : source.filter((item) => item.channel === "general")
+    const current = this.feedbackQuery.data() ?? []
+    return this.mode === "beta" ? current.filter((item) => item.channel === "beta") : current.filter((item) => item.channel === "general")
   }
 
   refresh() {

@@ -10,6 +10,7 @@ node_modules
 playground
 tmp
 dist
+dist-v35.5/
 ts-dist
 .turbo
 **/.serena
@@ -39,5 +40,8 @@ infra/opencode-updater/feed/*
 !infra/opencode-updater/feed/latest.example.yml
 infra/opencode-updater/bin/
 infra/opencode-updater/obj/
+packages/desktop-electron/updater-helper/bin/
+packages/desktop-electron/updater-helper/obj/
+infra/opencode-updater/admin-ui/.angular/
 packages/desktop-electron/dist-localhost*/
 packages/desktop/src-tauri/*.generated.conf.json

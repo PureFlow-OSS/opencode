@@ -101,7 +101,7 @@ app.MapPost("/opencode/feedback", async (
 
   if (!string.IsNullOrWhiteSpace(key))
   {
-    userName = await keyResolver.ResolveUserNameAsync(key, betaOptions.Value, clientFactory, request.HttpContext.RequestAborted);
+    userName = await keyResolver.ResolveBetaUserNameAsync(key, betaOptions.Value, clientFactory, request.HttpContext.RequestAborted);
   }
 
   var entry = new FeedbackEntry
@@ -146,6 +146,7 @@ app.MapGet("/opencode/admin/releases", async (UpdaterAdminStore store) => Result
 app.MapGet("/opencode/admin/releases/status", async (
   UpdaterAdminStore store,
   UpdaterChannelStateStore channelState,
+  LocalFeed feed,
   IOptions<UpdaterBetaOptions> betaOptions
 ) =>
 {
@@ -158,6 +159,8 @@ app.MapGet("/opencode/admin/releases/status", async (
     betaPositiveThreshold = (int)Math.Ceiling(betaOptions.Value.Users.Length / 2.0),
     betaRelease = releases.FirstOrDefault((release) => release.Channel == "beta"),
     normalRelease = releases.FirstOrDefault((release) => release.Channel == "normal"),
+    betaFeedVersion = feed.TryReadVersionFromLatestYml(true),
+    normalFeedVersion = feed.TryReadVersionFromLatestYml(false),
   });
 });
 
@@ -178,7 +181,7 @@ app.MapGet("/opencode/admin/beta/status", async (
       betaPositiveThreshold = (int)Math.Ceiling(betaOptions.Value.Users.Length / 2.0),
     });
 
-  var userName = await keyResolver.ResolveUserNameAsync(key, betaOptions.Value, clientFactory, request.HttpContext.RequestAborted);
+  var userName = await keyResolver.ResolveBetaUserNameAsync(key, betaOptions.Value, clientFactory, request.HttpContext.RequestAborted);
   var betaTester = await keyResolver.IsBetaMemberAsync(key, betaOptions.Value, clientFactory, request.HttpContext.RequestAborted);
   return Results.Json(new
   {
@@ -206,6 +209,20 @@ app.MapPost("/opencode/admin/releases/upload", async (
   if (string.IsNullOrWhiteSpace(version))
     return Results.BadRequest(new { error = "latest.yml with a version field is required inside the ZIP" });
 
+  var feedRoot = Path.Combine(request.HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath, "feed", "beta");
+  Directory.CreateDirectory(feedRoot);
+  CleanDirectory(feedRoot, preserve: ["_archives"]);
+  Directory.CreateDirectory(Path.Combine(feedRoot, "_archives"));
+  var zipName = Path.GetFileName(file.FileName);
+  var zipPath = Path.Combine(feedRoot, "_archives", zipName);
+  await using (var source = file.OpenReadStream())
+  await using (var destination = File.Create(zipPath))
+  {
+    await source.CopyToAsync(destination, request.HttpContext.RequestAborted);
+  }
+
+  await ExtractZipToDirectoryAsync(zipPath, feedRoot, request.HttpContext.RequestAborted);
+
   var release = await store.UploadReleaseAsync(new UploadReleaseRequest(
     version,
     file.FileName,
@@ -219,11 +236,16 @@ app.MapPost("/opencode/admin/releases/upload", async (
 app.MapPost("/opencode/admin/releases/{id}/promote", async (
   string id,
   UpdaterAdminStore store,
+  LocalFeed feed,
   HttpRequest request
 ) =>
 {
   var promoted = await store.PromoteReleaseAsync(id, request.HttpContext.RequestAborted);
-  return promoted is null ? Results.NotFound() : Results.Ok(promoted);
+  if (promoted is null) return Results.NotFound();
+
+  CopyDirectory(Path.Combine(request.HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath, "feed", "beta"),
+    Path.Combine(request.HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath, "feed"));
+  return Results.Ok(promoted);
 });
 
 app.MapPost("/opencode/admin/releases/normal/stop", async (UpdaterChannelStateStore channelState) =>
@@ -371,6 +393,67 @@ static async Task<string?> ReadVersionFromLatestYmlAsync(IFormFile file, Cancell
   var content = await reader.ReadToEndAsync(cancellationToken);
   var match = Regex.Match(content, @"(?m)^\s*version:\s*[""']?(?<version>[^""'\r\n#]+)");
   return match.Success ? match.Groups["version"].Value.Trim() : null;
+}
+
+static async Task ExtractZipToDirectoryAsync(string zipPath, string targetDirectory, CancellationToken cancellationToken)
+{
+  using var archive = ZipFile.OpenRead(zipPath);
+  foreach (var entry in archive.Entries)
+  {
+    if (string.IsNullOrWhiteSpace(entry.FullName)) continue;
+    var outputPath = Path.GetFullPath(Path.Combine(targetDirectory, entry.FullName));
+    if (!outputPath.StartsWith(Path.GetFullPath(targetDirectory), StringComparison.OrdinalIgnoreCase))
+      continue;
+
+    if (string.IsNullOrEmpty(entry.Name))
+    {
+      Directory.CreateDirectory(outputPath);
+      continue;
+    }
+
+    Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+    await using var input = entry.Open();
+    await using var output = File.Create(outputPath);
+    await input.CopyToAsync(output, cancellationToken);
+  }
+}
+
+static void CleanDirectory(string directory, string[]? preserve = null)
+{
+  var preserveSet = new HashSet<string>(preserve ?? [], StringComparer.OrdinalIgnoreCase);
+  foreach (var path in Directory.EnumerateFileSystemEntries(directory))
+  {
+    var name = Path.GetFileName(path);
+    if (preserveSet.Contains(name)) continue;
+    if (Directory.Exists(path))
+    {
+      Directory.Delete(path, true);
+      continue;
+    }
+
+    File.Delete(path);
+  }
+}
+
+static void CopyDirectory(string sourceDirectory, string targetDirectory)
+{
+  Directory.CreateDirectory(targetDirectory);
+  foreach (var sourcePath in Directory.EnumerateFileSystemEntries(sourceDirectory, "*", SearchOption.AllDirectories))
+  {
+    var relative = Path.GetRelativePath(sourceDirectory, sourcePath);
+    if (relative.StartsWith("..", StringComparison.Ordinal) || relative.Contains($"{Path.DirectorySeparatorChar}_archives{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+      continue;
+
+    var targetPath = Path.Combine(targetDirectory, relative);
+    if (Directory.Exists(sourcePath))
+    {
+      Directory.CreateDirectory(targetPath);
+      continue;
+    }
+
+    Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+    File.Copy(sourcePath, targetPath, true);
+  }
 }
 
 static async Task EnsureAdminTablesAsync(DbConnection connection, IWebHostEnvironment env)
@@ -1105,7 +1188,7 @@ sealed class UpdaterChannelStateStore(IWebHostEnvironment env)
 
 sealed class FeedbackKeyResolver(IMemoryCache cache)
 {
-  public async Task<string> ResolveUserNameAsync(string key, UpdaterBetaOptions beta, IHttpClientFactory clientFactory, CancellationToken cancellationToken)
+  public async Task<string> ResolveBetaUserNameAsync(string key, UpdaterBetaOptions beta, IHttpClientFactory clientFactory, CancellationToken cancellationToken)
   {
     var cacheKey = $"username:{ComputeHash(key)}";
     if (cache.TryGetValue(cacheKey, out string? cachedName)) return cachedName ?? string.Empty;
@@ -1127,7 +1210,7 @@ sealed class FeedbackKeyResolver(IMemoryCache cache)
 
       await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
       using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-      var name = ExtractUserName(document.RootElement);
+      var name = ExtractBetaUserName(document.RootElement, beta);
 
       cache.Set(cacheKey, name ?? "", TimeSpan.FromMinutes(10));
       return name ?? string.Empty;
@@ -1165,9 +1248,25 @@ sealed class FeedbackKeyResolver(IMemoryCache cache)
     }
   }
 
-  static string? ExtractUserName(JsonElement element)
+  static string? ExtractBetaUserName(JsonElement element, UpdaterBetaOptions beta)
   {
     if (element.ValueKind != JsonValueKind.Object) return null;
+
+    var users = ExtractStrings(element, "users");
+    foreach (var user in beta.Users)
+    {
+      if (string.IsNullOrWhiteSpace(user)) continue;
+      var match = user.Trim();
+      if (users.Contains(match)) return match;
+    }
+
+    var groups = ExtractStrings(element, "groups");
+    foreach (var group in beta.Groups)
+    {
+      if (string.IsNullOrWhiteSpace(group)) continue;
+      var match = group.Trim();
+      if (groups.Contains(match)) return match;
+    }
 
     foreach (var property in element.EnumerateObject())
     {
@@ -1191,7 +1290,8 @@ sealed class FeedbackKeyResolver(IMemoryCache cache)
 
     foreach (var property in element.EnumerateObject())
     {
-      var name = ExtractUserName(property.Value);
+      if (property.Value.ValueKind != JsonValueKind.Object && property.Value.ValueKind != JsonValueKind.Array) continue;
+      var name = ExtractBetaUserName(property.Value, beta);
       if (!string.IsNullOrEmpty(name)) return name;
     }
 

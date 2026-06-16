@@ -4,7 +4,7 @@
       <p class="eyebrow">OpenCode Updater</p>
       <h1>Admin Console</h1>
       <p class="lede">
-        One screen per job. Upload ZIP, review beta feedback, or inspect inbox and audit trail.
+        One screen per job. Upload ZIP into beta, review beta feedback, or inspect inbox and audit trail.
       </p>
       <nav class="nav">
         <button type="button" [class.active]="page === 'upload'" (click)="show('upload')">ZIP Upload</button>
@@ -25,11 +25,11 @@
       </strong>
       <p>
         @if (page === 'upload') {
-          latest.yml drives version. Notes tell testers what to check.
+          ZIP goes into feed/beta and the version is read from latest.yml.
         } @else if (page === 'beta-feedback') {
-          Beta feedback gets promoted only after 50% positive.
+          Beta feedback is real data from OpenCode and promotion happens after 50% positive.
         } @else {
-          General inbox plus audit trail for team review.
+          General inbox shows live feedback from OpenCode.
         }
       </p>
     </div>
