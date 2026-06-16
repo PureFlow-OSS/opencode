@@ -1010,8 +1010,26 @@ sealed class UpdaterAdminStore(IWebHostEnvironment env)
     await using var connection = await OpenAsync();
     await using var command = connection.CreateCommand();
     command.CommandText = """
-      SELECT Id, Version, Channel, ZipName, ZipSha256, ZipSize, Notes, Promoted, PositiveCount, TotalCount, CreatedAt, PromotedAt
-      FROM UpdaterReleases
+      SELECT
+        r.Id,
+        r.Version,
+        r.Channel,
+        r.ZipName,
+        r.ZipSha256,
+        r.ZipSize,
+        r.Notes,
+        r.Promoted,
+        COALESCE(f.PositiveCount, 0),
+        COALESCE(f.TotalCount, 0),
+        r.CreatedAt,
+        r.PromotedAt
+      FROM UpdaterReleases r
+      LEFT JOIN (
+        SELECT ReleaseId, SUM(CASE WHEN Rating = 'positive' THEN 1 ELSE 0 END) AS PositiveCount, COUNT(*) AS TotalCount
+        FROM UpdaterFeedback
+        WHERE ReleaseId IS NOT NULL
+        GROUP BY ReleaseId
+      ) f ON f.ReleaseId = r.Id
       ORDER BY CreatedAt DESC
       """;
     await using var reader = await command.ExecuteReaderAsync();
@@ -1036,7 +1054,7 @@ sealed class UpdaterAdminStore(IWebHostEnvironment env)
     command.Parameters.AddWithValue("$notes", string.IsNullOrWhiteSpace(body.Notes) ? DBNull.Value : body.Notes.Trim());
     command.Parameters.AddWithValue("$createdAt", DateTimeOffset.UtcNow.ToString("O"));
     await command.ExecuteNonQueryAsync();
-    return (await ListReleasesAsync()).First();
+    return (await ListReleasesAsync()).First((item) => item.Version == body.Version.Trim() && item.Channel == "beta");
   }
 
   public async Task<ReleaseRecord?> PromoteReleaseAsync(string id, CancellationToken cancellationToken)
@@ -1086,6 +1104,7 @@ sealed class UpdaterAdminStore(IWebHostEnvironment env)
   public async Task<FeedbackRecord> CreateFeedbackAsync(CreateFeedbackRequest body)
   {
     await using var connection = await OpenAsync();
+    var releaseId = string.IsNullOrWhiteSpace(body.ReleaseId) ? await GetCurrentBetaReleaseIdAsync(connection) : body.ReleaseId.Trim();
     var id = Guid.NewGuid().ToString("N");
     await using var command = connection.CreateCommand();
     command.CommandText = """
@@ -1094,7 +1113,7 @@ sealed class UpdaterAdminStore(IWebHostEnvironment env)
       """;
     command.Parameters.AddWithValue("$id", id);
     command.Parameters.AddWithValue("$channel", body.Channel?.Trim() == "beta" ? "beta" : "general");
-    command.Parameters.AddWithValue("$releaseId", string.IsNullOrWhiteSpace(body.ReleaseId) ? DBNull.Value : body.ReleaseId.Trim());
+    command.Parameters.AddWithValue("$releaseId", string.IsNullOrWhiteSpace(releaseId) ? DBNull.Value : releaseId);
     command.Parameters.AddWithValue("$userName", string.IsNullOrWhiteSpace(body.UserName) ? DBNull.Value : body.UserName.Trim());
     command.Parameters.AddWithValue("$userEmail", string.IsNullOrWhiteSpace(body.UserEmail) ? DBNull.Value : body.UserEmail.Trim());
     command.Parameters.AddWithValue("$rating", body.Rating?.Trim() is "positive" or "negative" ? body.Rating.Trim() : "neutral");
@@ -1102,6 +1121,20 @@ sealed class UpdaterAdminStore(IWebHostEnvironment env)
     command.Parameters.AddWithValue("$createdAt", DateTimeOffset.UtcNow.ToString("O"));
     await command.ExecuteNonQueryAsync();
     return (await ListFeedbackAsync()).First(item => item.Id == id);
+  }
+
+  async Task<string?> GetCurrentBetaReleaseIdAsync(SqliteConnection connection)
+  {
+    await using var command = connection.CreateCommand();
+    command.CommandText = """
+      SELECT Id
+      FROM UpdaterReleases
+      WHERE Channel = 'beta'
+      ORDER BY CreatedAt DESC
+      LIMIT 1
+      """;
+    var result = await command.ExecuteScalarAsync();
+    return result?.ToString();
   }
 
   public async Task<List<AuditRecord>> ListAuditAsync()
