@@ -46,23 +46,23 @@ type AuditRecord = {
             <div class="progress">
               <span [style.width.%]="progress(release)"></span>
             </div>
-            <button
-              type="button"
-              [disabled]="!canPromote(release)"
-              (click)="promote(release.id)"
-            >
-              Promote to normal
-            </button>
-            @if (!canPromote(release)) {
-              <small>
-                @if (release.channel === 'normal') {
-                  Already in normal channel.
-                } @else if (release.totalCount === 0) {
-                  Waiting for beta feedback.
-                } @else {
-                  Need {{ remainingPositive(release) }} more positive feedback item(s).
-                }
-              </small>
+            @if (release.channel !== 'normal') {
+              <button
+                type="button"
+                [disabled]="!canPromote(release)"
+                (click)="promote(release.id)"
+              >
+                Promote to normal
+              </button>
+              @if (!canPromote(release)) {
+                <small>
+                  @if (release.totalCount === 0) {
+                    Waiting for beta feedback.
+                  } @else {
+                    Need {{ remainingPositive(release) }} more positive feedback item(s).
+                  }
+                </small>
+              }
             }
           </section>
         }
@@ -82,6 +82,7 @@ type AuditRecord = {
       </div>
     </article>
   `,
+  styleUrl: "./audit-panel.component.css",
 })
 export class AuditPanelComponent {
   readonly api = inject(ApiService)

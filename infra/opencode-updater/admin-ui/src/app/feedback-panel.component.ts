@@ -73,6 +73,7 @@ function betaSentiment(text: string) {
       </div>
     </article>
   `,
+  styleUrl: "./feedback-panel.component.css",
 })
 export class FeedbackPanelComponent {
   readonly api = inject(ApiService)

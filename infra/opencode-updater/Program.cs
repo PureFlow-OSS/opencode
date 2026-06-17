@@ -163,17 +163,23 @@ app.MapGet("/opencode/admin/releases/status", async (
 ) =>
 {
   var releases = await store.ListReleasesAsync();
-  var betaRelease = releases.FirstOrDefault((release) => release.Channel == "beta");
-  var feedbackCounts = betaRelease is null ? (0L, 0L) : await GetBetaFeedbackCountsAsync(feedbackDb, betaRelease.Version);
+  var trackedVersion = feed.TryReadVersionFromLatestYml(true) ?? releases.FirstOrDefault()?.Version;
+  var feedbackCounts = string.IsNullOrWhiteSpace(trackedVersion) ? (0L, 0L) : await GetBetaFeedbackCountsAsync(feedbackDb, trackedVersion);
   return Results.Json(new
   {
-    releases = releases.Select((release) => release.Channel == "beta"
+    releases = releases.Select((release) => trackedVersion is not null && string.Equals(release.Version, trackedVersion, StringComparison.OrdinalIgnoreCase)
       ? release with { PositiveCount = feedbackCounts.Item1, TotalCount = feedbackCounts.Item2 }
       : release),
     normalStopped = await channelState.IsNormalStoppedAsync(),
     betaUserCount = betaOptions.Value.Users.Length,
     betaPositiveThreshold = (int)Math.Ceiling(betaOptions.Value.Users.Length / 2.0),
-    betaRelease = betaRelease is null ? null : betaRelease with { PositiveCount = feedbackCounts.Item1, TotalCount = feedbackCounts.Item2 },
+    betaRelease = string.IsNullOrWhiteSpace(trackedVersion)
+      ? null
+      : releases.FirstOrDefault((release) => string.Equals(release.Version, trackedVersion, StringComparison.OrdinalIgnoreCase)) with
+      {
+        PositiveCount = feedbackCounts.Item1,
+        TotalCount = feedbackCounts.Item2,
+      },
     normalRelease = releases.FirstOrDefault((release) => release.Channel == "normal"),
     betaFeedVersion = feed.TryReadVersionFromLatestYml(true),
     normalFeedVersion = feed.TryReadVersionFromLatestYml(false),

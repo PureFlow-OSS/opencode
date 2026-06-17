@@ -1,0 +1,15 @@
+:host {
+  display: block;
+}
+
+.card {
+  min-height: 240px;
+}
+
+.progress {
+  margin-top: 12px;
+}
+
+.item button {
+  margin-top: 8px;
+}

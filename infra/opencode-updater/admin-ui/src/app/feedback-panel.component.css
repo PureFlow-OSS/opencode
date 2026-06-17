@@ -1,0 +1,21 @@
+:host {
+  display: block;
+}
+
+.card {
+  min-height: 240px;
+}
+
+.item.empty {
+  opacity: 0.95;
+}
+
+.item p {
+  margin: 0;
+}
+
+.item small {
+  display: block;
+  margin-top: 10px;
+  color: rgba(242, 244, 248, 0.68);
+}
