@@ -104,10 +104,20 @@ app.MapPost("/opencode/feedback", async (
     userName = await keyResolver.ResolveBetaUserNameAsync(key, betaOptions.Value, clientFactory, request.HttpContext.RequestAborted);
   }
 
+  var category = body.Category?.Trim() ?? "general";
+  if (category == "beta")
+  {
+    var betaMatch = ParseBetaFeedback(body.Text!);
+    if (betaMatch is null)
+      return Results.BadRequest(new { error = "Beta feedback must start with either 'Version erfolgreich getestet' or 'Fehler gefunden'" });
+
+    body.Text = (betaMatch == "positive" ? "Version erfolgreich getestet" : "Fehler gefunden") + "\n" + body.Text!.Trim().Replace("\r\n", "\n");
+  }
+
   var entry = new FeedbackEntry
   {
     Text = body.Text!.Trim(),
-    Category = body.Category?.Trim() ?? "general",
+    Category = category,
     UserName = userName,
     AppVersion = body.AppVersion?.Trim(),
     Platform = body.Platform?.Trim(),
@@ -148,17 +158,22 @@ app.MapGet("/opencode/admin/releases/status", async (
   UpdaterAdminStore store,
   UpdaterChannelStateStore channelState,
   LocalFeed feed,
-  IOptions<UpdaterBetaOptions> betaOptions
+  IOptions<UpdaterBetaOptions> betaOptions,
+  FeedbackContext feedbackDb
 ) =>
 {
   var releases = await store.ListReleasesAsync();
+  var betaRelease = releases.FirstOrDefault((release) => release.Channel == "beta");
+  var feedbackCounts = betaRelease is null ? (0L, 0L) : await GetBetaFeedbackCountsAsync(feedbackDb, betaRelease.Version);
   return Results.Json(new
   {
-    releases,
+    releases = releases.Select((release) => release.Channel == "beta"
+      ? release with { PositiveCount = feedbackCounts.Item1, TotalCount = feedbackCounts.Item2 }
+      : release),
     normalStopped = await channelState.IsNormalStoppedAsync(),
     betaUserCount = betaOptions.Value.Users.Length,
     betaPositiveThreshold = (int)Math.Ceiling(betaOptions.Value.Users.Length / 2.0),
-    betaRelease = releases.FirstOrDefault((release) => release.Channel == "beta"),
+    betaRelease = betaRelease is null ? null : betaRelease with { PositiveCount = feedbackCounts.Item1, TotalCount = feedbackCounts.Item2 },
     normalRelease = releases.FirstOrDefault((release) => release.Channel == "normal"),
     betaFeedVersion = feed.TryReadVersionFromLatestYml(true),
     normalFeedVersion = feed.TryReadVersionFromLatestYml(false),
@@ -238,15 +253,23 @@ app.MapPost("/opencode/admin/releases/{id}/promote", async (
   string id,
   UpdaterAdminStore store,
   LocalFeed feed,
-  HttpRequest request
+  HttpRequest request,
+  FeedbackContext feedbackDb
 ) =>
 {
+  var releases = await store.ListReleasesAsync();
+  var release = releases.FirstOrDefault((item) => item.Id == id);
+  if (release is null) return Results.NotFound();
+  var counts = await GetBetaFeedbackCountsAsync(feedbackDb, release.Version);
+  if (counts.totalCount == 0 || counts.positiveCount * 2 < counts.totalCount)
+    return Results.BadRequest(new { error = "Not enough validated beta feedback to promote" });
+
   var promoted = await store.PromoteReleaseAsync(id, request.HttpContext.RequestAborted);
   if (promoted is null) return Results.NotFound();
 
   CopyDirectory(Path.Combine(request.HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath, "feed", "beta"),
     Path.Combine(request.HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath, "feed"));
-  return Results.Ok(promoted);
+  return Results.Ok(promoted with { Channel = "normal", Promoted = true, PositiveCount = counts.positiveCount, TotalCount = counts.totalCount });
 });
 
 app.MapPost("/opencode/admin/releases/normal/stop", async (UpdaterChannelStateStore channelState) =>
@@ -455,6 +478,26 @@ static void CopyDirectory(string sourceDirectory, string targetDirectory)
     Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
     File.Copy(sourcePath, targetPath, true);
   }
+}
+
+static string? ParseBetaFeedback(string text)
+{
+  var normalized = text.TrimStart();
+  var match = Regex.Match(normalized, @"^(Version erfolgreich getestet|Fehler gefunden)\b", RegexOptions.IgnoreCase);
+  if (!match.Success) return null;
+  return match.Groups[1].Value.Equals("Version erfolgreich getestet", StringComparison.OrdinalIgnoreCase) ? "positive" : "negative";
+}
+
+static async Task<(long positiveCount, long totalCount)> GetBetaFeedbackCountsAsync(FeedbackContext db, string version)
+{
+  var feedbacks = await db.Feedbacks
+    .Where((feedback) => feedback.Category == "beta" && feedback.AppVersion == version)
+    .Select((feedback) => feedback.Text)
+    .ToListAsync();
+
+  var totalCount = feedbacks.LongCount();
+  var positiveCount = feedbacks.LongCount((text) => ParseBetaFeedback(text) == "positive");
+  return (positiveCount, totalCount);
 }
 
 static async Task EnsureAdminTablesAsync(DbConnection connection, IWebHostEnvironment env)
@@ -1061,20 +1104,6 @@ sealed class UpdaterAdminStore(IWebHostEnvironment env)
   public async Task<ReleaseRecord?> PromoteReleaseAsync(string id, CancellationToken cancellationToken)
   {
     await using var connection = await OpenAsync();
-    await using var lookup = connection.CreateCommand();
-    lookup.CommandText = """
-      SELECT Id, Version, Channel, ZipName, ZipSha256, ZipSize, Notes, Promoted, PositiveCount, TotalCount, CreatedAt, PromotedAt
-      FROM UpdaterReleases
-      WHERE Id = $id
-      LIMIT 1
-      """;
-    lookup.Parameters.AddWithValue("$id", id);
-    await using var reader = await lookup.ExecuteReaderAsync(cancellationToken);
-    if (!await reader.ReadAsync(cancellationToken)) return null;
-
-    var release = ReadRelease(reader);
-    if (release.TotalCount == 0 || release.PositiveCount * 2 < release.TotalCount) return release;
-
     await using var update = connection.CreateCommand();
     update.CommandText = """
       UPDATE UpdaterReleases
@@ -1083,7 +1112,8 @@ sealed class UpdaterAdminStore(IWebHostEnvironment env)
       """;
     update.Parameters.AddWithValue("$id", id);
     update.Parameters.AddWithValue("$promotedAt", DateTimeOffset.UtcNow.ToString("O"));
-    await update.ExecuteNonQueryAsync(cancellationToken);
+    var affected = await update.ExecuteNonQueryAsync(cancellationToken);
+    if (affected == 0) return null;
     return (await ListReleasesAsync()).FirstOrDefault(item => item.Id == id);
   }
 
@@ -1161,7 +1191,7 @@ sealed class UpdaterAdminStore(IWebHostEnvironment env)
     reader.GetString(4),
     reader.GetInt64(5),
     reader.IsDBNull(6) ? null : reader.GetString(6),
-    reader.GetInt64(7) > 0,
+    reader.GetString(2) == "normal" || reader.GetInt64(7) > 0,
     reader.GetInt64(8),
     reader.GetInt64(9),
     DateTimeOffset.Parse(reader.GetString(10)),

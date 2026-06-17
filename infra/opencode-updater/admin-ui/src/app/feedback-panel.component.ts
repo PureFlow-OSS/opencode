@@ -4,13 +4,21 @@ import { ApiService } from "./api.service"
 
 type FeedbackRecord = {
   id: string
-  channel: string
-  releaseId?: string | null
-  userName?: string | null
-  userEmail?: string | null
-  rating: string
   text: string
+  category: string
+  userName: string
+  appVersion?: string | null
+  platform?: string | null
   createdAt: string
+}
+
+const betaSentimentPattern = /^(Version erfolgreich getestet|Fehler gefunden)\s*\n?/i
+
+function betaSentiment(text: string) {
+  const match = text.match(betaSentimentPattern)?.[1]?.toLowerCase()
+  if (match === "version erfolgreich getestet") return "positive"
+  if (match === "fehler gefunden") return "negative"
+  return "neutral"
 }
 
 @Component({
@@ -33,7 +41,7 @@ type FeedbackRecord = {
             <strong>No feedback yet</strong>
             <p>
               @if (mode === 'beta') {
-                Beta testers have not submitted any feedback yet.
+                Beta testers have not submitted any beta feedback yet.
               } @else {
                 OpenCode has not sent any general feedback yet.
               }
@@ -43,11 +51,23 @@ type FeedbackRecord = {
         @for (item of visibleFeedback; track item.id) {
           <section class="item">
             <div class="item-top">
-              <strong>{{ item.userName || 'anonymous' }}</strong>
-              <span>{{ item.channel }} · {{ item.rating }}</span>
+              <strong>{{ displayName(item) }}</strong>
+              <span>
+                @if (mode === 'beta') {
+                  {{ betaSentiment(item.text) }}
+                } @else {
+                  {{ item.category }}
+                }
+              </span>
             </div>
             <p>{{ item.text }}</p>
-            <small>{{ item.createdAt }}</small>
+            <small>
+              {{ item.platform || 'unknown platform' }}
+              @if (item.appVersion) {
+                · v{{ item.appVersion }}
+              }
+              · {{ item.createdAt }}
+            </small>
           </section>
         }
       </div>
@@ -68,7 +88,11 @@ export class FeedbackPanelComponent {
 
   get visibleFeedback() {
     const current = this.feedbackQuery.data() ?? []
-    return this.mode === "beta" ? current.filter((item) => item.channel === "beta") : current
+    return this.mode === "beta" ? current.filter((item) => item.category === "beta") : current.filter((item) => item.category === "general")
+  }
+
+  displayName(item: FeedbackRecord) {
+    return item.userName || `OpenCode ${item.appVersion ?? "feedback"}`
   }
 
   refresh() {

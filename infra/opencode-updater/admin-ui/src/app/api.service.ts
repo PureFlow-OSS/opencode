@@ -17,12 +17,11 @@ type ReleaseRecord = {
 
 type FeedbackRecord = {
   id: string
-  channel: string
-  releaseId?: string | null
-  userName?: string | null
-  userEmail?: string | null
-  rating: string
-  message: string
+  text: string
+  category: string
+  userName: string
+  appVersion?: string | null
+  platform?: string | null
   createdAt: string
 }
 
@@ -83,7 +82,27 @@ export class ApiService {
   }
 
   async listFeedback() {
-    return this.readJson<FeedbackRecord[]>(await fetch("/opencode/feedback"))
+    const items = await this.readJson<
+      Array<{
+        id: number
+        text: string
+        category: string
+        user_name: string | null
+        app_version: string | null
+        platform: string | null
+        created_at: string
+      }>
+    >(await fetch("/opencode/feedback"))
+
+    return items.map((item) => ({
+      id: String(item.id),
+      text: item.text,
+      category: item.category.trim().toLowerCase(),
+      userName: item.user_name?.trim() || "",
+      appVersion: item.app_version,
+      platform: item.platform,
+      createdAt: item.created_at,
+    }))
   }
 
   async createFeedback(payload: { channel: string; releaseId?: string; userName?: string; userEmail?: string; rating: string; message: string }) {

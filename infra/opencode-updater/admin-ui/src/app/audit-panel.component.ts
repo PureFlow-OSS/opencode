@@ -48,11 +48,22 @@ type AuditRecord = {
             </div>
             <button
               type="button"
-              [disabled]="release.channel === 'normal' || release.totalCount === 0 || release.positiveCount * 2 < release.totalCount"
+              [disabled]="!canPromote(release)"
               (click)="promote(release.id)"
             >
               Promote to normal
             </button>
+            @if (!canPromote(release)) {
+              <small>
+                @if (release.channel === 'normal') {
+                  Already in normal channel.
+                } @else if (release.totalCount === 0) {
+                  Waiting for beta feedback.
+                } @else {
+                  Need {{ remainingPositive(release) }} more positive feedback item(s).
+                }
+              </small>
+            }
           </section>
         }
       </div>
@@ -106,8 +117,16 @@ export class AuditPanelComponent {
     return Math.min(100, (release.positiveCount / release.totalCount) * 100)
   }
 
+  canPromote(release: ReleaseRecord) {
+    return release.channel !== "normal" && release.totalCount > 0 && release.positiveCount * 2 >= release.totalCount
+  }
+
+  remainingPositive(release: ReleaseRecord) {
+    return Math.max(0, Math.ceil(release.totalCount / 2) - release.positiveCount)
+  }
+
   promote(id: string) {
-    void this.promoteMutation.mutateAsync(id).then(() => this.statusQuery.refetch())
+    void this.promoteMutation.mutateAsync(id).then(() => this.refresh())
   }
 
   stopNormal() {
