@@ -9,6 +9,7 @@ type Deps = {
   reload: () => void
   relaunch: () => void
   betaTester?: boolean
+  betaUserName?: string | null
 }
 
 export function createMenu(deps: Deps) {
@@ -128,6 +129,10 @@ export function createMenu(deps: Deps) {
         {
           label: "Report a Bug",
           click: () => shell.openExternal("https://github.com/anomalyco/opencode/issues/new?template=bug_report.yml"),
+        },
+        {
+          label: `Beta Tester: ${deps.betaTester ? "yes" : "no"}${deps.betaUserName ? ` (${deps.betaUserName})` : ""}`,
+          enabled: false,
         },
         {
           label: "Beta Feedback",

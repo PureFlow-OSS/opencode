@@ -9,7 +9,7 @@ type FeedbackRecord = {
   userName?: string | null
   userEmail?: string | null
   rating: string
-  message: string
+  text: string
   createdAt: string
 }
 
@@ -46,8 +46,8 @@ type FeedbackRecord = {
               <strong>{{ item.userName || 'anonymous' }}</strong>
               <span>{{ item.channel }} · {{ item.rating }}</span>
             </div>
-            <p>{{ item.message }}</p>
-            <small>{{ item.userEmail || 'no email' }} · {{ item.createdAt }}</small>
+            <p>{{ item.text }}</p>
+            <small>{{ item.createdAt }}</small>
           </section>
         }
       </div>
@@ -68,7 +68,7 @@ export class FeedbackPanelComponent {
 
   get visibleFeedback() {
     const current = this.feedbackQuery.data() ?? []
-    return this.mode === "beta" ? current.filter((item) => item.channel === "beta") : current.filter((item) => item.channel === "general")
+    return this.mode === "beta" ? current.filter((item) => item.channel === "beta") : current
   }
 
   refresh() {

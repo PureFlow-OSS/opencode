@@ -80,13 +80,20 @@ function dataDir() {
 async function aifactoryApiKey() {
   const fromEnv = process.env.OPENCODE_AIFACTORY_API_KEY?.trim()
   if (fromEnv) return fromEnv
-  try {
-    const payload = JSON.parse(await readFile(path.join(dataDir(), "auth.json"), "utf8")) as Record<string, unknown>
+  const fromContent = process.env.OPENCODE_AUTH_CONTENT
+  if (fromContent) {
+    const payload = JSON.parse(fromContent) as Record<string, unknown>
     const auth = payload["aifactory"]
-    if (!isRecord(auth) || auth.type !== "api" || typeof auth.key !== "string" || !auth.key.trim()) return
-    return auth.key.trim()
-  } catch {
-    return
+    if (isRecord(auth) && auth.type === "api" && typeof auth.key === "string" && auth.key.trim()) return auth.key.trim()
+  }
+  for (const base of [dataDir(), path.join(os.homedir(), ".local", "share", "opencode"), path.join(process.env.APPDATA || "", "opencode")]) {
+    if (!base) continue
+    try {
+      const payload = JSON.parse(await readFile(path.join(base, "auth.json"), "utf8")) as Record<string, unknown>
+      const auth = payload["aifactory"]
+      if (!isRecord(auth) || auth.type !== "api" || typeof auth.key !== "string" || !auth.key.trim()) continue
+      return auth.key.trim()
+    } catch {}
   }
 }
 

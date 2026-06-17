@@ -93,6 +93,13 @@ logger.log("app starting", {
   version: app.getVersion(),
   packaged: app.isPackaged,
 })
+logger.log("updater bootstrap", {
+  channel: CHANNEL,
+  updateServer: updateServer.configUrl,
+  versionUrl: updateServer.versionUrl,
+  feedUrl: updateServer.feedUrl,
+  betaStatusUrl: updateServer.betaStatusUrl,
+})
 
 setupApp()
 
@@ -133,6 +140,10 @@ function setupApp() {
 
   app.on("will-quit", () => {
     void killSidecar()
+  })
+
+  app.on("browser-window-focus", () => {
+    void refreshBetaMenu()
   })
 
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
@@ -255,20 +266,7 @@ async function initialize() {
 
 function wireMenu() {
   if (!mainWindow) return
-  createMenu({
-    trigger: (id) => mainWindow && sendMenuCommand(mainWindow, id),
-    checkForUpdates: () => {
-      void checkForUpdates(true)
-    },
-    reload: () => mainWindow?.reload(),
-    relaunch: () => {
-      void killSidecar().finally(() => {
-        app.relaunch()
-        app.exit(0)
-      })
-    },
-    betaTester: betaStatus?.betaTester ?? false,
-  })
+  void refreshBetaMenu()
 }
 
 registerIpcHandlers({
@@ -426,6 +424,30 @@ async function getBetaStatusConfig(refresh = false) {
   betaStatus = await betaStatusPromise
   betaStatusPromise = undefined
   return betaStatus
+}
+
+async function refreshBetaMenu() {
+  const beta = await getBetaStatusConfig(true).catch(() => null)
+  logger.log("beta status refresh", {
+    betaTester: beta?.betaTester ?? false,
+    betaUserName: beta?.betaUserName ?? null,
+  })
+  if (!mainWindow) return
+  createMenu({
+    trigger: (id) => mainWindow && sendMenuCommand(mainWindow, id),
+    checkForUpdates: () => {
+      void checkForUpdates(true)
+    },
+    reload: () => mainWindow?.reload(),
+    relaunch: () => {
+      void killSidecar().finally(() => {
+        app.relaunch()
+        app.exit(0)
+      })
+    },
+    betaTester: beta?.betaTester ?? false,
+    betaUserName: beta?.betaUserName ?? null,
+  })
 }
 
 async function checkUpdate() {

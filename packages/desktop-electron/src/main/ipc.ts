@@ -1,6 +1,9 @@
 import { execFile } from "node:child_process"
 import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, shell } from "electron"
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron"
+import { readFile } from "node:fs/promises"
+import { homedir } from "node:os"
+import { join } from "node:path"
 
 import type {
   InitStep,
@@ -42,6 +45,35 @@ type Deps = {
   setBackgroundColor: (color: string) => void
 }
 
+function dataDir() {
+  const home = homedir()
+  if (process.platform === "win32") return join(process.env.LOCALAPPDATA || join(home, "AppData", "Local"), "opencode")
+  if (process.platform === "darwin") return join(home, "Library", "Application Support", "opencode")
+  return join(process.env.XDG_DATA_HOME || join(home, ".local", "share"), "opencode")
+}
+
+async function aifactoryApiKey() {
+  const fromEnv = process.env.OPENCODE_AIFACTORY_API_KEY?.trim()
+  if (fromEnv) return fromEnv
+  const fromContent = process.env.OPENCODE_AUTH_CONTENT
+  if (fromContent) {
+    const payload = JSON.parse(fromContent) as Record<string, unknown>
+    const auth = payload.aifactory as Record<string, unknown> | undefined
+    if (auth && auth.type === "api" && typeof auth.key === "string" && auth.key.trim()) return auth.key.trim()
+  }
+  for (const base of [dataDir(), join(homedir(), ".local", "share", "opencode"), join(process.env.APPDATA || "", "opencode")]) {
+    if (!base) continue
+    try {
+      const payload = JSON.parse(await readFile(join(base, "auth.json"), "utf8")) as Record<string, unknown>
+      const auth = payload.aifactory as Record<string, unknown> | undefined
+      if (!auth || auth.type !== "api" || typeof auth.key !== "string") continue
+      const key = auth.key.trim()
+      if (key.length > 0) return key
+    } catch {}
+  }
+  return null
+}
+
 export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("kill-sidecar", () => deps.killSidecar())
   ipcMain.handle("await-initialization", (event: IpcMainInvokeEvent) => {
@@ -78,9 +110,14 @@ export function registerIpcHandlers(deps: Deps) {
       _event: IpcMainInvokeEvent,
       input: { url: string; method?: string; headers?: Record<string, string>; body?: string },
     ) => {
+      const headers = { ...(input.headers ?? {}) }
+      const apiKey = await aifactoryApiKey().catch(() => null)
+      if (apiKey) {
+        headers["x-opencode-aifactory-api-key"] ??= apiKey
+      }
       const response = await fetch(input.url, {
         method: input.method,
-        headers: input.headers,
+        headers,
         body: input.body,
         signal: AbortSignal.timeout(5000),
       })

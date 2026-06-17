@@ -38,6 +38,7 @@ const deepLinkEvent = "opencode:deep-link"
 const updateServerBaseUrl = (import.meta.env.VITE_OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode")
   .trim()
   .replace(/\/+$/, "")
+const nativeFetch = globalThis.fetch.bind(globalThis)
 
 function isUpdateServerRequestUrl(input: string) {
   try {
@@ -55,6 +56,30 @@ function normalizeHeaders(headers: HeadersInit | undefined) {
   if (Array.isArray(headers)) return Object.fromEntries(headers)
   return headers
 }
+
+globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+  if (!(input instanceof Request)) {
+    const url = typeof input === "string" ? input : input.toString()
+    if (isUpdateServerRequestUrl(url)) {
+      return window.api
+        .fetchUpdateServer({
+          url,
+          method: init?.method,
+          headers: normalizeHeaders(init?.headers),
+          body: typeof init?.body === "string" ? init.body : undefined,
+        })
+        .then(
+          (result) =>
+            new Response(result.text, {
+              status: result.status,
+              statusText: result.statusText,
+              headers: result.headers,
+            }),
+        )
+    }
+  }
+  return nativeFetch(input as RequestInfo, init)
+}) as typeof fetch
 
 const emitDeepLinks = (urls: string[]) => {
   if (urls.length === 0) return
@@ -221,7 +246,7 @@ const createPlatform = (): Platform => {
     },
 
     fetch: (input, init) => {
-      if (input instanceof Request) return fetch(input)
+      if (input instanceof Request) return nativeFetch(input)
       const url = typeof input === "string" ? input : input.toString()
       if (isUpdateServerRequestUrl(url)) {
         return window.api
@@ -240,7 +265,7 @@ const createPlatform = (): Platform => {
               }),
           )
       }
-      return fetch(input, init)
+      return nativeFetch(input, init)
     },
 
     getMotd: () => window.api.getMotd(),
