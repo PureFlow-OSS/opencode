@@ -34,8 +34,7 @@ const appId = app.isPackaged ? APP_IDS[CHANNEL] : "ai.opencode.desktop.dev"
 app.setName(app.isPackaged ? APP_NAMES[CHANNEL] : "OpenCode Dev")
 app.setAppUserModelId(appId)
 app.setPath("userData", join(app.getPath("appData"), appId))
-const updateCacheRoot =
-  process.platform === "win32" ? process.env.OPENCODE_UPDATE_CACHE_DIR?.trim() || "C:/Entwicklung" : undefined
+const updateCacheRoot = process.env.OPENCODE_UPDATE_CACHE_DIR?.trim()
 const autoUpdater = pkg.autoUpdater
 
 if (process.platform === "win32" && updateCacheRoot) {
@@ -60,6 +59,7 @@ import { createMenu } from "./menu"
 import { getDefaultServerUrl, getWslConfig, setDefaultServerUrl, setWslConfig, spawnLocalServer } from "./server"
 import { updateServer } from "./update-server"
 import { shouldTrustUpdateServerCertificate } from "./update-server-trust"
+import { resolveInstallDirectory, WINDOWS_INSTALL_DIRECTORY } from "./install-directory"
 import {
   createLoadingWindow,
   createMainWindow,
@@ -526,6 +526,21 @@ async function installUpdate() {
     const downloadedUpdateHelper = Reflect.get(autoUpdater, "downloadedUpdateHelper")
     const packageFile = Reflect.get(downloadedUpdateHelper, "packageFile")
     const installDirectory = resolveInstallDirectory(Reflect.get(autoUpdater, "installDirectory"))
+    if (process.platform === "win32" && !installDirectory) {
+      logger.error("invalid install directory returned by updater", {
+        installDirectory: Reflect.get(autoUpdater, "installDirectory"),
+        expected: WINDOWS_INSTALL_DIRECTORY,
+      })
+      await dialog.showMessageBox({
+        type: "error",
+        title: "Update failed",
+        message: "Das Update konnte nicht installiert werden.",
+        detail: `Ungültiges Installationsverzeichnis erkannt. Erwartet: ${WINDOWS_INSTALL_DIRECTORY}`,
+        buttons: ["OK"],
+        defaultId: 0,
+      })
+      return
+    }
     const args = [
       "--updated",
       "--force-run",
@@ -603,13 +618,6 @@ async function checkForUpdates(alertOnFail: boolean) {
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function resolveInstallDirectory(input: unknown) {
-  if (typeof input === "string" && input.length > 0) return input
-  if (process.platform === "win32") return "C:/Entwicklung/OpenCode"
-  if (!app.isPackaged) return
-  return dirname(process.execPath)
 }
 
 async function scheduleWindowsInstaller(installerPath: string, args: string[], installDirectory: unknown) {
