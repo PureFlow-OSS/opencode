@@ -53,6 +53,7 @@ type ReleaseRecord = {
       <p class="status-text" [class.error]="!!statusError">{{ statusText }}</p>
     </article>
   `,
+  styleUrl: "./upload-panel.component.css",
 })
 export class UploadPanelComponent {
   readonly api = inject(ApiService)
