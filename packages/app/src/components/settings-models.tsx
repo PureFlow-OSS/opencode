@@ -100,7 +100,7 @@ const SettingsModelsContent: Component = () => {
     value === undefined || value === null ? "n/a" : new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(value)
 
   const list = useFilteredList<ModelItem>({
-    items: (_filter) => models.list(),
+    items: (_filter) => models.manageable(),
     key: (x) => `${x.provider.id}:${x.id}`,
     filterKeys: ["provider.name", "name", "id"],
     sortBy: (a, b) => a.name.localeCompare(b.name),
@@ -125,10 +125,7 @@ const SettingsModelsContent: Component = () => {
     <div class="flex flex-col h-full overflow-y-auto no-scrollbar px-4 pb-10 sm:px-10 sm:pb-10">
       <div class="sticky top-0 z-10 bg-[linear-gradient(to_bottom,var(--surface-stronger-non-alpha)_calc(100%_-_24px),transparent)]">
         <div class="flex flex-col gap-4 pt-6 pb-6 w-full">
-          <div class="flex items-center justify-between gap-4">
-            <h2 class="text-16-medium text-text-strong">{language.t("settings.models.title")}</h2>
-            <SettingsServerPicker />
-          </div>
+          <h2 class="text-16-medium text-text-strong">{language.t("settings.models.title")}</h2>
           <div class="flex items-center gap-2 px-3 h-9 rounded-lg bg-surface-base">
             <Icon name="magnifying-glass" class="text-icon-weak-base flex-shrink-0" />
             <TextField

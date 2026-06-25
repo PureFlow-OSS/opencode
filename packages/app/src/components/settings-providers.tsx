@@ -2,12 +2,12 @@ import { Button } from "@opencode-ai/ui/button"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { Tag } from "@opencode-ai/ui/tag"
-import { showToast } from "@/utils/toast"
+import { showToast } from "@opencode-ai/ui/toast"
 import { popularProviders, useProviders } from "@/hooks/use-providers"
 import { createMemo, type Component, For, Show } from "solid-js"
 import { useLanguage } from "@/context/language"
-import { useServerSDK } from "@/context/server-sdk"
-import { useServerSync } from "@/context/server-sync"
+import { useGlobalSDK } from "@/context/global-sdk"
+import { useGlobalSync } from "@/context/global-sync"
 import { normalizeProviderList } from "@/context/global-sync/utils"
 import { DialogConnectProvider } from "./dialog-connect-provider"
 import { DialogSelectProvider } from "./dialog-select-provider"
@@ -40,8 +40,8 @@ export const SettingsProviders: Component = () => {
 const SettingsProvidersContent: Component = () => {
   const dialog = useDialog()
   const language = useLanguage()
-  const serverSDK = useServerSDK()
-  const serverSync = useServerSync()
+  const globalSDK = useGlobalSDK()
+  const globalSync = useGlobalSync()
   const providers = useProviders()
 
   const connected = createMemo(() => {
@@ -84,7 +84,7 @@ const SettingsProvidersContent: Component = () => {
   const note = (id: string) => PROVIDER_NOTES.find((item) => item.match(id))?.key
 
   const isConfigCustom = (providerID: string) => {
-    const provider = serverSync().data.config.provider?.[providerID]
+    const provider = globalSync().data.config.provider?.[providerID]
     if (!provider) return false
     if (provider.npm !== "@ai-sdk/openai-compatible") return false
     if (!provider.models || Object.keys(provider.models).length === 0) return false
@@ -92,11 +92,11 @@ const SettingsProvidersContent: Component = () => {
   }
 
   const disableProvider = async (providerID: string, name: string) => {
-    const before = serverSync().data.config.disabled_providers ?? []
+    const before = globalSync().data.config.disabled_providers ?? []
     const next = before.includes(providerID) ? before : [...before, providerID]
-    serverSync().set("config", "disabled_providers", next)
+    globalSync().set("config", "disabled_providers", next)
 
-    await serverSync()
+    await globalSync()
       .updateConfig({ disabled_providers: next })
       .then(() => {
         showToast({
@@ -107,7 +107,7 @@ const SettingsProvidersContent: Component = () => {
         })
       })
       .catch((err: unknown) => {
-        serverSync().set("config", "disabled_providers", before)
+        globalSync().set("config", "disabled_providers", before)
         const message = err instanceof Error ? err.message : String(err)
         showToast({ title: language.t("common.requestFailed"), description: message })
       })
@@ -127,22 +127,23 @@ const SettingsProvidersContent: Component = () => {
 
   const disconnect = async (providerID: string, name: string) => {
     if (isConfigCustom(providerID)) {
-      await serverSDK()
+      await globalSDK()
         .client.auth.remove({ providerID })
         .catch(() => undefined)
       await disableProvider(providerID, name)
       return
     }
     try {
-      await serverSDK().client.auth.remove({ providerID })
-      await serverSDK().client.global.dispose().catch(() => undefined)
+      await globalSDK().client.auth.remove({ providerID })
+      await globalSDK().client.global.dispose().catch(() => undefined)
 
-      const refreshed = await serverSDK().client.provider.list().catch(() => undefined)
+      const refreshed = await globalSDK().client.provider.list().catch(() => undefined)
       if (refreshed?.data) {
         const normalized = normalizeProviderList(refreshed.data)
-        serverSync().set("provider", normalized)
-        if (providerID === "aifactory" && serverSync().data.config.model?.startsWith("aifactory/")) {
-          await serverSync().updateConfig({
+        globalSync().set("provider", normalized)
+        if (providerID === "aifactory" && globalSync().data.config.model?.startsWith("aifactory/")) {
+          await globalSync().updateConfig({
+            ...globalSync().data.config,
             model: fallbackModel(normalized),
           })
         }
