@@ -16,13 +16,9 @@ type OpenAttachmentPickerOptions = {
   defaultPath?: string
 }
 type SaveFilePickerOptions = { title?: string; defaultPath?: string }
-<<<<<<< HEAD
 type PlatformName = "web" | "desktop"
 type DesktopOS = "macos" | "windows" | "linux"
-=======
-type UpdateInfo = { updateAvailable: boolean; version?: string }
 type Motd = { enabled: boolean; text: string }
->>>>>>> 0529b961d (Add startup splash MOTD)
 
 export type FatalRendererErrorLog = {
   error: string
@@ -74,9 +70,6 @@ type PlatformBase = {
 
   /** Fetch override */
   fetch?: typeof fetch
-
-  /** Optional startup message from host app */
-  getMotd?(): Promise<Motd | null>
 
   /** Optional startup message from host app */
   getMotd?(): Promise<Motd | null>
