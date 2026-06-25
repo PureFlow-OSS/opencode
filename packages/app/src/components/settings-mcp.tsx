@@ -7,6 +7,7 @@ import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
 import { DialogMcpForm } from "./dialog-mcp-form"
 import { SettingsList } from "./settings-list"
+import { hideMcpName, showMcpName } from "./mcp-ui-state"
 import type { McpLocalConfig, McpRemoteConfig } from "@opencode-ai/sdk/v2/client"
 
 type McpConfig = McpLocalConfig | McpRemoteConfig
@@ -29,6 +30,7 @@ export const SettingsMcp: Component = () => {
   const deleteServer = async (name: string) => {
     const existing = { ...(globalSync.data.config.mcp ?? {}) }
     delete existing[name]
+    hideMcpName(name)
     await globalSync
       .updateConfig({ mcp: existing })
       .then(() => {
@@ -40,6 +42,7 @@ export const SettingsMcp: Component = () => {
         })
       })
       .catch((err: unknown) => {
+        showMcpName(name)
         showToast({
           title: language.t("common.requestFailed"),
           description: err instanceof Error ? err.message : String(err),

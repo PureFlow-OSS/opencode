@@ -10,6 +10,8 @@ import { batch, For, Show } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
+import { isValidRemoteUrl } from "./mcp-errors"
+import { showMcpName } from "./mcp-ui-state"
 import type { McpLocalConfig, McpRemoteConfig } from "@opencode-ai/sdk/v2/client"
 
 type McpConfig = McpLocalConfig | McpRemoteConfig
@@ -130,6 +132,8 @@ export function DialogMcpForm(props: Props) {
 
     if (form.type === "remote" && !form.url.trim())
       errs.url = language.t("settings.mcp.form.validation.urlRequired")
+    if (form.type === "remote" && form.url.trim() && !isValidRemoteUrl(form.url.trim()))
+      errs.url = "URL must start with http:// or https://"
 
     setForm("err", errs)
     if (Object.keys(errs).length) return null
@@ -162,6 +166,7 @@ export function DialogMcpForm(props: Props) {
       const name = form.name.trim()
       const existing = { ...(globalSync.data.config.mcp ?? {}) }
       existing[name] = config
+      showMcpName(name)
       await globalSync.updateConfig({ mcp: existing })
       return name
     },
