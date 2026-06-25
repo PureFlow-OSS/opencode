@@ -1,5 +1,8 @@
 import type { Session } from "@opencode-ai/sdk/v2/client"
 import { Avatar } from "@opencode-ai/ui/avatar"
+import { Button } from "@opencode-ai/ui/button"
+import { ContextMenu } from "@opencode-ai/ui/context-menu"
+import { Dialog } from "@opencode-ai/ui/dialog"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { IconButton } from "@opencode-ai/ui/icon-button"
@@ -9,6 +12,7 @@ import { getFilename } from "@opencode-ai/core/util/path"
 import { A, useParams } from "@solidjs/router"
 import { type Accessor, createMemo, For, type JSX, Match, Show, Switch } from "solid-js"
 import { useServerSync } from "@/context/server-sync"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useLanguage } from "@/context/language"
 import { getAvatarColors, type LocalProject, useLayout } from "@/context/layout"
 import { useNotification } from "@/context/notification"
@@ -87,6 +91,7 @@ export type SessionItemProps = {
   clearHoverProjectSoon: () => void
   prefetchSession: (session: Session, priority?: "high" | "low") => void
   archiveSession: (session: Session) => Promise<void>
+  deleteSession: (session: Session) => Promise<boolean>
 }
 
 const SessionRow = (props: {
@@ -145,6 +150,7 @@ const SessionRow = (props: {
 
 export const SessionItem = (props: SessionItemProps): JSX.Element => {
   const params = useParams()
+  const dialog = useDialog()
   const layout = useLayout()
   const language = useLanguage()
   const notification = useNotification()
@@ -197,6 +203,34 @@ export const SessionItem = (props: SessionItemProps): JSX.Element => {
     }
   }
 
+  function DialogDeleteSession(dialogProps: { session: Session }) {
+    const name = createMemo(() => sessionTitle(dialogProps.session.title) ?? language.t("command.session.new"))
+    const handleDelete = async () => {
+      await props.deleteSession(dialogProps.session)
+      dialog.close()
+    }
+
+    return (
+      <Dialog title={language.t("session.delete.title")} fit>
+        <div class="flex flex-col gap-4 pl-6 pr-2.5 pb-3">
+          <div class="flex flex-col gap-1">
+            <span class="text-14-regular text-text-strong">
+              {language.t("session.delete.confirm", { name: name() })}
+            </span>
+          </div>
+          <div class="flex justify-end gap-2">
+            <Button variant="ghost" size="large" onClick={() => dialog.close()}>
+              {language.t("common.cancel")}
+            </Button>
+            <Button variant="primary" size="large" onClick={handleDelete}>
+              {language.t("session.delete.button")}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+    )
+  }
+
   const item = (
     <SessionRow
       session={props.session}
@@ -217,57 +251,69 @@ export const SessionItem = (props: SessionItemProps): JSX.Element => {
 
   return (
     <>
-      <div
-        data-session-id={props.session.id}
-        class="group/session relative w-full min-w-0 rounded-md cursor-default pr-3 transition-colors hover:bg-surface-raised-base-hover [&:has(:focus-visible)]:bg-surface-raised-base-hover has-[[data-expanded]]:bg-surface-raised-base-hover has-[.active]:bg-surface-base-active"
-        style={{ "padding-left": `${8 + (props.level ?? 0) * 16}px` }}
-      >
-        <div class="flex min-w-0 items-center gap-1">
-          <div class="min-w-0 flex-1">
-            <Show
-              when={!tooltip()}
-              fallback={
-                <Tooltip
-                  placement={props.mobile ? "bottom" : "right"}
-                  value={sessionTitle(props.session.title)}
-                  gutter={10}
-                  class="min-w-0 w-full"
+      <ContextMenu modal={!layout.sidebar.opened()}>
+        <ContextMenu.Trigger>
+          <div
+            data-session-id={props.session.id}
+            class="group/session relative w-full min-w-0 rounded-md cursor-default pr-3 transition-colors hover:bg-surface-raised-base-hover [&:has(:focus-visible)]:bg-surface-raised-base-hover has-[[data-expanded]]:bg-surface-raised-base-hover has-[.active]:bg-surface-base-active"
+            style={{ "padding-left": `${8 + (props.level ?? 0) * 16}px` }}
+          >
+            <div class="flex min-w-0 items-center gap-1">
+              <div class="min-w-0 flex-1">
+                <Show
+                  when={!tooltip()}
+                  fallback={
+                    <Tooltip
+                      placement={props.mobile ? "bottom" : "right"}
+                      value={sessionTitle(props.session.title)}
+                      gutter={10}
+                      class="min-w-0 w-full"
+                    >
+                      {item}
+                    </Tooltip>
+                  }
                 >
                   {item}
-                </Tooltip>
-              }
-            >
-              {item}
-            </Show>
-          </div>
+                </Show>
+              </div>
 
-          <Show when={!props.level}>
-            <div
-              class="shrink-0 overflow-hidden transition-[width,opacity]"
-              classList={{
-                "w-6 opacity-100 pointer-events-auto": !!props.mobile,
-                "w-0 opacity-0 pointer-events-none": !props.mobile,
-                "group-hover/session:w-6 group-hover/session:opacity-100 group-hover/session:pointer-events-auto": true,
-                "group-focus-within/session:w-6 group-focus-within/session:opacity-100 group-focus-within/session:pointer-events-auto": true,
-              }}
-            >
-              <Tooltip value={language.t("common.archive")} placement="top">
-                <IconButton
-                  icon="archive"
-                  variant="ghost"
-                  class="size-6 rounded-md"
-                  aria-label={language.t("common.archive")}
-                  onClick={(event) => {
-                    event.preventDefault()
-                    event.stopPropagation()
-                    void props.archiveSession(props.session)
+              <Show when={!props.level}>
+                <div
+                  class="shrink-0 overflow-hidden transition-[width,opacity]"
+                  classList={{
+                    "w-6 opacity-100 pointer-events-auto": !!props.mobile,
+                    "w-0 opacity-0 pointer-events-none": !props.mobile,
+                    "group-hover/session:w-6 group-hover/session:opacity-100 group-hover/session:pointer-events-auto": true,
+                    "group-focus-within/session:w-6 group-focus-within/session:opacity-100 group-focus-within/session:pointer-events-auto":
+                      true,
                   }}
-                />
-              </Tooltip>
+                >
+                  <Tooltip value={language.t("common.archive")} placement="top">
+                    <IconButton
+                      icon="archive"
+                      variant="ghost"
+                      class="size-6 rounded-md"
+                      aria-label={language.t("common.archive")}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        void props.archiveSession(props.session)
+                      }}
+                    />
+                  </Tooltip>
+                </div>
+              </Show>
             </div>
-          </Show>
-        </div>
-      </div>
+          </div>
+        </ContextMenu.Trigger>
+        <ContextMenu.Portal>
+          <ContextMenu.Content>
+            <ContextMenu.Item onSelect={() => dialog.show(() => <DialogDeleteSession session={props.session} />)}>
+              <ContextMenu.ItemLabel>{language.t("common.delete")}</ContextMenu.ItemLabel>
+            </ContextMenu.Item>
+          </ContextMenu.Content>
+        </ContextMenu.Portal>
+      </ContextMenu>
       <Show when={currentChild()} keyed>
         {(child) => (
           <div class="w-full">

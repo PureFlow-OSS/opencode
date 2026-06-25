@@ -894,6 +894,67 @@ export default function LegacyLayout(props: ParentProps) {
     }
   }
 
+  async function deleteSession(session: Session) {
+    const [store, setStore] = globalSync.child(session.directory)
+    const sessions = (store.session ?? []).filter((item) => !item.parentID && !item.time?.archived)
+    const index = sessions.findIndex((item) => item.id === session.id)
+    const nextSession = index === -1 ? undefined : (sessions[index + 1] ?? sessions[index - 1])
+
+    const result = await globalSDK.client.session.delete({
+      directory: session.directory,
+      sessionID: session.id,
+    })
+    if (!result.data) return false
+
+    setStore(
+      produce((draft) => {
+        const removed = new Set<string>([session.id])
+
+        const byParent = new Map<string, string[]>()
+        for (const item of draft.session) {
+          if (!item.parentID) continue
+          const existing = byParent.get(item.parentID)
+          if (existing) {
+            existing.push(item.id)
+            continue
+          }
+          byParent.set(item.parentID, [item.id])
+        }
+
+        const stack = [session.id]
+        while (stack.length) {
+          const parentID = stack.pop()
+          if (!parentID) continue
+
+          const children = byParent.get(parentID)
+          if (!children) continue
+
+          for (const child of children) {
+            if (removed.has(child)) continue
+            removed.add(child)
+            stack.push(child)
+          }
+        }
+
+        draft.session = draft.session.filter((item) => !removed.has(item.id))
+      }),
+    )
+
+    if (session.id === params.id) {
+      if (session.parentID) {
+        navigate(`/${params.dir}/session/${session.parentID}`)
+        return true
+      }
+      if (nextSession) {
+        navigate(`/${params.dir}/session/${nextSession.id}`)
+        return true
+      }
+      navigate(`/${params.dir}/session`)
+    }
+
+    return true
+  }
+
   command.register("layout", () => {
     const commands: CommandOption[] = [
       {
@@ -1879,6 +1940,7 @@ export default function LegacyLayout(props: ParentProps) {
     clearHoverProjectSoon,
     prefetchSession,
     archiveSession,
+    deleteSession,
     workspaceName,
     renameWorkspace,
     editorOpen,
@@ -1925,6 +1987,7 @@ export default function LegacyLayout(props: ParentProps) {
       clearHoverProjectSoon,
       prefetchSession,
       archiveSession,
+      deleteSession,
     },
   }
 
