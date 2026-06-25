@@ -61,6 +61,8 @@ import { TuiConfigProvider, useTuiConfig } from "./context/tui-config"
 import { TuiConfig } from "@/cli/cmd/tui/config/tui"
 import { createTuiApi, TuiPluginRuntime, type RouteMap } from "./plugin"
 import { FormatError, FormatUnknownError } from "@/cli/error"
+import * as Process from "@/util/process"
+import path from "path"
 
 import type { EventSource } from "./context/sdk"
 import { DialogVariant } from "./component/dialog-variant"
@@ -103,6 +105,18 @@ function errorMessage(error: unknown) {
     return error.data.message
   }
   return FormatUnknownError(error)
+}
+
+function resetScriptPath() {
+  return path.join(path.dirname(process.execPath), "reset-opencode.ps1")
+}
+
+async function runResetScript() {
+  const script = resetScriptPath()
+  const result = await Process.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script], {
+    nothrow: true,
+  })
+  return result.code === 0
 }
 
 export function tui(input: {
@@ -641,6 +655,33 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
         dialog.clear()
       },
       category: "System",
+    },
+    {
+      title: "OpenCode Daten zurücksetzen",
+      value: "opencode.reset",
+      category: "Zurücksetzen",
+      hidden: process.platform !== "win32",
+      onSelect: async (dialog) => {
+        const confirmed = await DialogConfirm.show(
+          dialog,
+          "OpenCode zurücksetzen",
+          "Wirklich alle Sessions, Cache, Registry-Einträge und lokalen OpenCode-Daten löschen?",
+          "abbrechen",
+        )
+        if (confirmed !== true) return
+
+        dialog.clear()
+        const ok = await runResetScript()
+        toast.show({
+          variant: ok ? "success" : "error",
+          title: ok ? "Zurücksetzen gestartet" : "Zurücksetzen fehlgeschlagen",
+          message: ok
+            ? "Das Reset-Script wurde ausgeführt. Bitte OpenCode neu installieren bzw. neu starten."
+            : "Das Reset-Script konnte nicht ausgeführt werden.",
+          duration: 8000,
+        })
+        if (ok) exit()
+      },
     },
     {
       title: "Exit the app",

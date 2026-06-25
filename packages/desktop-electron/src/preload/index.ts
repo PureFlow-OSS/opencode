@@ -66,6 +66,7 @@ const api: ElectronAPI = {
   runUpdater: (alertOnFail) => ipcRenderer.invoke("run-updater", alertOnFail),
   checkUpdate: () => ipcRenderer.invoke("check-update"),
   installUpdate: () => ipcRenderer.invoke("install-update"),
+  resetData: () => ipcRenderer.invoke("reset-data"),
   setBackgroundColor: (color: string) => ipcRenderer.invoke("set-background-color", color),
   fetchUpdateServer: (input) => ipcRenderer.invoke("fetch-update-server", input),
 }

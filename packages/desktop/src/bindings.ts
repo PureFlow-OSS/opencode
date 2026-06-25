@@ -20,6 +20,7 @@ export const commands = {
 	resolveAppPath: (appName: string) => __TAURI_INVOKE<string | null>("resolve_app_path", { appName }),
 	openPath: (path: string, appName: string | null) => __TAURI_INVOKE<null>("open_path", { path, appName }),
 	openToolLink: (url: string) => __TAURI_INVOKE<ToolLinkResult>("open_tool_link", { url }),
+	resetData: () => __TAURI_INVOKE<void>("reset_data"),
 };
 
 /** Events */

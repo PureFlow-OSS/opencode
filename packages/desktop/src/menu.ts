@@ -30,6 +30,10 @@ export async function createMenu(trigger: (id: string) => void) {
             text: t("desktop.menu.installCli"),
           }),
           await MenuItem.new({
+            action: () => trigger("settings.models.open"),
+            text: t("settings.models.title"),
+          }),
+          await MenuItem.new({
             action: async () => window.location.reload(),
             text: t("desktop.menu.reloadWebview"),
           }),

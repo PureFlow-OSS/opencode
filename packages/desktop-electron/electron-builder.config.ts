@@ -33,8 +33,9 @@ const outputDir = process.env.OPENCODE_ELECTRON_OUTPUT_DIR?.trim() || "dist"
 const changelog = path.join(rootDir, "changelog.md")
 
 async function copyChangelog() {
-  await fs.mkdir(path.join(rootDir, outputDir), { recursive: true })
-  await fs.copyFile(changelog, path.join(rootDir, outputDir, "changelog.md"))
+  const outputPath = path.resolve(process.cwd(), outputDir, "changelog.md")
+  await fs.mkdir(path.dirname(outputPath), { recursive: true })
+  await fs.copyFile(changelog, outputPath)
 }
 
 const getBase = (): Configuration => ({
@@ -53,6 +54,10 @@ const getBase = (): Configuration => ({
       from: "native/",
       to: "native/",
       filter: ["index.js", "index.d.ts", "build/Release/mac_window.node", "swift-build/**"],
+    },
+    {
+      from: "../opencode/bin/reset-opencode.ps1",
+      to: "reset-opencode.ps1",
     },
     ...(process.platform === "win32"
       ? [

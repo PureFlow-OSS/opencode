@@ -7,6 +7,7 @@ Endpoints:
 - `GET /opencode/version`
 - `GET /opencode/url`
 - `GET /opencode/config`
+- `GET /opencode/modelcards.json`
 - `GET /opencode/latest.json`
 - `GET /opencode/changelog.md`
 - `GET /opencode/provider-config.json`
@@ -300,6 +301,33 @@ This is a complete example with:
 ```
 
 If `Updater.Motd` is not configured, the server defaults to `RRZ AI Factory`. Set `Updater.Motd.enabled` to `false` to hide it.
+
+## Model cards
+
+`/opencode/modelcards.json` returns a consolidated model-card payload for the currently active rollout.
+
+The response includes:
+
+- `version`
+- `isBeta`
+- `generatedAt`
+- `modelCount`
+- `models`
+- `providerConfig`
+
+Each entry in `models` is derived from `Updater.ProviderConfig.aifactory.model_limits` and contains:
+
+- `model`
+- `pattern`
+- `context`
+- `output`
+- `temperature`
+- `reasoning`
+- `modalities`
+- `price`
+- `source`
+
+`price` is currently `null` and is reserved for later LiteLLM-enriched pricing data, so the endpoint contract can stay stable when pricing sync is added.
 
 ## Model rollout example
 

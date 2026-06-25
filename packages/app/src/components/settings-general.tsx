@@ -173,6 +173,30 @@ export const SettingsGeneral: Component = () => {
       .finally(() => setStore("checking", false))
   }
 
+  const reset = async () => {
+    const confirmed = window.confirm(language.t("settings.updates.reset.confirm"))
+    if (!confirmed) return
+
+    setStore("checking", true)
+    try {
+      await platform.resetData?.()
+      showToast({
+        variant: "success",
+        title: language.t("settings.updates.reset.success.title"),
+        description: language.t("settings.updates.reset.success.description"),
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      showToast({
+        variant: "error",
+        title: language.t("settings.updates.reset.failed.title"),
+        description: message,
+      })
+    } finally {
+      setStore("checking", false)
+    }
+  }
+
   const themeOptions = createMemo<ThemeOption[]>(() => theme.ids().map((id) => ({ id, name: theme.name(id) })))
 
   const globalSync = useGlobalSync()
@@ -751,6 +775,23 @@ export const SettingsGeneral: Component = () => {
     </div>
   )
 
+  const ResetSection = () => (
+    <div class="flex flex-col gap-1">
+      <h3 class="text-14-medium text-text-strong pb-2">{language.t("settings.updates.section.reset")}</h3>
+
+      <SettingsList>
+        <SettingsRow
+          title={language.t("settings.updates.reset.title")}
+          description={language.t("settings.updates.reset.description")}
+        >
+          <Button size="small" variant="secondary" disabled={store.checking} onClick={reset}>
+            {store.checking ? language.t("settings.updates.action.checking") : language.t("settings.updates.reset.action")}
+          </Button>
+        </SettingsRow>
+      </SettingsList>
+    </div>
+  )
+
   console.log(import.meta.env)
   return (
     <div class="flex flex-col h-full overflow-y-auto no-scrollbar px-4 pb-10 sm:px-10 sm:pb-10">
@@ -770,6 +811,10 @@ export const SettingsGeneral: Component = () => {
         <SoundsSection />
 
         <UpdatesSection />
+
+        <Show when={desktop()}>
+          <ResetSection />
+        </Show>
 
         <Show when={linux()}>
           <div class="flex flex-col gap-1">

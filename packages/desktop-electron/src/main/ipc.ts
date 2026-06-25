@@ -42,6 +42,7 @@ type Deps = {
   runUpdater: (alertOnFail: boolean) => Promise<void> | void
   checkUpdate: () => Promise<{ updateAvailable: boolean; version?: string }>
   installUpdate: () => Promise<void> | void
+  resetData: () => Promise<void> | void
   setBackgroundColor: (color: string) => void
 }
 
@@ -103,6 +104,7 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("run-updater", (_event: IpcMainInvokeEvent, alertOnFail: boolean) => deps.runUpdater(alertOnFail))
   ipcMain.handle("check-update", () => deps.checkUpdate())
   ipcMain.handle("install-update", () => deps.installUpdate())
+  ipcMain.handle("reset-data", () => deps.resetData())
   ipcMain.handle("set-background-color", (_event: IpcMainInvokeEvent, color: string) => deps.setBackgroundColor(color))
   ipcMain.handle(
     "fetch-update-server",

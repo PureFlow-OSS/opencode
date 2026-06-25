@@ -376,6 +376,34 @@ async fn open_tool_link(app: AppHandle, url: String) -> Result<ToolLinkResult, S
     })
 }
 
+#[tauri::command]
+#[specta::specta]
+async fn reset_data(app: AppHandle) -> Result<(), String> {
+    let script = app
+        .path()
+        .resolve("reset-opencode.ps1", BaseDirectory::Resource)
+        .map_err(|e| format!("Failed to resolve reset script: {e}"))?;
+
+    let status = tokio::process::Command::new("powershell.exe")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            &script.to_string_lossy(),
+        ])
+        .status()
+        .await
+        .map_err(|e| format!("Failed to start reset script: {e}"))?;
+
+    if status.success() {
+        return Ok(());
+    }
+
+    Err(format!("Reset script exited with status {status}"))
+}
+
 #[cfg(target_os = "macos")]
 fn check_macos_app(app_name: &str) -> bool {
     // Check common installation locations
@@ -572,7 +600,8 @@ fn make_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             wsl_path,
             resolve_app_path,
             open_path,
-            open_tool_link
+            open_tool_link,
+            reset_data
         ])
         .events(tauri_specta::collect_events![
             LoadingWindowComplete,

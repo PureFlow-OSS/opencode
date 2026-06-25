@@ -1244,6 +1244,12 @@ export default function Layout(props: ParentProps) {
         onSelect: () => openSettings(),
       },
       {
+        id: "settings.models.open",
+        title: language.t("settings.models.title"),
+        category: language.t("command.category.settings"),
+        onSelect: () => openSettings("models"),
+      },
+      {
         id: "feedback.beta.open",
         title: "Beta Feedback",
         category: language.t("command.category.settings"),

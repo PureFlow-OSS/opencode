@@ -225,6 +225,8 @@ for (const item of targets) {
     },
   })
 
+  await $`cp ./bin/reset-opencode.ps1 ./dist/${name}/bin/reset-opencode.ps1`
+
   // Smoke test: only run if binary is for current platform
   if (item.os === process.platform && item.arch === process.arch && !item.abi) {
     const binaryPath = `dist/${name}/bin/opencode`

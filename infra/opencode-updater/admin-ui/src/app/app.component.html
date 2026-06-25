@@ -10,6 +10,7 @@
         <button type="button" [class.active]="page === 'upload'" (click)="show('upload')">ZIP Upload</button>
         <button type="button" [class.active]="page === 'beta-feedback'" (click)="show('beta-feedback')">Beta Feedback</button>
         <button type="button" [class.active]="page === 'inbox'" (click)="show('inbox')">Feedback Inbox</button>
+        <button type="button" [class.active]="page === 'model-status'" (click)="show('model-status')">Model Status</button>
       </nav>
     </div>
     <div class="hero-panel">
@@ -19,6 +20,8 @@
           ZIP only
         } @else if (page === 'beta-feedback') {
           Beta review
+        } @else if (page === 'model-status') {
+          Model cards
         } @else {
           Inbox + audit
         }
@@ -28,6 +31,8 @@
           ZIP goes into feed/beta and the version is read from latest.yml.
         } @else if (page === 'beta-feedback') {
           Beta feedback is real data from OpenCode and promotion happens after 50% positive.
+        } @else if (page === 'model-status') {
+          Live model cards are synced from the updater server.
         } @else {
           General inbox shows live feedback from OpenCode.
         }
@@ -43,6 +48,10 @@
     <section class="single">
       <app-feedback-panel mode="beta" />
       <app-audit-panel />
+    </section>
+  } @else if (page === 'model-status') {
+    <section class="single">
+      <app-model-status-panel />
     </section>
   } @else {
     <section class="single">

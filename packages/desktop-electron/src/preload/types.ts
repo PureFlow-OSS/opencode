@@ -83,6 +83,7 @@ export type ElectronAPI = {
   runUpdater: (alertOnFail: boolean) => Promise<void>
   checkUpdate: () => Promise<{ updateAvailable: boolean; version?: string }>
   installUpdate: () => Promise<void>
+  resetData: () => Promise<void>
   setBackgroundColor: (color: string) => Promise<void>
   fetchUpdateServer: (input: {
     url: string

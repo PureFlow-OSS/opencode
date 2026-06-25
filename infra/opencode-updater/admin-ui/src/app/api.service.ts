@@ -34,6 +34,50 @@ type AuditRecord = {
   createdAt: string
 }
 
+type ModelCard = {
+  model: string
+  context?: number | null
+  output?: number | null
+  temperature?: boolean | null
+  reasoning?: boolean | null
+  price?: { input?: number | null; output?: number | null } | null
+  modalities?: { input?: string[]; output?: string[] } | null
+  source?: string
+  config?: {
+    pattern?: string | null
+    context?: number | null
+    output?: number | null
+    temperature?: boolean | null
+    reasoning?: boolean | null
+    modalities?: { input?: string[]; output?: string[] } | null
+  } | null
+  liteLLM?: {
+    name: string
+    object?: string | null
+    created?: number | null
+    ownedBy?: string | null
+    mode?: string | null
+    provider?: string | null
+    providerSpecificEntry?: string | null
+    maxInputTokens?: number | null
+    maxOutputTokens?: number | null
+    inputCostPerMillionTokens?: number | null
+    outputCostPerMillionTokens?: number | null
+    supportsReasoning?: boolean | null
+    modalities?: { input?: string[]; output?: string[] } | null
+  } | null
+}
+
+type ModelCardsResponse = {
+  version: string
+  isBeta: boolean
+  generatedAt: string
+  aifactory?: {
+    models?: ModelCard[]
+    model_visibility?: Array<{ pattern?: string | null; visible?: boolean | null }>
+  } | null
+}
+
 type ReleaseStatus = {
   releases: ReleaseRecord[]
   normalStopped: boolean
@@ -115,5 +159,9 @@ export class ApiService {
 
   async listAudit() {
     return this.readJson<AuditRecord[]>(await fetch("/opencode/admin/audit"))
+  }
+
+  async listModelCards() {
+    return this.readJson<ModelCardsResponse>(await fetch("/opencode/modelcards.json"))
   }
 }

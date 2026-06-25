@@ -312,8 +312,36 @@ registerIpcHandlers({
   runUpdater: async (alertOnFail) => checkForUpdates(alertOnFail),
   checkUpdate: async () => checkUpdate(),
   installUpdate: async () => installUpdate(),
+  resetData: async () => resetData(),
   setBackgroundColor: (color) => setBackgroundColor(color),
 })
+
+async function resetData() {
+  const script = join(process.resourcesPath, "reset-opencode.ps1")
+  if (!existsSync(script)) {
+    throw new Error(`Reset script not found: ${script}`)
+  }
+
+  const child = spawn("powershell.exe", [
+    "-NoProfile",
+    "-NonInteractive",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    script,
+  ], {
+    stdio: "inherit",
+    windowsHide: true,
+  })
+
+  await new Promise<void>((resolve, reject) => {
+    child.once("error", reject)
+    child.once("exit", (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(`Reset script exited with code ${code ?? 1}`))
+    })
+  })
+}
 
 async function killSidecar() {
   if (sidecarStop) return sidecarStop

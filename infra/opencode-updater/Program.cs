@@ -13,6 +13,7 @@ using System.Data.Common;
 using System.Data;
 using System.IO.Compression;
 using System.Text.RegularExpressions;
+using Quartz;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(options =>
@@ -44,6 +45,20 @@ builder.Services.AddSingleton(new LocalFeed(Path.Combine(builder.Environment.Con
 builder.Services.AddSingleton<UpdaterChannelStateStore>();
 builder.Services.AddSingleton<UpdaterVersionResolver>();
 builder.Services.AddSingleton<UpdaterRolloutResolver>();
+builder.Services.AddSingleton<ModelCardStore>();
+var modelCardSyncSeconds = Math.Max(60, betaConfiguration.GetSection("UpdaterBeta:LiteLLM:SyncIntervalSeconds").Get<int?>() ?? 600);
+builder.Services.AddQuartz((quartz) =>
+{
+  var jobKey = new JobKey(nameof(ModelCardSyncJob));
+  quartz.AddJob<ModelCardSyncJob>((job) => job.WithIdentity(jobKey).StoreDurably());
+  quartz.AddTrigger((trigger) =>
+    trigger
+      .ForJob(jobKey)
+      .WithIdentity($"{nameof(ModelCardSyncJob)}-trigger")
+      .StartNow()
+      .WithSimpleSchedule((schedule) => schedule.WithInterval(TimeSpan.FromSeconds(modelCardSyncSeconds)).RepeatForever()));
+});
+builder.Services.AddQuartzHostedService((options) => options.WaitForJobsToComplete = true);
 builder.Services.AddDbContext<FeedbackContext>(options =>
 {
   var dataDir = Path.Combine(builder.Environment.ContentRootPath, "data");
@@ -357,6 +372,25 @@ app.MapGet("/opencode/provider-config.json", async (HttpRequest request, Updater
   return Results.Json(rollout.Options.ProviderConfig);
 });
 
+app.MapGet("/opencode/modelcards.json", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver) =>
+{
+  var rollout = await rolloutResolver.ResolveAsync(request, request.HttpContext.RequestAborted);
+  var providerConfig = rollout.Options.ProviderConfig;
+  var cards = request.HttpContext.RequestServices.GetRequiredService<ModelCardStore>().BuildSnapshot(rollout.IsBeta, providerConfig);
+
+  return Results.Json(new
+  {
+    version = rollout.Version,
+    isBeta = rollout.IsBeta,
+    generatedAt = cards.GeneratedAt,
+    aifactory = new
+    {
+      models = cards.Models,
+      model_visibility = providerConfig.AiFactory.ModelVisibility,
+    },
+  });
+});
+
 app.MapGet("/opencode/feed/{**asset}", async (HttpContext context, LocalFeed feed, UpdaterRolloutResolver rolloutResolver, string? asset) =>
 {
   var rollout = await rolloutResolver.ResolveAsync(context.Request, context.RequestAborted);
@@ -593,9 +627,380 @@ sealed class LiteLLMBetaOptions
   public string BaseUrl { get; set; } = "";
   public string KeyInfoPath { get; set; } = "/key/info";
   public string ApiKey { get; set; } = "";
+  public string ModelInfoPath { get; set; } = "/model/info";
+  public string ModelsPath { get; set; } = "/v1/models";
+  public int SyncIntervalSeconds { get; set; } = 600;
 }
 
 sealed record UpdaterRollout(UpdaterOptions Options, string Version, bool IsBeta, string? BetaToken = null);
+
+sealed record ModelCardSnapshot(
+  DateTimeOffset GeneratedAt,
+  int ModelCount,
+  ModelCardEntry[] Models,
+  ModelCardSyncInfo Sync
+);
+
+sealed record ModelCardSyncInfo(
+  string? Source,
+  DateTimeOffset SyncedAt,
+  bool IsBeta
+);
+
+sealed record ModelCardPrice(
+  decimal? Input,
+  decimal? Output
+);
+
+sealed record ModelCardModalities(
+  string[] Input,
+  string[] Output
+);
+
+sealed record ModelCardEntry(
+  string Model,
+  int? Context,
+  int? Output,
+  bool? Temperature,
+  bool? Reasoning,
+  ModelCardPrice? Price,
+  ModelCardModalities? Modalities,
+  string Source,
+  ModelCardConfig? Config,
+  ModelCardLiteLLM? LiteLLM
+);
+
+sealed record ModelCardConfig(
+  string? Pattern,
+  int? Context,
+  int? Output,
+  bool? Temperature,
+  bool? Reasoning,
+  ModelCardModalities? Modalities
+);
+
+sealed record ModelCardLiteLLM(
+  string Name,
+  string? Object,
+  long? Created,
+  string? OwnedBy,
+  string? Mode,
+  string? Provider,
+  string? ProviderSpecificEntry,
+  int? MaxInputTokens,
+  int? MaxOutputTokens,
+  decimal? InputCostPerMillionTokens,
+  decimal? OutputCostPerMillionTokens,
+  bool? SupportsReasoning,
+  ModelCardModalities? Modalities
+);
+
+sealed record ModelCardData(
+  string Name,
+  string? Object,
+  long? Created,
+  string? OwnedBy,
+  string? Mode,
+  string? Provider,
+  string? ProviderSpecificEntry,
+  int? Context,
+  int? Output,
+  bool? Temperature,
+  bool? Reasoning,
+  decimal? InputPrice,
+  decimal? OutputPrice,
+  ModelCardModalities? Modalities,
+  string Source
+)
+{
+  public decimal? Price => InputPrice is null && OutputPrice is null ? null : (InputPrice ?? 0) + (OutputPrice ?? 0);
+}
+
+sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClientFactory clientFactory, ILogger<ModelCardStore> logger)
+{
+  readonly SemaphoreSlim syncGate = new(1, 1);
+  volatile ModelCardData[] cached = [];
+  DateTimeOffset syncedAt = DateTimeOffset.MinValue;
+  string? source;
+
+  public ModelCardSnapshot BuildSnapshot(bool isBeta, ProviderConfigOptions providerConfig)
+  {
+    var models = cached.Select((model) =>
+    {
+      var match = providerConfig.AiFactory.ModelLimits
+        .Select((rule) => new
+        {
+          rule,
+          score = ScoreRule(rule.Pattern, model.Name),
+        })
+        .Where((item) => item.score >= 0)
+        .OrderByDescending((item) => item.score)
+        .FirstOrDefault()?.rule;
+
+      return new ModelCardEntry(
+        model.Name,
+        match?.Context ?? model.Context,
+        match?.Output ?? model.Output,
+        match?.Temperature ?? model.Temperature,
+        match?.Reasoning ?? model.Reasoning,
+        model.Price is null ? null : new ModelCardPrice(model.InputPrice is null ? null : model.InputPrice * 1000000m, model.OutputPrice is null ? null : model.OutputPrice * 1000000m),
+        match?.Modalities is null ? model.Modalities : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? []),
+        model.Source,
+        match is null
+          ? null
+          : new ModelCardConfig(
+            match.Pattern,
+            match.Context,
+            match.Output,
+            match.Temperature,
+            match.Reasoning,
+            match.Modalities is null ? null : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? [])
+          ),
+        new ModelCardLiteLLM(
+          model.Name,
+          model.Object,
+          model.Created,
+          model.OwnedBy,
+          model.Mode,
+          model.Provider,
+          model.ProviderSpecificEntry,
+          model.Context,
+          model.Output,
+          model.InputPrice is null ? null : model.InputPrice * 1000000m,
+          model.OutputPrice is null ? null : model.OutputPrice * 1000000m,
+          model.Reasoning,
+          model.Modalities
+        )
+      );
+    }).ToArray();
+
+    return new ModelCardSnapshot(DateTimeOffset.UtcNow, models.Length, models, new ModelCardSyncInfo(source, syncedAt, isBeta));
+  }
+
+  public async Task SyncAsync(CancellationToken cancellationToken)
+  {
+    var beta = betaOptions.Value;
+    if (string.IsNullOrWhiteSpace(beta.LiteLLM.BaseUrl)) return;
+    if (!await syncGate.WaitAsync(0, cancellationToken)) return;
+
+    try
+    {
+      var modelInfo = await TryLoadModelInfoAsync(beta, cancellationToken);
+      cached = modelInfo.Length > 0 ? modelInfo : await TryLoadModelsAsync(beta, cancellationToken);
+      syncedAt = DateTimeOffset.UtcNow;
+      source = modelInfo.Length > 0 ? "litellm:/model/info" : "litellm:/v1/models";
+      logger.LogInformation("synced model cards from {Source} count={Count}", source, cached.Length);
+    }
+    finally
+    {
+      syncGate.Release();
+    }
+  }
+
+  async Task<ModelCardData[]> TryLoadModelInfoAsync(UpdaterBetaOptions beta, CancellationToken cancellationToken)
+  {
+    using var request = new HttpRequestMessage(HttpMethod.Get, BuildLiteLLMUrl(beta, beta.LiteLLM.ModelInfoPath));
+    AddLiteLLMAuth(request, beta);
+    using var response = await clientFactory.CreateClient().SendAsync(request, cancellationToken);
+    if (!response.IsSuccessStatusCode) return [];
+    await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+    using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+    if (document.RootElement.ValueKind != JsonValueKind.Object || !document.RootElement.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array)
+      return [];
+
+    return data.EnumerateArray()
+      .Select(ParseModelInfoItem)
+      .Where((item) => item is not null)
+      .Cast<ModelCardData>()
+      .ToArray();
+  }
+
+  async Task<ModelCardData[]> TryLoadModelsAsync(UpdaterBetaOptions beta, CancellationToken cancellationToken)
+  {
+    using var request = new HttpRequestMessage(HttpMethod.Get, BuildLiteLLMUrl(beta, beta.LiteLLM.ModelsPath));
+    AddLiteLLMAuth(request, beta);
+    using var response = await clientFactory.CreateClient().SendAsync(request, cancellationToken);
+    if (!response.IsSuccessStatusCode) return [];
+    await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+    using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+    if (document.RootElement.ValueKind != JsonValueKind.Object || !document.RootElement.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array)
+      return [];
+
+    return data.EnumerateArray()
+      .Select((item) =>
+      {
+        if (item.ValueKind != JsonValueKind.Object || !TryGetString(item, "id", out var name) || string.IsNullOrWhiteSpace(name)) return null;
+        return new ModelCardData(
+          name,
+          ReadString(item, "object"),
+          TryGetLong(item, "created"),
+          ReadString(item, "owned_by"),
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          "litellm:/v1/models"
+        );
+      })
+      .Where((item) => item is not null)
+      .Cast<ModelCardData>()
+      .ToArray();
+  }
+
+  static ModelCardData? ParseModelInfoItem(JsonElement item)
+  {
+    if (item.ValueKind != JsonValueKind.Object) return null;
+    var name = TryGetString(item, "model_name", out var modelName) ? modelName : TryGetString(item, "id", out var id) ? id : null;
+    if (string.IsNullOrWhiteSpace(name)) return null;
+    var info = item.TryGetProperty("model_info", out var modelInfo) && modelInfo.ValueKind == JsonValueKind.Object ? modelInfo : item;
+    return new ModelCardData(
+      name,
+      ReadString(item, "object"),
+      TryGetLong(item, "created"),
+      ReadString(item, "owned_by"),
+      ReadString(info, "mode"),
+      ReadString(info, "litellm_provider"),
+      ReadString(info, "provider_specific_entry"),
+      TryGetInt(info, "context_window") ?? TryGetInt(info, "max_input_tokens") ?? TryGetInt(info, "max_tokens"),
+      TryGetInt(info, "max_output_tokens"),
+      TryGetBool(info, "temperature"),
+      TryGetBool(info, "reasoning") ?? TryGetBool(info, "supports_reasoning") ?? (TryGetString(info, "mode", out var mode) && mode == "reasoning" ? true : null),
+      TryGetPrice(info, "input_cost_per_million_tokens", "input_cost_per_1m_tokens", "input_cost", "input_cost_per_token", "input"),
+      TryGetPrice(info, "output_cost_per_million_tokens", "output_cost_per_1m_tokens", "output_cost", "output_cost_per_token", "output"),
+      TryGetModalities(info),
+      "litellm:/model/info"
+    );
+  }
+
+  static void AddLiteLLMAuth(HttpRequestMessage request, UpdaterBetaOptions beta)
+  {
+    var apiKey = string.IsNullOrWhiteSpace(beta.LiteLLM.ApiKey) ? null : beta.LiteLLM.ApiKey.Trim();
+    if (apiKey is not null) request.Headers.TryAddWithoutValidation("x-litellm-api-key", apiKey);
+  }
+
+  static string BuildLiteLLMUrl(UpdaterBetaOptions beta, string path) =>
+    $"{beta.LiteLLM.BaseUrl.TrimEnd('/')}/{path.TrimStart('/')}";
+
+  static bool TryGetString(JsonElement item, string name, out string? value)
+  {
+    value = item.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.String ? property.GetString()?.Trim() : null;
+    return !string.IsNullOrWhiteSpace(value);
+  }
+
+  static string? ReadString(JsonElement item, string name)
+  {
+    return item.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.String ? property.GetString()?.Trim() : null;
+  }
+
+  static int? TryGetInt(JsonElement item, params string[] names)
+  {
+    foreach (var name in names)
+      if (item.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.Number && property.TryGetInt32(out var value))
+        return value;
+    return null;
+  }
+
+  static long? TryGetLong(JsonElement item, params string[] names)
+  {
+    foreach (var name in names)
+      if (item.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.Number && property.TryGetInt64(out var value))
+        return value;
+    return null;
+  }
+
+  static bool? TryGetBool(JsonElement item, params string[] names)
+  {
+    foreach (var name in names)
+    {
+      if (!item.TryGetProperty(name, out var property)) continue;
+      if (property.ValueKind == JsonValueKind.True) return true;
+      if (property.ValueKind == JsonValueKind.False) return false;
+    }
+    return null;
+  }
+
+  static decimal? TryGetPrice(JsonElement item, params string[] names)
+  {
+    foreach (var name in names)
+    {
+      if (item.TryGetProperty(name, out var property))
+      {
+        if (property.ValueKind == JsonValueKind.Number && property.TryGetDecimal(out var value)) return value;
+        if (property.ValueKind == JsonValueKind.String && decimal.TryParse(property.GetString(), out var parsed)) return parsed;
+      }
+    }
+    if (item.TryGetProperty("cost", out var cost) && cost.ValueKind == JsonValueKind.Object)
+      foreach (var name in names)
+        if (cost.TryGetProperty(name, out var property))
+        {
+          if (property.ValueKind == JsonValueKind.Number && property.TryGetDecimal(out var value)) return value;
+          if (property.ValueKind == JsonValueKind.String && decimal.TryParse(property.GetString(), out var parsed)) return parsed;
+        }
+    if (item.TryGetProperty("pricing", out var pricing) && pricing.ValueKind == JsonValueKind.Object)
+      foreach (var name in names)
+        if (pricing.TryGetProperty(name, out var property))
+        {
+          if (property.ValueKind == JsonValueKind.Number && property.TryGetDecimal(out var value)) return value;
+          if (property.ValueKind == JsonValueKind.String && decimal.TryParse(property.GetString(), out var parsed)) return parsed;
+        }
+    if (item.TryGetProperty("litellm_params", out var paramsObj) && paramsObj.ValueKind == JsonValueKind.Object)
+      foreach (var name in names)
+        if (paramsObj.TryGetProperty(name, out var property))
+        {
+          if (property.ValueKind == JsonValueKind.Number && property.TryGetDecimal(out var value)) return value;
+          if (property.ValueKind == JsonValueKind.String && decimal.TryParse(property.GetString(), out var parsed)) return parsed;
+        }
+    return null;
+  }
+
+  static ModelCardModalities? TryGetModalities(JsonElement item)
+  {
+    if (!item.TryGetProperty("modalities", out var modalities) || modalities.ValueKind != JsonValueKind.Object) return null;
+    var input = ReadStrings(modalities, "input");
+    var output = ReadStrings(modalities, "output");
+    return input.Length == 0 && output.Length == 0 ? null : new ModelCardModalities(input, output);
+  }
+
+  static int ScoreRule(string pattern, string model)
+  {
+    if (pattern == "*") return 0;
+    if (string.Equals(pattern, model, StringComparison.OrdinalIgnoreCase)) return 1000 + pattern.Length;
+    if (pattern.Contains('*') && WildcardMatch(model, pattern)) return 100 + pattern.Count((x) => x == '*') * -10 + pattern.Length;
+    return -1;
+  }
+
+  static bool WildcardMatch(string value, string pattern)
+  {
+    var regex = "^" + Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".") + "$";
+    return Regex.IsMatch(value, regex, RegexOptions.IgnoreCase);
+  }
+
+  static string[] ReadStrings(JsonElement item, string name)
+  {
+    if (!item.TryGetProperty(name, out var property) || property.ValueKind != JsonValueKind.Array) return [];
+    return property.EnumerateArray()
+      .Where((x) => x.ValueKind == JsonValueKind.String)
+      .Select((x) => x.GetString()?.Trim())
+      .Where((x) => !string.IsNullOrWhiteSpace(x))
+      .Cast<string>()
+      .ToArray();
+  }
+}
+
+sealed class ModelCardSyncJob(ModelCardStore store, ILogger<ModelCardSyncJob> logger) : IJob
+{
+  public async Task Execute(IJobExecutionContext context)
+  {
+    logger.LogDebug("running scheduled model card sync");
+    await store.SyncAsync(context.CancellationToken);
+  }
+}
 
 sealed class MotdOptions
 {

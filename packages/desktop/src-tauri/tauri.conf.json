@@ -35,6 +35,7 @@
     "category": "DeveloperTool",
     "targets": ["deb", "rpm", "dmg", "nsis", "app"],
     "externalBin": ["sidecars/opencode-cli"],
+    "resources": ["../opencode/bin/reset-opencode.ps1"],
     "linux": {
       "rpm": {
         "compression": {

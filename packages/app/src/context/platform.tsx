@@ -56,6 +56,9 @@ export type Platform = {
   /** Install the downloaded update using the platform restart flow */
   updateAndRestart?(): Promise<void>
 
+  /** Reset all local OpenCode data */
+  resetData?(): Promise<void>
+
   /** Fetch override */
   fetch?: typeof fetch
 

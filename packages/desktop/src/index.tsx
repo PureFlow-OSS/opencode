@@ -350,6 +350,10 @@ const createPlatform = (): Platform => {
       await relaunch()
     },
 
+    resetData: async () => {
+      await commands.resetData()
+    },
+
     restart: async () => {
       await commands.killSidecar().catch(() => undefined)
       await relaunch()
