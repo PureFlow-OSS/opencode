@@ -9,6 +9,11 @@
 - MCP settings dialogs are now larger and better sized for editing more complex server setups.
 - MCP updates now sync more consistently between Settings and the status popover, including faster local UI refreshes after changes.
 - Desktop build packaging now includes the changelog file more reliably.
+- Session title generation is now more stable.
+- Model cards in Settings now load correctly again.
+- The app now has a session delete context menu.
+- Updater and install path handling has been improved.
+- Desktop and CLI packaging flow updates are included.
 
 ## Fixed
 
