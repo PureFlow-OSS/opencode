@@ -137,13 +137,15 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Co
 export const use = serviceUse(Service)
 
 function globalConfigFile() {
-  const candidates = ["opencode.jsonc", "opencode.json", "config.json"].map((file) =>
-    path.join(Global.Path.config, file),
-  )
+  const candidates = globalConfigFiles()
   for (const file of candidates) {
     if (existsSync(file)) return file
   }
   return candidates[0]
+}
+
+function globalConfigFiles() {
+  return ["opencode.jsonc", "opencode.json", "config.json"].map((file) => path.join(Global.Path.config, file))
 }
 
 function patchJsonc(input: string, patch: unknown, path: string[] = []): string {
@@ -652,6 +654,16 @@ export const layer = Layer.effect(
         next = ConfigParse.schema(ConfigV1.Info, ConfigParse.jsonc(updated, file), file)
         changed = updated !== before
         if (changed) yield* fs.writeFileString(file, updated).pipe(Effect.orDie)
+      }
+      if ("mcp" in patch) {
+        for (const sibling of globalConfigFiles()) {
+          if (sibling === file) continue
+          const previous = yield* readConfigFile(sibling)
+          if (!previous) continue
+          const cleared = patchJsonc(previous, { mcp: undefined })
+          if (cleared === previous) continue
+          yield* fs.writeFileString(sibling, cleared).pipe(Effect.orDie)
+        }
       }
 
       if (changed) yield* invalidate()

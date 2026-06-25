@@ -200,6 +200,7 @@ export function DialogMcpForm(props: Props) {
 
   return (
     <Dialog
+      size="x-large"
       title={
         <IconButton
           tabIndex={-1}
