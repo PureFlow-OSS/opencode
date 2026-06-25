@@ -4,11 +4,53 @@ import { Switch } from "@opencode-ai/ui/switch"
 import { Icon } from "@opencode-ai/ui/icon"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { TextField } from "@opencode-ai/ui/text-field"
-import { type Component, For, Show } from "solid-js"
+import { type Component, createResource, For, Show } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { useModels } from "@/context/models"
 import { popularProviders } from "@/hooks/use-providers"
 import { SettingsList } from "./settings-list"
+import { usePlatform } from "@/context/platform"
+
+type ModelCard = {
+  model: string
+  context?: number | null
+  output?: number | null
+  temperature?: boolean | null
+  reasoning?: boolean | null
+  modalities?: { input?: string[]; output?: string[] } | null
+  source?: string
+  config?: {
+    pattern?: string | null
+    context?: number | null
+    output?: number | null
+    temperature?: boolean | null
+    reasoning?: boolean | null
+    modalities?: { input?: string[]; output?: string[] } | null
+  } | null
+  liteLLM?: {
+    name: string
+    object?: string | null
+    created?: number | null
+    ownedBy?: string | null
+    mode?: string | null
+    provider?: string | null
+    providerSpecificEntry?: string | null
+    maxInputTokens?: number | null
+    maxOutputTokens?: number | null
+    inputCostPerMillionTokens?: number | null
+    outputCostPerMillionTokens?: number | null
+    supportsReasoning?: boolean | null
+    modalities?: { input?: string[]; output?: string[] } | null
+  } | null
+}
+
+type ModelCardResponse = {
+  version: string
+  generatedAt: string
+  aifactory?: {
+    models?: ModelCard[]
+  } | null
+}
 
 type ModelItem = ReturnType<ReturnType<typeof useModels>["list"]>[number]
 
@@ -34,6 +76,19 @@ const ListEmptyState: Component<{ message: string; filter: string }> = (props) =
 export const SettingsModels: Component = () => {
   const language = useLanguage()
   const models = useModels()
+  const platform = usePlatform()
+  const updateBaseUrl =
+    import.meta.env.VITE_OPENCODE_UPDATE_BASE_URL ?? (import.meta.env.DEV ? "http://127.0.0.1:80/opencode" : "http://10.53.7.23/opencode")
+  const [modelcards] = createResource(
+    () => updateBaseUrl,
+    async (baseUrl) =>
+      platform.fetch?.(new Request(`${baseUrl}/modelcards.json`, { cache: "no-store" }))
+        .then((response) => (response.ok ? response.json() : null))
+        .catch(() => null) ?? null,
+    { initialValue: null as ModelCardResponse | null },
+  )
+  const formatMoney = (value?: number | null) =>
+    value === undefined || value === null ? "n/a" : new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(value)
 
   const list = useFilteredList<ModelItem>({
     items: (_filter) => models.manageable(),
@@ -131,6 +186,73 @@ export const SettingsModels: Component = () => {
             </For>
           </Show>
         </Show>
+
+        <div class="flex flex-col gap-4">
+          <div class="flex items-end justify-between gap-4">
+            <div class="flex flex-col gap-1">
+              <h2 class="text-16-medium text-text-strong">{language.t("settings.models.title")}</h2>
+            </div>
+          </div>
+          <Show
+            when={modelcards()?.aifactory?.models?.length}
+            fallback={<div class="text-14-regular text-text-weak">No model cards available yet.</div>}
+          >
+            <div class="grid gap-4 xl:grid-cols-2">
+              <For each={modelcards()?.aifactory?.models ?? []}>
+                {(card) => (
+                  (() => {
+                    const context = card.context ?? card.config?.context ?? null
+                    const output = card.output ?? card.config?.output ?? null
+                    const thinking = card.reasoning ?? card.config?.reasoning ?? null
+                    const inputCost = card.liteLLM?.inputCostPerMillionTokens ?? null
+                    const outputCost = card.liteLLM?.outputCostPerMillionTokens ?? null
+
+                    return (
+                  <div class="rounded-2xl border border-border-weak-base bg-surface-raised-base p-5 shadow-sm">
+                    <div class="flex items-start justify-between gap-4">
+                      <div class="min-w-0">
+                        <div class="text-18-medium text-text-strong truncate">{card.model}</div>
+                        <div class="text-13-regular text-text-weak truncate">{card.config?.pattern || "All models"}</div>
+                      </div>
+                    </div>
+                    <div class="mt-4 grid grid-cols-2 gap-3 text-13-regular text-text-weak">
+                      <div>
+                        <div class="text-text-strong text-12-medium">Context</div>
+                        <div>{context === null ? "n/a" : context.toLocaleString()}</div>
+                      </div>
+                      <div>
+                        <div class="text-text-strong text-12-medium">Output</div>
+                        <div>{output === null ? "n/a" : output.toLocaleString()}</div>
+                      </div>
+                      <div>
+                        <div class="text-text-strong text-12-medium">Thinking</div>
+                        <div>{thinking === null ? "n/a" : thinking ? "Yes" : "No"}</div>
+                      </div>
+                      <div>
+                        <div class="text-text-strong text-12-medium">Input Cost /1M</div>
+                        <div>{formatMoney(inputCost)}</div>
+                      </div>
+                      <div>
+                        <div class="text-text-strong text-12-medium">Output Cost /1M</div>
+                        <div>{formatMoney(outputCost)}</div>
+                      </div>
+                    </div>
+                    <Show when={card.modalities?.input?.length || card.modalities?.output?.length}>
+                      <div class="mt-4 text-13-regular text-text-weak">
+                        <div class="text-text-strong text-12-medium mb-1">Modalities</div>
+                        <div>
+                          {card.modalities?.input?.join(", ") || "n/a"} {card.modalities?.output?.length ? `→ ${card.modalities.output.join(", ")}` : ""}
+                        </div>
+                      </div>
+                    </Show>
+                  </div>
+                    )
+                  })()
+                )}
+              </For>
+            </div>
+          </Show>
+        </div>
       </div>
     </div>
   )
