@@ -1,6 +1,6 @@
 import { NodeFileSystem } from "@effect/platform-node"
 import { FetchHttpClient } from "effect/unstable/http"
-import { expect } from "bun:test"
+import { expect, test } from "bun:test"
 import { Cause, Effect, Exit, Fiber, Layer } from "effect"
 import path from "path"
 import os from "os"
@@ -27,7 +27,7 @@ import { SessionCompaction } from "../../src/session/compaction"
 import { SessionSummary } from "../../src/session/summary"
 import { Instruction } from "../../src/session/instruction"
 import { SessionProcessor } from "../../src/session/processor"
-import { SessionPrompt } from "../../src/session/prompt"
+import { SessionPrompt, fallbackTitle } from "../../src/session/prompt"
 import { SessionRevert } from "../../src/session/revert"
 import { SessionRunState } from "../../src/session/run-state"
 import { MessageID, PartID, SessionID } from "../../src/session/schema"
@@ -326,6 +326,31 @@ const boot = Effect.fn("test.boot")(function* (input?: { title?: string }) {
   yield* config.get()
   const chat = yield* sessions.create(input ?? { title: "Pinned" })
   return { prompt, run, sessions, chat }
+})
+
+test("fallbackTitle derives a short readable title from user text", () => {
+  const messageID = MessageID.ascending()
+  expect(
+    fallbackTitle({
+      info: {
+        id: messageID,
+        sessionID: SessionID.make("session-1"),
+        role: "user",
+        time: { created: Date.now() },
+        agent: "build",
+        model: ref,
+      } as MessageV2.User,
+      parts: [
+        {
+          id: PartID.ascending(),
+          messageID,
+          sessionID: SessionID.make("session-1"),
+          type: "text",
+          text: "Fix session titles when title generation fails",
+        },
+      ],
+    } as MessageV2.WithParts),
+  ).toBe("Fix session titles when title generation fails")
 })
 
 // Loop semantics

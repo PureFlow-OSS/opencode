@@ -69,6 +69,7 @@ const STRUCTURED_OUTPUT_SYSTEM_PROMPT = `IMPORTANT: The user has requested struc
 const log = Log.create({ service: "session.prompt" })
 const elog = EffectLogger.create({ service: "session.prompt" })
 const UNSUPPORTED_DROP_DIR = process.platform === "win32" ? "C:\\Temp" : path.join(os.tmpdir(), "opencode-unsupported")
+const TITLE_MAX_LENGTH = 50
 
 function isModelReadableFile(mime: string) {
   return (
@@ -93,6 +94,27 @@ function decodeDataUrlBytes(url: string) {
   const body = url.slice(idx + 1)
   if (head.includes(";base64")) return Buffer.from(body, "base64")
   return Buffer.from(decodeURIComponent(body))
+}
+
+export function fallbackTitle(message: MessageV2.WithParts) {
+  const text = message.parts
+    .flatMap((part) => (part.type === "text" && !part.synthetic && !part.ignored ? [part.text] : []))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  if (!text) return undefined
+
+  const title = text
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[`*_#]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  if (!title) return undefined
+
+  const words = title.split(" ").slice(0, 8).join(" ")
+  return words.length > TITLE_MAX_LENGTH ? words.slice(0, TITLE_MAX_LENGTH - 3).trimEnd() + "..." : words
 }
 
 export interface Interface {
@@ -231,16 +253,17 @@ export const layer = Layer.effect(
         .pipe(
           Stream.filter((e): e is Extract<LLM.Event, { type: "text-delta" }> => e.type === "text-delta"),
           Stream.map((e) => e.text),
-          Stream.mkString,
-          Effect.orDie,
+          Stream.runCollect,
+          Effect.map((chunks) => Array.from(chunks).join("")),
+          Effect.orElseSucceed(() => ""),
         )
       const cleaned = text
         .replace(/<think>[\s\S]*?<\/think>\s*/g, "")
         .split("\n")
-        .map((line) => line.trim())
-        .find((line) => line.length > 0)
-      if (!cleaned) return
-      const t = cleaned.length > 100 ? cleaned.substring(0, 97) + "..." : cleaned
+        .map((line: string) => line.trim())
+        .find((line: string) => line.length > 0)
+      const t = cleaned ?? fallbackTitle(firstUser)
+      if (!t) return
       yield* sessions
         .setTitle({ sessionID: input.session.id, title: t })
         .pipe(Effect.catchCause((cause) => elog.error("failed to generate title", { error: Cause.squash(cause) })))
