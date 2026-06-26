@@ -38,6 +38,7 @@ import { createWslServersController } from "./wsl/servers"
 import { registerWslIpcHandlers } from "./wsl/ipc"
 import { spawnWslSidecar } from "./wsl/sidecar"
 import { migrate } from "./migrate"
+import { updateServer } from "./update-server"
 
 const APP_NAMES: Record<string, string> = {
   dev: "OpenCode Dev",
@@ -264,7 +265,7 @@ const main = Effect.gen(function* () {
     updater,
     showUpdater: () => showUpdaterDialog(updater, true),
     resetData: () => resetData(),
-    getMotd: () => null,
+    getMotd: async () => (await updateServer.fetch())?.motd ?? null,
     setBackgroundColor: (color) => setBackgroundColor(color),
     exportDebugLogs: () => exportDebugLogs(),
     recordFatalRendererError: (error) => writeLog("renderer", "fatal renderer error", { ...error }, "error"),

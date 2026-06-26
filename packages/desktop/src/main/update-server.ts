@@ -10,6 +10,7 @@ const parseVersion = (value: string) =>
 export const updateServer = {
   versionUrl: `${UPDATE_SERVER_BASE_URL}/version`,
   feedUrl: `${UPDATE_SERVER_BASE_URL}/url`,
+  configUrl: `${UPDATE_SERVER_BASE_URL}/config`,
   compareVersions(current: string, next: string) {
     const left = parseVersion(current)
     const right = parseVersion(next)
@@ -18,7 +19,7 @@ export const updateServer = {
     return delta > 0 ? 1 : -1
   },
   async fetch() {
-    const [version, url] = await Promise.all([
+    const [version, url, motd] = await Promise.all([
       fetch(this.versionUrl, { cache: "no-store" })
         .then((result) => (result.ok ? result.text() : ""))
         .then((result) => result.trim())
@@ -27,8 +28,20 @@ export const updateServer = {
         .then((result) => (result.ok ? result.text() : ""))
         .then((result) => result.trim())
         .catch(() => ""),
+      fetch(this.configUrl, { cache: "no-store" })
+        .then((result) => (result.ok ? result.json() : null))
+        .then((result) => {
+          if (!result || typeof result !== "object") return null
+          const value = "motd" in result ? (result as { motd?: unknown }).motd : null
+          if (!value || typeof value !== "object") return null
+          const enabled = "enabled" in value ? (value as { enabled?: unknown }).enabled : null
+          const text = "text" in value ? (value as { text?: unknown }).text : null
+          if (typeof enabled !== "boolean" || typeof text !== "string") return null
+          return { enabled, text }
+        })
+        .catch(() => null),
     ])
     if (!version || !url) return null
-    return { version, url }
+    return { version, url, motd }
   },
 }
