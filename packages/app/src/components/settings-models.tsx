@@ -7,10 +7,11 @@ import { TextField } from "@opencode-ai/ui/text-field"
 import { type Component, createResource, For, Show } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { useModels } from "@/context/models"
-import { popularProviders } from "@/hooks/use-providers"
 import { SettingsList } from "./settings-list"
 import { SettingsServerPicker, SettingsServerScope } from "./settings-server-picker"
 import { usePlatform } from "@/context/platform"
+
+const AIFACTORY_PROVIDER_ID = "aifactory"
 
 type ModelCard = {
   model: string
@@ -100,24 +101,15 @@ const SettingsModelsContent: Component = () => {
     value === undefined || value === null ? "n/a" : new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(value)
 
   const list = useFilteredList<ModelItem>({
-    items: (_filter) => models.manageable(),
+    items: (_filter) => models.manageable().filter((item) => item.provider.id === AIFACTORY_PROVIDER_ID),
     key: (x) => `${x.provider.id}:${x.id}`,
     filterKeys: ["provider.name", "name", "id"],
     sortBy: (a, b) => a.name.localeCompare(b.name),
     groupBy: (x) => x.provider.id,
     sortGroupsBy: (a, b) => {
-      const aIndex = popularProviders.indexOf(a.category)
-      const bIndex = popularProviders.indexOf(b.category)
-      const aPopular = aIndex >= 0
-      const bPopular = bIndex >= 0
-
-      if (aPopular && !bPopular) return -1
-      if (!aPopular && bPopular) return 1
-      if (aPopular && bPopular) return aIndex - bIndex
-
-      const aName = a.items[0].provider.name
-      const bName = b.items[0].provider.name
-      return aName.localeCompare(bName)
+      if (a.category === AIFACTORY_PROVIDER_ID && b.category !== AIFACTORY_PROVIDER_ID) return -1
+      if (a.category !== AIFACTORY_PROVIDER_ID && b.category === AIFACTORY_PROVIDER_ID) return 1
+      return a.items[0].provider.name.localeCompare(b.items[0].provider.name)
     },
   })
 
@@ -197,11 +189,6 @@ const SettingsModelsContent: Component = () => {
         </Show>
 
         <div class="flex flex-col gap-4">
-          <div class="flex items-end justify-between gap-4">
-            <div class="flex flex-col gap-1">
-              <h2 class="text-16-medium text-text-strong">{language.t("settings.models.title")}</h2>
-            </div>
-          </div>
           <Show
             when={modelcards()?.aifactory?.models?.length}
             fallback={<div class="text-14-regular text-text-weak">No model cards available yet.</div>}

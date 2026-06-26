@@ -6,7 +6,6 @@ import type { Accessor } from "solid-js"
 import { selectProviderCatalog } from "./provider-catalog"
 
 export const popularProviders = [
-  "github-copilot",
   "aifactory",
 ]
 const popularProviderSet = new Set(popularProviders)
