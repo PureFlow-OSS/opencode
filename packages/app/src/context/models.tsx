@@ -6,7 +6,7 @@ import { createSimpleContext } from "@opencode-ai/ui/context"
 import { usePlatform } from "@/context/platform"
 import { useProviders } from "@/hooks/use-providers"
 import { Persist, persisted } from "@/utils/persist"
-import { useGlobalSync } from "./global-sync"
+import { useServerSync } from "./server-sync"
 import {
   defaultModelVisibilityRules,
   readAiFactoryModelVisibilityRules,
@@ -36,7 +36,7 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
   init: () => {
     const platform = usePlatform()
     const providers = useProviders()
-    const globalSync = useGlobalSync()
+    const globalSync = useServerSync()
 
     const [store, setStore, _, ready] = persisted(
       Persist.global("model", ["model.v1"]),

@@ -264,6 +264,7 @@ const main = Effect.gen(function* () {
     updater,
     showUpdater: () => showUpdaterDialog(updater, true),
     resetData: () => resetData(),
+    getMotd: () => null,
     setBackgroundColor: (color) => setBackgroundColor(color),
     exportDebugLogs: () => exportDebugLogs(),
     recordFatalRendererError: (error) => writeLog("renderer", "fatal renderer error", { ...error }, "error"),

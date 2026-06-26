@@ -47,6 +47,7 @@ export type ElectronAPI = {
   wslServers: WslServersAPI
   updater: UpdaterAPI
   resetData: () => Promise<void>
+  getMotd: () => Promise<{ enabled: boolean; text: string } | null>
   consumeInitialDeepLinks: () => Promise<string[]>
   getDefaultServerUrl: () => Promise<string | null>
   setDefaultServerUrl: (url: string | null) => Promise<void>
