@@ -32,6 +32,15 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   shell: Schema.String.pipe(Schema.optional).annotate({
     description: "Default shell to use for terminal and shell tool execution",
   }),
+  http_proxy: Schema.String.pipe(Schema.optional).annotate({
+    description: "HTTP or HTTPS proxy URL for outbound provider requests",
+  }),
+  aifactory_host: Schema.String.pipe(Schema.optional).annotate({
+    description: "RRZ AI Factory host. Defaults to http://10.53.7.23.",
+  }),
+  use_http_proxy: Schema.Boolean.pipe(Schema.optional).annotate({
+    description: "Whether the configured global HTTP proxy should be used. Defaults to true.",
+  }),
   model: Schema.String.pipe(Schema.optional).annotate({
     description: "Default model to use when no session or agent model is selected",
   }),
