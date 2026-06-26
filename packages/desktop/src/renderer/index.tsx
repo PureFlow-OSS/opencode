@@ -200,6 +200,15 @@ const createPlatform = (): Platform => {
       check: () => window.api.updater.check(),
       install: () => window.api.updater.install(),
     },
+    checkUpdate: async () => {
+      const state = await window.api.updater.check()
+      return {
+        updateAvailable: state.status === "ready",
+        version: state.status === "ready" ? state.version : undefined,
+      }
+    },
+    updateAndRestart: () => window.api.updater.install(),
+    resetData: () => window.api.resetData(),
 
     exportDebugLogs: () => window.api.exportDebugLogs(),
 

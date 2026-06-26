@@ -19,6 +19,7 @@ type SaveFilePickerOptions = { title?: string; defaultPath?: string }
 type PlatformName = "web" | "desktop"
 type DesktopOS = "macos" | "windows" | "linux"
 type Motd = { enabled: boolean; text: string }
+type UpdateInfo = { updateAvailable: boolean; version?: string }
 
 export type FatalRendererErrorLog = {
   error: string
@@ -67,6 +68,15 @@ type PlatformBase = {
 
   /** Application-global desktop updater */
   updater?: UpdaterPlatform
+
+  /** Legacy updater check used by local/dev */
+  checkUpdate?(): Promise<UpdateInfo>
+
+  /** Legacy updater install used by local/dev */
+  updateAndRestart?(): Promise<void>
+
+  /** Legacy cleanup/reset helper used by local/dev */
+  resetData?(): Promise<void>
 
   /** Fetch override */
   fetch?: typeof fetch

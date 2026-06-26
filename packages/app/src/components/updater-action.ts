@@ -49,3 +49,30 @@ export function useUpdaterAction() {
     },
   }
 }
+
+export function useUpdaterInstall() {
+  const platform = usePlatform()
+
+  return () => platform.updater?.install()
+}
+
+export function useUpdaterCheck() {
+  const platform = usePlatform()
+  const language = useLanguage()
+
+  return async () => {
+    const state = await platform.updater?.check()
+    if (state?.status === "up-to-date") {
+      showToast({
+        variant: "success",
+        icon: "circle-check",
+        title: language.t("settings.updates.toast.latest.title"),
+        description: language.t("settings.updates.toast.latest.description", { version: platform.version ?? "" }),
+      })
+    }
+    if (state?.status === "error") {
+      showToast({ title: language.t("common.requestFailed"), description: state.message })
+    }
+    return state
+  }
+}

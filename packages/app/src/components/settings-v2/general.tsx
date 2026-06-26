@@ -11,7 +11,7 @@ import { usePermission } from "@/context/permission"
 import { usePlatform } from "@/context/platform"
 import { useServerSync } from "@/context/server-sync"
 import { useServerSDK } from "@/context/server-sdk"
-import { useUpdaterAction } from "../updater-action"
+import { useUpdaterAction, useUpdaterCheck } from "../updater-action"
 import {
   monoDefault,
   monoFontFamily,
@@ -94,6 +94,7 @@ export const SettingsGeneralV2: Component<{
   const mobile = createMediaQuery("(max-width: 767px)")
 
   const updater = useUpdaterAction()
+  const checkUpdate = useUpdaterCheck()
 
   const dir = createMemo(() => {
     if (!props.sessionID) return undefined
@@ -658,7 +659,7 @@ export const SettingsGeneralV2: Component<{
           title={language.t("settings.updates.row.check.title")}
           description={language.t("settings.updates.row.check.description")}
         >
-          <ButtonV2 size="normal" variant="neutral" disabled={!updater.action().run} onClick={updater.run}>
+          <ButtonV2 size="normal" variant="neutral" disabled={!updater.action().run} onClick={updater.action().run ? updater.run : checkUpdate}>
             {language.t(updater.action().label)}
           </ButtonV2>
         </SettingsRowV2>

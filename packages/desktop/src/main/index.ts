@@ -26,7 +26,7 @@ import {
   spawnLocalServer,
   type SidecarListener,
 } from "./server"
-import { setupAutoUpdater, showUpdaterDialog } from "./updater"
+import { resetData, setupAutoUpdater, showUpdaterDialog } from "./updater"
 import {
   createMainWindow,
   registerRendererProtocol,
@@ -263,6 +263,7 @@ const main = Effect.gen(function* () {
     resolveAppPath: async (appName) => resolveAppPath(appName),
     updater,
     showUpdater: () => showUpdaterDialog(updater, true),
+    resetData: () => resetData(),
     setBackgroundColor: (color) => setBackgroundColor(color),
     exportDebugLogs: () => exportDebugLogs(),
     recordFatalRendererError: (error) => writeLog("renderer", "fatal renderer error", { ...error }, "error"),
