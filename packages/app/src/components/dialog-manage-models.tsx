@@ -5,11 +5,12 @@ import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { Button } from "@opencode-ai/ui/button"
 import type { Component } from "solid-js"
 import { useLocal } from "@/context/local"
-import { popularProviders } from "@/hooks/use-providers"
 import { useLanguage } from "@/context/language"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { DialogSelectProvider } from "./dialog-select-provider"
 import { decode64 } from "@/utils/base64"
+
+const AIFACTORY_PROVIDER_ID = "aifactory"
 
 export const DialogManageModels: Component = () => {
   const local = useLocal()
@@ -20,7 +21,6 @@ export const DialogManageModels: Component = () => {
   const handleConnectProvider = () => {
     dialog.show(() => <DialogSelectProvider directory={directory} />)
   }
-  const providerRank = (id: string) => popularProviders.indexOf(id)
   const providerList = (providerID: string) => local.model.list().filter((x) => x.provider.id === providerID)
   const providerVisible = (providerID: string) =>
     providerList(providerID).every((x) => local.model.visible({ modelID: x.id, providerID: x.provider.id }))
@@ -45,7 +45,7 @@ export const DialogManageModels: Component = () => {
         search={{ placeholder: language.t("dialog.model.search.placeholder"), autofocus: true }}
         emptyMessage={language.t("dialog.model.empty")}
         key={(x) => `${x?.provider?.id}:${x?.id}`}
-        items={local.model.list()}
+        items={local.model.list().filter((x) => x.provider.id === AIFACTORY_PROVIDER_ID)}
         filterKeys={["provider.name", "name", "id"]}
         sortBy={(a, b) => a.name.localeCompare(b.name)}
         groupBy={(x) => x.provider.id}
@@ -71,13 +71,9 @@ export const DialogManageModels: Component = () => {
           )
         }}
         sortGroupsBy={(a, b) => {
-          const aRank = providerRank(a.items[0].provider.id)
-          const bRank = providerRank(b.items[0].provider.id)
-          const aPopular = aRank >= 0
-          const bPopular = bRank >= 0
-          if (aPopular && !bPopular) return -1
-          if (!aPopular && bPopular) return 1
-          return aRank - bRank
+          if (a.category === AIFACTORY_PROVIDER_ID && b.category !== AIFACTORY_PROVIDER_ID) return -1
+          if (a.category !== AIFACTORY_PROVIDER_ID && b.category === AIFACTORY_PROVIDER_ID) return 1
+          return a.items[0].provider.name.localeCompare(b.items[0].provider.name)
         }}
         onSelect={(x) => {
           if (!x) return

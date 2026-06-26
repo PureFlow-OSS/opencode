@@ -29,6 +29,7 @@ const PROVIDER_NOTES = [
 ] as const
 
 const PROVIDER_ICON_SIZE = 16
+const AIFACTORY_PROVIDER_ID = "aifactory"
 
 export const SettingsProvidersV2: Component = () => {
   const dialog = useDialog()
@@ -40,6 +41,7 @@ export const SettingsProvidersV2: Component = () => {
   const connected = createMemo(() => {
     return providers
       .connected()
+      .filter((p) => p.id === AIFACTORY_PROVIDER_ID)
       .filter((p) => p.id !== "opencode" || Object.values(p.models).find((m) => m.cost?.input))
   })
 
@@ -47,6 +49,7 @@ export const SettingsProvidersV2: Component = () => {
     const connectedIDs = new Set(connected().map((p) => p.id))
     const items = providers
       .popular()
+      .filter((p) => p.id === AIFACTORY_PROVIDER_ID)
       .filter((p) => !connectedIDs.has(p.id))
       .slice()
     items.sort((a, b) => popularProviders.indexOf(a.id) - popularProviders.indexOf(b.id))
@@ -197,7 +200,7 @@ export const SettingsProvidersV2: Component = () => {
                     <div class="settings-v2-provider-copy">
                       <div class="settings-v2-provider-main">
                         <span class="settings-v2-provider-name">{item.name}</span>
-                        <Show when={item.id === "opencode" || item.id === "opencode-go"}>
+                        <Show when={item.id === AIFACTORY_PROVIDER_ID}>
                           <Tag>{language.t("dialog.provider.tag.recommended")}</Tag>
                         </Show>
                       </div>
