@@ -136,13 +136,16 @@ export function buildLayer<
   const tiers = options?.tiers ?? (defaultTiers as unknown as Tiers<Names>)
   const replacementMap = new Map(options?.replacements?.map((item) => [item.source, item.replacement]))
   const plans = plan(node, tiers, replacementMap)
-  const layers: RuntimeLayer[] = tiers.names.map((name) => {
+  const layers = tiers.names.map((name) => {
     const tier = tiers.values[name as Names[number]]
     const layers = plans.get(tier) ?? []
-    return (options?.buildTier?.(name, layers) ?? combine(layers)) as RuntimeLayer
+    return {
+      name,
+      layer: (options?.buildTier?.(name, layers) ?? combine(layers)) as RuntimeLayer,
+    }
   })
   if (layers.length === 0) return Layer.empty as never
-  return layers.slice(1).reduce((result, layer) => result.pipe(Layer.provideMerge(layer)), layers[0]) as never
+  return layers.slice(1).reduce((result, item) => result.pipe(Layer.provideMerge(item.layer)), layers[0].layer) as never
 }
 
 export function combine(layers: readonly Layer.Any[]): RuntimeLayer {
@@ -227,9 +230,15 @@ function plan(
     stack.push(node)
     try {
       node.dependencies.forEach((dependency) => visit(dependency, tier, unseenOrigins))
+      if (!node.implementation) {
+        throw new Error(`Node ${node.name} is missing a layer implementation`)
+      }
+      if (typeof (node.implementation as { build?: unknown }).build !== "function") {
+        throw new Error(`Node ${node.name} has an invalid layer implementation`)
+      }
       const layers = plans.get(tier) ?? []
       plans.set(tier, layers)
-      layers.push(replacements.get(node.implementation!) ?? node.implementation!)
+      layers.push(replacements.get(node.implementation) ?? node.implementation)
       implementations.set(key, node)
     } finally {
       stack.pop()
