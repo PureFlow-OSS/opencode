@@ -121,7 +121,7 @@ export function DialogAddWslServer(props: DialogWslServerProps = {}) {
   const addDisabled = createMemo(() => {
     const job = current()?.job
     if (!job) return store.adding
-    return store.adding || job.kind !== "probe-opencode"
+    return store.adding || job?.kind !== "probe-opencode"
   })
   const recommendedStep = createMemo<WslServerStep>(() => {
     if (!wslReady()) return "wsl"

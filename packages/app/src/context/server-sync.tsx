@@ -509,6 +509,7 @@ export const { use: useServerSync, provider: ServerSyncProvider } = createSimple
   // Returns an accessor so the resolved server can change reactively without
   // re-instantiating the subtree (mirrors useServerSDK).
   init: (props: { server?: Accessor<ServerConnection.Any | undefined> }) => {
+    console.info("[opencode] ServerSyncProvider init")
     const global = useGlobal()
     const language = useLanguage()
     const server = useServer()

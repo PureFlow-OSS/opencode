@@ -9,6 +9,7 @@ const wslServersQueryKey = ["platform", "wslServers"] as const
 export const { use: useWslServers, provider: WslServersProvider } = createSimpleContext({
   name: "WslServers",
   init: () => {
+    console.info("[opencode] WslServersProvider init")
     const platform = usePlatform()
     const queryClient = useQueryClient()
     const query = useQuery(() => {

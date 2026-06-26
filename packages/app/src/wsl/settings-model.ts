@@ -1,7 +1,7 @@
 import type { WslOpencodeCheck, WslServerRuntime } from "./types"
 
-export const wslRuntimeRetryable = (runtime: WslServerRuntime) =>
-  runtime.kind === "failed" || runtime.kind === "stopped"
+export const wslRuntimeRetryable = (runtime?: WslServerRuntime) =>
+  runtime?.kind === "failed" || runtime?.kind === "stopped"
 
 export async function enterWslOpencodeStep(
   distro: string,

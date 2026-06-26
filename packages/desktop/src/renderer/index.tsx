@@ -291,6 +291,31 @@ window.api.onMenuCommand((id) => {
   menuTrigger?.(id)
 })
 listenForDeepLinks()
+console.info("[opencode] desktop renderer bootstrap")
+
+window.addEventListener("error", (event) => {
+  window.api.recordFatalRendererError({
+    error:
+      event.error instanceof Error
+        ? `${event.error.name}: ${event.error.message}\n${event.error.stack ?? ""}`
+        : String(event.message),
+    url: location.href,
+    version: pkg.version,
+    platform: "desktop",
+    os,
+  })
+})
+
+window.addEventListener("unhandledrejection", (event) => {
+  const reason = event.reason
+  window.api.recordFatalRendererError({
+    error: reason instanceof Error ? `${reason.name}: ${reason.message}\n${reason.stack ?? ""}` : String(reason),
+    url: location.href,
+    version: pkg.version,
+    platform: "desktop",
+    os,
+  })
+})
 
 function BootSplash() {
   const defaultMotd = { enabled: true, text: "RRZ AI Factory" }
@@ -409,6 +434,7 @@ render(() => {
 
   return (
     <PlatformProvider value={platform}>
+      {console.info("[opencode] desktop PlatformProvider rendered")}
       <AppBaseProviders locale={locale.latest}>
         <Show when={true}>{(_) => <App />}</Show>
       </AppBaseProviders>

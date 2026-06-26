@@ -379,6 +379,7 @@ function DraftProviders(props: ParentProps) {
 }
 
 export function AppBaseProviders(props: ParentProps<{ locale?: Locale }>) {
+  console.info("[opencode] AppBaseProviders render")
   return (
     <MetaProvider>
       <Font />

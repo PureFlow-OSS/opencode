@@ -34,6 +34,7 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
   name: "Models",
   gate: false,
   init: () => {
+    console.info("[opencode] ModelsProvider init")
     const platform = usePlatform()
     const providers = useProviders()
     const globalSync = useServerSync()

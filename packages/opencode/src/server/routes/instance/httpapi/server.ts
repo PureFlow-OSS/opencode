@@ -49,6 +49,7 @@ import { ToolRegistry } from "@/tool/registry"
 import { Truncate } from "@/tool/truncate"
 import { Worktree } from "@/worktree"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import * as BashProcess from "@/tool/bash-process"
 import { MoveSession } from "@opencode-ai/core/control-plane/move-session"
 import { Database } from "@opencode-ai/core/database/database"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
@@ -226,6 +227,7 @@ const app = LayerNode.group([
   SessionProjector.node,
   SessionStatus.node,
   BackgroundJob.node,
+  BashProcess.node,
   RuntimeFlags.node,
   EventV2Bridge.node,
   SessionRunState.node,

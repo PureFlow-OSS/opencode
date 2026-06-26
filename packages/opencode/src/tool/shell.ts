@@ -21,6 +21,7 @@ import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { ShellPrompt, type Parameters } from "./shell/prompt"
 import { BashArity } from "@/permission/arity"
+import * as BashProcess from "./bash-process"
 
 export { Parameters } from "./shell/prompt"
 
@@ -343,6 +344,7 @@ export const ShellTool = Tool.define(
     const fs = yield* FSUtil.Service
     const trunc = yield* Truncate.Service
     const plugin = yield* Plugin.Service
+    const background = yield* BashProcess.Service
     const flags = yield* RuntimeFlags.Service
     const defaultTimeoutMs = flags.bashDefaultTimeoutMs ?? 2 * 60 * 1000
 
@@ -627,6 +629,36 @@ export const ShellTool = Tool.define(
                   yield* ask(ctx, scan, params)
                 }),
               )
+
+              if (params.run_in_background) {
+                const info = yield* background.start({
+                  shell,
+                  command: params.command,
+                  cwd,
+                  env: yield* shellEnv(ctx, cwd),
+                })
+                return {
+                  title: params.command,
+                  output: [
+                    `Background command started.`,
+                    `process_id: ${info.id}`,
+                    `pid: ${info.pid}`,
+                    `status: ${info.status}`,
+                    `stdout: ${info.stdout_path}`,
+                    `stderr: ${info.stderr_path}`,
+                    `Use bash_read with this process_id to inspect logs.`,
+                    `Use bash_stop with this process_id to stop process.`,
+                  ].join("\n"),
+                  metadata: {
+                    output: "",
+                    exit: null,
+                    process_id: info.id,
+                    pid: info.pid,
+                    status: info.status,
+                    truncated: false,
+                  },
+                }
+              }
 
               return yield* run(
                 {

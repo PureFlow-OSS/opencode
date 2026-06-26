@@ -12,6 +12,7 @@ import type { ServerScope } from "@/utils/server-scope"
 export const { use: useGlobal, provider: GlobalProvider } = createSimpleContext({
   name: "Global",
   init: () => {
+    console.info("[opencode] GlobalProvider init")
     const server = useServer()
     const serverHealth = useServerHealth(
       () => server.list,

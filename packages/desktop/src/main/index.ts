@@ -265,7 +265,7 @@ const main = Effect.gen(function* () {
     updater,
     showUpdater: () => showUpdaterDialog(updater, true),
     resetData: () => resetData(),
-    getMotd: async () => (await updateServer.fetch())?.motd ?? null,
+    getMotd: async () => (await updateServer.fetch())?.motd ?? { enabled: true, text: "RRZ AI Factory" },
     setBackgroundColor: (color) => setBackgroundColor(color),
     exportDebugLogs: () => exportDebugLogs(),
     recordFatalRendererError: (error) => writeLog("renderer", "fatal renderer error", { ...error }, "error"),
