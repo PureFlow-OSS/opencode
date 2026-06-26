@@ -85,6 +85,7 @@ import { SidebarContent } from "./layout/sidebar-shell"
 
 export default function LegacyLayout(props: ParentProps) {
   const serverSDK = useServerSDK()
+  const globalSDK = serverSDK
   const [store, setStore, , ready] = persisted(
     Persist.serverGlobal(serverSDK().scope, "layout.page", ["layout.page.v1"]),
     createStore({
@@ -107,6 +108,7 @@ export default function LegacyLayout(props: ParentProps) {
 
   const params = useParams()
   const serverSync = useServerSync()
+  const globalSync = serverSync
   const layout = useLayout()
   const layoutReady = createMemo(() => layout.ready())
   const platform = usePlatform()
@@ -895,12 +897,12 @@ export default function LegacyLayout(props: ParentProps) {
   }
 
   async function deleteSession(session: Session) {
-    const [store, setStore] = globalSync.child(session.directory)
+    const [store, setStore] = globalSync().child(session.directory)
     const sessions = (store.session ?? []).filter((item) => !item.parentID && !item.time?.archived)
     const index = sessions.findIndex((item) => item.id === session.id)
     const nextSession = index === -1 ? undefined : (sessions[index + 1] ?? sessions[index - 1])
 
-    const result = await globalSDK.client.session.delete({
+    const result = await globalSDK().client.session.delete({
       directory: session.directory,
       sessionID: session.id,
     })

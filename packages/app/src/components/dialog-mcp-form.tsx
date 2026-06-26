@@ -70,7 +70,7 @@ export function DialogMcpForm(props: Props) {
   const isEditing = () => !!props.name
 
   const initialOAuth: OAuthState = (() => {
-    if (props.config?.type === "remote" && props.config.oauth && props.config.oauth !== false) {
+    if (props.config?.type === "remote" && props.config.oauth) {
       return {
         clientId: props.config.oauth.clientId ?? "",
         clientSecret: props.config.oauth.clientSecret ?? "",
@@ -86,7 +86,7 @@ export function DialogMcpForm(props: Props) {
     command: props.config?.type === "local" ? props.config.command.join(" ") : "",
     url: props.config?.type === "remote" ? props.config.url : "",
     headers: headersFromRecord(props.config?.type === "remote" ? props.config.headers : undefined),
-    oauthEnabled: props.config?.type === "remote" && !!props.config.oauth && props.config.oauth !== false,
+    oauthEnabled: props.config?.type === "remote" && !!props.config.oauth,
     oauth: initialOAuth,
     enabled: props.config?.enabled ?? true,
     err: {},
@@ -124,7 +124,7 @@ export function DialogMcpForm(props: Props) {
     const errs: FormState["err"] = {}
 
     if (!form.name.trim()) errs.name = language.t("settings.mcp.form.validation.nameRequired")
-    if (!isEditing() && form.name.trim() && (globalSync.data.config.mcp ?? {})[form.name.trim()])
+    if (!isEditing() && form.name.trim() && (globalSync().data.config.mcp ?? {})[form.name.trim()])
       errs.name = language.t("settings.mcp.form.validation.nameTaken")
 
     if (form.type === "local" && !form.command.trim())
@@ -164,10 +164,10 @@ export function DialogMcpForm(props: Props) {
   const saveMutation = useMutation(() => ({
     mutationFn: async (config: McpConfig) => {
       const name = form.name.trim()
-      const existing = { ...(globalSync.data.config.mcp ?? {}) }
+      const existing = { ...(globalSync().data.config.mcp ?? {}) }
       existing[name] = config
       showMcpName(name)
-      await globalSync.updateConfig({ mcp: existing })
+      await globalSync().updateConfig({ mcp: existing })
       return name
     },
     onSuccess: (name) => {

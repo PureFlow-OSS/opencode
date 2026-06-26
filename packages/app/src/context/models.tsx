@@ -7,6 +7,7 @@ import { usePlatform } from "@/context/platform"
 import { useProviders } from "@/hooks/use-providers"
 import { Persist, persisted } from "@/utils/persist"
 import { useServerSync } from "./server-sync"
+import type { ModelKey } from "./local"
 import {
   defaultModelVisibilityRules,
   readAiFactoryModelVisibilityRules,
@@ -17,7 +18,6 @@ import {
   isModelVisibleBase,
   modelKey,
   resolveConfiguredModelKey,
-  type ModelKey,
 } from "./model-selection"
 
 type Visibility = "show" | "hide"
@@ -49,7 +49,7 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
     )
 
     const aifactoryApiKey = createMemo(() => {
-      const key = globalSync.data.config.provider?.["aifactory"]?.options?.apiKey
+      const key = globalSync().data.config.provider?.["aifactory"]?.options?.apiKey
       return typeof key === "string" && key.trim() ? key.trim() : undefined
     })
     const [serverRules] = createResource(
@@ -155,7 +155,7 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
         items: manageable().map((item) => ({ providerID: item.provider.id, modelID: item.id })),
         defaults: Object.entries(providers.default()).map(([providerID, modelID]) => ({ providerID, modelID })),
         configured: resolveConfiguredModelKey(
-          globalSync.data.config.model,
+          globalSync().data.config.model,
           manageable().map((item) => ({ providerID: item.provider.id, modelID: item.id })),
         ),
         visible: baseVisible,

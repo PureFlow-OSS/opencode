@@ -118,7 +118,9 @@ const SettingsProvidersContent: Component = () => {
       const modelID = provider.default[item]
       if (modelID) return `${item}/${modelID}`
     }
-    const first = provider.all.find((item) => provider.connected.includes(item.id) && Object.keys(item.models).length > 0)
+    const first = Array.from(provider.all.values()).find(
+      (item) => provider.connected.includes(item.id) && Object.keys(item.models).length > 0,
+    )
     if (!first) return
     const modelID = Object.values(first.models)[0]?.id
     if (!modelID) return

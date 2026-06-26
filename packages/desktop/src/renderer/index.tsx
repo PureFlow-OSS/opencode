@@ -29,6 +29,14 @@ import "./styles.css"
 import { Splash } from "@opencode-ai/ui/logo"
 import { useTheme } from "@opencode-ai/ui/theme/context"
 
+const os = (() => {
+  const ua = navigator.userAgent
+  if (ua.includes("Mac")) return "macos"
+  if (ua.includes("Windows")) return "windows"
+  if (ua.includes("Linux")) return "linux"
+  return undefined
+})()
+
 const root = document.getElementById("root")
 if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
   throw new Error(t("error.dev.rootNotFound"))
@@ -79,13 +87,6 @@ const listenForDeepLinks = () => {
 
 const createPlatform = (): Platform => {
   const attachmentPaths = new WeakMap<File, string>()
-  const os = (() => {
-    const ua = navigator.userAgent
-    if (ua.includes("Mac")) return "macos"
-    if (ua.includes("Windows")) return "windows"
-    if (ua.includes("Linux")) return "linux"
-    return undefined
-  })()
 
   const runDesktopMenuAction: Platform["runDesktopMenuAction"] = (action) => {
     switch (action) {
@@ -434,7 +435,7 @@ render(() => {
 
   return (
     <PlatformProvider value={platform}>
-      {console.info("[opencode] desktop PlatformProvider rendered")}
+      {undefined}
       <AppBaseProviders locale={locale.latest}>
         <Show when={true}>{(_) => <App />}</Show>
       </AppBaseProviders>

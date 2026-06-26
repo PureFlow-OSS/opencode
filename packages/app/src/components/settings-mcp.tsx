@@ -93,14 +93,14 @@ export const SettingsMcp: Component = () => {
   const globalSync = useGlobalSync()
   const globalSDK = useGlobalSDK()
   const params = useParams()
-  const dir = createMemo(() => decode64(params.dir) ?? globalSync.data.path.directory ?? "")
+  const dir = createMemo(() => decode64(params.dir) ?? globalSync().data.path.directory ?? "")
   const [managedData] = createResource<Record<string, ManagedServer>>(() =>
-    globalSDK
-      .request("/mcp/managed")
-      .then((res) => (res.ok ? (res.json() as Promise<Record<string, ManagedServer>>) : {})),
+    fetch(new URL("/mcp/managed", globalSDK().url)).then((res) =>
+      res.ok ? (res.json() as Promise<Record<string, ManagedServer>>) : {},
+    ),
   )
   const [mcpStatus, { mutate: setMcpStatus }] = createResource<Record<string, { status: string }>>(() =>
-    globalSDK.client.mcp.status().then((res) => res.data ?? {}),
+    globalSDK().client.mcp.status().then((res) => res.data ?? {}),
   )
   const managed = createMemo(() => managedData.latest ?? {})
   const prompted = new Set<string>()
@@ -110,13 +110,13 @@ export const SettingsMcp: Component = () => {
     const items: ServerItem[] = []
     const names = Array.from(
       new Set([
-        ...Object.keys(globalSync.data.config.mcp ?? {}),
+        ...Object.keys(globalSync().data.config.mcp ?? {}),
         ...Object.keys(managed()),
       ]),
     )
     for (const name of names) {
       if (deleting[name]) continue
-      const local = globalSync.data.config.mcp?.[name]
+      const local = globalSync().data.config.mcp?.[name]
       const managedServer = managed()[name]
       if (managedServer) {
         items.push({
@@ -163,7 +163,7 @@ export const SettingsMcp: Component = () => {
     showMcpName(server.name)
     const header = server.managed.auth?.header ?? "Authorization"
     const prefix = server.managed.auth?.prefix ?? ""
-    const existing = { ...(globalSync.data.config.mcp ?? {}) }
+    const existing = { ...(globalSync().data.config.mcp ?? {}) }
     existing[server.name] = {
       ...server.managed.config,
       headers: {
@@ -173,12 +173,12 @@ export const SettingsMcp: Component = () => {
       },
       oauth: server.managed.config.oauth,
     }
-    await globalSync.updateConfig({ mcp: existing })
-    await globalSDK.client.mcp.connect({ name: server.name }).catch(() => undefined)
-    const next = await globalSDK.client.mcp.status().then((res) => res.data ?? {})
+    await globalSync().updateConfig({ mcp: existing })
+    await globalSDK().client.mcp.connect({ name: server.name }).catch(() => undefined)
+    const next = await globalSDK().client.mcp.status().then((res) => res.data ?? {})
     setMcpStatus(next)
     if (dir()) {
-      const [, setStore] = globalSync.child(dir(), { bootstrap: false })
+      const [, setStore] = globalSync().child(dir(), { bootstrap: false })
       setStore("mcp", next)
       setStore("mcp_ready", true)
     }
@@ -214,12 +214,12 @@ export const SettingsMcp: Component = () => {
 
   const deleteServer = async (name: string) => {
     if (deleting[name]) return
-    const existing = { ...(globalSync.data.config.mcp ?? {}) }
+    const existing = { ...(globalSync().data.config.mcp ?? {}) }
     delete existing[name]
     setDeleting(name, true)
     hideMcpName(name)
     if (dir()) {
-      const [, setStore] = globalSync.child(dir(), { bootstrap: false })
+      const [, setStore] = globalSync().child(dir(), { bootstrap: false })
       setStore("mcp", (current) => {
         if (!(name in current)) return current
         const next = { ...current }
@@ -234,13 +234,13 @@ export const SettingsMcp: Component = () => {
       title: language.t("settings.mcp.toast.deleted.title"),
       description: language.t("settings.mcp.toast.deleted.description", { name }),
     })
-    await globalSync
+    await globalSync()
       .updateConfig({ mcp: existing })
       .then(async () => {
-        const next = await globalSDK.client.mcp.status().then((res) => res.data ?? {})
+        const next = await globalSDK().client.mcp.status().then((res) => res.data ?? {})
         setMcpStatus(next)
         if (dir()) {
-          const [, setStore] = globalSync.child(dir(), { bootstrap: false })
+          const [, setStore] = globalSync().child(dir(), { bootstrap: false })
           setStore("mcp", next)
           setStore("mcp_ready", true)
         }
@@ -257,12 +257,12 @@ export const SettingsMcp: Component = () => {
 
   const showMcpSettings = () => {
     void import("./dialog-settings").then((x) => {
-      dialog.show(() => <x.DialogSettings defaultValue="mcp" />)
+      dialog.show(() => <x.DialogSettings />)
     })
   }
 
   const showMcpForm = (props: { name?: string; config?: McpConfig } = {}) => {
-    dialog.show(() => <DialogMcpForm {...props} onBack={showMcpSettings} />)
+    dialog.show(() => <DialogMcpForm {...props} />)
   }
 
   return (
