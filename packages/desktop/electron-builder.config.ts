@@ -59,6 +59,10 @@ const getBase = (appId: string): Configuration => ({
       to: "native/",
       filter: ["index.js", "index.d.ts", "build/Release/mac_window.node", "swift-build/**"],
     },
+    {
+      from: "../opencode/bin/reset-opencode.ps1",
+      to: "reset-opencode.ps1",
+    },
   ],
   mac: {
     category: "public.app-category.developer-tools",

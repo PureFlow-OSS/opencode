@@ -663,6 +663,25 @@ export const SettingsGeneralV2: Component<{
             {language.t(updater.action().label)}
           </ButtonV2>
         </SettingsRowV2>
+
+        <Show when={desktop()}>
+          <SettingsRowV2
+            title={language.t("settings.updates.reset.title")}
+            description={language.t("settings.updates.reset.description")}
+          >
+            <ButtonV2
+              size="normal"
+              variant="neutral"
+              onClick={async () => {
+                const confirmed = window.confirm(language.t("settings.updates.reset.confirm"))
+                if (!confirmed) return
+                await platform.resetData?.()
+              }}
+            >
+              {language.t("settings.updates.reset.action")}
+            </ButtonV2>
+          </SettingsRowV2>
+        </Show>
       </SettingsListV2>
     </div>
   )

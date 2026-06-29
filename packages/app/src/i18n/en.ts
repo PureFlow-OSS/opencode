@@ -808,6 +808,7 @@ export const dict = {
   "settings.general.section.sounds": "Sound effects",
   "settings.general.section.feed": "Feed",
   "settings.general.section.display": "Display",
+  "settings.updates.section.reset": "Reset",
 
   "settings.general.row.language.title": "Language",
   "settings.general.row.language.description": "Change the display language for OpenCode",
@@ -876,6 +877,11 @@ export const dict = {
   "settings.updates.action.checking": "Checking...",
   "settings.updates.action.downloading": "Downloading...",
   "settings.updates.action.installing": "Installing...",
+  "settings.updates.reset.title": "Reset OpenCode data",
+  "settings.updates.reset.description": "Delete sessions, cache, registry entries, and local OpenCode data",
+  "settings.updates.reset.action": "Reset now",
+  "settings.updates.reset.confirm":
+    "Are you sure you want to delete all sessions, cache, registry entries, and local OpenCode data?",
   "settings.updates.toast.latest.title": "You're up to date",
   "settings.updates.toast.latest.description": "You're running the latest version of OpenCode.",
   "sound.option.none": "None",
