@@ -34,3 +34,4 @@ logs/
 tsconfig.tsbuildinfo
 # Updater feed artifacts
 infra/opencode-updater/feed/
+/infra/opencode-updater/admin-ui/.angular/cache
