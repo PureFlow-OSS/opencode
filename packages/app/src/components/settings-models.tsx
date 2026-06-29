@@ -87,8 +87,7 @@ const SettingsModelsContent: Component = () => {
   const language = useLanguage()
   const models = useModels()
   const platform = usePlatform()
-  const updateBaseUrl =
-    import.meta.env.VITE_OPENCODE_UPDATE_BASE_URL ?? (import.meta.env.DEV ? "http://127.0.0.1:80/opencode" : "http://10.53.7.23/opencode")
+  const updateBaseUrl = import.meta.env.OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode"
   const [modelcards] = createResource(
     () => updateBaseUrl,
     async (baseUrl) =>

@@ -22,6 +22,7 @@ interface DialogWslServerProps {
 }
 
 export function DialogAddWslServer(props: DialogWslServerProps = {}) {
+  console.info("[opencode] DialogAddWslServer render")
   const language = useLanguage()
   const platform = usePlatform()
   const dialog = useDialog()
@@ -156,6 +157,11 @@ export function DialogAddWslServer(props: DialogWslServerProps = {}) {
   let lastAutoProbe: string | null = null
   createEffect(() => {
     const probe = autoProbe()
+    console.info("[opencode] DialogAddWslServer autoProbe", probe?.key ?? null, {
+      hasState: !!current(),
+      jobKind: current()?.job?.kind,
+      selectedDistro: selectedDistro(),
+    })
     if (!probe || probe.key === lastAutoProbe) return
     const key = probe.key
     lastAutoProbe = key

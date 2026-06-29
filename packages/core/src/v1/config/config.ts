@@ -34,6 +34,15 @@ export const Info = Schema.Struct({
     description: "JSON schema reference for configuration validation",
   }),
   shell: Schema.optional(Schema.String).annotate({ description: "Default shell to use for terminal and bash tool" }),
+  http_proxy: Schema.optional(Schema.String).annotate({
+    description: "HTTP or HTTPS proxy URL for outbound provider requests",
+  }),
+  aifactory_host: Schema.optional(Schema.String).annotate({
+    description: "RRZ AI Factory host. Defaults to http://10.53.7.23.",
+  }),
+  use_http_proxy: Schema.optional(Schema.Boolean).annotate({
+    description: "Whether the configured global HTTP proxy should be used. Defaults to true.",
+  }),
   logLevel: Schema.optional(LogLevelRef).annotate({ description: "Log level" }),
   server: Schema.optional(ConfigServerV1.Server).annotate({
     description: "Server configuration for opencode serve and web commands",

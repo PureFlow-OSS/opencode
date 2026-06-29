@@ -42,6 +42,20 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
   throw new Error(t("error.dev.rootNotFound"))
 }
 
+window.addEventListener("error", (event) => {
+  console.error("[opencode] renderer error", {
+    message: event.error?.message ?? event.message,
+    stack: event.error?.stack,
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno,
+  })
+})
+
+window.addEventListener("unhandledrejection", (event) => {
+  console.error("[opencode] renderer unhandled rejection", event.reason)
+})
+
 if (import.meta.env.VITE_SENTRY_DSN) {
   Sentry.init({
     dsn: import.meta.env.VITE_SENTRY_DSN,

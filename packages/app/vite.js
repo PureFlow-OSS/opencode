@@ -27,6 +27,7 @@ export default [
         },
         define: {
           "import.meta.env.VITE_OPENCODE_CHANNEL": JSON.stringify(channel),
+          "import.meta.env.OPENCODE_UPDATE_BASE_URL": JSON.stringify(process.env.OPENCODE_UPDATE_BASE_URL),
         },
         worker: {
           format: "es",

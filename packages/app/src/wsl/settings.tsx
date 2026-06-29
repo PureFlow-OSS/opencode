@@ -75,6 +75,7 @@ export function WslServerSettings(props: {
   controller: Controller
   servers: ReturnType<typeof useFilteredWslServers>
 }) {
+  console.info("[opencode] WslServerSettings render")
   const platform = usePlatform()
   const language = useLanguage()
   const wsl = useWslServers()
@@ -101,7 +102,11 @@ export function WslServerSettings(props: {
           const key = ServerConnection.Key.make(item.config.id)
           const check = () => wsl.data?.opencodeChecks[item.config.distro]
           const opencodeAction = () => wslOpencodeAction(check())
-          const busy = () => wsl.data?.job?.kind === "install-opencode" && wsl.data.job.distro === item.config.distro
+          const busy = () => wsl.data?.job?.kind === "install-opencode" && wsl.data?.job?.distro === item.config.distro
+          console.info("[opencode] WslServerSettings row", item.config.distro, {
+            hasData: !!wsl.data,
+            jobKind: wsl.data?.job?.kind,
+          })
           return (
             <div class="settings-v2-servers-row">
               <div class="settings-v2-servers-lead">
