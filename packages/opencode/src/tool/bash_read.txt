@@ -1,0 +1,1 @@
+Read the stdout/stderr of a background bash process.
