@@ -47,13 +47,19 @@ const lastAssistantWithTokens = (messages: Message[]) => {
   }
 }
 
-const build = (messages: Message[] = [], providers: Provider[] = []): Metrics => {
+const build = (
+  messages: Message[] = [],
+  providers: Provider[] = [],
+  selectedModel?: { providerID: string; modelID: string },
+): Metrics => {
   const totalCost = messages.reduce((sum, msg) => sum + (msg.role === "assistant" ? msg.cost : 0), 0)
   const message = lastAssistantWithTokens(messages)
   if (!message) return { totalCost, context: undefined }
 
-  const provider = providers.find((item) => item.id === message.providerID)
-  const model = provider?.models[message.modelID]
+  const providerID = selectedModel?.providerID ?? message.providerID
+  const modelID = selectedModel?.modelID ?? message.modelID
+  const provider = providers.find((item) => item.id === providerID)
+  const model = provider?.models[modelID]
   const limit = model?.limit.context
   const total = tokenTotal(message)
 
@@ -63,8 +69,8 @@ const build = (messages: Message[] = [], providers: Provider[] = []): Metrics =>
       message,
       provider,
       model,
-      providerLabel: provider?.name ?? message.providerID,
-      modelLabel: model?.name ?? message.modelID,
+      providerLabel: provider?.name ?? providerID,
+      modelLabel: model?.name ?? modelID,
       limit,
       input: message.tokens.input,
       output: message.tokens.output,
@@ -77,6 +83,10 @@ const build = (messages: Message[] = [], providers: Provider[] = []): Metrics =>
   }
 }
 
-export function getSessionContextMetrics(messages: Message[] = [], providers: Provider[] = []) {
-  return build(messages, providers)
+export function getSessionContextMetrics(
+  messages: Message[] = [],
+  providers: Provider[] = [],
+  selectedModel?: { providerID: string; modelID: string },
+) {
+  return build(messages, providers, selectedModel)
 }

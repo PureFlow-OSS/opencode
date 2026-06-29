@@ -3,6 +3,9 @@
 - Supports configurable result counts and returns the content from the most relevant websites
 - Use this tool for accessing information beyond knowledge cutoff
 - Searches are performed automatically within a single API call
+- Prefer this tool over using `webfetch` on Google, Bing, DuckDuckGo, LinkedIn search pages, or other generic search result pages
+- When this tool returns relevant results, answer from those results instead of claiming that nothing was found
+- Only say that no information was found when the search results are empty or clearly irrelevant to the user's request
 
 Usage notes:
   - Supports live crawling modes when available: 'fallback' (backup if cached unavailable) or 'preferred' (prioritize live crawling)

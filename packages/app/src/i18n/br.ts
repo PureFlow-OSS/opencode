@@ -557,7 +557,7 @@ export const dict = {
   "sidebar.project.recentSessions": "Sessões recentes",
   "sidebar.project.viewAllSessions": "Ver todas as sessões",
   "sidebar.project.clearNotifications": "Limpar notificações",
-  "app.name.desktop": "OpenCode Desktop",
+  "app.name.desktop": "RRZ OpenCode Desktop",
   "settings.section.desktop": "Desktop",
   "settings.section.server": "Servidor",
   "settings.tab.general": "Geral",

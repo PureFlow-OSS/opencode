@@ -1,0 +1,9 @@
+cd C:\Users\Klaus\Desktop\PFH\opencode\packages\desktop-electron
+
+Remove-Item Env:OPENCODE_EDIT_EXECUTABLE -ErrorAction Ignore    
+>> $env:OPENCODE_CHANNEL='prod'
+>> $env:OPENCODE_UPDATE_BASE_URL='http://opencode.pfcicd.local.programmierfabrik.at/opencode'
+>> $env:OPENCODE_UPDATE_CACHE_DIR='C:/Entwicklung'
+>> $env:OPENCODE_ELECTRON_OUTPUT_DIR='dist-branded-dev'
+
+bun run package:win      

@@ -193,10 +193,15 @@ for (const item of targets) {
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + workerRelativePath,
       OPENCODE_WORKER_PATH: workerPath,
       OPENCODE_CHANNEL: `'${Script.channel}'`,
+      OPENCODE_UPDATE_BASE_URL: JSON.stringify(
+        process.env.OPENCODE_UPDATE_BASE_URL?.trim() || "http://10.53.7.23/opencode",
+      ),
       OPENCODE_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "",
       ...(item.os === "linux" ? { "process.env.OPENTUI_LIBC": JSON.stringify(item.abi ?? "glibc") } : {}),
     },
   })
+
+  await $`cp ./bin/reset-opencode.ps1 ./dist/${name}/bin/reset-opencode.ps1`
 
   // Smoke test: only run if binary is for current platform
   if (item.os === process.platform && item.arch === process.arch && !item.abi) {

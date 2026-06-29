@@ -66,7 +66,7 @@ const ModelList: Component<{
         </Tooltip>
       )}
       onSelect={(x) => {
-        model.set(x ? { modelID: x.id, providerID: x.provider.id } : undefined, {
+        void model.set(x ? { modelID: x.id, providerID: x.provider.id } : undefined, {
           recent: true,
         })
         props.onSelect()

@@ -1,0 +1,58 @@
+import { check } from "@tauri-apps/plugin-updater"
+import { relaunch } from "@tauri-apps/plugin-process"
+import { ask, message } from "@tauri-apps/plugin-dialog"
+import { type as ostype } from "@tauri-apps/plugin-os"
+
+import { initI18n, t } from "./i18n"
+import { commands } from "./bindings"
+import pkg from "../package.json"
+import { updateServer } from "./update-server"
+
+export const UPDATER_ENABLED = window.__OPENCODE__?.updaterEnabled ?? false
+
+export async function runUpdater({ alertOnFail }: { alertOnFail: boolean }) {
+  await initI18n()
+
+  const remote = await updateServer.fetch()
+  if (!remote) return
+
+  if (updateServer.compareVersions(pkg.version, remote.version) <= 0) {
+    if (alertOnFail) await message(t("desktop.updater.none.message"), { title: t("desktop.updater.none.title") })
+    return
+  }
+
+  let update
+  try {
+    update = await check()
+  } catch {
+    return
+  }
+
+  if (!update) {
+    return
+  }
+
+  try {
+    await update.download()
+  } catch {
+    if (alertOnFail)
+      await message(t("desktop.updater.downloadFailed.message"), { title: t("desktop.updater.downloadFailed.title") })
+    return
+  }
+
+  const shouldUpdate = await ask(t("desktop.updater.downloaded.prompt", { version: update.version }), {
+    title: t("desktop.updater.downloaded.title"),
+  })
+  if (!shouldUpdate) return
+
+  try {
+    if (ostype() === "windows") await commands.killSidecar()
+    await update.install()
+  } catch {
+    await message(t("desktop.updater.installFailed.message"), { title: t("desktop.updater.installFailed.title") })
+    return
+  }
+
+  await commands.killSidecar()
+  await relaunch()
+}

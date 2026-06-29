@@ -8,8 +8,10 @@ import { useLanguage } from "@/context/language"
 export function SessionFollowupDock(props: {
   items: { id: string; text: string }[]
   sending?: string
-  onSend: (id: string) => void
+  onSteer: (id: string) => void
   onEdit: (id: string) => void
+  onDelete: (id: string) => void
+  onMove: (id: string, direction: -1 | 1) => void
 }) {
   const language = useLanguage()
   const [store, setStore] = createStore({
@@ -78,17 +80,36 @@ export function SessionFollowupDock(props: {
       <Show when={!store.collapsed}>
         <div class="px-3 pb-7 flex flex-col gap-1.5 max-h-42 overflow-y-auto no-scrollbar">
           <For each={props.items}>
-            {(item) => (
+            {(item, index) => (
               <div class="flex items-center gap-2 min-w-0 py-1">
                 <span class="min-w-0 flex-1 truncate text-13-regular text-text-strong">{item.text}</span>
+                <div class="shrink-0 flex items-center gap-0.5">
+                  <IconButton
+                    icon="arrow-up"
+                    size="small"
+                    variant="ghost"
+                    disabled={!!props.sending || index() === 0}
+                    aria-label={language.t("session.followupDock.moveUp")}
+                    onClick={() => props.onMove(item.id, -1)}
+                  />
+                  <IconButton
+                    icon="arrow-up"
+                    size="small"
+                    variant="ghost"
+                    style={{ transform: "rotate(180deg)" }}
+                    disabled={!!props.sending || index() === props.items.length - 1}
+                    aria-label={language.t("session.followupDock.moveDown")}
+                    onClick={() => props.onMove(item.id, 1)}
+                  />
+                </div>
                 <Button
                   size="small"
                   variant="secondary"
                   class="shrink-0"
                   disabled={!!props.sending}
-                  onClick={() => props.onSend(item.id)}
+                  onClick={() => props.onSteer(item.id)}
                 >
-                  {language.t("session.followupDock.sendNow")}
+                  {language.t("settings.general.row.followup.option.steer")}
                 </Button>
                 <Button
                   size="small"
@@ -99,6 +120,15 @@ export function SessionFollowupDock(props: {
                 >
                   {language.t("session.followupDock.edit")}
                 </Button>
+                <IconButton
+                  icon="trash"
+                  size="small"
+                  variant="ghost"
+                  class="shrink-0"
+                  disabled={!!props.sending}
+                  aria-label={language.t("common.delete")}
+                  onClick={() => props.onDelete(item.id)}
+                />
               </div>
             )}
           </For>

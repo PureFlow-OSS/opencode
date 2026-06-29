@@ -550,7 +550,7 @@ export const dict = {
   "sidebar.project.recentSessions": "الجلسات الحديثة",
   "sidebar.project.viewAllSessions": "عرض جميع الجلسات",
   "sidebar.project.clearNotifications": "مسح الإشعارات",
-  "app.name.desktop": "OpenCode Desktop",
+  "app.name.desktop": "RRZ OpenCode Desktop",
   "settings.section.desktop": "سطح المكتب",
   "settings.section.server": "الخادم",
   "settings.tab.general": "عام",

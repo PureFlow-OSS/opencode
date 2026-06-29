@@ -8,7 +8,7 @@ import { useLanguage } from "@/context/language"
 export function SessionPermissionDock(props: {
   request: PermissionRequest
   responding: boolean
-  onDecide: (response: "once" | "always" | "reject") => void
+  onDecide: (response: "once" | "always" | "reject" | "full-access") => void
 }) {
   const language = useLanguage()
 
@@ -43,7 +43,15 @@ export function SessionPermissionDock(props: {
               onClick={() => props.onDecide("always")}
               disabled={props.responding}
             >
-              {language.t("ui.permission.allowAlways")}
+              {language.t("ui.permission.rememberAllow")}
+            </Button>
+            <Button
+              variant="secondary"
+              size="normal"
+              onClick={() => props.onDecide("full-access")}
+              disabled={props.responding}
+            >
+              {language.t("ui.permission.fullAccess")}
             </Button>
             <Button variant="primary" size="normal" onClick={() => props.onDecide("once")} disabled={props.responding}>
               {language.t("ui.permission.allowOnce")}

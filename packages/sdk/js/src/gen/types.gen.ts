@@ -2888,7 +2888,7 @@ export type SessionUnrevertResponse = SessionUnrevertResponses[keyof SessionUnre
 
 export type PostSessionIdPermissionsPermissionIdData = {
   body?: {
-    response: "once" | "always" | "reject"
+    response: "once" | "always" | "never" | "reject"
   }
   path: {
     id: string
