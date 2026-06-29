@@ -12,6 +12,7 @@ import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { ModelTooltip } from "./model-tooltip"
 import { useLanguage } from "@/context/language"
 import { decode64 } from "@/utils/base64"
+import { isVisibleProvider } from "@/hooks/use-providers"
 
 const AIFACTORY_PROVIDER_ID = "aifactory"
 
@@ -34,7 +35,7 @@ const ModelList: Component<{
     model
       .list()
       .filter((m) => model.visible({ modelID: m.id, providerID: m.provider.id }))
-      .filter((m) => m.provider.id === (props.provider ?? AIFACTORY_PROVIDER_ID)),
+      .filter((m) => (props.provider ? m.provider.id === props.provider : isVisibleProvider(m.provider.id))),
   )
 
   return (
@@ -227,7 +228,7 @@ export const DialogSelectModel: Component<{ provider?: string; model?: ModelStat
         </Button>
       }
     >
-      <ModelList provider={props.provider ?? AIFACTORY_PROVIDER_ID} model={props.model} onSelect={() => dialog.close()} />
+      <ModelList provider={props.provider} model={props.model} onSelect={() => dialog.close()} />
       <Button variant="ghost" class="ml-3 mt-5 mb-6 text-text-base self-start" onClick={manage}>
         {language.t("dialog.model.manage")}
       </Button>

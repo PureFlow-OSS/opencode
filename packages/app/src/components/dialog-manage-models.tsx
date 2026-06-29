@@ -9,6 +9,7 @@ import { useLanguage } from "@/context/language"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { DialogSelectProvider } from "./dialog-select-provider"
 import { decode64 } from "@/utils/base64"
+import { isVisibleProvider } from "@/hooks/use-providers"
 
 const AIFACTORY_PROVIDER_ID = "aifactory"
 
@@ -45,7 +46,7 @@ export const DialogManageModels: Component = () => {
         search={{ placeholder: language.t("dialog.model.search.placeholder"), autofocus: true }}
         emptyMessage={language.t("dialog.model.empty")}
         key={(x) => `${x?.provider?.id}:${x?.id}`}
-        items={local.model.list().filter((x) => x.provider.id === AIFACTORY_PROVIDER_ID)}
+        items={local.model.list().filter((x) => isVisibleProvider(x.provider.id))}
         filterKeys={["provider.name", "name", "id"]}
         sortBy={(a, b) => a.name.localeCompare(b.name)}
         groupBy={(x) => x.provider.id}

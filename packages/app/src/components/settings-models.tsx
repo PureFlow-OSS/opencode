@@ -7,11 +7,24 @@ import { TextField } from "@opencode-ai/ui/text-field"
 import { type Component, createResource, For, Show } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { useModels } from "@/context/models"
+import { useGlobalSync } from "@/context/global-sync"
 import { SettingsList } from "./settings-list"
-import { SettingsServerPicker, SettingsServerScope } from "./settings-server-picker"
+import { SettingsServerScope } from "./settings-server-picker"
 import { usePlatform } from "@/context/platform"
 
 const AIFACTORY_PROVIDER_ID = "aifactory"
+const AIFACTORY_API_KEY_HEADER = "X-OpenCode-AiFactory-Api-Key"
+
+function requestInit(apiKey?: string) {
+  if (!apiKey?.trim()) return { cache: "no-store", signal: AbortSignal.timeout(3000) } satisfies RequestInit
+  return {
+    cache: "no-store",
+    headers: {
+      [AIFACTORY_API_KEY_HEADER]: apiKey.trim(),
+    },
+    signal: AbortSignal.timeout(3000),
+  } satisfies RequestInit
+}
 
 type ModelCard = {
   model: string
@@ -87,17 +100,32 @@ const SettingsModelsContent: Component = () => {
   const language = useLanguage()
   const models = useModels()
   const platform = usePlatform()
-  const updateBaseUrl = import.meta.env.OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode"
+  const globalSync = useGlobalSync()
+  const updateBaseUrl = (import.meta.env.OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode").trim().replace(/\/+$/, "")
+  const fetcher = platform.fetch ?? fetch
+  const aifactoryApiKey = () => {
+    const key = globalSync().data.config.provider?.["aifactory"]?.options?.apiKey
+    return typeof key === "string" && key.trim() ? key.trim() : undefined
+  }
   const [modelcards] = createResource(
-    () => updateBaseUrl,
-    async (baseUrl) =>
-      platform.fetch?.(new Request(`${baseUrl}/modelcards.json`, { cache: "no-store" }))
+    () => ({ baseUrl: updateBaseUrl, apiKey: aifactoryApiKey() }),
+    async (input) =>
+      fetcher(`${input.baseUrl}/modelcards.json`, requestInit(input.apiKey))
         .then((response) => (response.ok ? response.json() : null))
         .catch(() => null) ?? null,
     { initialValue: null as ModelCardResponse | null },
   )
+  const cards = () => modelcards()?.aifactory?.models ?? []
+  const formatBoolean = (value?: boolean | null) => {
+    if (value === undefined || value === null) return "n/a"
+    return value ? "yes" : "no"
+  }
   const formatMoney = (value?: number | null) =>
     value === undefined || value === null ? "n/a" : new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(value)
+  const formatNumber = (value?: number | null) => {
+    if (value === undefined || value === null) return "n/a"
+    return new Intl.NumberFormat("de-DE").format(value)
+  }
 
   const list = useFilteredList<ModelItem>({
     items: (_filter) => models.manageable().filter((item) => item.provider.id === AIFACTORY_PROVIDER_ID),
@@ -187,17 +215,17 @@ const SettingsModelsContent: Component = () => {
           </Show>
         </Show>
 
-        <div class="flex flex-col gap-4">
-          <Show
-            when={modelcards()?.aifactory?.models?.length}
+          <div class="flex flex-col gap-4">
+            <Show
+            when={cards().length}
             fallback={<div class="text-14-regular text-text-weak">No model cards available yet.</div>}
           >
             <div class="grid gap-4 xl:grid-cols-2">
-              <For each={modelcards()?.aifactory?.models ?? []}>
+              <For each={cards()}>
                 {(card) => {
-                  const context = card.context ?? card.config?.context ?? null
-                  const output = card.output ?? card.config?.output ?? null
-                  const thinking = card.reasoning ?? card.config?.reasoning ?? null
+                  const context = card.context ?? card.config?.context ?? card.liteLLM?.maxInputTokens ?? null
+                  const output = card.output ?? card.config?.output ?? card.liteLLM?.maxOutputTokens ?? null
+                  const thinking = card.reasoning ?? card.config?.reasoning ?? card.liteLLM?.supportsReasoning ?? null
                   const inputCost = card.liteLLM?.inputCostPerMillionTokens ?? null
                   const outputCost = card.liteLLM?.outputCostPerMillionTokens ?? null
 
@@ -212,15 +240,15 @@ const SettingsModelsContent: Component = () => {
                       <div class="mt-4 grid grid-cols-2 gap-3 text-13-regular text-text-weak">
                         <div>
                           <div class="text-text-strong text-12-medium">Context</div>
-                          <div>{context === null ? "n/a" : context.toLocaleString()}</div>
+                          <div>{formatNumber(context)}</div>
                         </div>
                         <div>
                           <div class="text-text-strong text-12-medium">Output</div>
-                          <div>{output === null ? "n/a" : output.toLocaleString()}</div>
+                          <div>{formatNumber(output)}</div>
                         </div>
                         <div>
                           <div class="text-text-strong text-12-medium">Thinking</div>
-                          <div>{thinking === null ? "n/a" : thinking ? "Yes" : "No"}</div>
+                          <div>{formatBoolean(thinking)}</div>
                         </div>
                         <div>
                           <div class="text-text-strong text-12-medium">Input Cost /1M</div>

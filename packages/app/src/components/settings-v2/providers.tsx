@@ -3,7 +3,7 @@ import { Tag } from "@opencode-ai/ui/v2/badge-v2"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { showToast } from "@/utils/toast"
-import { popularProviders, useProviders } from "@/hooks/use-providers"
+import { useProviders } from "@/hooks/use-providers"
 import { createMemo, type Component, For, Show } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { useServerSDK } from "@/context/server-sdk"
@@ -13,6 +13,7 @@ import { DialogSelectProvider } from "../dialog-select-provider"
 import { DialogCustomProvider } from "../dialog-custom-provider"
 import { SettingsListV2 } from "./parts/list"
 import "./settings-v2.css"
+import { isVisibleProvider } from "@/hooks/use-providers"
 
 type ProviderSource = "env" | "api" | "config" | "custom"
 type ProviderItem = ReturnType<ReturnType<typeof useProviders>["connected"]>[number]
@@ -41,19 +42,21 @@ export const SettingsProvidersV2: Component = () => {
   const connected = createMemo(() => {
     return providers
       .connected()
-      .filter((p) => p.id === AIFACTORY_PROVIDER_ID)
+      .filter((p) => isVisibleProvider(p.id))
       .filter((p) => p.id !== "opencode" || Object.values(p.models).find((m) => m.cost?.input))
   })
 
   const popular = createMemo(() => {
     const connectedIDs = new Set(connected().map((p) => p.id))
-    const items = providers
-      .popular()
-      .filter((p) => p.id === AIFACTORY_PROVIDER_ID)
-      .filter((p) => !connectedIDs.has(p.id))
-      .slice()
-    items.sort((a, b) => popularProviders.indexOf(a.id) - popularProviders.indexOf(b.id))
-    return items
+    const aiFactory = providers.all().get(AIFACTORY_PROVIDER_ID) ?? {
+      id: AIFACTORY_PROVIDER_ID,
+      name: "RRZ AI Factory",
+      source: "api",
+      env: [],
+      options: {},
+      models: {},
+    }
+    return aiFactory && !connectedIDs.has(aiFactory.id) ? [aiFactory] : []
   })
 
   const source = (item: ProviderItem): ProviderSource | undefined => {

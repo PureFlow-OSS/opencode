@@ -17,6 +17,8 @@ import { useServerSync } from "@/context/server-sync"
 import { useLanguage } from "@/context/language"
 import { useProviders } from "@/hooks/use-providers"
 
+const AIFACTORY_PROVIDER_ID = "aifactory"
+
 export function DialogConnectProvider(props: { provider: string; directory?: Accessor<string | undefined> }) {
   const dialog = useDialog()
   const serverSync = useServerSync()
@@ -41,7 +43,16 @@ export function DialogConnectProvider(props: { provider: string; directory?: Acc
   })
 
   const provider = createMemo(
-    () => providers.all().get(props.provider) ?? serverSync().data.provider.all.get(props.provider)!,
+    () =>
+      providers.all().get(props.provider) ??
+      serverSync().data.provider.all.get(props.provider) ?? {
+        id: props.provider,
+        name: props.provider === AIFACTORY_PROVIDER_ID ? "RRZ AI Factory" : props.provider,
+        source: "api",
+        env: [],
+        options: {},
+        models: {},
+      },
   )
   const fallback = createMemo<ProviderAuthMethod[]>(() => [
     {
@@ -324,6 +335,11 @@ export function DialogConnectProvider(props: { provider: string; directory?: Acc
   createEffect(() => {
     if (auto) return
     if (loading()) return
+    if (props.provider === AIFACTORY_PROVIDER_ID && methods().length > 0 && store.methodIndex === undefined) {
+      auto = true
+      void selectMethod(0)
+      return
+    }
     if (methods().length === 1) {
       auto = true
       void selectMethod(0)

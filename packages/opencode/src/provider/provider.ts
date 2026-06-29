@@ -1336,6 +1336,18 @@ export const layer = Layer.effect(
           env: () => env.all(),
           get: (key: string) => env.get(key),
         }
+        const recentModels = yield* fs.readJson(path.join(Global.Path.state, "model.json")).pipe(
+          Effect.map((input): { providerID: ProviderV2.ID; modelID: ModelV2.ID }[] => {
+            if (!isRecord(input) || !Array.isArray(input.recent)) return []
+            return input.recent.flatMap((item) => {
+              if (!isRecord(item)) return []
+              if (typeof item.providerID !== "string") return []
+              if (typeof item.modelID !== "string") return []
+              return [{ providerID: ProviderV2.ID.make(item.providerID), modelID: ModelV2.ID.make(item.modelID) }]
+            })
+          }),
+          Effect.catch(() => Effect.succeed([] as { providerID: ProviderV2.ID; modelID: ModelV2.ID }[])),
+        )
 
         function mergeProvider(providerID: ProviderV2.ID, provider: Partial<Info>) {
           const existing = providers[providerID]
@@ -1618,6 +1630,20 @@ export const layer = Layer.effect(
           }
 
           if (Object.keys(provider.models).length === 0) {
+            if (providerID === ProviderV2.ID.make("aifactory")) {
+              const fallback = fallbackModels({
+                providerID,
+                configuredModels: [cfg.model, cfg.small_model],
+                recentModels,
+                provider,
+              })
+              for (const model of fallback) {
+                provider.models[model.id] = model
+              }
+              if (Object.keys(provider.models).length > 0) {
+                continue
+              }
+            }
             delete providers[providerID]
             continue
           }
@@ -1977,6 +2003,85 @@ export function parseModel(model: string) {
     providerID: ProviderV2.ID.make(providerID),
     modelID: ModelV2.ID.make(rest.join("/")),
   }
+}
+
+function fallbackModels(input: {
+  providerID: ProviderV2.ID
+  configuredModels: Array<string | undefined>
+  recentModels: Array<{ providerID: ProviderV2.ID; modelID: ModelV2.ID }>
+  provider: Info
+}): Model[] {
+  const ids = new Set<ModelV2.ID>()
+
+  for (const configuredModel of input.configuredModels) {
+    const modelID = fallbackModelID(input.providerID, configuredModel)
+    if (modelID) ids.add(modelID)
+  }
+
+  for (const recent of input.recentModels) {
+    if (recent.providerID !== input.providerID) continue
+    ids.add(recent.modelID)
+  }
+
+  return [...ids].map((modelID) => ({
+    id: modelID,
+    providerID: input.providerID,
+    name: modelID,
+    family: "",
+    api: {
+      id: modelID,
+      url: typeof input.provider.options.baseURL === "string" ? input.provider.options.baseURL : "",
+      npm: "@ai-sdk/openai-compatible",
+    },
+    status: "active",
+    headers: {},
+    capabilities: {
+      temperature: true,
+      reasoning: false,
+      attachment: false,
+      toolcall: true,
+      input: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        pdf: false,
+      },
+      output: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        pdf: false,
+      },
+      interleaved: false,
+    },
+    cost: {
+      input: 0,
+      output: 0,
+      cache: {
+        read: 0,
+        write: 0,
+      },
+    },
+    options: {},
+    limit: {
+      context: 0,
+      output: 0,
+    },
+    release_date: "",
+    variants: {},
+  }))
+}
+
+function fallbackModelID(providerID: ProviderV2.ID, configuredModel: string | undefined) {
+  if (!configuredModel) return
+  if (!configuredModel.includes("/") && providerID === ProviderV2.ID.make("aifactory")) {
+    return ModelV2.ID.make(configuredModel)
+  }
+  const parsed = parseModel(configuredModel)
+  if (parsed.providerID !== providerID || !parsed.modelID) return
+  return parsed.modelID
 }
 
 export const node = LayerNode.make({

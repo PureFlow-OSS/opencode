@@ -56,6 +56,7 @@ const jsCallStackFeature = "DocumentPolicyIncludeJSCallStacksInCrashReports"
 let logger: ReturnType<typeof initLogging>
 let mainWindow: BrowserWindow | null = null
 let server: SidecarListener | null = null
+let aifactoryApiKey: string | null = null
 
 const pendingDeepLinks: string[] = []
 
@@ -269,6 +270,13 @@ const main = Effect.gen(function* () {
     setBackgroundColor: (color) => setBackgroundColor(color),
     exportDebugLogs: () => exportDebugLogs(),
     recordFatalRendererError: (error) => writeLog("renderer", "fatal renderer error", { ...error }, "error"),
+    setAifactoryApiKey: (key) => {
+      const next = key?.trim() || null
+      if (aifactoryApiKey === next) return
+      aifactoryApiKey = next
+      logger.log("aifactory api key updated", { present: Boolean(next) })
+      updateServer.setAifactoryApiKey(next)
+    },
   })
   registerWslIpcHandlers(wslServers)
   void updater.start()

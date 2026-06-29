@@ -1,4 +1,10 @@
+import { readFile } from "node:fs/promises"
+import os from "node:os"
+import path from "node:path"
+
 const UPDATE_SERVER_BASE_URL = process.env.OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode"
+const AIFACTORY_API_KEY_HEADER = "X-OpenCode-AiFactory-Api-Key"
+let aifactoryApiKey: string | null = null
 
 const parseVersion = (value: string) =>
   value
@@ -7,10 +13,50 @@ const parseVersion = (value: string) =>
     .split(".")
     .map((part) => Number.parseInt(part, 10))
 
+function dataDir() {
+  const home = os.homedir()
+  if (process.platform === "win32") return path.join(process.env.LOCALAPPDATA || path.join(home, "AppData", "Local"), "opencode")
+  if (process.platform === "darwin") return path.join(home, "Library", "Application Support", "opencode")
+  return path.join(process.env.XDG_DATA_HOME || path.join(home, ".local", "share"), "opencode")
+}
+
+function readApiKeyFromPayload(payload: Record<string, unknown>) {
+  const auth = payload.aifactory
+  if (!auth || typeof auth !== "object" || Array.isArray(auth)) return null
+  const value = auth as { type?: unknown; key?: unknown }
+  if (value.type !== "api" || typeof value.key !== "string") return null
+  const key = value.key.trim()
+  return key.length > 0 ? key : null
+}
+
+async function resolveAifactoryApiKey() {
+  if (aifactoryApiKey) return aifactoryApiKey
+  const fromEnv = process.env.OPENCODE_AIFACTORY_API_KEY?.trim()
+  if (fromEnv) return fromEnv
+  const fromContent = process.env.OPENCODE_AUTH_CONTENT
+  if (fromContent) {
+    try {
+      const key = readApiKeyFromPayload(JSON.parse(fromContent) as Record<string, unknown>)
+      if (key) return key
+    } catch {}
+  }
+  for (const base of [dataDir(), path.join(os.homedir(), ".local", "share", "opencode"), path.join(process.env.APPDATA || "", "opencode")]) {
+    if (!base) continue
+    try {
+      const key = readApiKeyFromPayload(JSON.parse(await readFile(path.join(base, "auth.json"), "utf8")) as Record<string, unknown>)
+      if (key) return key
+    } catch {}
+  }
+  return null
+}
+
 export const updateServer = {
   versionUrl: `${UPDATE_SERVER_BASE_URL}/version`,
   feedUrl: `${UPDATE_SERVER_BASE_URL}/url`,
   configUrl: `${UPDATE_SERVER_BASE_URL}/config`,
+  setAifactoryApiKey(value: string | null) {
+    aifactoryApiKey = value?.trim() || null
+  },
   compareVersions(current: string, next: string) {
     const left = parseVersion(current)
     const right = parseVersion(next)
@@ -19,16 +65,21 @@ export const updateServer = {
     return delta > 0 ? 1 : -1
   },
   async fetch() {
+    const apiKey = await resolveAifactoryApiKey()
+    const init = {
+      cache: "no-store",
+      ...(apiKey ? { headers: { [AIFACTORY_API_KEY_HEADER]: apiKey } } : {}),
+    } satisfies RequestInit
     const [version, url, motd] = await Promise.all([
-      fetch(this.versionUrl, { cache: "no-store" })
+      fetch(this.versionUrl, init)
         .then((result) => (result.ok ? result.text() : ""))
         .then((result) => result.trim())
         .catch(() => ""),
-      fetch(this.feedUrl, { cache: "no-store" })
+      fetch(this.feedUrl, init)
         .then((result) => (result.ok ? result.text() : ""))
         .then((result) => result.trim())
         .catch(() => ""),
-      fetch(this.configUrl, { cache: "no-store" })
+      fetch(this.configUrl, init)
         .then((result) => (result.ok ? result.json() : null))
         .then((result) => {
           if (!result || typeof result !== "object") return null

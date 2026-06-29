@@ -10,6 +10,10 @@ export const popularProviders = [
 ]
 const popularProviderSet = new Set(popularProviders)
 
+export function isVisibleProvider(id: string) {
+  return id === "aifactory"
+}
+
 export function useProviders(directory?: Accessor<string | undefined>) {
   const serverSync = useServerSync()
   const params = useParams()

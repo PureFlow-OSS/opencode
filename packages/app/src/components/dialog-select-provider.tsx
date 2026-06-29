@@ -1,6 +1,6 @@
 import { type Accessor, Component, Show } from "solid-js"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { popularProviders, useProviders } from "@/hooks/use-providers"
+import { useProviders } from "@/hooks/use-providers"
 import { Dialog } from "@opencode-ai/ui/dialog"
 import { List } from "@opencode-ai/ui/list"
 import { Tag } from "@opencode-ai/ui/tag"
@@ -17,15 +17,7 @@ export const DialogSelectProvider: Component<{ directory?: Accessor<string | und
   const providers = useProviders(props.directory)
   const language = useLanguage()
 
-  const popularGroup = () => language.t("dialog.provider.group.popular")
-  const otherGroup = () => language.t("dialog.provider.group.other")
   const customLabel = () => language.t("settings.providers.tag.custom")
-  const note = (id: string) => {
-    if (id === "anthropic") return language.t("dialog.provider.anthropic.note")
-    if (id === "openai") return language.t("dialog.provider.openai.note")
-    if (id.startsWith("github-copilot")) return language.t("dialog.provider.copilot.note")
-    if (id === "opencode-go") return language.t("dialog.provider.opencodeGo.tagline")
-  }
 
   return (
     <Dialog title={language.t("command.provider.connect")} transition>
@@ -42,19 +34,10 @@ export const DialogSelectProvider: Component<{ directory?: Accessor<string | und
           )
         }}
         filterKeys={["id", "name"]}
-        groupBy={(x) => (popularProviders.includes(x.id) ? popularGroup() : otherGroup())}
         sortBy={(a, b) => {
           if (a.id === CUSTOM_ID) return -1
           if (b.id === CUSTOM_ID) return 1
-          if (popularProviders.includes(a.id) && popularProviders.includes(b.id))
-            return popularProviders.indexOf(a.id) - popularProviders.indexOf(b.id)
           return a.name.localeCompare(b.name)
-        }}
-        sortGroupsBy={(a, b) => {
-          const popular = popularGroup()
-          if (a.category === popular && b.category !== popular) return -1
-          if (b.category === popular && a.category !== popular) return 1
-          return 0
         }}
         onSelect={(x) => {
           if (!x) return
@@ -72,7 +55,6 @@ export const DialogSelectProvider: Component<{ directory?: Accessor<string | und
             <Show when={i.id === CUSTOM_ID}>
               <Tag>{language.t("settings.providers.tag.custom")}</Tag>
             </Show>
-            <Show when={note(i.id)}>{(value) => <div class="text-14-regular text-text-weak">{value()}</div>}</Show>
             <Show when={i.id === AIFACTORY_PROVIDER_ID}>
               <Tag>{language.t("dialog.provider.tag.recommended")}</Tag>
             </Show>

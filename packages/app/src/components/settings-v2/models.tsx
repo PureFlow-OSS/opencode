@@ -8,6 +8,7 @@ import { type Component, createResource, For, Show } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { useModels } from "@/context/models"
 import { usePlatform } from "@/context/platform"
+import { useServerSync } from "@/context/server-sync"
 import { SettingsListV2 } from "./parts/list"
 import { SettingsRowV2 } from "./parts/row"
 import "./settings-v2.css"
@@ -45,21 +46,39 @@ type ModelCardResponse = {
 
 const PROVIDER_ICON_SIZE = 16
 const AIFACTORY_PROVIDER_ID = "aifactory"
+const AIFACTORY_API_KEY_HEADER = "X-OpenCode-AiFactory-Api-Key"
+
+function requestInit(apiKey?: string) {
+  if (!apiKey?.trim()) return { cache: "no-store", signal: AbortSignal.timeout(3000) } satisfies RequestInit
+  return {
+    cache: "no-store",
+    headers: {
+      [AIFACTORY_API_KEY_HEADER]: apiKey.trim(),
+    },
+    signal: AbortSignal.timeout(3000),
+  } satisfies RequestInit
+}
 
 export const SettingsModelsV2: Component = () => {
   const language = useLanguage()
   const models = useModels()
   const platform = usePlatform()
-  const updateBaseUrl = (import.meta.env.VITE_OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode").trim().replace(/\/+$/, "")
+  const serverSync = useServerSync()
+  const updateBaseUrl = (import.meta.env.OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode").trim().replace(/\/+$/, "")
   const fetcher = platform.fetch ?? fetch
+  const aifactoryApiKey = () => {
+    const key = serverSync().data.config.provider?.["aifactory"]?.options?.apiKey
+    return typeof key === "string" && key.trim() ? key.trim() : undefined
+  }
   const [modelcards] = createResource(
-    () => updateBaseUrl,
-    async (baseUrl) =>
-      fetcher(new Request(`${baseUrl}/modelcards.json`, { cache: "no-store" }))
+    () => ({ baseUrl: updateBaseUrl, apiKey: aifactoryApiKey() }),
+    async (input) =>
+      fetcher(`${input.baseUrl}/modelcards.json`, requestInit(input.apiKey))
         .then((response) => (response.ok ? response.json() : null))
         .catch(() => null) ?? null,
     { initialValue: null as ModelCardResponse | null },
   )
+  const cards = () => modelcards()?.aifactory?.models ?? []
 
   const formatBoolean = (value?: boolean | null) => {
     if (value === undefined || value === null) return "n/a"
@@ -188,14 +207,14 @@ export const SettingsModelsV2: Component = () => {
         <div class="settings-v2-section settings-v2-modelcards-section">
           <div class="settings-v2-modelcards-header">
             <h3 class="settings-v2-section-title">Model Cards</h3>
-            <span class="settings-v2-modelcards-count">Models: {modelcards()?.aifactory?.models?.length ?? 0}</span>
+            <span class="settings-v2-modelcards-count">Models: {cards().length}</span>
           </div>
           <Show
-            when={modelcards()?.aifactory?.models?.length}
+            when={cards().length}
             fallback={<div class="settings-v2-modelcards-status">No model cards available yet.</div>}
           >
             <div class="settings-v2-modelcards-grid">
-              <For each={modelcards()?.aifactory?.models ?? []}>
+              <For each={cards()}>
                 {(card) => (
                   <section class="settings-v2-modelcard">
                     <div class="settings-v2-modelcard-head">
@@ -207,15 +226,15 @@ export const SettingsModelsV2: Component = () => {
                     <div class="settings-v2-modelcard-meta">
                       <div class="settings-v2-modelcard-item">
                         <small>Context</small>
-                        <strong>{formatNumber(card.context ?? card.config?.context)}</strong>
+                        <strong>{formatNumber(card.context ?? card.config?.context ?? card.liteLLM?.maxInputTokens)}</strong>
                       </div>
                       <div class="settings-v2-modelcard-item">
                         <small>Output</small>
-                        <strong>{formatNumber(card.output ?? card.config?.output)}</strong>
+                        <strong>{formatNumber(card.output ?? card.config?.output ?? card.liteLLM?.maxOutputTokens)}</strong>
                       </div>
                       <div class="settings-v2-modelcard-item">
                         <small>Thinking</small>
-                        <strong>{formatBoolean(card.reasoning ?? card.config?.reasoning)}</strong>
+                        <strong>{formatBoolean(card.reasoning ?? card.config?.reasoning ?? card.liteLLM?.supportsReasoning)}</strong>
                       </div>
                       <div class="settings-v2-modelcard-item">
                         <small>Input Cost /1M</small>
