@@ -4,14 +4,44 @@ import { Switch } from "@opencode-ai/ui/v2/switch-v2"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
-import { type Component, For, Show } from "solid-js"
+import { type Component, createResource, For, Show } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { useModels } from "@/context/models"
+import { usePlatform } from "@/context/platform"
 import { SettingsListV2 } from "./parts/list"
 import { SettingsRowV2 } from "./parts/row"
 import "./settings-v2.css"
 
 type ModelItem = ReturnType<ReturnType<typeof useModels>["list"]>[number]
+
+type ModelCard = {
+  model: string
+  context?: number | null
+  output?: number | null
+  reasoning?: boolean | null
+  modalities?: { input?: string[]; output?: string[] } | null
+  config?: {
+    pattern?: string | null
+    context?: number | null
+    output?: number | null
+    reasoning?: boolean | null
+    modalities?: { input?: string[]; output?: string[] } | null
+  } | null
+  price?: {
+    input?: number | null
+    output?: number | null
+  } | null
+  liteLLM?: {
+    inputCostPerMillionTokens?: number | null
+    outputCostPerMillionTokens?: number | null
+  } | null
+}
+
+type ModelCardResponse = {
+  aifactory?: {
+    models?: ModelCard[]
+  } | null
+}
 
 const PROVIDER_ICON_SIZE = 16
 const AIFACTORY_PROVIDER_ID = "aifactory"
@@ -19,6 +49,37 @@ const AIFACTORY_PROVIDER_ID = "aifactory"
 export const SettingsModelsV2: Component = () => {
   const language = useLanguage()
   const models = useModels()
+  const platform = usePlatform()
+  const updateBaseUrl = (import.meta.env.VITE_OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode").trim().replace(/\/+$/, "")
+  const fetcher = platform.fetch ?? fetch
+  const [modelcards] = createResource(
+    () => updateBaseUrl,
+    async (baseUrl) =>
+      fetcher(new Request(`${baseUrl}/modelcards.json`, { cache: "no-store" }))
+        .then((response) => (response.ok ? response.json() : null))
+        .catch(() => null) ?? null,
+    { initialValue: null as ModelCardResponse | null },
+  )
+
+  const formatBoolean = (value?: boolean | null) => {
+    if (value === undefined || value === null) return "n/a"
+    return value ? "yes" : "no"
+  }
+
+  const formatNumber = (value?: number | null) => {
+    if (value === undefined || value === null) return "n/a"
+    return new Intl.NumberFormat("de-DE").format(value)
+  }
+
+  const formatMoney = (value?: number | null) => {
+    if (value === undefined || value === null) return "n/a"
+    return new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: "EUR",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)
+  }
 
   const list = useFilteredList<ModelItem>({
     items: (_filter) => models.list().filter((item) => item.provider.id === AIFACTORY_PROVIDER_ID),
@@ -123,6 +184,63 @@ export const SettingsModelsV2: Component = () => {
             </For>
           </Show>
         </Show>
+
+        <div class="settings-v2-section settings-v2-modelcards-section">
+          <div class="settings-v2-modelcards-header">
+            <h3 class="settings-v2-section-title">Model Cards</h3>
+            <span class="settings-v2-modelcards-count">Models: {modelcards()?.aifactory?.models?.length ?? 0}</span>
+          </div>
+          <Show
+            when={modelcards()?.aifactory?.models?.length}
+            fallback={<div class="settings-v2-modelcards-status">No model cards available yet.</div>}
+          >
+            <div class="settings-v2-modelcards-grid">
+              <For each={modelcards()?.aifactory?.models ?? []}>
+                {(card) => (
+                  <section class="settings-v2-modelcard">
+                    <div class="settings-v2-modelcard-head">
+                      <div class="settings-v2-modelcard-copy">
+                        <strong>{card.model}</strong>
+                        <span>{card.config?.pattern || "All models"}</span>
+                      </div>
+                    </div>
+                    <div class="settings-v2-modelcard-meta">
+                      <div class="settings-v2-modelcard-item">
+                        <small>Context</small>
+                        <strong>{formatNumber(card.context ?? card.config?.context)}</strong>
+                      </div>
+                      <div class="settings-v2-modelcard-item">
+                        <small>Output</small>
+                        <strong>{formatNumber(card.output ?? card.config?.output)}</strong>
+                      </div>
+                      <div class="settings-v2-modelcard-item">
+                        <small>Thinking</small>
+                        <strong>{formatBoolean(card.reasoning ?? card.config?.reasoning)}</strong>
+                      </div>
+                      <div class="settings-v2-modelcard-item">
+                        <small>Input Cost /1M</small>
+                        <strong>{formatMoney(card.price?.input ?? card.liteLLM?.inputCostPerMillionTokens)}</strong>
+                      </div>
+                      <div class="settings-v2-modelcard-item">
+                        <small>Output Cost /1M</small>
+                        <strong>{formatMoney(card.price?.output ?? card.liteLLM?.outputCostPerMillionTokens)}</strong>
+                      </div>
+                      <Show when={card.modalities?.input?.length || card.modalities?.output?.length}>
+                        <div class="settings-v2-modelcard-item settings-v2-modelcard-item--wide">
+                          <small>Modalities</small>
+                          <strong>
+                            {card.modalities?.input?.join(", ") || "n/a"}
+                            {card.modalities?.output?.length ? ` → ${card.modalities.output.join(", ")}` : ""}
+                          </strong>
+                        </div>
+                      </Show>
+                    </div>
+                  </section>
+                )}
+              </For>
+            </div>
+          </Show>
+        </div>
       </div>
     </>
   )
