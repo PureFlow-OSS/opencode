@@ -46,3 +46,4 @@ infra/opencode-updater/admin-ui/.angular/
 packages/desktop-electron/dist-localhost*/
 packages/desktop/src-tauri/*.generated.conf.json
 infra/opencode-updater/appsettings.beta.json
+/packages/desktop/out
