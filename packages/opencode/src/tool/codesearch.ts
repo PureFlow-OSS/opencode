@@ -11,7 +11,7 @@ export const Parameters = Schema.Struct({
   }),
   tokensNum: Schema.Number.check(Schema.isGreaterThanOrEqualTo(1000))
     .check(Schema.isLessThanOrEqualTo(50000))
-    .pipe(Schema.optional, Schema.withDecodingDefault(Effect.succeed(5000)))
+    .pipe(Schema.optional)
     .annotate({
       description:
         "Number of tokens to return (1000-50000). Default is 5000 tokens. Adjust this value based on how much context you need - use lower values for focused queries and higher values for comprehensive documentation.",
@@ -26,15 +26,16 @@ export const CodeSearchTool = Tool.define(
     return {
       description: DESCRIPTION,
       parameters: Parameters,
-      execute: (params: { query: string; tokensNum: number }, ctx: Tool.Context) =>
+      execute: (params: { query: string; tokensNum?: number }, ctx: Tool.Context) =>
         Effect.gen(function* () {
+          const tokensNum = params.tokensNum ?? 5000
           yield* ctx.ask({
             permission: "codesearch",
             patterns: [params.query],
             always: ["*"],
             metadata: {
               query: params.query,
-              tokensNum: params.tokensNum,
+              tokensNum,
             },
           })
 
@@ -44,7 +45,7 @@ export const CodeSearchTool = Tool.define(
             McpExa.CodeArgs,
             {
               query: params.query,
-              tokensNum: params.tokensNum,
+              tokensNum,
             },
             "30 seconds",
           )

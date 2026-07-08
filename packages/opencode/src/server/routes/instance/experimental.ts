@@ -19,6 +19,16 @@ import { Effect, Option } from "effect"
 import { Agent } from "@/agent/agent"
 import { jsonRequest, runRequest } from "./trace"
 
+const fallbackToolSchema = { type: "object", additionalProperties: true } as const
+
+function toToolSchema(schema: Parameters<typeof EffectZod.toJsonSchema>[0]) {
+  try {
+    return EffectZod.toJsonSchema(schema)
+  } catch {
+    return fallbackToolSchema
+  }
+}
+
 const ConsoleOrgOption = z.object({
   accountID: z.string(),
   accountEmail: z.string(),
@@ -214,7 +224,7 @@ export const ExperimentalRoutes = lazy(() =>
           tools.map((t) => ({
             id: t.id,
             description: t.description,
-            parameters: EffectZod.toJsonSchema(t.parameters),
+            parameters: toToolSchema(t.parameters),
           })),
         )
       },

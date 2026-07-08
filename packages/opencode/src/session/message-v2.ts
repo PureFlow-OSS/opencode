@@ -64,7 +64,7 @@ export class OutputFormatText extends Schema.Class<OutputFormatText>("OutputForm
 export class OutputFormatJsonSchema extends Schema.Class<OutputFormatJsonSchema>("OutputFormatJsonSchema")({
   type: Schema.Literal("json_schema"),
   schema: Schema.Record(Schema.String, Schema.Any).annotate({ identifier: "JSONSchema" }),
-  retryCount: NonNegativeInt.pipe(Schema.optional, Schema.withDecodingDefault(Effect.succeed(2))),
+  retryCount: Schema.optional(NonNegativeInt),
 }) {
   static readonly zod = zod(this)
 }
@@ -443,7 +443,7 @@ export type Part =
 // Errors are still NamedError-based Zod; bridge via ZodOverride so the derived
 // Zod + JSON Schema emit the original discriminatedUnion shape. Migrating the
 // error classes to Schema.TaggedErrorClass is a separate slice.
-const AssistantErrorZod = z.discriminatedUnion("name", [
+export const AssistantErrorZod = z.discriminatedUnion("name", [
   AuthError.Schema,
   NamedError.Unknown.Schema,
   OutputLengthError.Schema,
@@ -452,7 +452,7 @@ const AssistantErrorZod = z.discriminatedUnion("name", [
   ContextOverflowError.Schema,
   APIError.Schema,
 ])
-type AssistantError = z.infer<typeof AssistantErrorZod>
+export type AssistantError = z.infer<typeof AssistantErrorZod>
 
 // ── Prompt input schemas ─────────────────────────────────────────────────────
 //

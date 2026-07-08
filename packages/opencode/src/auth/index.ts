@@ -37,7 +37,7 @@ export type Info = Schema.Schema.Type<typeof _Info>
 
 export class AuthError extends Schema.TaggedErrorClass<AuthError>()("AuthError", {
   message: Schema.String,
-  cause: Schema.optional(Schema.Defect),
+  cause: Schema.optional(Schema.Unknown),
 }) {}
 
 export interface Interface {

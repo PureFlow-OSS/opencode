@@ -15,6 +15,19 @@ import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse"
 import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "./auth"
 
+const fallbackJsonSchema = {
+  type: "object",
+  additionalProperties: true,
+} as const
+
+function toJsonSchema(schema: Parameters<typeof EffectZod.toJsonSchema>[0]) {
+  try {
+    return EffectZod.toJsonSchema(schema)
+  } catch {
+    return fallbackJsonSchema
+  }
+}
+
 const ConsoleStateResponse = Schema.Struct({
   consoleManagedProviders: Schema.mutable(Schema.Array(Schema.String)),
   activeOrgName: Schema.optionalKey(Schema.String),
@@ -267,7 +280,7 @@ export const experimentalHandlers = Layer.unwrap(
       return list.map((item) => ({
         id: item.id,
         description: item.description,
-        parameters: EffectZod.toJsonSchema(item.parameters),
+        parameters: toJsonSchema(item.parameters),
       }))
     })
 

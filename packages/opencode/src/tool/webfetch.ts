@@ -14,11 +14,9 @@ const envProxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.en
 
 export const Parameters = Schema.Struct({
   url: Schema.String.annotate({ description: "The URL to fetch content from" }),
-  format: Schema.Literals(["text", "markdown", "html"])
-    .pipe(Schema.optional, Schema.withDecodingDefault(Effect.succeed("markdown" as const)))
-    .annotate({
-      description: "The format to return the content in (text, markdown, or html). Defaults to markdown.",
-    }),
+  format: Schema.optional(Schema.Literals(["text", "markdown", "html"])).annotate({
+    description: "The format to return the content in (text, markdown, or html). Defaults to markdown.",
+  }),
   timeout: Schema.optional(Schema.Number).annotate({ description: "Optional timeout in seconds (max 120)" }),
 })
 

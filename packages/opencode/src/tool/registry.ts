@@ -27,6 +27,7 @@ import { WebSearchTool } from "./websearch"
 import { CodeSearchTool } from "./codesearch"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Log } from "@/util"
+import { errorMessage } from "@/util/error"
 import { LspTool } from "./lsp"
 import * as Truncate from "./truncate"
 import { ApplyPatchTool } from "./apply_patch"
@@ -177,7 +178,18 @@ export const layer: Layer.Layer<
           const namespace = path.basename(match, path.extname(match))
           // `match` is an absolute filesystem path from `Glob.scanSync(..., { absolute: true })`.
           // Import it as `file://` so Node on Windows accepts the dynamic import.
-          const mod = yield* Effect.promise(() => import(pathToFileURL(match).href))
+          const mod = yield* Effect.promise(() => import(pathToFileURL(match).href)).pipe(
+            Effect.catch((error) =>
+              Effect.sync(() => {
+                log.warn("skipping custom tool module", {
+                  path: match,
+                  error: errorMessage(error),
+                })
+                return undefined
+              }),
+            ),
+          )
+          if (!mod) continue
           for (const [id, def] of Object.entries<ToolDefinition>(mod)) {
             custom.push(fromPlugin(id === "default" ? namespace : `${namespace}_${id}`, def))
           }

@@ -67,6 +67,19 @@ IMPORTANT:
 const STRUCTURED_OUTPUT_SYSTEM_PROMPT = `IMPORTANT: The user has requested structured output. You MUST use the StructuredOutput tool to provide your final response. Do NOT respond with plain text - you MUST call the StructuredOutput tool with your answer formatted according to the schema.`
 
 const log = Log.create({ service: "session.prompt" })
+const fallbackToolSchema: JSONSchema7 = {
+  type: "object",
+  additionalProperties: true,
+}
+
+function toToolSchema(schema: Parameters<typeof EffectZod.toJsonSchema>[0]) {
+  try {
+    return EffectZod.toJsonSchema(schema)
+  } catch (error) {
+    log.warn("falling back to permissive tool schema", { error: String(error) })
+    return fallbackToolSchema
+  }
+}
 const elog = EffectLogger.create({ service: "session.prompt" })
 const UNSUPPORTED_DROP_DIR = process.platform === "win32" ? "C:\\Temp" : path.join(os.tmpdir(), "opencode-unsupported")
 const TITLE_MAX_LENGTH = 50
@@ -456,7 +469,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         providerID: input.model.providerID,
         agent: input.agent,
       })) {
-        const schema = ProviderTransform.schema(input.model, EffectZod.toJsonSchema(item.parameters))
+        const schema = ProviderTransform.schema(input.model, toToolSchema(item.parameters))
         tools[item.id] = tool({
           description: item.description,
           inputSchema: jsonSchema(schema),

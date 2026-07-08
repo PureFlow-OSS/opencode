@@ -3,15 +3,22 @@ import { dirname, join, relative, resolve as pathResolve } from "path"
 import { realpathSync } from "fs"
 import * as NFS from "fs/promises"
 import { lookup } from "mime-types"
-import { Effect, FileSystem, Layer, Schema, Context } from "effect"
+import { Effect, FileSystem, Layer, Context } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { Glob } from "./util/glob"
 
 export namespace AppFileSystem {
-  export class FileSystemError extends Schema.TaggedErrorClass<FileSystemError>()("FileSystemError", {
-    method: Schema.String,
-    cause: Schema.optional(Schema.Defect),
-  }) {}
+  export class FileSystemError extends Error {
+    readonly method: string
+    readonly cause?: unknown
+
+    constructor(input: { method: string; cause?: unknown }) {
+      super(`FileSystemError: ${input.method}`)
+      this.name = "FileSystemError"
+      this.method = input.method
+      this.cause = input.cause
+    }
+  }
 
   export type Error = PlatformError | FileSystemError
 

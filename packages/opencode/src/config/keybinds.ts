@@ -8,7 +8,7 @@ import { zod } from "@/util/effect-zod"
 // binding and a human description.  `keybind()` keeps the declaration list
 // below dense and readable.
 const keybind = (value: string, description: string) =>
-  Schema.String.pipe(Schema.optional, Schema.withDecodingDefault(Effect.succeed(value))).annotate({ description })
+  Schema.optional(Schema.String).annotate({ description })
 
 // Windows prepends ctrl+z to the undo binding because `terminal_suspend`
 // cannot consume ctrl+z on native Windows terminals (no POSIX suspend).
