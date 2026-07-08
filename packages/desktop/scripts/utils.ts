@@ -48,7 +48,14 @@ export async function copyBinaryToSidecarFolder(source: string, target = RUST_TA
   await $`mkdir -p src-tauri/sidecars`
   const dest = windowsify(`src-tauri/sidecars/opencode-cli-${target}`)
   await $`cp ${source} ${dest}`
-  if (process.platform === "win32" && process.env.GITHUB_ACTIONS === "true") {
+  if (
+    process.platform === "win32" &&
+    (process.env.AZURE_KEYVAULT_URL ||
+      process.env.KEYVAULT_URL ||
+      (process.env.AZURE_TRUSTED_SIGNING_ENDPOINT &&
+        process.env.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME &&
+        process.env.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE))
+  ) {
     await $`pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ../../script/sign-windows.ps1 ${dest}`
   }
 

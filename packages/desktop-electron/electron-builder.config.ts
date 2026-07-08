@@ -12,11 +12,32 @@ const signScript = path.join(rootDir, "script", "sign-windows.ps1")
 
 async function signWindows(configuration: { path: string }) {
   if (process.platform !== "win32") return
-  if (process.env.GITHUB_ACTIONS !== "true") return
+  if (
+    !process.env.AZURE_KEYVAULT_URL &&
+    !process.env.KEYVAULT_URL &&
+    !process.env.AZURE_TRUSTED_SIGNING_ENDPOINT
+  )
+    return
 
   await execFileAsync(
     "pwsh",
     ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", signScript, configuration.path],
+    { cwd: rootDir },
+  )
+}
+
+async function signWindowsOutput(configuration: { appOutDir: string }) {
+  if (process.platform !== "win32") return
+  if (
+    !process.env.AZURE_KEYVAULT_URL &&
+    !process.env.KEYVAULT_URL &&
+    !process.env.AZURE_TRUSTED_SIGNING_ENDPOINT
+  )
+    return
+
+  await execFileAsync(
+    "pwsh",
+    ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", signScript, configuration.appOutDir],
     { cwd: rootDir },
   )
 }
@@ -27,7 +48,15 @@ const channel = (() => {
   return "dev"
 })()
 
-const shouldUseWindowsSignScript = process.platform === "win32" && process.env.GITHUB_ACTIONS === "true"
+const shouldUseWindowsSignScript =
+  process.platform === "win32" &&
+  Boolean(
+    process.env.AZURE_KEYVAULT_URL ||
+      process.env.KEYVAULT_URL ||
+      (process.env.AZURE_TRUSTED_SIGNING_ENDPOINT &&
+        process.env.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME &&
+        process.env.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE),
+  )
 const shouldEditWindowsExecutable = process.env.OPENCODE_EDIT_EXECUTABLE !== "false"
 const outputDir = process.env.OPENCODE_ELECTRON_OUTPUT_DIR?.trim() || "dist"
 const changelog = path.join(rootDir, "changelog.md")
@@ -47,6 +76,9 @@ const getBase = (): Configuration => ({
   asarUnpack: ["**/*.node"],
   artifactBuildCompleted: async () => {
     await copyChangelog()
+  },
+  afterSign: async (context: { appOutDir: string }) => {
+    await signWindowsOutput({ appOutDir: context.appOutDir })
   },
   files: ["out/**/*", "resources/**/*"],
   extraResources: [
