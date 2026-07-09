@@ -9,6 +9,11 @@ type BetaStatus = {
 }
 
 type BetaSentiment = "positive" | "negative"
+type FeedbackAttachment = {
+  name: string
+  type: string
+  data: string
+}
 
 const betaPrefix = {
   positive: "Version erfolgreich getestet",
@@ -22,8 +27,26 @@ function composeBetaMessage(sentiment: BetaSentiment, message: string) {
   return `${betaPrefix[sentiment]}\n${body}`.trimEnd()
 }
 
+async function readAttachment(file: File): Promise<FeedbackAttachment> {
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  let binary = ""
+  const chunkSize = 0x8000
+
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize))
+  }
+
+  return {
+    name: file.name,
+    type: file.type || "application/octet-stream",
+    data: btoa(binary),
+  }
+}
+
 export default function Feedback() {
   const [betaSentiment, setBetaSentiment] = createSignal<BetaSentiment | null>(null)
+  const [generalFiles, setGeneralFiles] = createSignal<File[]>([])
+  const [betaFiles, setBetaFiles] = createSignal<File[]>([])
   const [betaStatus] = createResource(async () => {
     const response = await fetch(`${UPDATE_SERVER_BASE_URL}/admin/beta/status`)
 
@@ -31,7 +54,7 @@ export default function Feedback() {
     return (await response.json()) as BetaStatus
   })
 
-  const submitFeedback = async (form: HTMLFormElement, mode: "general" | "beta") => {
+  const submitFeedback = async (form: HTMLFormElement, mode: "general" | "beta", attachments: File[]) => {
     const data = new FormData(form)
     const message = String(data.get("message") ?? "").trim()
     const payload = {
@@ -39,7 +62,7 @@ export default function Feedback() {
       category: mode === "beta" ? "beta" : "general",
       app_version: String(data.get("appVersion") ?? "").trim() || undefined,
       platform: String(data.get("platform") ?? "").trim() || undefined,
-      attachments: [],
+      attachments: await Promise.all(attachments.map((file) => readAttachment(file))),
     }
 
     if (!payload.text) throw new Error("Message is required")
@@ -62,11 +85,28 @@ export default function Feedback() {
         <form
           onSubmit={async (event) => {
             event.preventDefault()
-            await submitFeedback(event.currentTarget, "general")
+            await submitFeedback(event.currentTarget, "general", generalFiles())
           }}
         >
           <input name="appVersion" placeholder="App version" />
           <input name="platform" placeholder="Platform" />
+          <input
+            type="file"
+            multiple
+            onChange={(event) => {
+              setGeneralFiles(Array.from(event.currentTarget.files ?? []))
+            }}
+          />
+          <Show when={generalFiles().length > 0}>
+            <div data-card>
+              <strong>Attachments</strong>
+              <ul>
+                {generalFiles().map((file) => (
+                  <li>{file.name}</li>
+                ))}
+              </ul>
+            </div>
+          </Show>
           <textarea name="message" placeholder="What would you like to tell the team?" />
           <button type="submit">Send feedback</button>
         </form>
@@ -77,19 +117,42 @@ export default function Feedback() {
             <form
               onSubmit={async (event) => {
                 event.preventDefault()
-                await submitFeedback(event.currentTarget, "beta")
+                await submitFeedback(event.currentTarget, "beta", betaFiles())
               }}
             >
               <input type="hidden" name="channel" value="beta" />
               <input type="hidden" name="betaSentiment" value={betaSentiment() ?? ""} />
               <input name="appVersion" placeholder="Beta version" />
               <input name="platform" placeholder="Platform" />
+              <input
+                type="file"
+                multiple
+                onChange={(event) => {
+                  setBetaFiles(Array.from(event.currentTarget.files ?? []))
+                }}
+              />
+              <Show when={betaFiles().length > 0}>
+                <div data-card>
+                  <strong>Screenshots / attachments</strong>
+                  <ul>
+                    {betaFiles().map((file) => (
+                      <li>{file.name}</li>
+                    ))}
+                  </ul>
+                </div>
+              </Show>
               <div data-card>
-                <button type="button" onClick={() => setBetaSentiment("positive")}>Version erfolgreich getestet</button>
-                <button type="button" onClick={() => setBetaSentiment("negative")}>Fehler gefunden</button>
+                <button type="button" onClick={() => setBetaSentiment("positive")}>
+                  Version erfolgreich getestet
+                </button>
+                <button type="button" onClick={() => setBetaSentiment("negative")}>
+                  Fehler gefunden
+                </button>
               </div>
               <textarea name="message" placeholder="Write your details here..." />
-              <button type="submit" disabled={!betaSentiment()}>Send beta feedback</button>
+              <button type="submit" disabled={!betaSentiment()}>
+                Send beta feedback
+              </button>
             </form>
           </section>
         </Show>
