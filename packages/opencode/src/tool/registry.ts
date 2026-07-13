@@ -448,6 +448,7 @@ export const node = LayerNode.make({
     Format.node,
     Truncate.node,
     RuntimeFlags.node,
+    BashProcess.node,
     MCP.node,
     Database.node,
     Ripgrep.node,

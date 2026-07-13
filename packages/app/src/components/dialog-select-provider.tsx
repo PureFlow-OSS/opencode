@@ -5,7 +5,7 @@ import { Dialog } from "@opencode-ai/ui/dialog"
 import { List } from "@opencode-ai/ui/list"
 import { Tag } from "@opencode-ai/ui/tag"
 import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
-import { DialogConnectProvider } from "./dialog-connect-provider"
+import { DialogConnectProvider, useProviderConnectController } from "./dialog-connect-provider"
 import { useLanguage } from "@/context/language"
 import { DialogCustomProvider } from "./dialog-custom-provider"
 
@@ -42,10 +42,12 @@ export const DialogSelectProvider: Component<{ directory?: Accessor<string | und
         onSelect={(x) => {
           if (!x) return
           if (x.id === CUSTOM_ID) {
-            dialog.show(() => <DialogCustomProvider back="providers" directory={props.directory} />)
+            dialog.show(() => <DialogCustomProvider onBack={() => dialog.show(() => <DialogSelectProvider directory={props.directory} />)} />)
             return
           }
-          dialog.show(() => <DialogConnectProvider provider={x.id} directory={props.directory} />)
+          const controller = useProviderConnectController()
+          controller.select(x.id)
+          dialog.show(() => <DialogConnectProvider controller={controller} directory={props.directory} />)
         }}
       >
         {(i) => (

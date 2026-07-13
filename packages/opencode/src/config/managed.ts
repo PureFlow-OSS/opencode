@@ -4,6 +4,12 @@ import { existsSync } from "fs"
 import os from "os"
 import path from "path"
 import { Process } from "@/util/process"
+import { isRecord } from "@/util/record"
+
+declare const OPENCODE_UPDATE_BASE_URL: string | undefined
+
+const DEFAULT_UPDATE_BASE_URL = "http://10.53.7.23/opencode"
+export const PROVIDER_CONFIG_AIFACTORY_API_KEY_HEADER = "X-OpenCode-AiFactory-Api-Key"
 
 const MANAGED_PLIST_DOMAIN = "ai.opencode.managed"
 
@@ -38,6 +44,62 @@ export function parseManagedPlist(json: string): string {
     if (PLIST_META.has(key)) delete raw[key]
   }
   return JSON.stringify(raw)
+}
+
+export function providerConfigPayload(payload: unknown): Record<string, unknown> {
+  if (!isRecord(payload)) return {}
+  const updater = isRecord(payload.Updater) ? payload.Updater : isRecord(payload.updater) ? payload.updater : undefined
+  if (!updater) return payload
+  return isRecord(updater.ProviderConfig)
+    ? updater.ProviderConfig
+    : isRecord(updater.providerConfig)
+      ? updater.providerConfig
+      : payload
+}
+
+export function updateBaseUrl() {
+  const embedded = typeof OPENCODE_UPDATE_BASE_URL !== "undefined" ? OPENCODE_UPDATE_BASE_URL : undefined
+  return (process.env.OPENCODE_UPDATE_BASE_URL?.trim() || embedded || DEFAULT_UPDATE_BASE_URL).replace(/\/+$/, "")
+}
+
+export function providerConfigUrl() {
+  return `${updateBaseUrl()}/provider-config.json`
+}
+
+function aifactoryApiKey(input: { config?: unknown; auth?: Record<string, unknown> }) {
+  const auth = input.auth?.aifactory
+  if (isRecord(auth) && auth.type === "api" && typeof auth.key === "string" && auth.key.trim()) return auth.key.trim()
+  const config = isRecord(input.config) && isRecord(input.config.provider) ? input.config.provider : undefined
+  const provider = config && isRecord(config.aifactory) ? config.aifactory : undefined
+  const options = provider && isRecord(provider.options) ? provider.options : undefined
+  if (typeof options?.apiKey !== "string" || !options.apiKey.trim()) return
+  return options.apiKey.trim()
+}
+
+export function providerConfigRequestInit(input: { config?: unknown; auth?: Record<string, unknown> } = {}) {
+  const apiKey = aifactoryApiKey(input) ?? process.env.OPENCODE_AIFACTORY_API_KEY?.trim()
+  if (!apiKey) return {}
+  return {
+    headers: {
+      [PROVIDER_CONFIG_AIFACTORY_API_KEY_HEADER]: apiKey,
+    },
+  } satisfies RequestInit
+}
+
+export async function readProviderConfig(
+  fetchFn: typeof fetch = fetch,
+  init: RequestInit = {},
+): Promise<Record<string, unknown>> {
+  return fetchFn(providerConfigUrl(), {
+    ...init,
+    signal: AbortSignal.timeout(3000),
+  })
+    .then(async (response) => {
+      if (!response.ok) return {}
+      const payload = providerConfigPayload(await response.json())
+      return isRecord(payload) ? payload : {}
+    })
+    .catch(() => ({}))
 }
 
 export async function readManagedPreferences() {

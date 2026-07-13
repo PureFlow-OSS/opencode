@@ -31,6 +31,7 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { ModelStatus } from "./model-status"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderError } from "./error"
+import { readProviderConfig } from "@/config/managed"
 
 const OPENAI_HEADER_TIMEOUT_DEFAULT = 10_000
 
@@ -149,6 +150,77 @@ type CustomDep = {
   config: () => Effect.Effect<ConfigV1.Info>
   env: () => Effect.Effect<Record<string, string | undefined>>
   get: (key: string) => Effect.Effect<string | undefined>
+}
+
+type AiFactoryRule = {
+  pattern: string
+  context?: number
+  output?: number
+  temperature?: boolean
+  reasoning?: boolean
+  input?: string[]
+  output_modalities?: string[]
+}
+
+function aiFactoryRule(modelID: string, rules: AiFactoryRule[] | undefined) {
+  const rule = rules?.find((item) => {
+    const pattern = item.pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
+    return new RegExp(`^${pattern}$`, "i").test(modelID)
+  })
+  return {
+    context: rule?.context ?? 200_000,
+    output: rule?.output ?? 32_000,
+    temperature: rule?.temperature ?? true,
+    reasoning: rule?.reasoning ?? /(^o[134]\b)|(^gpt-5\b)|claude|reason|r1|deepseek|gemini/i.test(modelID),
+    input: rule?.input ?? ["text"],
+    outputModalities: rule?.output_modalities ?? ["text"],
+  }
+}
+
+async function discoverAiFactoryModels(token: string, baseURL: string, rules: AiFactoryRule[] | undefined) {
+  const response = await fetch(`${baseURL.replace(/\/$/, "")}/models`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(5000),
+  })
+  if (!response.ok) return {}
+  const payload = (await response.json()) as { data?: Array<{ id?: string; created?: number | string }> }
+  return Object.fromEntries(
+    (payload.data ?? []).flatMap((item) => {
+      if (!item.id?.trim()) return []
+      const id = item.id.trim()
+      const override = aiFactoryRule(id, rules)
+      const modality = (value: string) => ({
+        text: value === "text",
+        audio: value === "audio",
+        image: value === "image",
+        video: value === "video",
+        pdf: value === "pdf",
+      })
+      return [[id, {
+        id: ModelV2.ID.make(id),
+        providerID: ProviderV2.ID.make("aifactory"),
+        api: { id, url: baseURL, npm: "@ai-sdk/openai-compatible" },
+        name: id,
+        family: id.split(/[-/]/)[0],
+        capabilities: {
+          temperature: override.temperature,
+          reasoning: override.reasoning,
+          attachment: override.input.some((value) => value !== "text"),
+          toolcall: true,
+          input: Object.fromEntries(["text", "audio", "image", "video", "pdf"].map((value) => [value, override.input.includes(value)])),
+          output: Object.fromEntries(["text", "audio", "image", "video", "pdf"].map((value) => [value, override.outputModalities.includes(value)])),
+          interleaved: false,
+        },
+        cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+        limit: { context: override.context, output: override.output },
+        status: "active",
+        options: {},
+        headers: {},
+        release_date: typeof item.created === "number" ? new Date(item.created * 1000).toISOString().slice(0, 10) : "",
+        variants: {},
+      } satisfies Model] as const]
+    }),
+  )
 }
 
 function selectAzureLanguageModel(sdk: any, modelID: string, useChat: boolean) {
@@ -957,6 +1029,39 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         options,
       }
     }),
+    aifactory: Effect.fnUntraced(function* (input: Info) {
+      const auth = yield* dep.auth(input.id)
+      const token = auth?.type === "api" ? auth.key : input.key
+      if (!token) return { autoload: false }
+      const baseURL =
+        (typeof input.options.baseURL === "string" && input.options.baseURL.trim()) ||
+        process.env.OPENCODE_AIFACTORY_HOST?.trim() ||
+        "http://10.53.7.23/v1"
+      const config = yield* Effect.promise(() =>
+        readProviderConfig(fetch, {
+          headers: { "X-OpenCode-AiFactory-Api-Key": token },
+        }),
+      )
+      const rawRules = isRecord(config.aifactory) && Array.isArray(config.aifactory.model_limits) ? config.aifactory.model_limits : []
+      const rules = rawRules.flatMap((value) => {
+        if (!isRecord(value) || typeof value.pattern !== "string") return []
+        return [value as unknown as AiFactoryRule]
+      })
+      return {
+        autoload: true,
+        async getModel(sdk: BundledSDK, modelID: string) {
+          return sdk.chat?.(modelID) ?? sdk.languageModel(modelID)
+        },
+        async discoverModels() {
+          try {
+            return await discoverAiFactoryModels(token, baseURL, rules)
+          } catch {
+            return {}
+          }
+        },
+        options: { baseURL, apiKey: token },
+      }
+    }),
   }
 }
 
@@ -1653,6 +1758,7 @@ const layer = Layer.effect(
           }
 
           if (Object.keys(provider.models).length === 0) {
+            if (providerID === ProviderV2.ID.make("aifactory") && provider.key) continue
             if (providerID === ProviderV2.ID.make("aifactory")) {
               const fallback = fallbackModels({
                 providerID,

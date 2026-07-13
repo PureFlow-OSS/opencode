@@ -1,5 +1,5 @@
 import { type Component, Match, Show, Switch, createMemo, createResource } from "solid-js"
-import { Markdown } from "@opencode-ai/ui/markdown"
+import { Markdown } from "@opencode-ai/session-ui/markdown"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useGlobalSync } from "@/context/global-sync"
@@ -26,7 +26,7 @@ export const SettingsChangelog: Component = () => {
   const globalSync = useGlobalSync()
 
   const aifactoryApiKey = createMemo(() => {
-    const key = globalSync.data.config.provider?.["aifactory"]?.options?.apiKey
+    const key = globalSync().data.config.provider?.["aifactory"]?.options?.apiKey
     return typeof key === "string" && key.trim() ? key.trim() : undefined
   })
 

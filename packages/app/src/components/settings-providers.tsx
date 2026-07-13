@@ -9,7 +9,7 @@ import { useLanguage } from "@/context/language"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
 import { normalizeProviderList } from "@/context/global-sync/utils"
-import { DialogConnectProvider } from "./dialog-connect-provider"
+import { DialogConnectProvider, useProviderConnectController } from "./dialog-connect-provider"
 import { DialogSelectProvider } from "./dialog-select-provider"
 import { DialogCustomProvider } from "./dialog-custom-provider"
 import { SettingsList } from "./settings-list"
@@ -241,7 +241,9 @@ const SettingsProvidersContent: Component = () => {
                     variant="secondary"
                     icon="plus-small"
                     onClick={() => {
-                      dialog.show(() => <DialogConnectProvider provider={item.id} />)
+                      const controller = useProviderConnectController()
+                      controller.select(item.id)
+                      dialog.show(() => <DialogConnectProvider controller={controller} />)
                     }}
                   >
                     {language.t("common.connect")}
@@ -269,7 +271,7 @@ const SettingsProvidersContent: Component = () => {
                 variant="secondary"
                 icon="plus-small"
                 onClick={() => {
-                  dialog.show(() => <DialogCustomProvider back="close" />)
+                  dialog.show(() => <DialogCustomProvider onBack={() => dialog.close()} />)
                 }}
               >
                 {language.t("common.connect")}

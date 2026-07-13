@@ -10,6 +10,12 @@ type BetaStatus = {
 
 type BetaSentiment = "positive" | "negative"
 
+type FeedbackAttachment = {
+  name: string
+  type: string
+  data: string
+}
+
 const betaPrefix = {
   positive: "Version erfolgreich getestet",
   negative: "Fehler gefunden",
@@ -20,6 +26,20 @@ const betaPrefixPattern = /^(Version erfolgreich getestet|Fehler gefunden)\s*\n?
 function composeBetaMessage(sentiment: BetaSentiment, message: string) {
   const body = message.replace(betaPrefixPattern, "").trim()
   return `${betaPrefix[sentiment]}\n${body}`.trimEnd()
+}
+
+async function readAttachment(file: File): Promise<FeedbackAttachment> {
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const chunks: string[] = []
+  const chunkSize = 0x8000
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + chunkSize)))
+  }
+  return {
+    name: file.name,
+    type: file.type || "application/octet-stream",
+    data: btoa(chunks.join("")),
+  }
 }
 
 export default function Feedback() {
@@ -34,12 +54,15 @@ export default function Feedback() {
   const submitFeedback = async (form: HTMLFormElement, mode: "general" | "beta") => {
     const data = new FormData(form)
     const message = String(data.get("message") ?? "").trim()
+    const attachments = await Promise.all(
+      Array.from(data.getAll("attachments")).flatMap((value) => (value instanceof File && value.size ? [readAttachment(value)] : [])),
+    )
     const payload = {
       text: mode === "beta" && betaSentiment() ? composeBetaMessage(betaSentiment()!, message) : message,
       category: mode === "beta" ? "beta" : "general",
       app_version: String(data.get("appVersion") ?? "").trim() || undefined,
       platform: String(data.get("platform") ?? "").trim() || undefined,
-      attachments: [],
+      attachments,
     }
 
     if (!payload.text) throw new Error("Message is required")
@@ -67,6 +90,7 @@ export default function Feedback() {
         >
           <input name="appVersion" placeholder="App version" />
           <input name="platform" placeholder="Platform" />
+          <input name="attachments" type="file" multiple />
           <textarea name="message" placeholder="What would you like to tell the team?" />
           <button type="submit">Send feedback</button>
         </form>
@@ -84,6 +108,7 @@ export default function Feedback() {
               <input type="hidden" name="betaSentiment" value={betaSentiment() ?? ""} />
               <input name="appVersion" placeholder="Beta version" />
               <input name="platform" placeholder="Platform" />
+              <input name="attachments" type="file" multiple />
               <div data-card>
                 <button type="button" onClick={() => setBetaSentiment("positive")}>Version erfolgreich getestet</button>
                 <button type="button" onClick={() => setBetaSentiment("negative")}>Fehler gefunden</button>

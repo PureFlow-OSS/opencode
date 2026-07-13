@@ -18,10 +18,6 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
   const dialog = useDialog()
   const [tab, setTab] = createSignal(props.defaultValue ?? "general")
 
-  const showProviders = () => {
-    void dialog.show(() => <DialogSettings defaultValue="providers" />)
-  }
-
   return (
     <Dialog size="x-large" transition>
       <Tabs
@@ -88,7 +84,7 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
           <SettingsServers />
         </Tabs.Content>
         <Tabs.Content value="providers" class="no-scrollbar">
-          <SettingsProviders onBack={showProviders} />
+          <SettingsProviders />
         </Tabs.Content>
         <Tabs.Content value="models" class="no-scrollbar">
           <SettingsModels />

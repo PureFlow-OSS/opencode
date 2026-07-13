@@ -1,5 +1,5 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { httpClient } from "@opencode-ai/core/effect/layer-node-platform"
+import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import { serviceUse } from "@opencode-ai/core/effect/service-use"
 import path from "path"
 import { pathToFileURL } from "url"
@@ -129,7 +129,7 @@ export interface Interface {
   readonly getGlobal: () => Effect.Effect<Info>
   readonly getConsoleState: () => Effect.Effect<ConsoleState>
   readonly update: (config: Info) => Effect.Effect<void>
-  readonly updateGlobal: (config: Info) => Effect.Effect<{ info: Info; changed: boolean }>
+  readonly updateGlobal: (config: Info) => Effect.Effect<Info & { info: Info; changed: boolean }>
   readonly invalidate: () => Effect.Effect<void>
   readonly directories: () => Effect.Effect<string[]>
   readonly waitForDependencies: () => Effect.Effect<void>
@@ -202,6 +202,28 @@ function managedHttpProxyPatch(config: Info, raw: unknown) {
   return patch
 }
 
+async function migrateLegacyAiFactoryProvider(input: {
+  path: string
+  text: string
+  data: Info
+  auth: Auth.Interface
+  fs: FSUtil.Interface
+}) {
+  const legacy = input.data.provider?.["aifactory"]
+  const key = legacy?.options?.apiKey
+  if (typeof key !== "string" || !key.trim()) return input.data
+
+  await Effect.runPromise(input.auth.set("aifactory", { type: "api", key: key.trim() }))
+  const provider = { ...(input.data.provider ?? {}) }
+  delete provider.aifactory
+  const patch = { provider: Object.keys(provider).length ? provider : undefined }
+  const updated = input.path.endsWith(".jsonc")
+    ? patchJsonc(input.text, patch)
+    : JSON.stringify(mergeDeep(writable(input.data), patch), null, 2)
+  await Effect.runPromise(input.fs.writeFileString(input.path, updated))
+  return { ...input.data, provider: Object.keys(provider).length ? provider : undefined } satisfies Info
+}
+
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -254,8 +276,18 @@ export const layer = Layer.effect(
         ),
       )
       const parsed = ConfigParse.jsonc(expanded, source)
-      const data = ConfigParse.schema(ConfigV1.Info, normalizeLoadedConfig(parsed), source)
+      let data = ConfigParse.schema(ConfigV1.Info, normalizeLoadedConfig(parsed), source)
       if (!("path" in options)) return data
+
+      data = yield* Effect.promise(() =>
+        migrateLegacyAiFactoryProvider({
+          path: options.path,
+          text,
+          data,
+          auth: authSvc,
+          fs,
+        }),
+      )
 
       yield* Effect.promise(() => resolveLoadedPlugins(data, options.path))
       if (!data.$schema) {
@@ -287,6 +319,7 @@ export const layer = Layer.effect(
       }
       for (const file of globalConfigFiles()) {
         const before = (yield* readConfigFile(file)) ?? "{}"
+        if (Flag.OPENCODE_CONFIG_DIR && !existsSync(file)) continue
         const raw = ConfigParse.jsonc(before, file)
         const next = yield* loadFile(file, env)
         result = mergeConfig(result, next)
@@ -709,7 +742,7 @@ export const layer = Layer.effect(
       }
 
       if (changed) yield* invalidate()
-      return { info: next, changed }
+      return { ...next, info: next, changed }
     })
 
     return Service.of({

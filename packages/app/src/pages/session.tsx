@@ -2038,7 +2038,25 @@ export default function Page() {
               items: followupDock(),
               sending: sendingFollowup(),
               onSend: (id) => void sendFollowup(params.id!, id, { manual: true }),
+              onSteer: (id) => void sendFollowup(params.id!, id, { manual: true }),
               onEdit: editFollowup,
+              onDelete: (id) => {
+                const sessionID = params.id
+                if (!sessionID || followupBusy(sessionID)) return
+                setFollowup("items", sessionID, (items) => (items ?? []).filter((entry) => entry.id !== id))
+              },
+              onMove: (id, direction) => {
+                const sessionID = params.id
+                if (!sessionID || followupBusy(sessionID)) return
+                const items = [...(followup.items[sessionID] ?? [])]
+                const index = items.findIndex((entry) => entry.id === id)
+                const next = index + direction
+                if (index < 0 || next < 0 || next >= items.length) return
+                const item = items[index]
+                items[index] = items[next]
+                items[next] = item
+                setFollowup("items", sessionID, items)
+              },
             }
           : undefined,
       revert: () =>

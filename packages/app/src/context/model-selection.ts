@@ -12,7 +12,7 @@ export function resolveConfiguredModelKey(
   if (!configured) return undefined
   const [providerID, ...rest] = configured.split("/")
   const modelID = rest.join("/")
-  if (!providerID || !modelID) return undefined
+  if (!modelID) return items.find((item) => item.modelID === configured)
   return items.find((item) => item.providerID === providerID && item.modelID === modelID)
 }
 
@@ -35,18 +35,18 @@ export function isModelVisibleBase(input: {
 export function computeForcedVisibleModelKeys(input: {
   items: Array<{ providerID: string; modelID: string }>
   defaults: Array<{ providerID: string; modelID: string }>
-  configured: { providerID: string; modelID: string } | undefined
+  configured?: { providerID: string; modelID: string }
   visible: (model: ModelKey) => boolean
 }) {
   const result = new Set<string>()
-  for (const item of input.items) {
-    const key = modelKey(item)
-    if (input.visible(item)) result.add(key)
-  }
   for (const item of input.defaults) {
-    const key = modelKey(item)
-    if (input.visible(item)) result.add(key)
+    if (input.items.some((candidate) => candidate.providerID === item.providerID && candidate.modelID === item.modelID)) {
+      result.add(modelKey(item))
+    }
   }
-  if (input.configured && input.visible(input.configured)) result.add(modelKey(input.configured))
+  if (input.configured) result.add(modelKey(input.configured))
+  if (result.size > 0) return result
+  const fallback = input.items.find((item) => !/embedding/i.test(item.modelID))
+  if (fallback) result.add(modelKey(fallback))
   return result
 }

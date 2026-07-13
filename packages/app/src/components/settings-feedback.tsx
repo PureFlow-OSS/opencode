@@ -63,7 +63,7 @@ export const SettingsFeedback: Component<{ mode?: "general" | "beta" }> = (props
   })
 
   const aifactoryApiKey = createMemo(() => {
-    const key = globalSync.data.config.provider?.["aifactory"]?.options?.apiKey
+    const key = globalSync().data.config.provider?.["aifactory"]?.options?.apiKey
     return typeof key === "string" && key.trim() ? key.trim() : undefined
   })
 
