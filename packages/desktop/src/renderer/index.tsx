@@ -17,44 +17,23 @@ import {
 import type { UpdaterState } from "@opencode-ai/app/updater"
 import * as Sentry from "@sentry/solid"
 import type { AsyncStorage } from "@solid-primitives/storage"
-import { MemoryRouter } from "@solidjs/router"
+import { createMemoryHistory, MemoryRouter, type BaseRouterProps } from "@solidjs/router"
 import { createEffect, createMemo, createResource, createSignal, onCleanup, onMount, Show } from "solid-js"
 import { render } from "solid-js/web"
 import pkg from "../../package.json"
 import { initI18n, t } from "./i18n"
 import { initializationData, initializationReady } from "./initialization"
+import { DesktopFirstLaunchOnboarding } from "./onboarding"
 import { resetZoom, setPinchZoomEnabled, webviewZoom, zoomIn, zoomOut } from "./webview-zoom"
 import { availableStartupServer, readyWslConnections } from "./wsl/connections"
 import "./styles.css"
 import { Splash } from "@opencode-ai/ui/logo"
 import { useTheme } from "@opencode-ai/ui/theme/context"
 
-const os = (() => {
-  const ua = navigator.userAgent
-  if (ua.includes("Mac")) return "macos"
-  if (ua.includes("Windows")) return "windows"
-  if (ua.includes("Linux")) return "linux"
-  return undefined
-})()
-
 const root = document.getElementById("root")
 if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
   throw new Error(t("error.dev.rootNotFound"))
 }
-
-window.addEventListener("error", (event) => {
-  console.error("[opencode] renderer error", {
-    message: event.error?.message ?? event.message,
-    stack: event.error?.stack,
-    filename: event.filename,
-    lineno: event.lineno,
-    colno: event.colno,
-  })
-})
-
-window.addEventListener("unhandledrejection", (event) => {
-  console.error("[opencode] renderer unhandled rejection", event.reason)
-})
 
 if (import.meta.env.VITE_SENTRY_DSN) {
   Sentry.init({
@@ -86,6 +65,10 @@ void window.api.updater.subscribe(setUpdaterState)
 
 const deepLinkEvent = "opencode:deep-link"
 
+type DesktopWindowState = {
+  id?: string
+}
+
 const emitDeepLinks = (urls: string[]) => {
   if (urls.length === 0) return
   window.__OPENCODE__ ??= {}
@@ -99,8 +82,43 @@ const listenForDeepLinks = () => {
   return window.api.onDeepLink((urls) => emitDeepLinks(urls))
 }
 
-const createPlatform = (): Platform => {
+function windowLastActiveUrlKey(windowID: string) {
+  return `opencode.desktop.window.${windowID}.last-active-url`
+}
+
+function getLastActiveUrl(windowID: string) {
+  if (typeof localStorage !== "object") return "/"
+  try {
+    const value = localStorage.getItem(windowLastActiveUrlKey(windowID))
+    if (value?.startsWith("/") && !value.startsWith("//")) return value
+  } catch {}
+  return "/"
+}
+
+function setLastActiveUrl(windowID: string, value: string) {
+  if (typeof localStorage !== "object") return
+  try {
+    localStorage.setItem(windowLastActiveUrlKey(windowID), value)
+  } catch {}
+}
+
+function DesktopMemoryRouter(props: BaseRouterProps & { windowID: string }) {
+  const history = createMemoryHistory()
+  const initialUrl = getLastActiveUrl(props.windowID)
+  if (initialUrl !== "/") history.set({ value: initialUrl, replace: true, scroll: false })
+  onCleanup(history.listen((value) => setLastActiveUrl(props.windowID, value)))
+  return <MemoryRouter {...props} history={history} />
+}
+
+const createPlatform = (windowState: DesktopWindowState): Platform => {
   const attachmentPaths = new WeakMap<File, string>()
+  const os = (() => {
+    const ua = navigator.userAgent
+    if (ua.includes("Mac")) return "macos"
+    if (ua.includes("Windows")) return "windows"
+    if (ua.includes("Linux")) return "linux"
+    return undefined
+  })()
 
   const runDesktopMenuAction: Platform["runDesktopMenuAction"] = (action) => {
     switch (action) {
@@ -151,6 +169,7 @@ const createPlatform = (): Platform => {
     platform: "desktop",
     os,
     version: pkg.version,
+    windowID: windowState.id,
 
     async openDirectoryPickerDialog(opts) {
       return window.api.openDirectoryPicker({
@@ -199,6 +218,9 @@ const createPlatform = (): Platform => {
       }
       return window.api.openPath(path, app)
     },
+    async revealPath(path: string) {
+      return window.api.revealPath(path)
+    },
 
     back() {
       window.history.back()
@@ -215,15 +237,6 @@ const createPlatform = (): Platform => {
       check: () => window.api.updater.check(),
       install: () => window.api.updater.install(),
     },
-    checkUpdate: async () => {
-      const state = await window.api.updater.check()
-      return {
-        updateAvailable: state.status === "ready",
-        version: state.status === "ready" ? state.version : undefined,
-      }
-    },
-    updateAndRestart: () => window.api.updater.install(),
-    resetData: () => window.api.resetData(),
 
     exportDebugLogs: () => window.api.exportDebugLogs(),
 
@@ -255,7 +268,6 @@ const createPlatform = (): Platform => {
       return fetch(input, init)
     },
 
-    getMotd: () => window.api.getMotd(),
     getDefaultServer: async () => {
       const url = await window.api.getDefaultServerUrl().catch(() => null)
       if (!url) return null
@@ -306,52 +318,17 @@ window.api.onMenuCommand((id) => {
   menuTrigger?.(id)
 })
 listenForDeepLinks()
-console.info("[opencode] desktop renderer bootstrap")
 
-window.addEventListener("error", (event) => {
-  window.api.recordFatalRendererError({
-    error:
-      event.error instanceof Error
-        ? `${event.error.name}: ${event.error.message}\n${event.error.stack ?? ""}`
-        : String(event.message),
-    url: location.href,
-    version: pkg.version,
-    platform: "desktop",
-    os,
-  })
-})
-
-window.addEventListener("unhandledrejection", (event) => {
-  const reason = event.reason
-  window.api.recordFatalRendererError({
-    error: reason instanceof Error ? `${reason.name}: ${reason.message}\n${reason.stack ?? ""}` : String(reason),
-    url: location.href,
-    version: pkg.version,
-    platform: "desktop",
-    os,
-  })
-})
-
-function BootSplash() {
-  const defaultMotd = { enabled: true, text: "RRZ AI Factory" }
-  const [motd] = createResource(() => window.api.getMotd().catch(() => defaultMotd), { initialValue: defaultMotd })
-
+function LoadingSplash() {
   return (
-    <div class="h-dvh w-screen flex items-center justify-center bg-background-base">
-      <div class="flex flex-col items-center justify-center gap-6 text-center">
-        <Splash class="w-28 h-28 opacity-50 animate-pulse" />
-        <Show when={motd()?.enabled && motd()?.text}>
-          <div class="max-w-[calc(100vw-4rem)] text-center text-26-regular text-text-muted truncate">
-            {motd()?.text}
-          </div>
-        </Show>
-      </div>
+    <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
+      <Splash class="w-16 h-20 opacity-50 animate-pulse" />
     </div>
   )
 }
 
-render(() => {
-  const platform = createPlatform()
+function DesktopRoot(props: { windowState: DesktopWindowState }) {
+  const platform = createPlatform(props.windowState)
   const loadLocale = async () => {
     const current = await platform.storage?.("opencode.global.dat").getItem("language")
     const legacy = current ? undefined : await platform.storage?.().getItem("language.v1")
@@ -371,6 +348,10 @@ render(() => {
 
   const [defaultServer] = createResource(() => platform.getDefaultServer?.())
   const [locale] = createResource(loadLocale)
+  const router = (props: BaseRouterProps) => (
+    <DesktopMemoryRouter {...props} windowID={platform.windowID ?? "browser"} />
+  )
+  const onboarding = Promise.withResolvers<void>()
 
   function handleClick(e: MouseEvent) {
     const link = (e.target as HTMLElement).closest("a.external-link") as HTMLAnchorElement | null
@@ -400,8 +381,6 @@ render(() => {
 
   function App() {
     const wslServers = useWslServers()
-    const splash = <BootSplash />
-
     const ready = createMemo(
       () => !defaultServer.loading && !sidecar.loading && !windowCount.loading && !locale.loading,
     )
@@ -426,12 +405,22 @@ render(() => {
     const effectiveDefaultServer = createMemo(() =>
       ServerConnection.Key.make(availableStartupServer(defaultServer.latest, wslServers.data)),
     )
-
     return (
-      <Show when={ready()} fallback={splash}>
+      <Show when={ready()} fallback={<LoadingSplash />}>
         <Show when={effectiveDefaultServer()} keyed>
           {(key) => (
-            <AppInterface defaultServer={key} servers={servers()} router={MemoryRouter}>
+            <AppInterface
+              defaultServer={key}
+              servers={servers()}
+              router={router}
+              startup={onboarding.promise}
+              serverScoped={
+                <DesktopFirstLaunchOnboarding
+                  initialUrl={getLastActiveUrl(platform.windowID ?? "browser")}
+                  onLoaded={onboarding.resolve}
+                />
+              }
+            >
               <Inner />
             </AppInterface>
           )}
@@ -449,10 +438,24 @@ render(() => {
 
   return (
     <PlatformProvider value={platform}>
-      {undefined}
       <AppBaseProviders locale={locale.latest}>
         <Show when={true}>{(_) => <App />}</Show>
       </AppBaseProviders>
     </PlatformProvider>
+  )
+}
+
+render(() => {
+  const [windowState] = createResource(async () => {
+    const api = window.api as typeof window.api & {
+      getWindowID?: () => Promise<string>
+    }
+    return { id: await api.getWindowID?.() }
+  })
+
+  return (
+    <Show when={windowState.latest} fallback={<LoadingSplash />} keyed>
+      {(state) => <DesktopRoot windowState={state} />}
+    </Show>
   )
 }, root!)
