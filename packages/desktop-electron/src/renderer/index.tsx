@@ -166,14 +166,21 @@ const createPlatform = (): Platform => {
       return await handleWslPicker(result)
     },
 
-    async openFilePickerDialog(opts) {
+    async openAttachmentPickerDialog(opts, onFile) {
       const result = await window.api.openFilePicker({
         multiple: opts?.multiple ?? false,
         title: opts?.title ?? t("desktop.dialog.chooseFile"),
         accept: opts?.accept ?? ACCEPTED_FILE_TYPES,
         extensions: opts?.extensions ?? ACCEPTED_FILE_EXTENSIONS,
       })
-      return handleWslPicker(result)
+      const selected = await handleWslPicker(result)
+      const paths = selected ? (Array.isArray(selected) ? selected : [selected]) : []
+      for (const path of paths) {
+        const value = await window.api.readFile(path)
+        if (!value) continue
+        const bytes = Uint8Array.from(atob(value.data), (character) => character.charCodeAt(0))
+        await onFile(new File([bytes], value.name, { type: value.type }))
+      }
     },
 
     async saveFilePickerDialog(opts) {
@@ -269,12 +276,6 @@ const createPlatform = (): Platform => {
     },
 
     getMotd: () => window.api.getMotd(),
-
-    getWslEnabled: () => isWslEnabled(),
-
-    setWslEnabled: async (enabled) => {
-      await window.api.setWslConfig({ enabled })
-    },
 
     getDefaultServer: async () => {
       const url = await window.api.getDefaultServerUrl().catch(() => null)
@@ -459,4 +460,3 @@ render(() => {
     </PlatformProvider>
   )
 }, root!)
-

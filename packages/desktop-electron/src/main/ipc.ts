@@ -3,7 +3,7 @@ import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, shell } f
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron"
 import { readFile } from "node:fs/promises"
 import { homedir } from "node:os"
-import { join } from "node:path"
+import { extname, join, basename } from "node:path"
 
 import type {
   InitStep,
@@ -199,6 +199,24 @@ export function registerIpcHandlers(deps: Deps) {
     },
   )
 
+  ipcMain.handle("read-file", async (_event: IpcMainInvokeEvent, path: string) => {
+    const bytes = await readFile(path)
+    const extension = extname(path).toLowerCase()
+    const type =
+      extension === ".png"
+        ? "image/png"
+        : extension === ".jpg" || extension === ".jpeg"
+          ? "image/jpeg"
+          : extension === ".gif"
+            ? "image/gif"
+            : extension === ".webp"
+              ? "image/webp"
+              : extension === ".pdf"
+                ? "application/pdf"
+                : "application/octet-stream"
+    return { name: basename(path), type, data: bytes.toString("base64") }
+  })
+
   ipcMain.on("open-link", (_event: IpcMainEvent, url: string) => {
     void shell.openExternal(url)
   })
@@ -266,4 +284,3 @@ export function sendMenuCommand(win: BrowserWindow, id: string) {
 export function sendDeepLinks(win: BrowserWindow, urls: string[]) {
   win.webContents.send("deep-link", urls)
 }
-

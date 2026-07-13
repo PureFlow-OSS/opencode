@@ -67,6 +67,7 @@ export type ElectronAPI = {
     accept?: string[]
     extensions?: string[]
   }) => Promise<string | string[] | null>
+  readFile: (path: string) => Promise<{ name: string; type: string; data: string } | null>
   saveFilePicker: (opts?: { title?: string; defaultPath?: string }) => Promise<string | null>
   openLink: (url: string) => void
   openPath: (path: string, app?: string) => Promise<void>
@@ -99,4 +100,3 @@ export type ElectronAPI = {
     text: string
   }>
 }
-

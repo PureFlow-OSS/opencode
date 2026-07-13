@@ -207,8 +207,20 @@ async function discoverAiFactoryModels(token: string, baseURL: string, rules: Ai
           reasoning: override.reasoning,
           attachment: override.input.some((value) => value !== "text"),
           toolcall: true,
-          input: Object.fromEntries(["text", "audio", "image", "video", "pdf"].map((value) => [value, override.input.includes(value)])),
-          output: Object.fromEntries(["text", "audio", "image", "video", "pdf"].map((value) => [value, override.outputModalities.includes(value)])),
+          input: {
+            text: override.input.includes("text"),
+            audio: override.input.includes("audio"),
+            image: override.input.includes("image"),
+            video: override.input.includes("video"),
+            pdf: override.input.includes("pdf"),
+          },
+          output: {
+            text: override.outputModalities.includes("text"),
+            audio: override.outputModalities.includes("audio"),
+            image: override.outputModalities.includes("image"),
+            video: override.outputModalities.includes("video"),
+            pdf: override.outputModalities.includes("pdf"),
+          },
           interleaved: false,
         },
         cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
@@ -1049,7 +1061,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       })
       return {
         autoload: true,
-        async getModel(sdk: BundledSDK, modelID: string) {
+        async getModel(sdk: any, modelID: string) {
           return sdk.chat?.(modelID) ?? sdk.languageModel(modelID)
         },
         async discoverModels() {

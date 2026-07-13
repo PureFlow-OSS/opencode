@@ -455,6 +455,7 @@ describe("prompt submit worktree selection", () => {
     const queued: unknown[] = []
 
     const submit = createPromptSubmit({
+      prompt,
       info: () => ({ id: "session-1" }),
       imageAttachments: () => [],
       commentCount: () => 0,

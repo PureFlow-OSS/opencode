@@ -63,3 +63,26 @@ const build = (messages: Message[] = [], providers: Provider[] = []): Context | 
 export function getSessionContext(messages: Message[] = [], providers: Provider[] = []) {
   return build(messages, providers)
 }
+
+export function getSessionContextMetrics(
+  messages: Message[] = [],
+  providers: Provider[] = [],
+  selected?: { providerID: string; modelID: string },
+) {
+  const context = getSessionContext(messages, providers)
+  if (!context || !selected) return { context }
+  const provider = providers.find((item) => item.id === selected.providerID)
+  const model = provider?.models[selected.modelID]
+  const limit = model?.limit.context
+  return {
+    context: {
+      ...context,
+      provider,
+      model,
+      providerLabel: provider?.name ?? selected.providerID,
+      modelLabel: model?.name ?? selected.modelID,
+      limit,
+      usage: limit ? Math.round((context.total / limit) * 100) : null,
+    },
+  }
+}
