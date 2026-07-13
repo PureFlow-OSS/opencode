@@ -188,6 +188,9 @@ function ProviderConnection(props: {
   const provider = createMemo(
     () => providers.all().get(props.provider) ?? serverSync().data.provider.all.get(props.provider)!,
   )
+  const providerName = createMemo(
+    () => provider()?.name ?? (props.provider === "aifactory" ? "RRZ AI Factory" : props.provider),
+  )
   const fallback = createMemo<ProviderAuthMethod[]>(() => [
     {
       type: "api" as const,
@@ -503,8 +506,8 @@ function ProviderConnection(props: {
     showToast({
       variant: "success",
       icon: "circle-check",
-      title: language.t("provider.connect.toast.connected.title", { provider: provider().name }),
-      description: language.t("provider.connect.toast.connected.description", { provider: provider().name }),
+      title: language.t("provider.connect.toast.connected.title", { provider: providerName() }),
+      description: language.t("provider.connect.toast.connected.description", { provider: providerName() }),
     })
   }
 
@@ -522,7 +525,7 @@ function ProviderConnection(props: {
     return (
       <>
         <div class="text-14-regular text-text-base">
-          {language.t("provider.connect.selectMethod", { provider: provider().name })}
+          {language.t("provider.connect.selectMethod", { provider: providerName() })}
         </div>
         <div>
           <List
@@ -584,7 +587,7 @@ function ProviderConnection(props: {
     return (
       <div class="flex flex-col gap-6">
         <Switch>
-          <Match when={provider().id === "opencode"}>
+          <Match when={provider()?.id === "opencode"}>
             <div class="flex flex-col gap-4">
               <div class="text-14-regular text-text-base">{language.t("provider.connect.opencodeZen.line1")}</div>
               <div class="text-14-regular text-text-base">{language.t("provider.connect.opencodeZen.line2")}</div>
@@ -599,7 +602,7 @@ function ProviderConnection(props: {
           </Match>
           <Match when={true}>
             <div class="text-14-regular text-text-base">
-              {language.t("provider.connect.apiKey.description", { provider: provider().name })}
+              {language.t("provider.connect.apiKey.description", { provider: providerName() })}
             </div>
           </Match>
         </Switch>
@@ -607,7 +610,7 @@ function ProviderConnection(props: {
           <TextField
             autofocus
             type="text"
-            label={language.t("provider.connect.apiKey.label", { provider: provider().name })}
+            label={language.t("provider.connect.apiKey.label", { provider: providerName() })}
             placeholder={language.t("provider.connect.apiKey.placeholder")}
             name="apiKey"
             value={formStore.value}
@@ -662,7 +665,7 @@ function ProviderConnection(props: {
         <div class="text-14-regular text-text-base">
           {language.t("provider.connect.oauth.code.visit.prefix")}
           <Link href={store.authorization!.url}>{language.t("provider.connect.oauth.code.visit.link")}</Link>
-          {language.t("provider.connect.oauth.code.visit.suffix", { provider: provider().name })}
+          {language.t("provider.connect.oauth.code.visit.suffix", { provider: providerName() })}
         </div>
         <form onSubmit={handleSubmit} class="flex flex-col items-start gap-4">
           <TextField
@@ -720,7 +723,7 @@ function ProviderConnection(props: {
         <div class="text-14-regular text-text-base">
           {language.t("provider.connect.oauth.auto.visit.prefix")}
           <Link href={store.authorization!.url}>{language.t("provider.connect.oauth.auto.visit.link")}</Link>
-          {language.t("provider.connect.oauth.auto.visit.suffix", { provider: provider().name })}
+          {language.t("provider.connect.oauth.auto.visit.suffix", { provider: providerName() })}
         </div>
         <TextField
           label={language.t("provider.connect.oauth.auto.confirmationCode")}
@@ -746,7 +749,7 @@ function ProviderConnection(props: {
             <Match when={props.provider === "anthropic" && method()?.label?.toLowerCase().includes("max")}>
               {language.t("provider.connect.title.anthropicProMax")}
             </Match>
-            <Match when={true}>{language.t("provider.connect.title", { provider: provider().name })}</Match>
+            <Match when={true}>{language.t("provider.connect.title", { provider: providerName() })}</Match>
           </Switch>
         </div>
       </div>

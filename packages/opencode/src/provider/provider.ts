@@ -34,6 +34,13 @@ import { ProviderError } from "./error"
 import { readProviderConfig } from "@/config/managed"
 
 const OPENAI_HEADER_TIMEOUT_DEFAULT = 10_000
+const AIFACTORY_CATALOG: ModelsDev.Provider = {
+  id: "aifactory",
+  name: "RRZ AI Factory",
+  api: "http://10.53.7.23/v1",
+  env: [],
+  models: {},
+}
 
 function wrapSSE(res: Response, ms: number, ctl: AbortController) {
   if (typeof ms !== "number" || ms <= 0) return res
@@ -1451,7 +1458,8 @@ const layer = Layer.effect(
         const bridge = yield* EffectBridge.make()
         const cfg = yield* config.get()
         const modelsDev = yield* modelsDevSvc.get()
-        const catalog = mapValues(modelsDev, fromModelsDevProvider)
+        const catalogSource = modelsDev.aifactory ? modelsDev : { ...modelsDev, aifactory: AIFACTORY_CATALOG }
+        const catalog = mapValues(catalogSource, fromModelsDevProvider)
         const database = mapValues(catalog, toPublicInfo)
 
         const providers: Record<ProviderV2.ID, Info> = {} as Record<ProviderV2.ID, Info>
@@ -1723,6 +1731,16 @@ const layer = Layer.effect(
                 }
               }
             } catch (e) {}
+          })
+        }
+
+        const aifactory = ProviderV2.ID.make("aifactory")
+        if (discoveryLoaders[aifactory] && providers[aifactory] && isProviderAllowed(aifactory)) {
+          yield* Effect.promise(async () => {
+            try {
+              const discovered = await discoveryLoaders[aifactory]!()
+              providers[aifactory].models = discovered
+            } catch {}
           })
         }
 

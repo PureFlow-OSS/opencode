@@ -2036,3 +2036,36 @@ it.effect("opencode loader keeps paid models when auth exists", () =>
     expect(keyedCount).toBeGreaterThan(0)
   }).pipe(provideMultiInstance),
 )
+
+it.effect(
+  "aifactory loader reads the api key from auth.json",
+  () =>
+    Effect.gen(function* () {
+      const directory = yield* tmpdirScoped()
+      const authPath = path.join(Global.Path.data, "auth.json")
+      const original = yield* Effect.promise(() => Filesystem.readText(authPath).catch(() => undefined))
+
+      yield* Effect.acquireRelease(
+        Effect.promise(() =>
+          Filesystem.write(authPath, JSON.stringify({ aifactory: { type: "api", key: "sk-test" } })),
+        ),
+        () =>
+          Effect.promise(async () => {
+            if (original !== undefined) await Filesystem.write(authPath, original)
+            else await unlink(authPath).catch(() => undefined)
+          }),
+      )
+
+      const listIn = (directory: string) =>
+        Provider.use
+          .list()
+          .pipe(provideInstanceEffect(directory))
+          .pipe(Effect.provide(instanceStoreLayer), Effect.provide(AppNodeBuilder.build(CrossSpawnSpawner.node)))
+
+      const providers = yield* listIn(directory)
+      const aifactory = providers[ProviderV2.ID.make("aifactory")]
+      expect(aifactory).toBeDefined()
+      expect(aifactory.key).toBe("sk-test")
+    }).pipe(provideMultiInstance),
+  { timeout: 20_000 },
+)
