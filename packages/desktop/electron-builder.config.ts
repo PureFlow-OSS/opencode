@@ -17,13 +17,38 @@ const legacyDesktopEntryFpm = `${legacyDesktopEntry}=/usr/share/applications/ope
 
 async function signWindows(configuration: { path: string }) {
   if (process.platform !== "win32") return
-  if (process.env.GITHUB_ACTIONS !== "true") return
+  if (!hasSigningConfiguration()) return
 
   await execFileAsync(
     "pwsh",
     ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", signScript, configuration.path],
     { cwd: rootDir },
   )
+}
+
+async function signWindowsOutput(configuration: { appOutDir: string }) {
+  if (process.platform !== "win32") return
+  if (!hasSigningConfiguration()) return
+
+  await execFileAsync(
+    "pwsh",
+    ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", signScript, configuration.appOutDir],
+    { cwd: rootDir },
+  )
+}
+
+function hasSigningConfiguration() {
+  const keyVault =
+    (process.env.AZURE_KEYVAULT_URL || process.env.KEYVAULT_URL) &&
+    (process.env.AZURE_KEYVAULT_CLIENT_ID || process.env.AZURE_CLIENT_ID) &&
+    (process.env.AZURE_KEYVAULT_CLIENT_SECRET || process.env.AZURE_CLIENT_SECRET) &&
+    (process.env.AZURE_KEYVAULT_TENANT_ID || process.env.AZURE_TENANT_ID) &&
+    (process.env.AZURE_KEYVAULT_CERT || process.env.CERT_ALIAS || process.env.CertificateName)
+  const trustedSigning =
+    process.env.AZURE_TRUSTED_SIGNING_ENDPOINT &&
+    process.env.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME &&
+    process.env.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE
+  return Boolean(keyVault || trustedSigning)
 }
 
 const channel = (() => {
@@ -53,6 +78,9 @@ const getBase = (appId: string): Configuration => ({
     desktopName: `${appId}.desktop`,
   },
   files: ["out/**/*", "resources/**/*"],
+  afterSign: async (context: { appOutDir: string }) => {
+    await signWindowsOutput(context)
+  },
   extraResources: [
     {
       from: "native/",
