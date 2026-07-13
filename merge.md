@@ -9,6 +9,7 @@ Sie beschreibt die Änderungen seit `ee4f46600344c47f69631597be5f549cb0bdb701` n
 - Zweiter Block: Config-, Provider- und Proxy-Umstellung rund um RRZ AI Factory, managed Provider-Config und modellbezogene Sichtbarkeit.
 - Dritter Block: UI- und Session-Workflows, vor allem MCP-Verwaltung, Model Switch Compaction, Followup/Todo/Permission UX und bessere Sync-Logik.
 - Vierter Block: Tooling-Änderungen für Bash-Background-Jobs, Webfetch/Websearch-Proxying, Playwright und Attachment-Fallbacks.
+- Letzter kleiner Change: Feedback im Updater-Console-Frontend kann jetzt Attachments mitgeben.
 
 ## Copy-Paste Prompt Für Das Modell
 Verwende diesen Prompt, wenn die Änderungen später erneut eingearbeitet werden sollen:
@@ -30,6 +31,7 @@ Wichtige Leitplanken:
 - `packages/desktop` und `packages/desktop-electron` enthalten Tauri/Electron-spezifische Desktop- und Updater-Änderungen.
 - Die neue RRZ-AI-Factory-Logik ist über Config, Provider, Update-Server und Modellsichtbarkeit verteilt.
 - Tooling wie `bash_read`, `bash_stop`, `playwright`, `webfetch` und Proxy-Unterstützung muss zusammen gedacht werden.
+- Die Console-Route für Feedback ist Teil der Updater-Pipeline und bekommt Attachment-Encoding, Beta-Status und Payload-Formatierung.
 
 Vorgehen:
 1. Stelle die Config-/Provider-Basis wieder her.
@@ -250,12 +252,27 @@ Implementierungsdetails:
 - `tail()` in `logging.ts` ist async.
 - `fetch-update-server` im IPC hängt den AI-Factory-Key als Header an.
 
+### 9. Updater Feedback Attachments
+
+Implementierung:
+- Die Console-Feedback-Route kann jetzt Dateianhänge mitsenden.
+- Generisches Feedback und Beta-Feedback teilen sich dieselbe Submit-Logik.
+- Beta-Feedback erzwingt weiter die vorhandene Sentiment-Vorwahl, hängt aber jetzt optional Attachments an.
+
+Wichtige Dateien:
+- [packages/console/app/src/routes/feedback.tsx](C:/Users/Klaus/Desktop/PFH/opencode/packages/console/app/src/routes/feedback.tsx)
+
+Implementierungsdetails:
+- `readAttachment()` liest Dateien als Bytes, wandelt sie chunkweise in Base64 und sendet `{ name, type, data }`.
+- `submitFeedback()` baut das JSON-Payload mit `attachments` und POSTet es an `/feedback`.
+- Beta-Feedback normalisiert die Text-Vorlage über `composeBetaMessage()` und entfernt bereits vorhandene Prefixe.
+
 ## Wieder-Einbau-Checkliste
 - Config und managed config zuerst.
 - Dann Provider- und Model-Visibility-Logik.
 - Danach UI: MCP, Settings, Session-Composer, Sidebar, Dialoge.
 - Anschließend Prompt- und Tooling-Änderungen.
-- Zum Schluss Desktop-Release, Updater, Packaging und Reset-Flow.
+- Zum Schluss Desktop-Release, Updater, Packaging, Reset-Flow und Console-Feedback-Attachments.
 
 ## Tests Und Validierung
 - `packages/opencode`: `bun typecheck`
@@ -263,4 +280,3 @@ Implementierungsdetails:
 - `packages/app`: Sichtbarkeit, Sync, Model Switch Compaction
 - `packages/desktop-electron`: Build-/Packaging-Pfade auf Windows prüfen
 - `packages/desktop`: Tauri-Build und Update-URL-Injektion prüfen
-
