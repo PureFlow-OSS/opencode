@@ -1,4 +1,4 @@
-import { Component, createSignal, startTransition } from "solid-js"
+import { Component, createSignal, Show, startTransition } from "solid-js"
 import { Dialog } from "@opencode-ai/ui/v2/dialog-v2"
 import { TabsV2 } from "@opencode-ai/ui/v2/tabs-v2"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -12,6 +12,8 @@ import "./settings-v2.css"
 import { SettingsServersV2 } from "./servers"
 import { SettingsMcp } from "../settings-mcp"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { SettingsChangelog } from "../settings-changelog"
+import { SettingsFeedback } from "../settings-feedback"
 
 export const DialogSettings: Component<{
   sessionID?: string
@@ -21,6 +23,7 @@ export const DialogSettings: Component<{
   const platform = usePlatform()
   const dialog = useDialog()
   const [tab, setTab] = createSignal(props.defaultValue ?? "general")
+  const betaTester = () => typeof window !== "undefined" && !!window.__OPENCODE__?.betaTester
 
   const showProviders = () => {
     void dialog.show(() => <DialogSettings sessionID={props.sessionID} defaultValue="providers" />)
@@ -50,6 +53,20 @@ export const DialogSettings: Component<{
                       <Icon name="keyboard" />
                       {language.t("settings.tab.shortcuts")}
                     </TabsV2.Trigger>
+                    <TabsV2.Trigger value="changelog">
+                      <Icon name="bullet-list" />
+                      {language.t("settings.tab.changelog")}
+                    </TabsV2.Trigger>
+                    <TabsV2.Trigger value="feedback">
+                      <Icon name="bubble-5" />
+                      {language.t("settings.tab.feedback")}
+                    </TabsV2.Trigger>
+                    <Show when={betaTester()}>
+                      <TabsV2.Trigger value="beta-feedback">
+                        <Icon name="bubble-5" />
+                        {language.t("settings.tab.betaFeedback")}
+                      </TabsV2.Trigger>
+                    </Show>
                   </div>
                 </div>
 
@@ -88,6 +105,17 @@ export const DialogSettings: Component<{
         <TabsV2.Content value="shortcuts" class="settings-v2-panel">
           <SettingsKeybinds v2 />
         </TabsV2.Content>
+        <TabsV2.Content value="changelog" class="settings-v2-panel">
+          <SettingsChangelog />
+        </TabsV2.Content>
+        <TabsV2.Content value="feedback" class="settings-v2-panel">
+          <SettingsFeedback />
+        </TabsV2.Content>
+        <Show when={betaTester()}>
+          <TabsV2.Content value="beta-feedback" class="settings-v2-panel">
+            <SettingsFeedback mode="beta" />
+          </TabsV2.Content>
+        </Show>
         <TabsV2.Content value="servers" class="settings-v2-panel">
           <SettingsServersV2 />
         </TabsV2.Content>

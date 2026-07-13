@@ -231,6 +231,7 @@ declare global {
   interface Window {
     __OPENCODE__?: {
       deepLinks?: string[]
+      betaTester?: boolean
     }
   }
 }
