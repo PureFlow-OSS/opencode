@@ -13,7 +13,7 @@ import {
 import { createStore } from "solid-js/store"
 import { useLocal } from "@/context/local"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { popularProviders } from "@/hooks/use-providers"
+import { isModelProviderVisible, popularProviders } from "@/hooks/use-providers"
 import { Button } from "@opencode-ai/ui/button"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { ScrollView } from "@opencode-ai/ui/scroll-view"
@@ -66,6 +66,7 @@ const ModelList: Component<{
   const models = createMemo(() =>
     model
       .list()
+      .filter((m) => isModelProviderVisible(m.provider.id))
       .filter((m) => model.visible({ modelID: m.id, providerID: m.provider.id }))
       .filter((m) => (props.provider ? m.provider.id === props.provider : true)),
   )
@@ -253,6 +254,7 @@ export function ModelSelectorPopoverV2(props: {
   const allModels = createMemo(() =>
     model
       .list()
+      .filter((item) => isModelProviderVisible(item.provider.id))
       .filter((item) => model.visible({ modelID: item.id, providerID: item.provider.id }))
       .filter((item) => (props.provider ? item.provider.id === props.provider : true)),
   )

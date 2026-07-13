@@ -7,7 +7,7 @@ import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { createMemo, onCleanup, onMount, type Component, For, Show } from "solid-js"
 import { useLocal } from "@/context/local"
-import { popularProviders, useProviders } from "@/hooks/use-providers"
+import { isModelProviderVisible, popularProviders, useProviders } from "@/hooks/use-providers"
 import { decode64 } from "@/utils/base64"
 import { useLanguage } from "@/context/language"
 import { ModelTooltip } from "./model-tooltip"
@@ -76,7 +76,7 @@ export const DialogSelectModelUnpaidV2: Component<{ model?: ModelState }> = (pro
                   {language.t("dialog.model.unpaid.freeModels.title")}
                 </div>
               </div>
-              <For each={model.list()}>
+              <For each={model.list().filter((item) => isModelProviderVisible(item.provider.id))}>
                 {(item) => (
                   <TooltipV2
                     class="w-full"

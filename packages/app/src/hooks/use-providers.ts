@@ -14,6 +14,10 @@ export function isVisibleProvider(id: string) {
   return id === "aifactory"
 }
 
+export function isModelProviderVisible(id: string) {
+  return id === "aifactory" || id.startsWith("github-copilot")
+}
+
 export function useProviders(directory?: Accessor<string | undefined>) {
   const serverSync = useServerSync()
   const params = useParams()
