@@ -232,10 +232,6 @@ declare global {
     __OPENCODE__?: {
       deepLinks?: string[]
     }
-    api?: {
-      setTitlebar?: (theme: { mode: "light" | "dark"; scheme?: "system" | "light" | "dark" }) => Promise<void>
-      exportDebugLogs?: () => Promise<string>
-    }
   }
 }
 
@@ -368,7 +364,8 @@ export function AppBaseProviders(props: ParentProps<{ locale?: Locale }>) {
       <Font />
       <ThemeProvider
         onThemeApplied={(_, mode, scheme) => {
-          void window.api?.setTitlebar?.({ mode, scheme })
+          void (window as Window & { api?: { setTitlebar?: (theme: { mode: "light" | "dark"; scheme?: string }) => Promise<void> } })
+            .api?.setTitlebar?.({ mode, scheme })
         }}
       >
         <LanguageProvider locale={props.locale}>

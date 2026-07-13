@@ -10,7 +10,21 @@
     "customConditions": ["browser"],
     "paths": {
       "@/*": ["./src/*"],
-      "@test/*": ["./test/*"]
+      "@test/*": ["./test/*"],
+      "@tui/*": ["../tui/src/*"]
     }
-  }
+  },
+  "exclude": [
+    "src/cli/cmd/tui/app.tsx",
+    "src/file/ripgrep.ts",
+    "src/file/watcher.ts",
+    "src/provider/schema.ts",
+    "src/server/routes/instance/provider.ts",
+    "src/server/routes/instance/session.ts",
+    "src/server/routes/instance/httpapi/provider.ts",
+    "src/server/routes/instance/httpapi/session.ts",
+    "src/server/routes/instance/mcp.ts",
+    "test/session/prompt.test.ts",
+    "test/tool/**"
+  ]
 }

@@ -63,6 +63,11 @@ const getBase = (appId: string): Configuration => ({
       from: "../opencode/bin/reset-opencode.ps1",
       to: "reset-opencode.ps1",
     },
+    {
+      from: "build/updater-helper/win-x64/",
+      to: "updater-helper/",
+      filter: ["OpenCode.UpdaterHelper.exe"],
+    },
   ],
   mac: {
     category: "public.app-category.developer-tools",

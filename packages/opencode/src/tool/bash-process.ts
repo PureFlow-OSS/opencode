@@ -276,7 +276,7 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer.pipe(Layer.provide(FSUtil.defaultLayer))
+export const defaultLayer = layer
 
 export const node = LayerNode.make({
   service: Service,

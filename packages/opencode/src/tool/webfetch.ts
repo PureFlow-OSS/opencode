@@ -111,7 +111,7 @@ export const WebFetchTool = Tool.define(
 
               case "text":
                 if (contentType.includes("text/html")) {
-                  const text = yield* Effect.promise(() => extractTextFromHTML(content))
+                  const text = extractTextFromHTML(content)
                   return { output: text, title, metadata: {} }
                 }
                 return { output: content, title, metadata: {} }
