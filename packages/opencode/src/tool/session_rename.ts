@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect"
-import { Session } from "../session/session"
+import { Session } from "../session"
 import * as Tool from "./tool"
 
 export const Parameters = Schema.Struct({

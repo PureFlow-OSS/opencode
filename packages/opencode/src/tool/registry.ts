@@ -241,7 +241,6 @@ export const layer: Layer.Layer<
             tool.bash_read,
             tool.bash_stop,
             tool.session_rename,
-            tool.shell,
             tool.read,
             tool.glob,
             tool.grep,
