@@ -14,6 +14,7 @@ import { SettingsMcp } from "../settings-mcp"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { SettingsChangelog } from "../settings-changelog"
 import { SettingsFeedback } from "../settings-feedback"
+import { useBetaTester } from "@/context/beta-status"
 
 export const DialogSettings: Component<{
   sessionID?: string
@@ -23,7 +24,7 @@ export const DialogSettings: Component<{
   const platform = usePlatform()
   const dialog = useDialog()
   const [tab, setTab] = createSignal(props.defaultValue ?? "general")
-  const betaTester = () => typeof window !== "undefined" && !!window.__OPENCODE__?.betaTester
+  const betaTester = useBetaTester()
 
   const showProviders = () => {
     void dialog.show(() => <DialogSettings sessionID={props.sessionID} defaultValue="providers" />)

@@ -13,13 +13,14 @@ import { SettingsServers } from "./settings-servers"
 import { SettingsProviders } from "./settings-providers"
 import { SettingsChangelog } from "./settings-changelog"
 import { SettingsFeedback } from "./settings-feedback"
+import { useBetaTester } from "@/context/beta-status"
 
 export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
   const language = useLanguage()
   const platform = usePlatform()
   const dialog = useDialog()
   const [tab, setTab] = createSignal(props.defaultValue ?? "general")
-  const betaTester = () => typeof window !== "undefined" && !!window.__OPENCODE__?.betaTester
+  const betaTester = useBetaTester()
 
   return (
     <Dialog size="x-large" transition>
