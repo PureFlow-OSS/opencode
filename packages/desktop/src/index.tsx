@@ -469,6 +469,11 @@ void updateServer.fetchBetaStatus().then((status) => {
   window.__OPENCODE__ ??= {}
   window.__OPENCODE__.betaTester = status?.betaTester ?? false
   window.__OPENCODE__.betaUserName = status?.betaUserName ?? null
+  window.dispatchEvent(
+    new CustomEvent("opencode:beta-status", {
+      detail: { betaTester: window.__OPENCODE__.betaTester },
+    }),
+  )
 })
 
 render(() => {

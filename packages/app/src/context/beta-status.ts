@@ -1,4 +1,4 @@
-import { createResource } from "solid-js"
+import { createResource, createSignal, onCleanup, onMount } from "solid-js"
 import { useGlobalSync } from "./global-sync"
 import { usePlatform } from "./platform"
 
@@ -11,6 +11,9 @@ const AIFACTORY_API_KEY_HEADER = "X-OpenCode-AiFactory-Api-Key"
 export function useBetaTester() {
   const platform = usePlatform()
   const globalSync = useGlobalSync()
+  const [desktopStatus, setDesktopStatus] = createSignal(
+    typeof window !== "undefined" && window.__OPENCODE__?.betaTester === true,
+  )
   const [status] = createResource(
     () => {
       const key = globalSync().data.config.provider?.["aifactory"]?.options?.apiKey
@@ -30,5 +33,14 @@ export function useBetaTester() {
     { initialValue: false },
   )
 
-  return () => (typeof window !== "undefined" && window.__OPENCODE__?.betaTester === true) || status() === true
+  onMount(() => {
+    const handleStatus = (event: Event) => {
+      const detail = (event as CustomEvent<{ betaTester?: boolean }>).detail
+      setDesktopStatus(detail?.betaTester === true)
+    }
+    window.addEventListener("opencode:beta-status", handleStatus)
+    onCleanup(() => window.removeEventListener("opencode:beta-status", handleStatus))
+  })
+
+  return () => desktopStatus() || status() === true
 }
