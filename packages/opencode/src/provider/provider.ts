@@ -34,12 +34,38 @@ import { ProviderError } from "./error"
 import { readProviderConfig } from "@/config/managed"
 
 const OPENAI_HEADER_TIMEOUT_DEFAULT = 10_000
+const AIFACTORY_ID = ProviderV2.ID.make("aifactory")
+const AIFACTORY_BASE_URL = "http://10.53.7.23/v1"
+const AIFACTORY_BYPASS = new URL(AIFACTORY_BASE_URL).host
 const AIFACTORY_CATALOG: ModelsDev.Provider = {
   id: "aifactory",
   name: "RRZ AI Factory",
-  api: "http://10.53.7.23/v1",
+  api: AIFACTORY_BASE_URL,
   env: [],
   models: {},
+}
+
+type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+
+function mergeNoProxyEntry(value: string | undefined, entry: string) {
+  if (!value) return entry
+  if (value.split(",").map((item) => item.trim()).includes(entry)) return value
+  return `${value},${entry}`
+}
+
+function applyProviderProxyConfig(config: ConfigV1.Info) {
+  process.env.NO_PROXY = mergeNoProxyEntry(process.env.NO_PROXY, AIFACTORY_BYPASS)
+  process.env.no_proxy = mergeNoProxyEntry(process.env.no_proxy, AIFACTORY_BYPASS)
+  if (!config.http_proxy) return
+  process.env.HTTP_PROXY = config.http_proxy
+  process.env.HTTPS_PROXY = config.http_proxy
+  process.env.http_proxy = config.http_proxy
+  process.env.https_proxy = config.http_proxy
+}
+
+function providerFetch(providerID: ProviderV2.ID, proxy: string | undefined, fetchFn: FetchLike = fetch) {
+  if (!proxy || providerID === AIFACTORY_ID || typeof Bun === "undefined") return fetchFn
+  return (input: RequestInfo | URL, init?: RequestInit) => Bun.fetch(input, { ...init, proxy })
 }
 
 function wrapSSE(res: Response, ms: number, ctl: AbortController) {
@@ -184,9 +210,17 @@ function aiFactoryRule(modelID: string, rules: AiFactoryRule[] | undefined) {
   }
 }
 
-async function discoverAiFactoryModels(token: string, baseURL: string, rules: AiFactoryRule[] | undefined) {
-  const response = await fetch(`${baseURL.replace(/\/$/, "")}/models`, {
-    headers: { Authorization: `Bearer ${token}` },
+async function discoverAiFactoryModels(
+  token: string,
+  baseURL: string,
+  rules: AiFactoryRule[] | undefined,
+  fetchFn: FetchLike = fetch,
+) {
+  const response = await fetchFn(`${baseURL.replace(/\/$/, "")}/models`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-OpenCode-AiFactory-Api-Key": token,
+    },
     signal: AbortSignal.timeout(5000),
   })
   if (!response.ok) return {}
@@ -1050,7 +1084,9 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
     }),
     aifactory: Effect.fnUntraced(function* (input: Info) {
       const auth = yield* dep.auth(input.id)
-      const token = auth?.type === "api" ? auth.key : input.key
+      const configured = yield* dep.config()
+      const configuredKey = configured.provider?.[input.id]?.options?.apiKey
+      const token = auth?.type === "api" ? auth.key : input.key ?? configuredKey
       if (!token) return { autoload: false }
       const baseURL =
         (typeof input.options.baseURL === "string" && input.options.baseURL.trim()) ||
@@ -1073,7 +1109,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         },
         async discoverModels() {
           try {
-            return await discoverAiFactoryModels(token, baseURL, rules)
+            return await discoverAiFactoryModels(token, baseURL, rules, providerFetch(AIFACTORY_ID, configured.http_proxy))
           } catch {
             return {}
           }
@@ -1462,6 +1498,7 @@ const layer = Layer.effect(
       Effect.gen(function* () {
         const bridge = yield* EffectBridge.make()
         const cfg = yield* config.get()
+        applyProviderProxyConfig(cfg)
         const modelsDev = yield* modelsDevSvc.get()
         const catalogSource = modelsDev.aifactory ? modelsDev : { ...modelsDev, aifactory: AIFACTORY_CATALOG }
         const catalog = mapValues(catalogSource, fromModelsDevProvider)
