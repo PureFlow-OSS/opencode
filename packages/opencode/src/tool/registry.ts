@@ -57,6 +57,7 @@ import * as BashProcess from "./bash-process"
 import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { McpCatalog } from "@/mcp/catalog"
+import { SessionRenameTool } from "./session_rename"
 
 export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false, parallel: false }) {
   return providerID === ProviderV2.ID.opencode || flags.exa || flags.parallel
@@ -102,6 +103,7 @@ const layer = Layer.effect(
     const bashRead = yield* BashReadTool
     const bashStop = yield* BashStopTool
     const question = yield* QuestionTool
+    const sessionRename = yield* SessionRenameTool
     const todo = yield* TodoWriteTool
     const lsptool = yield* LspTool
     const plan = yield* PlanExitTool
@@ -223,6 +225,7 @@ const layer = Layer.effect(
           skill: Tool.init(skilltool),
           patch: Tool.init(patchtool),
           question: Tool.init(question),
+          session_rename: Tool.init(sessionRename),
           lsp: Tool.init(lsptool),
           plan: Tool.init(plan),
           ...(codeModeTool ? { execute: Tool.init(codeModeTool) } : {}),
@@ -233,6 +236,7 @@ const layer = Layer.effect(
           builtin: [
             tool.invalid,
             ...(questionEnabled ? [tool.question] : []),
+            tool.session_rename,
             tool.shell,
             tool.read,
             tool.glob,
