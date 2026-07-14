@@ -26,6 +26,15 @@ import { ModelV2 } from "@opencode-ai/core/model"
 
 const originalEnv = new Map<string, string | undefined>()
 
+test("defaultModelIDs skips providers without models", () => {
+  expect(
+    Provider.defaultModelIDs({
+      aifactory: { models: {} },
+      copilot: { models: { "gpt-4": { id: "gpt-4" } } },
+    }),
+  ).toEqual({ copilot: "gpt-4" })
+})
+
 const rememberEnv = (k: string) => {
   if (!originalEnv.has(k)) originalEnv.set(k, process.env[k])
 }
