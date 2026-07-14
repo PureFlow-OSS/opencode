@@ -7,6 +7,7 @@ const UPDATE_SERVER_BASE_URL = (import.meta.env.OPENCODE_UPDATE_BASE_URL ?? "htt
   .replace(/\/+$/, "")
 const BETA_STATUS_URL = `${UPDATE_SERVER_BASE_URL}/admin/beta/status`
 const AIFACTORY_API_KEY_HEADER = "X-OpenCode-AiFactory-Api-Key"
+const LOCAL_BETA_CHANNELS = new Set(["dev", "beta"])
 
 export function useBetaTester() {
   const platform = usePlatform()
@@ -42,5 +43,6 @@ export function useBetaTester() {
     onCleanup(() => window.removeEventListener("opencode:beta-status", handleStatus))
   })
 
-  return () => desktopStatus() || status() === true
+  return () =>
+    LOCAL_BETA_CHANNELS.has(import.meta.env.VITE_OPENCODE_CHANNEL) || desktopStatus() || status() === true
 }
