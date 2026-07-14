@@ -52,6 +52,7 @@ import { Agent } from "../agent/agent"
 import { Skill } from "../skill"
 import { Permission } from "@/permission"
 import * as BashProcess from "./bash-process"
+import { SessionRenameTool } from "./session_rename"
 
 const log = Log.create({ service: "tool.registry" })
 
@@ -108,6 +109,7 @@ export const layer: Layer.Layer<
     const task = yield* TaskTool
     const read = yield* ReadTool
     const question = yield* QuestionTool
+    const sessionRename = yield* SessionRenameTool
     const todo = yield* TodoWriteTool
     const lsptool = yield* LspTool
     const plan = yield* PlanExitTool
@@ -225,6 +227,7 @@ export const layer: Layer.Layer<
           playwright: Tool.init(playwright),
           patch: Tool.init(patchtool),
           question: Tool.init(question),
+          session_rename: Tool.init(sessionRename),
           lsp: Tool.init(lsptool),
           plan: Tool.init(plan),
         })
@@ -237,6 +240,8 @@ export const layer: Layer.Layer<
             tool.bash,
             tool.bash_read,
             tool.bash_stop,
+            tool.session_rename,
+            tool.shell,
             tool.read,
             tool.glob,
             tool.grep,
