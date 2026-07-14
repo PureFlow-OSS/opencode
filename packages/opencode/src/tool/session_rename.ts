@@ -16,12 +16,6 @@ export const SessionRenameTool = Tool.define(
       parameters: Parameters,
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
         Effect.gen(function* () {
-          yield* ctx.ask({
-            permission: "session_rename",
-            patterns: [params.title],
-            always: [params.title],
-            metadata: {},
-          })
           const title = params.title.trim().slice(0, 50)
           if (!title) return yield* Effect.die("Session title must not be empty")
           yield* session.setTitle({ sessionID: ctx.sessionID, title })
