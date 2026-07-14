@@ -78,7 +78,10 @@ export const SettingsModelsV2: Component = () => {
         .catch(() => null) ?? null,
     { initialValue: null as ModelCardResponse | null },
   )
-  const cards = () => modelcards()?.aifactory?.models ?? []
+  const cards = () =>
+    (modelcards()?.aifactory?.models ?? []).filter((card: ModelCard) =>
+      models.policyVisible({ providerID: AIFACTORY_PROVIDER_ID, modelID: card.model }),
+    )
 
   const formatBoolean = (value?: boolean | null) => {
     if (value === undefined || value === null) return "n/a"
@@ -101,7 +104,7 @@ export const SettingsModelsV2: Component = () => {
   }
 
   const list = useFilteredList<ModelItem>({
-    items: (_filter) => models.list().filter((item) => item.provider.id === AIFACTORY_PROVIDER_ID),
+    items: (_filter) => models.manageable().filter((item) => item.provider.id === AIFACTORY_PROVIDER_ID),
     key: (x) => `${x.provider.id}:${x.id}`,
     filterKeys: ["provider.name", "name", "id"],
     sortBy: (a, b) => a.name.localeCompare(b.name),

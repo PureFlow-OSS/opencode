@@ -126,8 +126,11 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
     const find = (key: ModelKey) => list().find((m) => m.id === key.modelID && m.provider.id === key.providerID)
     const policyVisibility = (model: ModelKey) => {
       const found = find(model)
-      if (found?.provider.id !== "aifactory") return
-      return resolveAiFactoryModelVisibility(found, defaultRules())
+      if (model.providerID !== "aifactory") return
+      return resolveAiFactoryModelVisibility(
+        found ?? { id: model.modelID, name: model.modelID },
+        defaultRules(),
+      )
     }
     const manageable = createMemo(() =>
       list().filter((item) => policyVisibility({ providerID: item.provider.id, modelID: item.id }) !== false),
@@ -200,6 +203,7 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
       list,
       manageable,
       find,
+      policyVisible: (model: ModelKey) => policyVisibility(model) !== false,
       visible,
       setVisibility,
       recent: {
