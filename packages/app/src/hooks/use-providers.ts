@@ -11,7 +11,7 @@ export const popularProviders = [
 const popularProviderSet = new Set(popularProviders)
 
 export function isVisibleProvider(id: string) {
-  return id === "aifactory"
+  return id === "aifactory" || id.startsWith("github-copilot")
 }
 
 export function isModelProviderVisible(id: string) {

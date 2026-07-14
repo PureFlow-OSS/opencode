@@ -27,7 +27,7 @@ import { Link } from "@/components/link"
 import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
 import { useLanguage } from "@/context/language"
-import { popularProviders, useProviders } from "@/hooks/use-providers"
+import { isVisibleProvider, popularProviders, useProviders } from "@/hooks/use-providers"
 import { CustomProviderForm } from "./dialog-custom-provider"
 
 const CUSTOM_ID = "_custom"
@@ -118,7 +118,9 @@ function ProviderPicker(props: { directory?: Accessor<string | undefined>; onSel
       key={(x) => x?.id}
       items={() => {
         language.locale()
-        return [{ id: CUSTOM_ID, name: customLabel() }, ...providers.all().values()]
+        return [{ id: CUSTOM_ID, name: customLabel() }, ...providers.all().values()].filter(
+          (provider) => provider.id === CUSTOM_ID || isVisibleProvider(provider.id),
+        )
       }}
       filterKeys={["id", "name"]}
       groupBy={(x) => (popularProviders.includes(x.id) ? popularGroup() : otherGroup())}
