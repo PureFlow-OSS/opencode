@@ -1090,8 +1090,9 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       if (!token) return { autoload: false }
       const baseURL =
         (typeof input.options.baseURL === "string" && input.options.baseURL.trim()) ||
+        configured.aifactory_host?.trim() ||
         process.env.OPENCODE_AIFACTORY_HOST?.trim() ||
-        "http://10.53.7.23/v1"
+        AIFACTORY_BASE_URL
       const config = yield* Effect.promise(() =>
         readProviderConfig(fetch, {
           headers: { "X-OpenCode-AiFactory-Api-Key": token },
