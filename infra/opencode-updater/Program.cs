@@ -363,6 +363,7 @@ app.MapGet("/opencode/changelog.md", async (HttpContext context, LocalFeed feed,
 {
   var rollout = await rolloutResolver.ResolveAsync(context.Request, context.RequestAborted);
   if (feed.TryGet("changelog.md", rollout.IsBeta, out var local)) return await LocalFileAsync(context, local);
+  if (rollout.IsBeta && feed.TryGet("changelog.md", false, out var stable)) return await LocalFileAsync(context, stable);
   return Results.NotFound();
 });
 
