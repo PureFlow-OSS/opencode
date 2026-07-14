@@ -5,7 +5,9 @@ import { usePlatform } from "@/context/platform"
 import { useGlobalSync } from "@/context/global-sync"
 import { SettingsList } from "./settings-list"
 
-const UPDATE_SERVER_BASE_URL = import.meta.env.VITE_OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode"
+const UPDATE_SERVER_BASE_URL = (import.meta.env.OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode")
+  .trim()
+  .replace(/\/+$/, "")
 const CHANGELOG_URL = `${UPDATE_SERVER_BASE_URL}/changelog.md`
 const AIFACTORY_API_KEY_HEADER = "X-OpenCode-AiFactory-Api-Key"
 

@@ -10,7 +10,9 @@ import { useGlobalSync } from "@/context/global-sync"
 import { SettingsList } from "./settings-list"
 import "./settings-feedback.css"
 
-const UPDATE_SERVER_BASE_URL = import.meta.env.VITE_OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode"
+const UPDATE_SERVER_BASE_URL = (import.meta.env.OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode")
+  .trim()
+  .replace(/\/+$/, "")
 const FEEDBACK_URL = `${UPDATE_SERVER_BASE_URL}/feedback`
 const AIFACTORY_API_KEY_HEADER = "X-OpenCode-AiFactory-Api-Key"
 const FEEDBACK_TEXT_LIMIT = 4000
@@ -179,6 +181,7 @@ export const SettingsFeedback: Component<{ mode?: "general" | "beta" }> = (props
                 variant="secondary"
                 size="small"
                 triggerVariant="settings"
+                class="settings-feedback-select"
               />
             </Show>
 

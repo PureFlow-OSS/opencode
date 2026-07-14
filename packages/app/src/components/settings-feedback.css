@@ -1,5 +1,5 @@
 .settings-feedback {
-  color: var(--v2-text-text-base);
+  color: var(--v2-text-text-base, var(--text-strong)) !important;
 }
 
 .settings-feedback [data-component="input"],
@@ -7,23 +7,26 @@
 .settings-feedback [data-slot="input-label"],
 .settings-feedback [data-slot="input-description"],
 .settings-feedback [data-slot="select-select-trigger-value"] {
-  color: var(--v2-text-text-base);
+  color: var(--v2-text-text-base, var(--text-strong)) !important;
 }
 
 .settings-feedback [data-slot="input-input"] {
-  color: var(--v2-text-text-base);
-  caret-color: var(--v2-text-text-base);
+  color: var(--v2-text-text-base, var(--text-strong)) !important;
+  caret-color: var(--v2-text-text-base, var(--text-strong));
 }
 
 .settings-feedback [data-slot="input-input"]::placeholder {
-  color: var(--v2-text-text-muted);
+  color: var(--v2-text-text-muted, var(--text-weak)) !important;
   opacity: 1;
 }
 
 .settings-feedback [data-slot="select-select-trigger"] {
-  color: var(--v2-text-text-base);
+  color: var(--v2-text-text-base, var(--text-strong)) !important;
 }
 
-.settings-feedback button {
-  color: var(--v2-text-text-base);
+.settings-feedback button,
+.settings-feedback-select,
+[data-component="select-content"].settings-feedback-select,
+.settings-feedback-select [data-slot="select-select-item-label"] {
+  color: var(--v2-text-text-base, var(--text-strong)) !important;
 }
