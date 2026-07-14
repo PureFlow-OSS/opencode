@@ -1,11 +1,48 @@
 import { net } from "electron"
+import { readFile } from "node:fs/promises"
+import os from "node:os"
+import path from "node:path"
 import { updateServerBaseUrl } from "./update-server-trust"
 
 const baseUrl = updateServerBaseUrl()
 const API_KEY_HEADER = "X-OpenCode-AiFactory-Api-Key"
 
-function requestInit() {
-  const apiKey = process.env.OPENCODE_AIFACTORY_API_KEY?.trim()
+function readApiKeyFromPayload(payload: Record<string, unknown>) {
+  const auth = payload.aifactory
+  if (!auth || typeof auth !== "object" || Array.isArray(auth)) return null
+  const value = auth as { type?: unknown; key?: unknown }
+  if (value.type !== "api" || typeof value.key !== "string") return null
+  const key = value.key.trim()
+  return key.length > 0 ? key : null
+}
+
+async function resolveAifactoryApiKey() {
+  const fromEnv = process.env.OPENCODE_AIFACTORY_API_KEY?.trim()
+  if (fromEnv) return fromEnv
+  const fromContent = process.env.OPENCODE_AUTH_CONTENT
+  if (fromContent) {
+    try {
+      const key = readApiKeyFromPayload(JSON.parse(fromContent) as Record<string, unknown>)
+      if (key) return key
+    } catch {}
+  }
+  const home = os.homedir()
+  const directories = [
+    path.join(process.env.APPDATA || path.join(home, "AppData", "Roaming"), "opencode"),
+    path.join(process.env.LOCALAPPDATA || path.join(home, "AppData", "Local"), "opencode"),
+    path.join(home, ".local", "share", "opencode"),
+  ]
+  for (const directory of directories) {
+    try {
+      const key = readApiKeyFromPayload(JSON.parse(await readFile(path.join(directory, "auth.json"), "utf8")) as Record<string, unknown>)
+      if (key) return key
+    } catch {}
+  }
+  return null
+}
+
+async function requestInit() {
+  const apiKey = await resolveAifactoryApiKey()
   return {
     cache: "no-store",
     ...(apiKey ? { headers: { [API_KEY_HEADER]: apiKey } } : {}),
@@ -39,7 +76,7 @@ export const updateServer = {
     return 0
   },
   async fetch() {
-    const init = requestInit()
+    const init = await requestInit()
     const [version, url, motd] = await Promise.all([
       net.fetch(`${baseUrl}/version`, init).then((response) => (response.ok ? response.text() : "")).catch(() => ""),
       net.fetch(`${baseUrl}/url`, init).then((response) => (response.ok ? response.text() : "")).catch(() => ""),
@@ -61,7 +98,7 @@ export const updateServer = {
   },
   async fetchBetaStatus() {
     return net
-      .fetch(`${baseUrl}/admin/beta/status`, requestInit())
+      .fetch(`${baseUrl}/admin/beta/status`, await requestInit())
       .then(async (response): Promise<BetaStatus | null> => {
         if (!response.ok) return null
         const value = (await response.json()) as Record<string, unknown>

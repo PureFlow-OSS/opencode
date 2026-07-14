@@ -95,4 +95,21 @@ export const updateServer = {
     if (!version || !url) return null
     return { version, url, motd }
   },
+  async fetchBetaStatus() {
+    const apiKey = await resolveAifactoryApiKey()
+    return fetch(`${UPDATE_SERVER_BASE_URL}/admin/beta/status`, {
+      cache: "no-store",
+      ...(apiKey ? { headers: { [AIFACTORY_API_KEY_HEADER]: apiKey } } : {}),
+      signal: AbortSignal.timeout(3_000),
+    })
+      .then(async (response) => {
+        if (!response.ok) return null
+        const value = (await response.json()) as Record<string, unknown>
+        return {
+          betaTester: value.betaTester === true,
+          betaUserName: typeof value.betaUserName === "string" ? value.betaUserName : null,
+        }
+      })
+      .catch(() => null)
+  },
 }

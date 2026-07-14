@@ -465,6 +465,11 @@ void createMenu((id) => {
   menuTrigger?.(id)
 })
 void listenForDeepLinks()
+void updateServer.fetchBetaStatus().then((status) => {
+  window.__OPENCODE__ ??= {}
+  window.__OPENCODE__.betaTester = status?.betaTester ?? false
+  window.__OPENCODE__.betaUserName = status?.betaUserName ?? null
+})
 
 render(() => {
   const platform = createPlatform()
