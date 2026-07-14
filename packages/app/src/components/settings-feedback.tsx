@@ -8,6 +8,7 @@ import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useGlobalSync } from "@/context/global-sync"
 import { SettingsList } from "./settings-list"
+import "./settings-feedback.css"
 
 const UPDATE_SERVER_BASE_URL = import.meta.env.VITE_OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode"
 const FEEDBACK_URL = `${UPDATE_SERVER_BASE_URL}/feedback`
@@ -145,7 +146,7 @@ export const SettingsFeedback: Component<{ mode?: "general" | "beta" }> = (props
   }
 
   return (
-    <div class="flex flex-col h-full overflow-y-auto no-scrollbar px-4 pb-10 sm:px-10 sm:pb-10">
+    <div class="settings-feedback flex flex-col h-full overflow-y-auto no-scrollbar px-4 pb-10 sm:px-10 sm:pb-10">
       <div class="sticky top-0 z-10 bg-[linear-gradient(to_bottom,var(--surface-stronger-non-alpha)_calc(100%_-_24px),transparent)]">
         <div class="flex flex-col gap-1 pt-6 pb-8 w-full">
           <h2 class="text-16-medium text-text-strong">

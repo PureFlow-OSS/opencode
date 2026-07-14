@@ -1,0 +1,29 @@
+.settings-feedback {
+  color: var(--v2-text-text-base);
+}
+
+.settings-feedback [data-component="input"],
+.settings-feedback [data-component="select"],
+.settings-feedback [data-slot="input-label"],
+.settings-feedback [data-slot="input-description"],
+.settings-feedback [data-slot="select-select-trigger-value"] {
+  color: var(--v2-text-text-base);
+}
+
+.settings-feedback [data-slot="input-input"] {
+  color: var(--v2-text-text-base);
+  caret-color: var(--v2-text-text-base);
+}
+
+.settings-feedback [data-slot="input-input"]::placeholder {
+  color: var(--v2-text-text-muted);
+  opacity: 1;
+}
+
+.settings-feedback [data-slot="select-select-trigger"] {
+  color: var(--v2-text-text-base);
+}
+
+.settings-feedback button {
+  color: var(--v2-text-text-base);
+}
