@@ -319,10 +319,15 @@ window.api.onMenuCommand((id) => {
 })
 listenForDeepLinks()
 
-function LoadingSplash() {
+function LoadingSplash(props: { motd?: { enabled: boolean; text: string } | null }) {
   return (
     <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
       <Splash class="w-16 h-20 opacity-50 animate-pulse" />
+      <Show when={props.motd?.enabled && props.motd.text}>
+        <div class="mt-6 max-w-[calc(100vw-4rem)] truncate text-center text-26-regular text-text-muted">
+          {props.motd?.text}
+        </div>
+      </Show>
     </div>
   )
 }
@@ -347,6 +352,9 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
   const [sidecar] = createResource(() => window.api.awaitInitialization())
 
   const [defaultServer] = createResource(() => platform.getDefaultServer?.())
+  const [motd] = createResource(() => platform.getMotd?.(), {
+    initialValue: { enabled: true, text: "RRZ AI Factory" },
+  })
   const [locale] = createResource(loadLocale)
   const router = (props: BaseRouterProps) => (
     <DesktopMemoryRouter {...props} windowID={platform.windowID ?? "browser"} />
@@ -406,7 +414,7 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
       ServerConnection.Key.make(availableStartupServer(defaultServer.latest, wslServers.data)),
     )
     return (
-      <Show when={ready()} fallback={<LoadingSplash />}>
+      <Show when={ready()} fallback={<LoadingSplash motd={motd()} />}>
         <Show when={effectiveDefaultServer()} keyed>
           {(key) => (
             <AppInterface
@@ -454,7 +462,7 @@ render(() => {
   })
 
   return (
-    <Show when={windowState.latest} fallback={<LoadingSplash />} keyed>
+    <Show when={windowState.latest} fallback={<LoadingSplash motd={{ enabled: true, text: "RRZ AI Factory" }} />} keyed>
       {(state) => <DesktopRoot windowState={state} />}
     </Show>
   )
