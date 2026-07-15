@@ -168,7 +168,7 @@ describe("applyDirectoryEvent", () => {
     expect((store.part.message?.[0] as { text: string }).text).toBe("existing appended")
   })
 
-  test("preserves a Home-specific retained session limit", () => {
+  test("does not trim session events for a Home-specific retained limit", () => {
     const [store, setStore] = createStore(
       baseState({
         limit: 1,
@@ -186,7 +186,7 @@ describe("applyDirectoryEvent", () => {
       retainedLimit: 3,
     })
 
-    expect(store.session).toHaveLength(3)
+    expect(store.session).toHaveLength(4)
   })
 
   test("inserts root sessions in sorted order and updates sessionTotal", () => {

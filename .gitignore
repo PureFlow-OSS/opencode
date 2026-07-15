@@ -11,6 +11,10 @@ node_modules
 playground
 tmp
 dist
+**/bin/
+**/obj/
+packages/desktop*/build/
+packages/desktop*/dist-*/
 ts-dist
 .turbo
 **/.serena
@@ -35,3 +39,5 @@ tsconfig.tsbuildinfo
 # Updater feed artifacts
 infra/opencode-updater/feed/
 /infra/opencode-updater/admin-ui/.angular/cache
+/infra/opencode-updater/bin
+/infra/opencode-updater/bin

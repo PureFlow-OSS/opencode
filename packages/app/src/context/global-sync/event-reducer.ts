@@ -12,7 +12,6 @@ import type {
   Todo,
 } from "@opencode-ai/sdk/v2/client"
 import type { State, VcsCache } from "./types"
-import { trimSessions } from "./session-trim"
 import { dropSessionCaches } from "./session-cache"
 import { diffs as list, message as clean } from "@/utils/diffs"
 
@@ -46,6 +45,7 @@ export function applyGlobalEvent(input: {
 
   if (input.event.type !== "project.updated") return
   const properties = input.event.properties as Project
+  if (!properties?.id) return
   const result = Binary.search(input.project, properties.id, (s) => s.id)
   if (result.found) {
     input.setGlobalProject(
@@ -121,7 +121,6 @@ export function applyDirectoryEvent(input: {
 }) {
   const event = input.event
   if (input.sessionContent === false && SESSION_CONTENT_EVENTS.has(event.type)) return
-  const limit = Math.max(input.store.limit, input.retainedLimit ?? 0)
   switch (event.type) {
     case "server.instance.disposed": {
       input.push(input.directory)
@@ -136,9 +135,7 @@ export function applyDirectoryEvent(input: {
       }
       const next = input.store.session.slice()
       next.splice(result.index, 0, info)
-      const trimmed = trimSessions(next, { limit, permission: input.permission ?? input.store.permission })
-      input.setStore("session", reconcile(trimmed, { key: "id" }))
-      cleanupDroppedSessionCaches(input.store, input.setStore, trimmed, input.setSessionTodo)
+      input.setStore("session", reconcile(next, { key: "id" }))
       if (!info.parentID) input.setStore("sessionTotal", (value) => value + 1)
       break
     }
@@ -166,9 +163,7 @@ export function applyDirectoryEvent(input: {
       }
       const next = input.store.session.slice()
       next.splice(result.index, 0, info)
-      const trimmed = trimSessions(next, { limit, permission: input.permission ?? input.store.permission })
-      input.setStore("session", reconcile(trimmed, { key: "id" }))
-      cleanupDroppedSessionCaches(input.store, input.setStore, trimmed, input.setSessionTodo)
+      input.setStore("session", reconcile(next, { key: "id" }))
       break
     }
     case "session.deleted": {

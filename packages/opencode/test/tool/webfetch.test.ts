@@ -4,6 +4,7 @@ import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import { Effect, Layer } from "effect"
 import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 import { Agent } from "../../src/agent/agent"
+import { Config } from "../../src/config/config"
 import { Truncate } from "@/tool/truncate"
 import { WebFetchTool } from "../../src/tool/webfetch"
 import { SessionID, MessageID } from "../../src/session/schema"
@@ -11,7 +12,7 @@ import { Tool } from "@/tool/tool"
 import { testEffect } from "../lib/effect"
 
 const it = testEffect(
-  LayerNode.compile(LayerNode.group([httpClient, Truncate.node, Agent.node]), [
+  LayerNode.compile(LayerNode.group([httpClient, Truncate.node, Agent.node, Config.node]), [
     [httpClient, FetchHttpClient.layer as Layer.Layer<HttpClient.HttpClient>],
   ]),
 )
@@ -64,6 +65,7 @@ describe("tool.webfetch", () => {
           }),
       )
     }),
+    { config: { use_http_proxy: false } },
   )
 
   it.instance("keeps svg as text output", () =>
@@ -80,6 +82,7 @@ describe("tool.webfetch", () => {
           expect(result.attachments).toBeUndefined()
         }),
     ),
+    { config: { use_http_proxy: false } },
   )
 
   it.instance("keeps text responses as text output", () =>
@@ -96,6 +99,7 @@ describe("tool.webfetch", () => {
           expect(result.attachments).toBeUndefined()
         }),
     ),
+    { config: { use_http_proxy: false } },
   )
 
   it.instance("extracts text from html without scripts or styles", () =>
@@ -115,5 +119,6 @@ describe("tool.webfetch", () => {
           expect(result.attachments).toBeUndefined()
         }),
     ),
+    { config: { use_http_proxy: false } },
   )
 })
