@@ -483,6 +483,9 @@ export const Persist = {
   global(key: string, legacy?: string[]): PersistTarget {
     return { storage: GLOBAL_STORAGE, key, legacy }
   },
+  isolatedGlobal(storage: string, key: string, legacy?: string[]): PersistTarget {
+    return { storage, legacyStorageNames: [GLOBAL_STORAGE], key, legacy }
+  },
   window(key: string, legacy?: string[]): PersistTarget {
     return { scope: "window", key, legacy }
   },

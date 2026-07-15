@@ -1,6 +1,6 @@
 import Store from "electron-store"
 import electron from "electron"
-import { rmSync } from "node:fs"
+import { renameSync, rmSync } from "node:fs"
 import { join } from "node:path"
 
 import { SETTINGS_STORE } from "./store-keys"
@@ -15,14 +15,26 @@ const cache = new Map<string, Store>()
 export function getStore(name = SETTINGS_STORE) {
   const cached = cache.get(name)
   if (cached) return cached
-  const next = new Store({
+  const next = loadStore(name)
+  cache.set(name, next)
+  return next
+}
+
+function loadStore(name: string) {
+  const options = {
     name,
     cwd: electron.app.getPath("userData"),
     fileExtension: "",
     accessPropertiesByDotNotation: false,
-  })
-  cache.set(name, next)
-  return next
+  }
+
+  try {
+    return new Store(options)
+  } catch (error) {
+    const source = join(options.cwd, name)
+    renameSync(source, `${source}.corrupt-${Date.now()}`)
+    return new Store(options)
+  }
 }
 
 export async function removeStoreFileIfEmpty(name: string) {

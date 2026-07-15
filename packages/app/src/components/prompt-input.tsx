@@ -61,6 +61,7 @@ import {
   canNavigateHistoryAtCursor,
   navigatePromptHistory,
   prependHistoryEntry,
+  migratePromptHistory,
   type PromptHistoryComment,
   type PromptHistoryEntry,
   type PromptHistoryStoredEntry,
@@ -147,11 +148,17 @@ function createPromptInputHistoryStore(
 
 function createPersistedPromptInputHistory() {
   const [normal, setNormal] = persisted(
-    Persist.global("prompt-history", ["prompt-history.v1"]),
+    {
+      ...Persist.isolatedGlobal("opencode.prompt-history.dat", "prompt-history", ["prompt-history.v1"]),
+      migrate: migratePromptHistory,
+    },
     createStore<PromptHistoryState>({ entries: [] }),
   )
   const [shell, setShell] = persisted(
-    Persist.global("prompt-history-shell", ["prompt-history-shell.v1"]),
+    {
+      ...Persist.isolatedGlobal("opencode.prompt-history-shell.dat", "prompt-history-shell", ["prompt-history-shell.v1"]),
+      migrate: migratePromptHistory,
+    },
     createStore<PromptHistoryState>({ entries: [] }),
   )
   return createPromptInputHistoryStore(normal, setNormal, shell, setShell)

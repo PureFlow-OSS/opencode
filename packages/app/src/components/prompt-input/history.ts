@@ -4,6 +4,8 @@ import type { SelectedLineRange } from "@/context/file"
 const DEFAULT_PROMPT: Prompt = [{ type: "text", content: "", start: 0, end: 0 }]
 
 export const MAX_HISTORY = 100
+export const MAX_HISTORY_ENTRY_BYTES = 256 * 1024
+export const MAX_HISTORY_BYTES = 1024 * 1024
 
 export type PromptHistoryComment = {
   id: string
@@ -94,9 +96,29 @@ export function prependHistoryEntry(
     prompt: clonePromptParts(prompt),
     comments: clonePromptHistoryComments(comments),
   } satisfies PromptHistoryEntry
+  if (JSON.stringify(entry).length > MAX_HISTORY_ENTRY_BYTES) return entries
   const last = entries[0]
   if (last && isPromptEqual(last, entry)) return entries
-  return [entry, ...entries].slice(0, max)
+  return trimPromptHistory([entry, ...entries].slice(0, max))
+}
+
+export function trimPromptHistory(entries: PromptHistoryStoredEntry[]) {
+  const result = entries.reduce(
+    (state, entry) => {
+      const bytes = JSON.stringify(entry).length
+      if (bytes > MAX_HISTORY_ENTRY_BYTES || state.bytes + bytes > MAX_HISTORY_BYTES) return state
+      return { bytes: state.bytes + bytes, entries: [...state.entries, entry] }
+    },
+    { bytes: 0, entries: [] as PromptHistoryStoredEntry[] },
+  )
+  return result.entries
+}
+
+export function migratePromptHistory(value: unknown) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return value
+  const entries = (value as { entries?: unknown }).entries
+  if (!Array.isArray(entries)) return value
+  return { ...value, entries: trimPromptHistory(entries as PromptHistoryStoredEntry[]) }
 }
 
 function isCommentEqual(commentA: PromptHistoryComment, commentB: PromptHistoryComment) {

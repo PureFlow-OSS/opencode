@@ -5,6 +5,7 @@ import {
   clonePromptParts,
   normalizePromptHistoryEntry,
   navigatePromptHistory,
+  migratePromptHistory,
   prependHistoryEntry,
   promptLength,
   type PromptHistoryComment,
@@ -39,6 +40,14 @@ describe("prompt-input history", () => {
 
     const dedupedComments = prependHistoryEntry(commentsOnly, DEFAULT_PROMPT, [comment("c1")])
     expect(dedupedComments).toBe(commentsOnly)
+  })
+
+  test("drops oversized entries and trims migrated history by bytes", () => {
+    const oversized = text("x".repeat(300 * 1024))
+    expect(prependHistoryEntry([], oversized)).toEqual([])
+
+    const migrated = migratePromptHistory({ entries: [oversized, text("kept")] })
+    expect(migrated).toEqual({ entries: [text("kept")] })
   })
 
   test("navigatePromptHistory restores saved prompt when moving down from newest", () => {
