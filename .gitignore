@@ -47,3 +47,6 @@ packages/desktop-electron/dist-localhost*/
 packages/desktop/src-tauri/*.generated.conf.json
 infra/opencode-updater/appsettings.beta.json
 /packages/desktop/out
+/packages/desktop/build/updater-helper/win-x64
+/packages/desktop/updater-helper/bin
+/packages/desktop/updater-helper/obj
