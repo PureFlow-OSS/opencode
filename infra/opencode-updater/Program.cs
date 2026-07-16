@@ -82,6 +82,8 @@ using (var scope = app.Services.CreateScope())
   db.Database.EnsureCreated();
   if (!await HasColumnAsync(db.Database, "Feedbacks", "AttachmentsJson"))
     db.Database.ExecuteSqlRaw(@"ALTER TABLE ""Feedbacks"" ADD COLUMN ""AttachmentsJson"" TEXT NULL");
+  if (!await HasColumnAsync(db.Database, "Feedbacks", "BetaSentiment"))
+    db.Database.ExecuteSqlRaw(@"ALTER TABLE ""Feedbacks"" ADD COLUMN ""BetaSentiment"" TEXT NULL");
   await EnsureAdminTablesAsync(db.Database.GetDbConnection(), scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>());
 }
 
@@ -120,19 +122,19 @@ app.MapPost("/opencode/feedback", async (
   }
 
   var category = body.Category?.Trim() ?? "general";
+  var betaSentiment = body.BetaSentiment?.Trim().ToLowerInvariant();
   if (category == "beta")
   {
-    var betaMatch = ParseBetaFeedback(body.Text!);
-    if (betaMatch is null)
-      return Results.BadRequest(new { error = "Beta feedback must start with either 'Version erfolgreich getestet' or 'Fehler gefunden'" });
-
-    body.Text = (betaMatch == "positive" ? "Version erfolgreich getestet" : "Fehler gefunden") + "\n" + body.Text!.Trim().Replace("\r\n", "\n");
+    if (betaSentiment is not "positive" and not "negative") betaSentiment = ParseBetaFeedback(body.Text!);
+    if (betaSentiment is null)
+      return Results.BadRequest(new { error = "Beta feedback requires beta_sentiment 'positive' or 'negative'" });
   }
 
   var entry = new FeedbackEntry
   {
     Text = body.Text!.Trim(),
     Category = category,
+    BetaSentiment = category == "beta" ? betaSentiment : null,
     UserName = userName,
     AppVersion = body.AppVersion?.Trim(),
     Platform = body.Platform?.Trim(),
@@ -154,6 +156,7 @@ app.MapGet("/opencode/feedback", async (FeedbackContext db) =>
       id = f.Id,
       text = f.Text,
       category = f.Category,
+      beta_sentiment = f.BetaSentiment,
       user_name = f.UserName,
       app_version = f.AppVersion,
       platform = f.Platform,
@@ -281,6 +284,9 @@ app.MapPost("/opencode/admin/releases/{id}/promote", async (
   var releases = await store.ListReleasesAsync();
   var release = releases.FirstOrDefault((item) => item.Id == id);
   if (release is null) return Results.NotFound();
+  var activeBetaVersion = feed.TryReadVersionFromLatestYml(true);
+  if (!string.Equals(release.Version, activeBetaVersion, StringComparison.OrdinalIgnoreCase))
+    return Results.BadRequest(new { error = "A newer beta release is active and must be promoted instead" });
   var counts = await GetBetaFeedbackCountsAsync(feedbackDb, release.Version);
   if (counts.totalCount == 0 || counts.positiveCount * 2 < counts.totalCount)
     return Results.BadRequest(new { error = "Not enough validated beta feedback to promote" });
@@ -533,11 +539,11 @@ static async Task<(long positiveCount, long totalCount)> GetBetaFeedbackCountsAs
 {
   var feedbacks = await db.Feedbacks
     .Where((feedback) => feedback.Category == "beta" && feedback.AppVersion == version)
-    .Select((feedback) => feedback.Text)
+    .Select((feedback) => new { feedback.BetaSentiment, feedback.Text })
     .ToListAsync();
 
   var totalCount = feedbacks.LongCount();
-  var positiveCount = feedbacks.LongCount((text) => ParseBetaFeedback(text) == "positive");
+  var positiveCount = feedbacks.LongCount((feedback) => feedback.BetaSentiment == "positive" || (string.IsNullOrWhiteSpace(feedback.BetaSentiment) && ParseBetaFeedback(feedback.Text) == "positive"));
   return (positiveCount, totalCount);
 }
 
@@ -1242,7 +1248,7 @@ sealed class UpdaterRolloutResolver(
     if (cache.TryGetValue(cacheKey, out bool cached)) return cached;
 
     using var request = new HttpRequestMessage(HttpMethod.Get, BuildLiteLLMKeyInfoUrl(beta, key));
-    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ResolveLiteLLMApiKey(beta, key));
+    request.Headers.TryAddWithoutValidation("x-litellm-api-key", ResolveLiteLLMApiKey(beta, key));
 
     try
     {
@@ -1407,6 +1413,9 @@ sealed class FeedbackRequest
   [JsonPropertyName("category")]
   public string? Category { get; set; }
 
+  [JsonPropertyName("beta_sentiment")]
+  public string? BetaSentiment { get; set; }
+
   [JsonPropertyName("key")]
   public string? Key { get; set; }
 
@@ -1437,6 +1446,7 @@ sealed class FeedbackEntry
   public int Id { get; set; }
   public string Text { get; set; } = "";
   public string Category { get; set; } = "general";
+  public string? BetaSentiment { get; set; }
   public string UserName { get; set; } = "";
   public string? AppVersion { get; set; }
   public string? Platform { get; set; }

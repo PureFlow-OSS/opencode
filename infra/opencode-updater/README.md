@@ -66,8 +66,8 @@ Important behavior:
 - if `Updater.PublicBaseUrl` is missing in `appsettings.beta.json`, beta falls back to the stable `Updater.PublicBaseUrl`
 - if `feed/beta/latest.yml` exists, beta users get that version first
 - if `feed/beta/latest.yml` does not exist, beta users fall back to `appsettings.beta.json -> Updater.Version`
-- if `UpdaterBeta.LiteLLM.ApiKey` is set, updater calls LiteLLM with that admin key and passes the user key as `?key=<user-key>`
-- if `UpdaterBeta.LiteLLM.ApiKey` is empty, updater uses the user key itself as `Authorization: Bearer <user-key>`
+- if `UpdaterBeta.LiteLLM.ApiKey` is set, updater calls LiteLLM with that management key in `x-litellm-api-key` and passes the user key as `?key=<user-key>`
+- if `UpdaterBeta.LiteLLM.ApiKey` is empty, updater uses the user key itself in `x-litellm-api-key`
 - URLs in JSON must be quoted strings
 
 ### Matching logic
