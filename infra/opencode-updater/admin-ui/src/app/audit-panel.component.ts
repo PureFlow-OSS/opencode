@@ -1,6 +1,7 @@
 import { Component, inject } from "@angular/core"
 import { injectMutation, injectQuery } from "@tanstack/angular-query-experimental"
 import { ApiService } from "./api.service"
+import { formatDateTime } from "./format-date"
 
 type ReleaseRecord = {
   id: string
@@ -56,7 +57,9 @@ type AuditRecord = {
               </button>
               @if (!canPromote(release)) {
                 <small>
-                  @if (release.totalCount === 0) {
+                  @if (isSuperseded(release)) {
+                    A newer beta release is active.
+                  } @else if (release.totalCount === 0) {
                     Waiting for beta feedback.
                   } @else {
                     Need {{ remainingPositive(release) }} more positive feedback item(s).
@@ -73,7 +76,7 @@ type AuditRecord = {
           <section class="item">
             <div class="item-top">
               <strong>{{ event.action }}</strong>
-              <span>{{ event.createdAt }}</span>
+              <span>{{ formatDateTime(event.createdAt) }}</span>
             </div>
             <p>{{ event.details }}</p>
             <small>{{ event.actor }} · {{ event.feedbackId }}</small>
@@ -86,6 +89,7 @@ type AuditRecord = {
 })
 export class AuditPanelComponent {
   readonly api = inject(ApiService)
+  readonly formatDateTime = formatDateTime
   readonly statusQuery = injectQuery(() => ({
     queryKey: ["release-status"],
     queryFn: () => this.api.listReleaseStatus(),
@@ -119,7 +123,12 @@ export class AuditPanelComponent {
   }
 
   canPromote(release: ReleaseRecord) {
-    return release.channel !== "normal" && release.totalCount > 0 && release.positiveCount * 2 >= release.totalCount
+    return !this.isSuperseded(release) && release.channel !== "normal" && release.totalCount > 0 && release.positiveCount * 2 >= release.totalCount
+  }
+
+  isSuperseded(release: ReleaseRecord) {
+    const activeBetaVersion = this.statusQuery.data()?.betaFeedVersion
+    return release.channel !== "normal" && !!activeBetaVersion && release.version !== activeBetaVersion
   }
 
   remainingPositive(release: ReleaseRecord) {

@@ -22,7 +22,15 @@ type FeedbackRecord = {
   userName: string
   appVersion?: string | null
   platform?: string | null
+  attachments: FeedbackAttachment[]
   createdAt: string
+}
+
+type FeedbackAttachment = {
+  name: string
+  type: string
+  dataUrl: string
+  image: boolean
 }
 
 type AuditRecord = {
@@ -131,20 +139,24 @@ export class ApiService {
         id: number
         text: string
         category: string
+        beta_sentiment: string | null
         user_name: string | null
         app_version: string | null
         platform: string | null
+        attachments: string | null
         created_at: string
       }>
-    >(await fetch("/opencode/feedback"))
+    >(await fetch("/opencode/feedback", { cache: "no-store" }))
 
     return items.map((item) => ({
       id: String(item.id),
       text: item.text,
       category: item.category.trim().toLowerCase(),
+      betaSentiment: item.beta_sentiment?.trim().toLowerCase() ?? null,
       userName: item.user_name?.trim() || "",
       appVersion: item.app_version,
       platform: item.platform,
+      attachments: parseFeedbackAttachments(item.attachments),
       createdAt: item.created_at,
     }))
   }
@@ -163,5 +175,27 @@ export class ApiService {
 
   async listModelCards() {
     return this.readJson<ModelCardsResponse>(await fetch("/opencode/modelcards.json"))
+  }
+}
+
+function parseFeedbackAttachments(value: string | null): FeedbackAttachment[] {
+  if (!value) return []
+  try {
+    const attachments: unknown = JSON.parse(value)
+    if (!Array.isArray(attachments)) return []
+    return attachments.flatMap((attachment) => {
+      if (!attachment || typeof attachment !== "object") return []
+      const value = attachment as { name?: unknown; type?: unknown; data?: unknown }
+      if (typeof value.name !== "string" || typeof value.type !== "string" || typeof value.data !== "string") return []
+      if (!/^[A-Za-z0-9+/]+={0,2}$/.test(value.data)) return []
+      return [{
+        name: value.name,
+        type: value.type,
+        dataUrl: `data:${value.type};base64,${value.data}`,
+        image: value.type.startsWith("image/"),
+      }]
+    })
+  } catch {
+    return []
   }
 }
