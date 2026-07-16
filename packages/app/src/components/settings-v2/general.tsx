@@ -193,6 +193,12 @@ export const SettingsGeneralV2: Component<{
       label: language.label(locale),
     })),
   )
+  const followupOptions = createMemo(() =>
+    [
+      { value: "queue" as const, label: language.t("settings.general.row.followup.option.queue") },
+      { value: "steer" as const, label: language.t("settings.general.row.followup.option.steer") },
+    ],
+  )
 
   const noneSound = { id: "none", label: "sound.option.none" } as const
   const soundOptions = [noneSound, ...SOUND_OPTIONS]
@@ -274,6 +280,23 @@ export const SettingsGeneralV2: Component<{
               if (option.value === currentShell()) return
               serverSync().updateConfig({ shell: option.value })
             }}
+          />
+        </SettingsRowV2>
+
+        <SettingsRowV2
+          title={language.t("settings.general.row.followup.title")}
+          description={language.t("settings.general.row.followup.description")}
+        >
+          <SelectV2
+            appearance="inline"
+            data-action="settings-followup"
+            options={followupOptions()}
+            placement="bottom-end"
+            gutter={6}
+            current={followupOptions().find((option) => option.value === settings.general.followup())}
+            value={(option) => option.value}
+            label={(option) => option.label}
+            onSelect={(option) => option && settings.general.setFollowup(option.value)}
           />
         </SettingsRowV2>
 

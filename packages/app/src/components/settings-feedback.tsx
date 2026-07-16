@@ -46,13 +46,6 @@ function requestInit(apiKey?: string, body?: Record<string, unknown>) {
   } satisfies RequestInit
 }
 
-const betaSentimentPattern = /^(Version erfolgreich getestet|Fehler gefunden)\s*\n?/i
-
-function normalizeBetaText(text: string, sentiment: BetaSentiment) {
-  const body = text.replace(betaSentimentPattern, "").replace(/^\s+/, "")
-  return `${sentiment === "positive" ? "Version erfolgreich getestet" : "Fehler gefunden"}\n${body}`.trimEnd()
-}
-
 export const SettingsFeedback: Component<{ mode?: "general" | "beta" }> = (props) => {
   const language = useLanguage()
   const platform = usePlatform()
@@ -109,18 +102,14 @@ export const SettingsFeedback: Component<{ mode?: "general" | "beta" }> = (props
     if (!text || store.sending) return
     if (props.mode === "beta" && !store.betaSentiment) return
 
-    const payloadText =
-      props.mode === "beta" && store.betaSentiment
-        ? normalizeBetaText(text, store.betaSentiment)
-        : text
-
     setStore("sending", true)
     const attachments = await Promise.all(store.files.map((item) => readAttachment(item.file)))
     await (platform.fetch ?? fetch)(
       FEEDBACK_URL,
       requestInit(aifactoryApiKey(), {
-        text: payloadText.slice(0, FEEDBACK_TEXT_LIMIT),
+        text: text.slice(0, FEEDBACK_TEXT_LIMIT),
         category: props.mode === "beta" ? "beta" : store.category,
+        beta_sentiment: props.mode === "beta" ? store.betaSentiment : undefined,
         key: aifactoryApiKey(),
         app_version: platform.version,
         platform: platform.platform,
@@ -189,8 +178,9 @@ export const SettingsFeedback: Component<{ mode?: "general" | "beta" }> = (props
               <div class="flex flex-wrap gap-2">
                 <Button
                   type="button"
-                  variant={store.betaSentiment === "positive" ? "primary" : "secondary"}
+                  variant="secondary"
                   size="small"
+                  data-selected={store.betaSentiment === "positive"}
                   onClick={() => {
                     setStore("betaSentiment", "positive")
                   }}
@@ -199,8 +189,9 @@ export const SettingsFeedback: Component<{ mode?: "general" | "beta" }> = (props
                 </Button>
                 <Button
                   type="button"
-                  variant={store.betaSentiment === "negative" ? "primary" : "secondary"}
+                  variant="secondary"
                   size="small"
+                  data-selected={store.betaSentiment === "negative"}
                   onClick={() => {
                     setStore("betaSentiment", "negative")
                   }}

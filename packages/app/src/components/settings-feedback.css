@@ -30,3 +30,12 @@
 .settings-feedback-select [data-slot="select-select-item-label"] {
   color: var(--v2-text-text-base, var(--text-strong)) !important;
 }
+
+.settings-feedback [data-component="button"][data-selected="true"] {
+  background-color: var(--v2-background-bg-accent, #2563eb) !important;
+  color: white !important;
+}
+
+.settings-feedback [data-component="button"][data-selected="true"]:hover:not(:disabled) {
+  background-color: var(--v2-text-text-accent-hover, #1d4ed8) !important;
+}

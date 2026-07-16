@@ -18,13 +18,12 @@ export function useBetaTester() {
   const [status] = createResource(
     () => {
       const key = globalSync().data.config.provider?.["aifactory"]?.options?.apiKey
-      return typeof key === "string" && key.trim() ? key.trim() : undefined
+      return [typeof key === "string" && key.trim() ? key.trim() : undefined] as const
     },
-    async (apiKey) => {
-      if (!apiKey) return false
+    async ([apiKey]) => {
       const response = await (platform.fetch ?? fetch)(BETA_STATUS_URL, {
         cache: "no-store",
-        headers: { [AIFACTORY_API_KEY_HEADER]: apiKey },
+        ...(apiKey ? { headers: { [AIFACTORY_API_KEY_HEADER]: apiKey } } : {}),
         signal: AbortSignal.timeout(3_000),
       }).catch(() => undefined)
       if (!response?.ok) return false
