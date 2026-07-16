@@ -662,18 +662,15 @@ export function MessageTimeline(props: {
   }))
 
   const titleMutation = useMutation(() => ({
-    mutationFn: (input: { id: string; title: string }) =>
+    mutationFn: (input: { id: string; title: string; previousTitle: string }) =>
       sdk().client.session.update({ sessionID: input.id, title: input.title }),
     onSuccess: (_, input) => {
-      sync().set(
-        produce((draft) => {
-          const index = draft.session.findIndex((s) => s.id === input.id)
-          if (index !== -1) draft.session[index].title = input.title
-        }),
-      )
       setTitle("editing", false)
     },
-    onError: (err) => {
+    onError: (err, input) => {
+      const session = sync().session.get(input.id)
+      if (session?.title === input.title) sync().session.remember({ ...session, title: input.previousTitle })
+      setTitle("editing", false)
       showToast({
         title: language.t("common.requestFailed"),
         description: errorMessage(err),
@@ -776,7 +773,10 @@ export function MessageTimeline(props: {
       return
     }
 
-    titleMutation.mutate({ id, title: next })
+    const session = sync().session.get(id)
+    if (!session) return
+    sync().session.remember({ ...session, title: next })
+    titleMutation.mutate({ id, title: next, previousTitle: session.title ?? "" })
   }
 
   const navigateAfterSessionRemoval = (sessionID: string, parentID?: string, nextSessionID?: string) => {
