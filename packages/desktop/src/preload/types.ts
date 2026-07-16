@@ -41,6 +41,20 @@ export type FatalRendererError = {
   os?: string
 }
 
+export type UpdateServerRequest = {
+  url: string
+  method: string
+  headers: Record<string, string>
+  body: string | null
+}
+
+export type UpdateServerResponse = {
+  status: number
+  statusText: string
+  headers: Record<string, string>
+  body: string
+}
+
 export type ElectronAPI = {
   killSidecar: () => Promise<void>
   installCli: () => Promise<string>
@@ -107,4 +121,5 @@ export type ElectronAPI = {
   exportDebugLogs: () => Promise<string>
   recordFatalRendererError: (error: FatalRendererError) => Promise<void>
   setAifactoryApiKey: (key: string | null) => Promise<void>
+  updateServerRequest: (request: UpdateServerRequest) => Promise<UpdateServerResponse>
 }

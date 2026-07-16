@@ -124,6 +124,7 @@ const api: ElectronAPI = {
   exportDebugLogs: () => ipcRenderer.invoke("export-debug-logs"),
   recordFatalRendererError: (error) => ipcRenderer.invoke("record-fatal-renderer-error", error),
   setAifactoryApiKey: (key) => ipcRenderer.invoke("set-aifactory-api-key", key),
+  updateServerRequest: (request) => ipcRenderer.invoke("update-server-request", request),
 }
 
 contextBridge.exposeInMainWorld("api", api)

@@ -5,7 +5,7 @@ import { app, BrowserWindow, Notification, clipboard, dialog, ipcMain, shell } f
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron"
 import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
 
-import type { FatalRendererError, ServerReadyData, TitlebarTheme } from "../preload/types"
+import type { FatalRendererError, ServerReadyData, TitlebarTheme, UpdateServerRequest, UpdateServerResponse } from "../preload/types"
 import { runDesktopMenuAction } from "./desktop-menu-actions"
 import { assertAttachmentBudget, createPickedFileAuthorizations } from "./attachment-picker"
 import { getStore, removeStoreFileIfEmpty } from "./store"
@@ -42,6 +42,7 @@ type Deps = {
   exportDebugLogs: () => Promise<string>
   recordFatalRendererError: (error: FatalRendererError) => Promise<void> | void
   setAifactoryApiKey: (key: string | null) => void
+  updateServerRequest: (request: UpdateServerRequest) => Promise<UpdateServerResponse>
 }
 
 export function registerIpcHandlers(deps: Deps) {
@@ -90,6 +91,9 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("set-aifactory-api-key", (_event: IpcMainInvokeEvent, key: string | null) => {
     deps.setAifactoryApiKey(key)
   })
+  ipcMain.handle("update-server-request", (_event: IpcMainInvokeEvent, request: UpdateServerRequest) =>
+    deps.updateServerRequest(request),
+  )
   ipcMain.handle("store-get", (_event: IpcMainInvokeEvent, name: string, key: string) => {
     try {
       const store = getStore(name)

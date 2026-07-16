@@ -1,8 +1,10 @@
 import { readFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
+import type { UpdateServerRequest } from "../preload/types"
 
-const UPDATE_SERVER_BASE_URL = process.env.OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode"
+const UPDATE_SERVER_BASE_URL =
+  process.env.OPENCODE_UPDATE_BASE_URL ?? import.meta.env.OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode"
 const AIFACTORY_API_KEY_HEADER = "X-OpenCode-AiFactory-Api-Key"
 let aifactoryApiKey: string | null = null
 
@@ -56,6 +58,32 @@ export const updateServer = {
   configUrl: `${UPDATE_SERVER_BASE_URL}/config`,
   setAifactoryApiKey(value: string | null) {
     aifactoryApiKey = value?.trim() || null
+  },
+  async request(input: UpdateServerRequest) {
+    const base = new URL(UPDATE_SERVER_BASE_URL)
+    const url = new URL(input.url)
+    const basePath = base.pathname.replace(/\/+$/, "")
+    if (url.origin !== base.origin || (url.pathname !== basePath && !url.pathname.startsWith(`${basePath}/`))) {
+      throw new Error("Update server URL is not allowed")
+    }
+    const headers = new Headers(input.headers)
+    const apiKey = await resolveAifactoryApiKey()
+    if (apiKey && !headers.has(AIFACTORY_API_KEY_HEADER)) headers.set(AIFACTORY_API_KEY_HEADER, apiKey)
+    const response = await fetch(url, {
+      method: input.method,
+      headers,
+      body: input.body ?? undefined,
+    })
+    const responseHeaders: Record<string, string> = {}
+    response.headers.forEach((value, name) => {
+      responseHeaders[name] = value
+    })
+    return {
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders,
+      body: await response.text(),
+    }
   },
   compareVersions(current: string, next: string) {
     const left = parseVersion(current)

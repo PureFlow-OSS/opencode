@@ -31,6 +31,8 @@ import { Splash } from "@opencode-ai/ui/logo"
 import { useTheme } from "@opencode-ai/ui/theme/context"
 
 const root = document.getElementById("root")
+const updateServerUrl = new URL(import.meta.env.OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode")
+const updateServerPath = updateServerUrl.pathname.replace(/\/+$/, "")
 if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
   throw new Error(t("error.dev.rootNotFound"))
 }
@@ -263,9 +265,27 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
       }
     },
 
-    fetch: (input, init) => {
-      if (input instanceof Request) return fetch(input)
-      return fetch(input, init)
+    async fetch(input, init) {
+      const request = input instanceof Request ? input : new Request(input, init)
+      const url = new URL(request.url)
+      if (
+        url.origin !== updateServerUrl.origin ||
+        (url.pathname !== updateServerPath && !url.pathname.startsWith(`${updateServerPath}/`))
+      ) {
+        return fetch(input, init)
+      }
+      const body = request.method === "GET" || request.method === "HEAD" ? null : await request.text()
+      const response = await window.api.updateServerRequest({
+        url: request.url,
+        method: request.method,
+        headers: Object.fromEntries(request.headers.entries()),
+        body,
+      })
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+      })
     },
 
     getDefaultServer: async () => {
@@ -319,15 +339,21 @@ window.api.onMenuCommand((id) => {
 })
 listenForDeepLinks()
 
-function LoadingSplash(props: { motd?: { enabled: boolean; text: string } | null }) {
+const defaultMotd = { enabled: true, text: "RRZ AI Factory" }
+
+function LoadingSplash() {
+  const [motd] = createResource(() => window.api.getMotd().catch(() => defaultMotd), { initialValue: defaultMotd })
+
   return (
-    <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
-      <Splash class="w-16 h-20 opacity-50 animate-pulse" />
-      <Show when={props.motd?.enabled && props.motd.text}>
-        <div class="mt-6 max-w-[calc(100vw-4rem)] truncate text-center text-26-regular text-text-muted">
-          {props.motd?.text}
-        </div>
-      </Show>
+    <div class="h-dvh w-screen flex items-center justify-center bg-background-base">
+      <div class="flex flex-col items-center justify-center gap-6 text-center">
+        <Splash class="h-28 w-24 animate-pulse opacity-70" />
+        <Show when={motd()?.enabled && motd()?.text}>
+          <div class="max-w-[calc(100vw-4rem)] break-words text-center text-26-regular text-text-muted">
+            {motd()?.text}
+          </div>
+        </Show>
+      </div>
     </div>
   )
 }
@@ -352,9 +378,6 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
   const [sidecar] = createResource(() => window.api.awaitInitialization())
 
   const [defaultServer] = createResource(() => platform.getDefaultServer?.())
-  const [motd] = createResource(() => platform.getMotd?.(), {
-    initialValue: { enabled: true, text: "RRZ AI Factory" },
-  })
   const [locale] = createResource(loadLocale)
   const router = (props: BaseRouterProps) => (
     <DesktopMemoryRouter {...props} windowID={platform.windowID ?? "browser"} />
@@ -414,7 +437,7 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
       ServerConnection.Key.make(availableStartupServer(defaultServer.latest, wslServers.data)),
     )
     return (
-      <Show when={ready()} fallback={<LoadingSplash motd={motd()} />}>
+      <Show when={ready()} fallback={<LoadingSplash />}>
         <Show when={effectiveDefaultServer()} keyed>
           {(key) => (
             <AppInterface
@@ -462,7 +485,7 @@ render(() => {
   })
 
   return (
-    <Show when={windowState.latest} fallback={<LoadingSplash motd={{ enabled: true, text: "RRZ AI Factory" }} />} keyed>
+    <Show when={windowState.latest} fallback={<LoadingSplash />} keyed>
       {(state) => <DesktopRoot windowState={state} />}
     </Show>
   )

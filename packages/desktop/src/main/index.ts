@@ -280,6 +280,7 @@ const main = Effect.gen(function* () {
       logger.log("aifactory api key updated", { present: Boolean(next) })
       updateServer.setAifactoryApiKey(next)
     },
+    updateServerRequest: (request) => updateServer.request(request),
   })
   registerWslIpcHandlers(wslServers)
   void updater.start()

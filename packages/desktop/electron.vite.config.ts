@@ -92,6 +92,9 @@ const require = __cjs_mod__.createRequire(import.meta.url);
     },
   },
   renderer: {
+    define: {
+      "import.meta.env.OPENCODE_UPDATE_BASE_URL": JSON.stringify(process.env.OPENCODE_UPDATE_BASE_URL),
+    },
     plugins: [appPlugin, sentry],
     publicDir: "../../../app/public",
     root: "src/renderer",
