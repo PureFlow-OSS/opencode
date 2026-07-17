@@ -1,12 +1,15 @@
 import {
+  DialogConnectProvider,
   ServerConnection,
   useLayout,
+  useProviderConnectController,
   useProviders,
   useServer,
   useServerSDK,
   useServerSync,
   useTabs,
 } from "@opencode-ai/app"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { onMount, startTransition } from "solid-js"
 
 export function DesktopFirstLaunchOnboarding(props: { initialUrl: string; onLoaded: () => void }) {
@@ -16,6 +19,8 @@ export function DesktopFirstLaunchOnboarding(props: { initialUrl: string; onLoad
   const layout = useLayout()
   const providers = useProviders()
   const tabs = useTabs()
+  const dialog = useDialog()
+  const providerConnect = useProviderConnectController()
 
   onMount(() => {
     void runFirstLaunchOnboarding().finally(props.onLoaded)
@@ -70,6 +75,10 @@ export function DesktopFirstLaunchOnboarding(props: { initialUrl: string; onLoad
       await startTransition(() => {
         tabs.newDraft({ server: server.key, directory })
       })
+      if (connectedProviders.some((provider) => provider.id === "aifactory")) return
+
+      providerConnect.select("aifactory")
+      dialog.show(() => <DialogConnectProvider controller={providerConnect} />)
     } catch (error) {
       console.error("[desktop-onboarding] first launch onboarding failed", error)
     }

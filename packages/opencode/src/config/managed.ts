@@ -3,13 +3,34 @@ export * as ConfigManaged from "./managed"
 import { existsSync } from "fs"
 import os from "os"
 import path from "path"
+import { ConfigMCPV1 } from "@opencode-ai/core/v1/config/mcp"
 import { Process } from "@/util/process"
 import { isRecord } from "@/util/record"
+import { Option, Schema } from "effect"
 
 declare const OPENCODE_UPDATE_BASE_URL: string | undefined
 
 const DEFAULT_UPDATE_BASE_URL = "http://10.53.7.23/opencode"
 export const PROVIDER_CONFIG_AIFACTORY_API_KEY_HEADER = "X-OpenCode-AiFactory-Api-Key"
+
+export const McpAuth = Schema.Struct({
+  type: Schema.Literal("pat"),
+  label: Schema.optional(Schema.String),
+  description: Schema.optional(Schema.String),
+  placeholder: Schema.optional(Schema.String),
+  header: Schema.optional(Schema.String),
+  prefix: Schema.optional(Schema.String),
+})
+export type McpAuth = Schema.Schema.Type<typeof McpAuth>
+
+export const Mcp = Schema.Struct({
+  config: ConfigMCPV1.Info,
+  auth: Schema.optional(McpAuth),
+})
+export type Mcp = Schema.Schema.Type<typeof Mcp>
+
+const decodeMcp = Schema.decodeUnknownOption(ConfigMCPV1.Info, { onExcessProperty: "ignore" })
+const decodeMcpAuth = Schema.decodeUnknownOption(McpAuth, { onExcessProperty: "ignore" })
 
 const MANAGED_PLIST_DOMAIN = "ai.opencode.managed"
 
@@ -55,6 +76,21 @@ export function providerConfigPayload(payload: unknown): Record<string, unknown>
     : isRecord(updater.providerConfig)
       ? updater.providerConfig
       : payload
+}
+
+export function mcp(payload: Record<string, unknown>): Record<string, Mcp> {
+  if (!isRecord(payload.mcp)) return {}
+  return Object.fromEntries(
+    Object.entries(payload.mcp).flatMap(([name, value]) => {
+      if (!isRecord(value)) return []
+      const configInput = { ...value }
+      delete configInput.auth
+      const config = Option.getOrUndefined(decodeMcp(configInput))
+      if (!config) return []
+      const auth = Option.getOrUndefined(decodeMcpAuth(value.auth))
+      return [[name, auth ? { config, auth } : { config }]]
+    }),
+  )
 }
 
 export function updateBaseUrl() {

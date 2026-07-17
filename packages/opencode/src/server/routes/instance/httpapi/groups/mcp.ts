@@ -1,4 +1,5 @@
 import { MCP } from "@/mcp"
+import { ConfigManaged } from "@/config/managed"
 import { ConfigMCPV1 } from "@opencode-ai/core/v1/config/mcp"
 import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
@@ -31,6 +32,7 @@ export class UnsupportedOAuthError extends Schema.ErrorClass<UnsupportedOAuthErr
 
 export const McpPaths = {
   status: "/mcp",
+  managed: "/mcp/managed",
   auth: "/mcp/:name/auth",
   authCallback: "/mcp/:name/auth/callback",
   authAuthenticate: "/mcp/:name/auth/authenticate",
@@ -42,6 +44,16 @@ export const McpApi = HttpApi.make("mcp")
   .add(
     HttpApiGroup.make("mcp")
       .add(
+        HttpApiEndpoint.get("managed", McpPaths.managed, {
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Record(Schema.String, ConfigManaged.Mcp), "Managed MCP servers"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "mcp.managed",
+            summary: "Get managed MCP servers",
+            description: "Get server-managed MCP configuration and authentication metadata.",
+          }),
+        ),
         HttpApiEndpoint.get("status", McpPaths.status, {
           query: WorkspaceRoutingQuery,
           success: described(Schema.Record(Schema.String, MCP.Status), "MCP server status"),

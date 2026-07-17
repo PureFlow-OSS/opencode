@@ -119,6 +119,7 @@ type Info = ConfigV1.Info & {
 
 type State = {
   config: Info
+  managedMcp: Record<string, ConfigManaged.Mcp>
   directories: string[]
   deps: Fiber.Fiber<void>[]
   consoleState: ConsoleState
@@ -127,6 +128,7 @@ type State = {
 export interface Interface {
   readonly get: () => Effect.Effect<Info>
   readonly getGlobal: () => Effect.Effect<Info>
+  readonly managedMcp: () => Effect.Effect<Record<string, ConfigManaged.Mcp>>
   readonly getConsoleState: () => Effect.Effect<ConsoleState>
   readonly update: (config: Info) => Effect.Effect<void>
   readonly updateGlobal: (config: Info) => Effect.Effect<Info & { info: Info; changed: boolean }>
@@ -388,6 +390,7 @@ export const layer = Layer.effect(
 
         let result: Info = {}
         const authEnv: Record<string, string> = {}
+        let managedMcp: Record<string, ConfigManaged.Mcp> = {}
         const consoleManagedProviders = new Set<string>()
         let activeOrgName: string | undefined
 
@@ -468,6 +471,23 @@ export const layer = Layer.effect(
 
         const global = Object.keys(authEnv).length ? yield* loadGlobal(authEnv) : yield* getGlobal()
         yield* merge(Global.Path.config, global, "global")
+
+        const providerConfig = yield* Effect.promise(() =>
+          ConfigManaged.readProviderConfig(fetch, ConfigManaged.providerConfigRequestInit({ config: result, auth })),
+        )
+        managedMcp = ConfigManaged.mcp(providerConfig)
+        const missingManagedMcp = Object.fromEntries(
+          Object.entries(managedMcp)
+            .filter(([name]) => !(name in (result.mcp ?? {})))
+            .map(([name, value]) => [name, value.config]),
+        )
+        if (Object.keys(missingManagedMcp).length) {
+          yield* merge(
+            ConfigManaged.providerConfigUrl(),
+            { mcp: missingManagedMcp },
+            "global",
+          )
+        }
 
         if (Flag.OPENCODE_CONFIG) {
           yield* merge(Flag.OPENCODE_CONFIG, yield* loadFile(Flag.OPENCODE_CONFIG, authEnv))
@@ -656,6 +676,7 @@ export const layer = Layer.effect(
 
         return {
           config: result,
+          managedMcp,
           directories,
           deps,
           consoleState: {
@@ -676,6 +697,10 @@ export const layer = Layer.effect(
 
     const get = Effect.fn("Config.get")(function* () {
       return yield* InstanceState.use(state, (s) => s.config)
+    })
+
+    const managedMcp = Effect.fn("Config.managedMcp")(function* () {
+      return yield* InstanceState.use(state, (s) => s.managedMcp)
     })
 
     const directories = Effect.fn("Config.directories")(function* () {
@@ -748,6 +773,7 @@ export const layer = Layer.effect(
     return Service.of({
       get,
       getGlobal,
+      managedMcp,
       getConsoleState,
       update,
       updateGlobal,

@@ -16,6 +16,7 @@ import {
   ToolListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js"
 import { Config } from "@/config/config"
+import { ConfigManaged } from "@/config/managed"
 import { ConfigMCPV1 } from "@opencode-ai/core/v1/config/mcp"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
@@ -163,6 +164,7 @@ export interface McpTool {
 
 export interface Interface {
   readonly status: () => Effect.Effect<Record<string, Status>>
+  readonly managed: () => Effect.Effect<Record<string, ConfigManaged.Mcp>>
   readonly clients: () => Effect.Effect<Record<string, MCPClient>>
   readonly instructions: () => Effect.Effect<ServerInstructions[]>
   readonly tools: () => Effect.Effect<Record<string, McpTool>>
@@ -414,6 +416,7 @@ const layer = Layer.effect(
       }),
     )
     const cfgSvc = yield* Config.Service
+    const managed = Effect.fn("MCP.managed")(() => cfgSvc.managedMcp())
 
     const descendants = Effect.fnUntraced(
       function* (pid: number) {
@@ -970,6 +973,7 @@ const layer = Layer.effect(
     })
 
     return Service.of({
+      managed,
       status,
       clients,
       instructions,

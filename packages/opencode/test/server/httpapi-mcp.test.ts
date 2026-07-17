@@ -56,6 +56,17 @@ const readResponse = Effect.fnUntraced(function* (input: { app: TestApp; path: s
 })
 
 describe("mcp HttpApi", () => {
+  it.instance("serves managed MCP metadata", () =>
+    Effect.gen(function* () {
+      const tmp = yield* TestInstance
+      const handler = HttpApiApp.webHandler()
+      const response = yield* request(handler, McpPaths.managed, tmp.directory)
+
+      expect(response.status).toBe(200)
+      expect(yield* json(response)).toEqual({})
+    }),
+  )
+
   it.instance(
     "serves status endpoint",
     () =>

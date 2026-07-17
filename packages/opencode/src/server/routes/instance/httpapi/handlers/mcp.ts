@@ -13,6 +13,10 @@ export const mcpHandlers = HttpApiBuilder.group(InstanceHttpApi, "mcp", (handler
       return yield* mcp.status()
     })
 
+    const managed = Effect.fn("McpHttpApi.managed")(function* () {
+      return yield* mcp.managed()
+    })
+
     const add = Effect.fn("McpHttpApi.add")(function* (ctx: { payload: typeof AddPayload.Type }) {
       const result = (yield* mcp.add(ctx.payload.name, ctx.payload.config)).status
       return yield* Schema.decodeUnknownEffect(StatusMap)(
@@ -99,6 +103,7 @@ export const mcpHandlers = HttpApiBuilder.group(InstanceHttpApi, "mcp", (handler
     })
 
     return handlers
+      .handle("managed", managed)
       .handle("status", status)
       .handle("add", add)
       .handle("authStart", authStart)

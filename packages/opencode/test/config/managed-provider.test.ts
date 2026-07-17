@@ -55,6 +55,39 @@ test("providerConfigPayload accepts lower camel updater payload", () => {
   })
 })
 
+test("mcp keeps executable config and PAT metadata separate", () => {
+  expect(
+    ConfigManaged.mcp({
+      mcp: {
+        devops: {
+          type: "remote",
+          url: "https://mcp.example.com/devops",
+          auth: {
+            type: "pat",
+            label: "DevOps PAT",
+            header: "Authorization",
+            prefix: "Bearer ",
+          },
+        },
+        invalid: { type: "remote" },
+      },
+    }),
+  ).toEqual({
+    devops: {
+      config: {
+        type: "remote",
+        url: "https://mcp.example.com/devops",
+      },
+      auth: {
+        type: "pat",
+        label: "DevOps PAT",
+        header: "Authorization",
+        prefix: "Bearer ",
+      },
+    },
+  })
+})
+
 test("providerConfigRequestInit sends only aifactory api key", () => {
   expect(
     ConfigManaged.providerConfigRequestInit({

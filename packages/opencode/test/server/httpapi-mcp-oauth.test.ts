@@ -18,6 +18,7 @@ const fakeSession = Layer.mock(Session.Service)({})
 const testMcpHandlers = HttpApiBuilder.group(TestHttpApi, "mcp", (handlers) =>
   Effect.succeed(
     handlers
+      .handle("managed", () => Effect.die("unexpected managed MCP servers"))
       .handle("status", () => Effect.die("unexpected MCP status"))
       .handle("add", () => Effect.die("unexpected MCP add"))
       .handle("authStart", () =>
