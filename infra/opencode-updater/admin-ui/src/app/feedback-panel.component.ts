@@ -24,14 +24,6 @@ type FeedbackAttachment = {
 
 const betaSentimentPattern = /^(Version erfolgreich getestet|Fehler gefunden)\s*\n?/i
 
-function betaSentiment(item: FeedbackRecord) {
-  if (item.betaSentiment === "positive" || item.betaSentiment === "negative") return item.betaSentiment
-  const match = item.text.match(betaSentimentPattern)?.[1]?.toLowerCase()
-  if (match === "version erfolgreich getestet") return "positive"
-  if (match === "fehler gefunden") return "negative"
-  return "neutral"
-}
-
 @Component({
   selector: "app-feedback-panel",
   standalone: true,
@@ -88,7 +80,7 @@ function betaSentiment(item: FeedbackRecord) {
               <strong>{{ displayName(item) }}</strong>
               <span>
                 @if (mode === 'beta') {
-                  {{ betaSentiment(item) }}
+                  {{ sentiment(item) }}
                 } @else {
                   {{ categoryLabel(item.category) }}
                 }
@@ -167,6 +159,14 @@ export class FeedbackPanelComponent {
     if (category === "idea") return "Funktionsvorschlag"
     if (category === "beta") return "Beta"
     return "Allgemein"
+  }
+
+  sentiment(item: FeedbackRecord) {
+    if (item.betaSentiment === "positive" || item.betaSentiment === "negative") return item.betaSentiment
+    const match = item.text.match(betaSentimentPattern)?.[1]?.toLowerCase()
+    if (match === "version erfolgreich getestet") return "positive"
+    if (match === "fehler gefunden") return "negative"
+    return "neutral"
   }
 
   refresh() {

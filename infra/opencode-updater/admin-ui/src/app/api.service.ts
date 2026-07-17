@@ -33,15 +33,6 @@ type FeedbackAttachment = {
   image: boolean
 }
 
-type AuditRecord = {
-  id: string
-  feedbackId: string
-  actor: string
-  action: string
-  details: string
-  createdAt: string
-}
-
 type ModelCard = {
   model: string
   context?: number | null
@@ -105,11 +96,11 @@ export class ApiService {
   }
 
   async listReleases() {
-    return this.readJson<ReleaseRecord[]>(await fetch("/opencode/admin/releases"))
+    return this.readJson<ReleaseRecord[]>(await fetch("/opencode/admin/releases", { cache: "no-store" }))
   }
 
   async listReleaseStatus() {
-    return this.readJson<ReleaseStatus>(await fetch("/opencode/admin/releases/status"))
+    return this.readJson<ReleaseStatus>(await fetch("/opencode/admin/releases/status", { cache: "no-store" }))
   }
 
   async uploadRelease(payload: { archive: File; notes?: string }) {
@@ -167,10 +158,6 @@ export class ApiService {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
     })
-  }
-
-  async listAudit() {
-    return this.readJson<AuditRecord[]>(await fetch("/opencode/admin/audit"))
   }
 
   async listModelCards() {

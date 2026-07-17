@@ -21,6 +21,18 @@
 
 .toolbar select {
   margin-top: 6px;
+  color-scheme: dark;
+  background-color: #171b23;
+}
+
+.toolbar select option {
+  color: #f2f4f8;
+  background-color: #171b23;
+}
+
+.toolbar select option:checked {
+  color: #fff;
+  background-color: #5e73ff;
 }
 
 .refresh {

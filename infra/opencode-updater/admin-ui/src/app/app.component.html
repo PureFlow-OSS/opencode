@@ -4,7 +4,7 @@
       <p class="eyebrow">OpenCode Updater</p>
       <h1>Admin Console</h1>
       <p class="lede">
-        One screen per job. Upload ZIP into beta, review beta feedback, or inspect inbox and audit trail.
+        One screen per job. Upload ZIP into beta, review beta feedback, or inspect the general inbox.
       </p>
       <nav class="nav">
         <button type="button" [class.active]="page === 'upload'" (click)="show('upload')">ZIP Upload</button>
@@ -23,7 +23,7 @@
         } @else if (page === 'model-status') {
           Model cards
         } @else {
-          Inbox + audit
+          General inbox
         }
       </strong>
       <p>

@@ -99,6 +99,8 @@ app.MapGet("/opencode/admin/", () =>
 app.MapPost("/opencode/feedback", async (
   HttpRequest request,
   FeedbackContext db,
+  LocalFeed feed,
+  UpdaterAdminStore store,
   FeedbackKeyResolver keyResolver,
   IOptions<UpdaterBetaOptions> betaOptions,
   IHttpClientFactory clientFactory
@@ -121,7 +123,7 @@ app.MapPost("/opencode/feedback", async (
     userName = await keyResolver.ResolveBetaUserNameAsync(key, betaOptions.Value, clientFactory, request.HttpContext.RequestAborted);
   }
 
-  var category = body.Category?.Trim() ?? "general";
+  var category = (body.Category?.Trim() ?? "general").ToLowerInvariant();
   var betaSentiment = body.BetaSentiment?.Trim().ToLowerInvariant();
   if (category == "beta")
   {
@@ -136,7 +138,7 @@ app.MapPost("/opencode/feedback", async (
     Category = category,
     BetaSentiment = category == "beta" ? betaSentiment : null,
     UserName = userName,
-    AppVersion = body.AppVersion?.Trim(),
+    AppVersion = category == "beta" ? await ResolveActiveBetaVersionAsync(feed, store) ?? body.AppVersion?.Trim() : body.AppVersion?.Trim(),
     Platform = body.Platform?.Trim(),
     AttachmentsJson = body.Attachments is { Length: > 0 } ? JsonSerializer.Serialize(body.Attachments) : null,
     CreatedAt = DateTimeOffset.UtcNow,
@@ -148,8 +150,10 @@ app.MapPost("/opencode/feedback", async (
   return Results.Ok(new { id = entry.Id });
 });
 
-app.MapGet("/opencode/feedback", async (FeedbackContext db) =>
+app.MapGet("/opencode/feedback", async (FeedbackContext db, LocalFeed feed, UpdaterAdminStore store) =>
 {
+  var releases = await store.ListReleasesAsync();
+  await BackfillBetaFeedbackVersionAsync(db, await ResolveActiveBetaVersionAsync(feed, store, releases), releases);
   var items = (await db.Feedbacks
     .Select(f => new
     {
@@ -181,7 +185,8 @@ app.MapGet("/opencode/admin/releases/status", async (
 ) =>
 {
   var releases = await store.ListReleasesAsync();
-  var trackedVersion = feed.TryReadVersionFromLatestYml(true) ?? releases.FirstOrDefault()?.Version;
+  var trackedVersion = await ResolveActiveBetaVersionAsync(feed, store, releases);
+  await BackfillBetaFeedbackVersionAsync(feedbackDb, trackedVersion, releases);
   var feedbackCounts = string.IsNullOrWhiteSpace(trackedVersion) ? (0L, 0L) : await GetBetaFeedbackCountsAsync(feedbackDb, trackedVersion);
   return Results.Json(new
   {
@@ -190,16 +195,12 @@ app.MapGet("/opencode/admin/releases/status", async (
       : release),
     normalStopped = await channelState.IsNormalStoppedAsync(),
     betaUserCount = betaOptions.Value.Users.Length,
-    betaPositiveThreshold = (int)Math.Ceiling(betaOptions.Value.Users.Length / 2.0),
-    betaRelease = string.IsNullOrWhiteSpace(trackedVersion)
-      ? null
-      : releases.FirstOrDefault((release) => string.Equals(release.Version, trackedVersion, StringComparison.OrdinalIgnoreCase)) with
-      {
-        PositiveCount = feedbackCounts.Item1,
-        TotalCount = feedbackCounts.Item2,
-      },
+    betaPositiveThreshold = BetaPositiveThreshold(betaOptions.Value),
+    betaRelease = releases.FirstOrDefault((release) => string.Equals(release.Version, trackedVersion, StringComparison.OrdinalIgnoreCase)) is { } betaRelease
+      ? betaRelease with { PositiveCount = feedbackCounts.Item1, TotalCount = feedbackCounts.Item2 }
+      : null,
     normalRelease = releases.FirstOrDefault((release) => release.Channel == "normal"),
-    betaFeedVersion = feed.TryReadVersionFromLatestYml(true),
+    betaFeedVersion = trackedVersion,
     normalFeedVersion = feed.TryReadVersionFromLatestYml(false),
   });
 });
@@ -277,6 +278,7 @@ app.MapPost("/opencode/admin/releases/{id}/promote", async (
   string id,
   UpdaterAdminStore store,
   LocalFeed feed,
+  IOptions<UpdaterBetaOptions> betaOptions,
   HttpRequest request,
   FeedbackContext feedbackDb
 ) =>
@@ -284,11 +286,11 @@ app.MapPost("/opencode/admin/releases/{id}/promote", async (
   var releases = await store.ListReleasesAsync();
   var release = releases.FirstOrDefault((item) => item.Id == id);
   if (release is null) return Results.NotFound();
-  var activeBetaVersion = feed.TryReadVersionFromLatestYml(true);
+  var activeBetaVersion = await ResolveActiveBetaVersionAsync(feed, store, releases);
   if (!string.Equals(release.Version, activeBetaVersion, StringComparison.OrdinalIgnoreCase))
     return Results.BadRequest(new { error = "A newer beta release is active and must be promoted instead" });
   var counts = await GetBetaFeedbackCountsAsync(feedbackDb, release.Version);
-  if (counts.totalCount == 0 || counts.positiveCount * 2 < counts.totalCount)
+  if (counts.positiveCount < BetaPositiveThreshold(betaOptions.Value))
     return Results.BadRequest(new { error = "Not enough validated beta feedback to promote" });
 
   var promoted = await store.PromoteReleaseAsync(id, request.HttpContext.RequestAborted);
@@ -547,6 +549,24 @@ static async Task<(long positiveCount, long totalCount)> GetBetaFeedbackCountsAs
   return (positiveCount, totalCount);
 }
 
+static int BetaPositiveThreshold(UpdaterBetaOptions options) => Math.Max(1, (int)Math.Ceiling(options.Users.Length / 2.0));
+
+static async Task<string?> ResolveActiveBetaVersionAsync(LocalFeed feed, UpdaterAdminStore store, List<ReleaseRecord>? releases = null)
+{
+  var feedVersion = feed.TryReadVersionFromLatestYml(true);
+  if (!string.IsNullOrWhiteSpace(feedVersion)) return feedVersion;
+  return (releases ?? await store.ListReleasesAsync()).FirstOrDefault((release) => release.Channel == "beta")?.Version;
+}
+
+static async Task BackfillBetaFeedbackVersionAsync(FeedbackContext db, string? version, List<ReleaseRecord> releases)
+{
+  if (string.IsNullOrWhiteSpace(version)) return;
+  var betaVersions = releases.Where((release) => release.Channel == "beta").Select((release) => release.Version).ToArray();
+  await db.Feedbacks
+    .Where((feedback) => feedback.Category == "beta" && (feedback.AppVersion == null || feedback.AppVersion == "" || !betaVersions.Contains(feedback.AppVersion!)))
+    .ExecuteUpdateAsync((setters) => setters.SetProperty((feedback) => feedback.AppVersion, version));
+}
+
 static async Task EnsureAdminTablesAsync(DbConnection connection, IWebHostEnvironment env)
 {
   Directory.CreateDirectory(Path.Combine(env.ContentRootPath, "data"));
@@ -593,6 +613,33 @@ static async Task EnsureAdminTablesAsync(DbConnection connection, IWebHostEnviro
       Value INTEGER NOT NULL,
       UpdatedAt TEXT NOT NULL
     );
+    """;
+  await command.ExecuteNonQueryAsync();
+
+  command.CommandText = """
+    UPDATE UpdaterFeedback
+    SET ReleaseId = (
+      SELECT replacement.Id
+      FROM UpdaterReleases original
+      JOIN UpdaterReleases replacement ON replacement.Channel = 'beta' AND replacement.Version = original.Version
+      WHERE original.Id = UpdaterFeedback.ReleaseId
+      ORDER BY replacement.rowid DESC
+      LIMIT 1
+    )
+    WHERE ReleaseId IN (SELECT Id FROM UpdaterReleases WHERE Channel = 'beta');
+
+    DELETE FROM UpdaterReleases
+    WHERE Channel = 'beta'
+      AND rowid NOT IN (
+        SELECT MAX(rowid)
+        FROM UpdaterReleases
+        WHERE Channel = 'beta'
+        GROUP BY Version
+      );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS UpdaterReleases_BetaVersion
+    ON UpdaterReleases (Version)
+    WHERE Channel = 'beta';
     """;
   await command.ExecuteNonQueryAsync();
 }
@@ -1511,6 +1558,12 @@ sealed class UpdaterAdminStore(IWebHostEnvironment env)
     command.CommandText = """
       INSERT INTO UpdaterReleases (Id, Version, Channel, ZipName, ZipSha256, ZipSize, Notes, Promoted, PositiveCount, TotalCount, CreatedAt)
       VALUES ($id, $version, 'beta', $zipName, $zipSha256, $zipSize, $notes, 0, 0, 0, $createdAt)
+      ON CONFLICT(Version) WHERE Channel = 'beta' DO UPDATE SET
+        ZipName = excluded.ZipName,
+        ZipSha256 = excluded.ZipSha256,
+        ZipSize = excluded.ZipSize,
+        Notes = excluded.Notes,
+        CreatedAt = excluded.CreatedAt
       """;
     command.Parameters.AddWithValue("$id", Guid.NewGuid().ToString("N"));
     command.Parameters.AddWithValue("$version", body.Version.Trim());
