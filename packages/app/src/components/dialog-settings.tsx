@@ -23,7 +23,7 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
   const betaTester = useBetaTester()
 
   return (
-    <Dialog size="x-large" transition>
+    <Dialog size="x-large" class="h-full" transition>
       <Tabs
         orientation="vertical"
         variant="settings"
