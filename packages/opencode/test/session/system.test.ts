@@ -4,6 +4,7 @@ import { Effect } from "effect"
 import { Agent } from "../../src/agent/agent"
 import { Instance } from "../../src/project/instance"
 import { SystemPrompt } from "../../src/session/system"
+import type { Provider } from "../../src/provider/provider"
 import { provideInstance, tmpdir } from "../fixture/fixture"
 
 function load<A>(dir: string, fn: (svc: Agent.Interface) => Effect.Effect<A>) {
@@ -11,6 +12,13 @@ function load<A>(dir: string, fn: (svc: Agent.Interface) => Effect.Effect<A>) {
 }
 
 describe("session.system", () => {
+  test("instructs default models to list all tools and rename clear sessions", () => {
+    const prompt = SystemPrompt.provider({ api: { id: "qwen3-coder" } } as Provider.Model)[0]
+
+    expect(prompt).toContain("list every tool exposed in the current tool definitions")
+    expect(prompt).toContain("proactively call `session_rename` once")
+  })
+
   test("skills output is sorted by name and stable across calls", async () => {
     await using tmp = await tmpdir({
       git: true,
