@@ -46,3 +46,16 @@ test("keeps a hidden prod launcher for old Linux pins", async () => {
   expect(desktop).toContain("StartupWMClass=ai.opencode.desktop")
   expect(desktop).toContain("NoDisplay=true")
 })
+
+test("uses OPENCODE_ELECTRON_OUTPUT_DIR for packaged artifacts", async () => {
+  const previous = process.env.OPENCODE_ELECTRON_OUTPUT_DIR
+  process.env.OPENCODE_ELECTRON_OUTPUT_DIR = "dist-v36-ai-signed"
+
+  const module = await import("./electron-builder.config.ts?output-dir=custom")
+  const config = module.default as Configuration
+
+  if (previous === undefined) delete process.env.OPENCODE_ELECTRON_OUTPUT_DIR
+  else process.env.OPENCODE_ELECTRON_OUTPUT_DIR = previous
+
+  expect(config.directories?.output).toBe("dist-v36-ai-signed")
+})

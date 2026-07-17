@@ -56,6 +56,7 @@ const channel = (() => {
   if (raw === "dev" || raw === "beta" || raw === "prod") return raw
   return "prod"
 })()
+const outputDir = process.env.OPENCODE_ELECTRON_OUTPUT_DIR?.trim() || "dist"
 
 const APP_IDS = {
   dev: "ai.opencode.desktop.dev",
@@ -66,7 +67,7 @@ const APP_IDS = {
 const getBase = (appId: string): Configuration => ({
   artifactName: "opencode-desktop-${os}-${arch}.${ext}",
   directories: {
-    output: "dist",
+    output: outputDir,
     buildResources: "resources",
   },
   // Linux launchers are .desktop files, so this is the desktop file name,
