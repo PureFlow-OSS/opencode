@@ -410,7 +410,7 @@ const createPlatform = (): Platform => {
       return ServerConnection.Key.make(url)
     },
 
-    getMotd: async () => (await updateServer.fetch())?.motd ?? { enabled: true, text: "RRZ AI Factory" },
+    getMotd: async () => (await updateServer.motd()) ?? { enabled: true, text: "RRZ AI Factory" },
 
     setDefaultServer: async (url: string | null) => {
       await commands.setDefaultServerUrl(url)

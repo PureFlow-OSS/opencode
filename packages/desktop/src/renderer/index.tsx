@@ -342,17 +342,28 @@ listenForDeepLinks()
 const defaultMotd = { enabled: true, text: "RRZ AI Factory" }
 
 function LoadingSplash() {
-  const [motd] = createResource(() => window.api.getMotd().catch(() => defaultMotd), { initialValue: defaultMotd })
+  const [motd, setMotd] = createSignal(defaultMotd)
+  const text = () => (motd().enabled && motd().text.trim() ? motd().text : defaultMotd.text)
+
+  onMount(() => {
+    void window.api
+      .getMotd()
+      .then((next) => {
+        if (next) setMotd(next)
+      })
+      .catch(() => undefined)
+  })
 
   return (
     <div class="h-dvh w-screen flex items-center justify-center bg-background-base">
       <div class="flex flex-col items-center justify-center gap-6 text-center">
         <Splash class="h-28 w-24 animate-pulse opacity-70" />
-        <Show when={motd()?.enabled && motd()?.text}>
-          <div class="max-w-[calc(100vw-4rem)] break-words text-center text-26-regular text-text-muted">
-            {motd()?.text}
-          </div>
-        </Show>
+        <div
+          class="max-w-[calc(100vw-4rem)] break-words text-center"
+          style={{ color: "#525252", "font-size": "16px", "line-height": "24px" }}
+        >
+          {text()}
+        </div>
       </div>
     </div>
   )
@@ -378,6 +389,7 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
   const [sidecar] = createResource(() => window.api.awaitInitialization())
 
   const [defaultServer] = createResource(() => platform.getDefaultServer?.())
+  const [motd] = createResource(() => window.api.getMotd().catch(() => defaultMotd), { initialValue: defaultMotd })
   const [locale] = createResource(loadLocale)
   const router = (props: BaseRouterProps) => (
     <DesktopMemoryRouter {...props} windowID={platform.windowID ?? "browser"} />
@@ -445,6 +457,14 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
               servers={servers()}
               router={router}
               startup={onboarding.promise}
+              loadingContent={
+                <div
+                  class="max-w-[calc(100vw-4rem)] break-words text-center"
+                  style={{ color: "#525252", "font-size": "16px", "line-height": "24px" }}
+                >
+                  {motd()?.enabled && motd()?.text.trim() ? motd()?.text : defaultMotd.text}
+                </div>
+              }
               serverScoped={
                 <DesktopFirstLaunchOnboarding
                   initialUrl={getLastActiveUrl(platform.windowID ?? "browser")}

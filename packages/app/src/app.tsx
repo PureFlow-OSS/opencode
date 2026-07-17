@@ -394,7 +394,7 @@ export function AppBaseProviders(props: ParentProps<{ locale?: Locale }>) {
   )
 }
 
-function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean; startup?: Promise<void> }>) {
+function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean; startup?: Promise<void>; loadingContent?: JSX.Element }>) {
   const server = useServer()
   const checkServerHealth = useCheckServerHealth()
 
@@ -457,8 +457,9 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean; start
         </Show>
       </Show>
       <Show when={loading()}>
-        <div class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background-base">
+        <div class="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-6 bg-background-base">
           <Splash class="w-16 h-20 opacity-50 animate-pulse" />
+          {props.loadingContent}
         </div>
       </Show>
     </>
@@ -529,6 +530,7 @@ export function AppInterface(props: {
   router?: Component<BaseRouterProps>
   disableHealthCheck?: boolean
   startup?: Promise<void>
+  loadingContent?: JSX.Element
   serverScoped?: JSX.Element
 }) {
   // The visual new layout lives in the router root so it remains mounted across
@@ -551,7 +553,11 @@ export function AppInterface(props: {
     >
       <GlobalProvider>
         <SettingsProvider>
-          <ConnectionGate disableHealthCheck={props.disableHealthCheck} startup={props.startup}>
+          <ConnectionGate
+            disableHealthCheck={props.disableHealthCheck}
+            startup={props.startup}
+            loadingContent={props.loadingContent}
+          >
             <Show when={useSettings().general.newLayoutDesigns().toString()} keyed>
               <Dynamic
                 component={props.router ?? Router}

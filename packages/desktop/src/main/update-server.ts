@@ -92,6 +92,25 @@ export const updateServer = {
     if (!delta) return 0
     return delta > 0 ? 1 : -1
   },
+  async motd() {
+    const apiKey = await resolveAifactoryApiKey()
+    return fetch(this.configUrl, {
+      cache: "no-store",
+      ...(apiKey ? { headers: { [AIFACTORY_API_KEY_HEADER]: apiKey } } : {}),
+      signal: AbortSignal.timeout(3_000),
+    })
+      .then((result) => (result.ok ? result.json() : null))
+      .then((result) => {
+        if (!result || typeof result !== "object") return null
+        const value = "motd" in result ? (result as { motd?: unknown }).motd : null
+        if (!value || typeof value !== "object") return null
+        const enabled = "enabled" in value ? (value as { enabled?: unknown }).enabled : null
+        const text = "text" in value ? (value as { text?: unknown }).text : null
+        if (typeof enabled !== "boolean" || typeof text !== "string") return null
+        return { enabled, text }
+      })
+      .catch(() => null)
+  },
   async fetch() {
     const apiKey = await resolveAifactoryApiKey()
     const init = {
@@ -107,18 +126,7 @@ export const updateServer = {
         .then((result) => (result.ok ? result.text() : ""))
         .then((result) => result.trim())
         .catch(() => ""),
-      fetch(this.configUrl, init)
-        .then((result) => (result.ok ? result.json() : null))
-        .then((result) => {
-          if (!result || typeof result !== "object") return null
-          const value = "motd" in result ? (result as { motd?: unknown }).motd : null
-          if (!value || typeof value !== "object") return null
-          const enabled = "enabled" in value ? (value as { enabled?: unknown }).enabled : null
-          const text = "text" in value ? (value as { text?: unknown }).text : null
-          if (typeof enabled !== "boolean" || typeof text !== "string") return null
-          return { enabled, text }
-        })
-        .catch(() => null),
+      this.motd(),
     ])
     if (!version || !url) return null
     return { version, url, motd }

@@ -39,6 +39,8 @@ import { createWslServersController } from "./wsl/servers"
 import { registerWslIpcHandlers } from "./wsl/ipc"
 import { spawnWslSidecar } from "./wsl/sidecar"
 import { migrate } from "./migrate"
+import { getStore } from "./store"
+import { MOTD_KEY } from "./store-keys"
 import { updateServer } from "./update-server"
 
 const APP_NAMES: Record<string, string> = {
@@ -58,8 +60,32 @@ let logger: ReturnType<typeof initLogging>
 let mainWindow: BrowserWindow | null = null
 let server: SidecarListener | null = null
 let aifactoryApiKey: string | null = null
+let motdRefresh: Promise<void> | null = null
 
 const pendingDeepLinks: string[] = []
+const defaultMotd = { enabled: true, text: "RRZ AI Factory" }
+
+function cachedMotd() {
+  const value = getStore().get(MOTD_KEY)
+  if (!value || typeof value !== "object") return defaultMotd
+  const enabled = "enabled" in value ? (value as { enabled?: unknown }).enabled : null
+  const text = "text" in value ? (value as { text?: unknown }).text : null
+  if (typeof enabled !== "boolean" || typeof text !== "string" || !text.trim()) return defaultMotd
+  return { enabled, text }
+}
+
+function refreshMotd() {
+  if (motdRefresh) return motdRefresh
+  motdRefresh = updateServer
+    .motd()
+    .then((motd) => {
+      if (motd?.text.trim()) getStore().set(MOTD_KEY, motd)
+    })
+    .finally(() => {
+      motdRefresh = null
+    })
+  return motdRefresh
+}
 
 function useEnvProxy() {
   try {
@@ -269,7 +295,10 @@ const main = Effect.gen(function* () {
     updater,
     showUpdater: () => showUpdaterDialog(updater, true),
     resetData: () => resetData(),
-    getMotd: async () => (await updateServer.fetch())?.motd ?? { enabled: true, text: "RRZ AI Factory" },
+    getMotd: () => {
+      void refreshMotd()
+      return cachedMotd()
+    },
     setBackgroundColor: (color) => setBackgroundColor(color),
     exportDebugLogs: () => exportDebugLogs(),
     recordFatalRendererError: (error) => writeLog("renderer", "fatal renderer error", { ...error }, "error"),
