@@ -38,13 +38,13 @@ import { MOTD_KEY } from "./store-keys"
 import { updateServer } from "./update-server"
 import { safeWebContentsURL } from "./window-state"
 import {
+  createMainWindow,
   getLastFocusedWindow,
   registerRendererProtocol,
   setRelaunchHandler,
   setAppQuitting,
   setBackgroundColor,
   setDockIcon,
-  restoreMainWindows,
 } from "./windows"
 import { createWslServersController } from "./wsl/servers"
 import { registerWslIpcHandlers } from "./wsl/ipc"
@@ -420,8 +420,8 @@ const main = Effect.gen(function* () {
 
   yield* Fiber.await(loadingTask)
 
-  const windows = restoreMainWindows()
-  if (windows.length) {
+  const mainWindow = createMainWindow()
+  if (mainWindow) {
     createMenu({
       trigger: (id) => {
         const win = getLastFocusedWindow()
