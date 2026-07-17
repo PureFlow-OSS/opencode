@@ -1,26 +1,22 @@
 import {
   DialogConnectProvider,
   ServerConnection,
-  useLayout,
   useProviderConnectController,
   useProviders,
   useServer,
-  useServerSDK,
-  useServerSync,
+  useSettings,
   useTabs,
 } from "@opencode-ai/app"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { onMount, startTransition } from "solid-js"
+import { onMount } from "solid-js"
 
 export function DesktopFirstLaunchOnboarding(props: { initialUrl: string; onLoaded: () => void }) {
   const server = useServer()
-  const serverSDK = useServerSDK()
-  const serverSync = useServerSync()
-  const layout = useLayout()
-  const providers = useProviders()
+  const settings = useSettings()
   const tabs = useTabs()
   const dialog = useDialog()
   const providerConnect = useProviderConnectController()
+  const providers = useProviders()
 
   onMount(() => {
     void runFirstLaunchOnboarding().finally(props.onLoaded)
@@ -29,39 +25,26 @@ export function DesktopFirstLaunchOnboarding(props: { initialUrl: string; onLoad
   async function runFirstLaunchOnboarding() {
     try {
       await Promise.all(
-        [server.ready.promise, layout.ready.promise, tabs.ready.promise, tabs.recentReady.promise].map(
-          (p) => p ?? Promise.resolve(),
-        ),
+        [server.ready.promise, tabs.ready.promise, tabs.recentReady.promise].map((p) => p ?? Promise.resolve()),
       )
+      const existingInstall = await window.api.isOldLayoutEligible()
+      settings.general.setOldLayoutEligible(existingInstall)
       if (!server.isLocal()) return
 
       const pending = await window.api.isFirstLaunchOnboardingPending()
       if (!pending) return
 
-      const sessions = await serverSDK()
-        .client.session.list()
-        .then((x) => x.data ?? [])
-        .catch(() => undefined)
-      const connectedProviders = providers.connected()
-      const paidProviders = providers.paid()
-      const persistedProjects = layout.projects.list()
       const shouldTrigger =
+        !existingInstall &&
         props.initialUrl === "/" &&
-        sessions?.length === 0 &&
-        paidProviders.length === 0 &&
-        persistedProjects.length === 0 &&
         tabs.store.length === 0 &&
         server.list.every(ServerConnection.builtin)
 
       console.info("[desktop-onboarding] first launch onboarding evaluated", {
         pending,
         shouldTrigger,
+        existingInstall,
         initialUrl: props.initialUrl,
-        sessions: sessions?.length,
-        connectedProviders: connectedProviders.length,
-        paidProviders: paidProviders.length,
-        serverProjects: serverSync().data.project.length,
-        persistedProjects: persistedProjects.length,
         tabs: tabs.store.length,
         servers: server.list.map(ServerConnection.key),
       })
@@ -72,10 +55,8 @@ export function DesktopFirstLaunchOnboarding(props: { initialUrl: string; onLoad
       console.info("[desktop-onboarding] starting first launch draft", { directory })
       server.projects.open(directory)
       server.projects.touch(directory)
-      await startTransition(() => {
-        tabs.newDraft({ server: server.key, directory })
-      })
-      if (connectedProviders.some((provider) => provider.id === "aifactory")) return
+      tabs.select(await tabs.newDraft({ server: server.key, directory }))
+      if (providers.connected().some((provider) => provider.id === "aifactory")) return
 
       providerConnect.select("aifactory")
       dialog.show(() => <DialogConnectProvider controller={providerConnect} />)

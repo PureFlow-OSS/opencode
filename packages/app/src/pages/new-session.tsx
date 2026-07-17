@@ -3,6 +3,7 @@ import { createStore } from "solid-js/store"
 import { Portal } from "solid-js/web"
 import { useSearchParams } from "@solidjs/router"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { NewSessionDesignView } from "@/components/session"
@@ -28,7 +29,7 @@ import { PromptWorkspaceSelector } from "@/components/prompt-workspace-selector"
 import { useTitlebarRightMount } from "@/components/titlebar"
 import { useCommand } from "@/context/command"
 import { useProviders } from "@/hooks/use-providers"
-import { useSettingsDialog } from "@/components/settings-dialog"
+import { useSettingsCommand } from "@/components/settings-dialog"
 import { Persist, persisted } from "@/utils/persist"
 import createPresence from "solid-presence"
 import { useLocal } from "@/context/local"
@@ -51,9 +52,15 @@ export default function NewSessionPage() {
   const comments = useComments()
   const language = useLanguage()
   const settings = useSettings()
+  const dialog = useDialog()
   const command = useCommand()
   const providers = useProviders(() => sdk().directory)
-  const openProviderSettings = useSettingsDialog("providers")
+  const openProviders = () => {
+    void import("@/components/dialog-connect-provider").then(({ DialogConnectProvider }) => {
+      void dialog.show(() => <DialogConnectProvider directory={() => sdk().directory} />)
+    })
+  }
+  useSettingsCommand()
   const route = useSessionKey()
   const [searchParams, setSearchParams] = useSearchParams<{ draftId?: string; prompt?: string }>()
   const local = useLocal()
@@ -76,6 +83,15 @@ export default function NewSessionPage() {
   })
 
   command.register("new-session", () => [
+    {
+      id: "command.palette",
+      title: language.t("command.palette"),
+      hidden: true,
+      onSelect: async () => {
+        const { DialogSelectFile } = await import("@/components/dialog-select-file")
+        void dialog.show(() => <DialogSelectFile />)
+      },
+    },
     {
       id: "input.focus",
       title: language.t("command.input.focus"),
@@ -204,7 +220,7 @@ export default function NewSessionPage() {
             <ProviderTip
               ready={() => serverSync().child(sdk().directory)[0].provider_ready}
               connected={() => providers.paid().length > 0}
-              openProviders={openProviderSettings}
+              openProviders={openProviders}
             />
           </div>
         </div>
