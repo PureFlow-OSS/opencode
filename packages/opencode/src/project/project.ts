@@ -1,5 +1,5 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { and, eq, sql } from "drizzle-orm"
+import { and, eq, inArray, sql } from "drizzle-orm"
 import { Database } from "@opencode-ai/core/database/database"
 import { ProjectDirectoryTable, ProjectTable } from "@opencode-ai/core/project/sql"
 import { ProjectDirectories } from "@opencode-ai/core/project/directories"
@@ -31,6 +31,15 @@ export const Event = {
 }
 
 type Row = typeof ProjectTable.$inferSelect
+
+function decodedDirectory(directory: string) {
+  try {
+    const decoded = decodeURIComponent(directory)
+    return decoded === directory ? undefined : decoded
+  } catch {
+    return undefined
+  }
+}
 
 export function fromRow(row: Row): Info {
   const icon =
@@ -289,10 +298,13 @@ const layer = Layer.effect(
         .pipe(Effect.orDie)
 
       if (projectID !== ProjectV2.ID.global) {
+        const decoded = decodedDirectory(data.directory)
+        const directories =
+          decoded && !(yield* fs.exists(decoded).pipe(Effect.orDie)) ? [data.directory, decoded] : [data.directory]
         yield* db
           .update(SessionTable)
-          .set({ project_id: projectID })
-          .where(and(eq(SessionTable.project_id, ProjectV2.ID.global), eq(SessionTable.directory, data.directory)))
+          .set({ project_id: projectID, directory: data.directory, time_updated: sql`${SessionTable.time_updated}` })
+          .where(and(eq(SessionTable.project_id, ProjectV2.ID.global), inArray(SessionTable.directory, directories)))
           .run()
           .pipe(Effect.orDie)
       }

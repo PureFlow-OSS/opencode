@@ -8,6 +8,8 @@ import { AbsolutePath } from "@opencode-ai/core/schema"
 import { ProjectV2 } from "@opencode-ai/core/project"
 import { SessionID } from "../../src/session/schema"
 import { $ } from "bun"
+import { mkdir } from "node:fs/promises"
+import path from "node:path"
 import { tmpdirScoped } from "../fixture/fixture"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
@@ -140,6 +142,37 @@ describe("migrateFromGlobal", () => {
       )
       expect(row).toBeDefined()
       expect(row!.project_id).toBe(ProjectV2.ID.global)
+    }),
+  )
+
+  it.live("migrates sessions saved under a decoded legacy directory", () =>
+    Effect.gen(function* () {
+      const tmp = yield* tmpdirScoped()
+      const encoded = path.join(tmp, "iSign%20Abl%C3%B6se")
+      const decoded = decodeURIComponent(encoded)
+      yield* Effect.promise(() => mkdir(encoded))
+      yield* Effect.promise(() => $`git init`.cwd(encoded).quiet())
+      yield* Effect.promise(() => $`git config user.name "Test"`.cwd(encoded).quiet())
+      yield* Effect.promise(() => $`git config user.email "test@opencode.test"`.cwd(encoded).quiet())
+      yield* Effect.promise(() => $`git config commit.gpgsign false`.cwd(encoded).quiet())
+      yield* Effect.promise(() => $`git commit --allow-empty -m "root"`.cwd(encoded).quiet())
+
+      const projects = yield* Project.Service
+      const { project } = yield* projects.fromDirectory(encoded)
+      expect(project.id).not.toBe(ProjectV2.ID.global)
+
+      yield* ensureGlobal()
+      const id = legacySessionID()
+      yield* seed({ id, dir: decoded, project: ProjectV2.ID.global })
+
+      yield* projects.fromDirectory(encoded)
+
+      const row = yield* Database.Service.use(({ db }) =>
+        db.select().from(SessionTable).where(eq(SessionTable.id, id)).get().pipe(Effect.orDie),
+      )
+      expect(row).toBeDefined()
+      expect(row!.project_id).toBe(project.id)
+      expect(row!.directory).toBe(encoded)
     }),
   )
 
