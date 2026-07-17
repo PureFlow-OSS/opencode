@@ -90,6 +90,13 @@ describe("session.system", () => {
     )
   })
 
+  test("instructs default models to list all tools and rename clear sessions", () => {
+    const prompt = SystemPrompt.provider({ api: { id: "qwen3-coder" } } as Provider.Model)[0]
+
+    expect(prompt).toContain("list every tool exposed in the current tool definitions")
+    expect(prompt).toContain("proactively call `session_rename` once")
+  })
+
   it.effect("skills output is sorted by name and stable across calls", () =>
     Effect.gen(function* () {
       const prompt = yield* SystemPrompt.Service
