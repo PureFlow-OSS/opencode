@@ -5,6 +5,7 @@ import type { PermissionRequest } from "@opencode-ai/sdk/v2/client"
 import { Persist, persisted } from "@/utils/persist"
 import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "./server-sync"
+import { useSettings } from "./settings"
 import { useParams } from "@solidjs/router"
 import { decode64 } from "@/utils/base64"
 import {
@@ -51,6 +52,7 @@ export const { use: usePermission, provider: PermissionProvider } = createSimple
     const params = useParams()
     const serverSDK = useServerSDK()
     const serverSync = useServerSync()
+    const settings = useSettings()
 
     const permissionsEnabled = createMemo(() => {
       const directory = props.directory?.() ?? decode64(params.dir)
@@ -151,6 +153,7 @@ export const { use: usePermission, provider: PermissionProvider } = createSimple
     }
 
     function shouldAutoRespond(permission: PermissionRequest, directory?: string) {
+      if (settings.permissions.autoApprove()) return true
       const session = directory ? serverSync().child(directory, { bootstrap: false })[0].session : []
       return autoRespondsPermission(store.autoAccept, session, permission, directory)
     }
@@ -161,6 +164,20 @@ export const { use: usePermission, provider: PermissionProvider } = createSimple
       enableVersion.set(key, next)
       return next
     }
+
+    createEffect(() => {
+      if (!settings.permissions.autoApprove()) return
+      serverSDK()
+        .client.permission.list()
+        .then((x) => {
+          if (!settings.permissions.autoApprove()) return
+          for (const perm of x.data ?? []) {
+            if (!perm?.id) continue
+            respondOnce(perm)
+          }
+        })
+        .catch(() => undefined)
+    })
 
     const unsubscribe = serverSDK().event.listen((e) => {
       const event = e.details

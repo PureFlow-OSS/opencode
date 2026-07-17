@@ -165,6 +165,8 @@ export const dict: Record<string, string> = {
 
   "ui.permission.deny": "Deny",
   "ui.permission.allowAlways": "Allow always",
+  "ui.permission.rememberAllow": "Yes, don't ask again",
+  "ui.permission.fullAccess": "Allow full access",
   "ui.permission.allowOnce": "Allow once",
 
   "ui.message.expand": "Expand message",

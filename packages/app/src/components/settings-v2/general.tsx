@@ -7,7 +7,6 @@ import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
 import { useTheme, type ColorScheme } from "@opencode-ai/ui/theme/context"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useLanguage } from "@/context/language"
-import { usePermission } from "@/context/permission"
 import { usePlatform } from "@/context/platform"
 import { useServerSync } from "@/context/server-sync"
 import { useServerSDK } from "@/context/server-sdk"
@@ -80,12 +79,9 @@ const playDemoSound = (id: string | undefined) => {
   }, 100)
 }
 
-export const SettingsGeneralV2: Component<{
-  sessionID?: string
-}> = (props) => {
+export const SettingsGeneralV2: Component = () => {
   const theme = useTheme()
   const language = useLanguage()
-  const permission = usePermission()
   const platform = usePlatform()
   const dialog = useDialog()
   const settings = useSettings()
@@ -96,26 +92,8 @@ export const SettingsGeneralV2: Component<{
   const updater = useUpdaterAction()
   const checkUpdate = useUpdaterCheck()
 
-  const dir = createMemo(() => {
-    if (!props.sessionID) return undefined
-    return serverSync().session.lineage.peek(props.sessionID)?.session.directory
-  })
-  const accepting = createMemo(() => {
-    const value = dir()
-    if (!value || !props.sessionID) return false
-    return permission.isAutoAccepting(props.sessionID, value)
-  })
-
   const toggleAccept = (checked: boolean) => {
-    const value = dir()
-    if (!value || !props.sessionID) return
-
-    if (checked) {
-      permission.enableAutoAccept(props.sessionID, value)
-      return
-    }
-
-    permission.disableAutoAccept(props.sessionID, value)
+    settings.permissions.setAutoApprove(checked)
   }
   const desktop = createMemo(() => platform.platform === "desktop")
 
@@ -254,11 +232,11 @@ export const SettingsGeneralV2: Component<{
         </SettingsRowV2>
 
         <SettingsRowV2
-          title={language.t("command.permissions.autoaccept.enable")}
+          title={language.t("ui.permission.fullAccess")}
           description={language.t("toast.permissions.autoaccept.on.description")}
         >
           <div data-action="settings-auto-accept-permissions">
-            <Switch checked={accepting()} disabled={!dir()} onChange={toggleAccept} />
+            <Switch checked={settings.permissions.autoApprove()} onChange={toggleAccept} />
           </div>
         </SettingsRowV2>
 
