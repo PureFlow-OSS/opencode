@@ -475,6 +475,11 @@ export const layer = Layer.effect(
         const providerConfig = yield* Effect.promise(() =>
           ConfigManaged.readProviderConfig(fetch, ConfigManaged.providerConfigRequestInit({ config: result, auth })),
         )
+        const defaultModel = ConfigManaged.aiFactoryModel(providerConfig.model)
+        const defaultSmallModel = ConfigManaged.aiFactoryModel(providerConfig.small_model)
+        if (!result.model && defaultModel) yield* merge(ConfigManaged.providerConfigUrl(), { model: defaultModel }, "global")
+        if (!result.small_model && defaultSmallModel)
+          yield* merge(ConfigManaged.providerConfigUrl(), { small_model: defaultSmallModel }, "global")
         managedMcp = ConfigManaged.mcp(providerConfig)
         const missingManagedMcp = Object.fromEntries(
           Object.entries(managedMcp)

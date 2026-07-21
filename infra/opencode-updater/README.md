@@ -62,8 +62,8 @@ Important behavior:
 
 - `appsettings.json` stays the stable config
 - `appsettings.beta.json` is only used for requests that match beta rollout
-- for beta requests, `Updater` values from `appsettings.beta.json` override stable values
-- if `Updater.PublicBaseUrl` is missing in `appsettings.beta.json`, beta falls back to the stable `Updater.PublicBaseUrl`
+- for beta requests, values in `appsettings.beta.json` override the matching stable values recursively; values not defined there fall back to `appsettings.json`
+- this includes `Updater.ProviderConfig`, so beta can override individual model settings without copying the stable configuration
 - if `feed/beta/latest.yml` exists, beta users get that version first
 - if `feed/beta/latest.yml` does not exist, beta users fall back to `appsettings.beta.json -> Updater.Version`
 - if `UpdaterBeta.LiteLLM.ApiKey` is set, updater calls LiteLLM with that management key in `x-litellm-api-key` and passes the user key as `?key=<user-key>`
@@ -305,6 +305,8 @@ If `Updater.Motd` is not configured, the server defaults to `RRZ AI Factory`. Se
 ## Model cards
 
 `/opencode/modelcards.json` returns a consolidated model-card payload for the currently active rollout.
+
+The **Model Status** page in the admin UI can edit a model's context, output, temperature, thinking, and modalities. Saving creates or updates an exact model rule in the selected `appsettings.json` or `appsettings.beta.json`. For beta, **Use stable fallback** removes that exact beta rule so the stable setting applies again.
 
 The response includes:
 

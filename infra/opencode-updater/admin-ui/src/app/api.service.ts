@@ -39,6 +39,7 @@ type ModelCard = {
   output?: number | null
   temperature?: boolean | null
   reasoning?: boolean | null
+  visible?: boolean | null
   price?: { input?: number | null; output?: number | null } | null
   modalities?: { input?: string[]; output?: string[] } | null
   source?: string
@@ -75,6 +76,16 @@ type ModelCardsResponse = {
     models?: ModelCard[]
     model_visibility?: Array<{ pattern?: string | null; visible?: boolean | null }>
   } | null
+}
+
+export type ModelSettings = {
+  context?: number | null
+  output?: number | null
+  temperature?: boolean | null
+  reasoning?: boolean | null
+  visible?: boolean | null
+  input_modalities?: string[]
+  output_modalities?: string[]
 }
 
 type ReleaseStatus = {
@@ -160,8 +171,22 @@ export class ApiService {
     })
   }
 
-  async listModelCards() {
-    return this.readJson<ModelCardsResponse>(await fetch("/opencode/modelcards.json"))
+  async listModelCards(channel: "stable" | "beta" = "stable") {
+    return this.readJson<ModelCardsResponse>(await fetch(`/opencode/admin/modelcards?channel=${channel}`, { cache: "no-store" }))
+  }
+
+  async saveModelSettings(model: string, channel: "stable" | "beta", settings: ModelSettings) {
+    return this.readJson<ModelSettings>(await fetch(`/opencode/admin/model-settings?channel=${channel}&model=${encodeURIComponent(model)}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(settings),
+    }))
+  }
+
+  async resetModelSettings(model: string, channel: "stable" | "beta") {
+    const response = await fetch(`/opencode/admin/model-settings?channel=${channel}&model=${encodeURIComponent(model)}`, { method: "DELETE" })
+    if (response.status === 404) throw new Error(`No exact ${channel} override exists for ${model}`)
+    if (!response.ok) throw new Error(await response.text())
   }
 }
 

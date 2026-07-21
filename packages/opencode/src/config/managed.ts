@@ -78,6 +78,11 @@ export function providerConfigPayload(payload: unknown): Record<string, unknown>
       : payload
 }
 
+export function aiFactoryModel(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return
+  return value.startsWith("aifactory/") ? value : `aifactory/${value.trim()}`
+}
+
 export function mcp(payload: Record<string, unknown>): Record<string, Mcp> {
   if (!isRecord(payload.mcp)) return {}
   return Object.fromEntries(

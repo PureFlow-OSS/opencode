@@ -2,11 +2,13 @@ import { Effect, Schema } from "effect"
 import { HttpClient } from "effect/unstable/http"
 import { Config } from "@/config/config"
 import * as Tool from "./tool"
+import * as McpExa from "./mcp-exa"
 import * as McpWebSearch from "./mcp-websearch"
 import DESCRIPTION from "./websearch.txt"
-import { checksum } from "@opencode-ai/core/util/encode"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+
+const envProxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.https_proxy || process.env.http_proxy
 
 export const Parameters = Schema.Struct({
   query: Schema.String.annotate({ description: "Websearch query" }),
@@ -33,8 +35,7 @@ export function selectWebSearchProvider(sessionID: string, flags = { exa: false,
   if (override === "exa" || override === "parallel") return override
   if (flags.parallel) return "parallel"
   if (flags.exa) return "exa"
-
-  return Number.parseInt(checksum(sessionID) ?? "0", 36) % 2 === 0 ? "exa" : "parallel"
+  return "exa"
 }
 
 export function webSearchProviderLabel(provider: unknown) {
@@ -79,14 +80,14 @@ function callProvider(
       },
       "25 seconds",
       parallelAuthHeaders(),
+      proxy,
     )
   }
 
-  return McpWebSearch.call(
+  return McpExa.call(
     http,
-    McpWebSearch.EXA_URL,
     "web_search_exa",
-    McpWebSearch.SearchArgs,
+    McpExa.SearchArgs,
     {
       query: params.query,
       type: params.type || "auto",
@@ -95,7 +96,7 @@ function callProvider(
       contextMaxCharacters: params.contextMaxCharacters,
     },
     "25 seconds",
-    proxy ? { "X-Proxy": proxy } : undefined,
+    proxy,
   )
 }
 
@@ -134,7 +135,9 @@ export const WebSearchTool = Tool.define(
             },
           })
 
-          const result = yield* callProvider(http, provider, params, ctx, (yield* config.get()).http_proxy)
+          const settings = yield* config.get()
+          const proxy = settings.use_http_proxy === false ? undefined : settings.http_proxy ?? envProxy
+          const result = yield* callProvider(http, provider, params, ctx, proxy)
 
           return {
             output: result ?? "No search results found. Please try a different query.",

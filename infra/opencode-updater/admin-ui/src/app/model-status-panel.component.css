@@ -14,6 +14,52 @@
   margin: 0;
 }
 
+.header-row p {
+  margin: 6px 0 0;
+  color: rgba(242, 244, 248, 0.65);
+}
+
+.header-actions,
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+select,
+input {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  padding: 8px 10px;
+}
+
+select option {
+  background: #10151f;
+  color: #f2f4f8;
+}
+
+button.secondary {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.error-state {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: #ffb4ab;
+  background: rgba(186, 26, 26, 0.18);
+}
+
+.success-state {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: #9be8ba;
+  background: rgba(36, 134, 79, 0.2);
+}
+
 .count-pill {
   flex: 0 0 auto;
   padding: 8px 12px;
@@ -84,6 +130,36 @@
   margin-top: 16px;
 }
 
+.settings-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.settings-form label {
+  display: grid;
+  gap: 6px;
+  color: rgba(242, 244, 248, 0.82);
+  font-size: 13px;
+}
+
+.settings-form label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+}
+
+.settings-form input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+}
+
+.form-actions {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+
 .meta-item {
   min-width: 0;
 }
@@ -114,5 +190,9 @@
   .header-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .settings-form {
+    grid-template-columns: 1fr;
   }
 }
