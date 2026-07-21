@@ -33,7 +33,7 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderError } from "./error"
 import { readProviderConfig } from "@/config/managed"
 
-const OPENAI_HEADER_TIMEOUT_DEFAULT = 10_000
+const OPENAI_HEADER_TIMEOUT_DEFAULT = 300_000
 const AIFACTORY_ID = ProviderV2.ID.make("aifactory")
 const AIFACTORY_BASE_URL = "http://10.53.7.23/v1"
 const AIFACTORY_BYPASS = new URL(AIFACTORY_BASE_URL).host
