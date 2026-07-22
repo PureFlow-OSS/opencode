@@ -124,6 +124,17 @@ describe("tool.read external_directory permission", () => {
     }),
   )
 
+  it.live("decodes Windows-1252 files", () =>
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped()
+      const filePath = path.join(dir, "legacy.txt")
+      yield* put(filePath, Buffer.from("Äpfel, Grüße", "latin1"))
+
+      const result = yield* exec(dir, { filePath })
+      expect(result.output).toContain("Äpfel, Grüße")
+    }),
+  )
+
   it.live("asks for external_directory permission when reading absolute path outside project", () =>
     Effect.gen(function* () {
       const outer = yield* tmpdirScoped()

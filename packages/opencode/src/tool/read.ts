@@ -1,5 +1,6 @@
 import { Effect, Option, Schema, Scope } from "effect"
 import { createReadStream } from "fs"
+import { Transform } from "stream"
 import * as path from "path"
 import { createInterface } from "readline"
 import * as Tool from "./tool"
@@ -10,6 +11,7 @@ import { Instance } from "../project/instance"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
 import { isImageAttachment, isPdfAttachment, sniffAttachmentMime } from "@/util/media"
+import * as Bom from "@/util/bom"
 
 const DEFAULT_READ_LIMIT = 2000
 const MAX_LINE_LENGTH = 2000
@@ -244,7 +246,7 @@ export const ReadTool = Tool.define(
       }
 
       const file = yield* Effect.promise(() =>
-        lines(filepath, { limit: params.limit ?? DEFAULT_READ_LIMIT, offset: params.offset ?? 1 }),
+        lines(filepath, Bom.detect(sample), { limit: params.limit ?? DEFAULT_READ_LIMIT, offset: params.offset ?? 1 }),
       )
       if (file.count < file.offset && !(file.count === 0 && file.offset === 1)) {
         return yield* Effect.fail(
@@ -293,8 +295,26 @@ export const ReadTool = Tool.define(
   }),
 )
 
-async function lines(filepath: string, opts: { limit: number; offset: number }) {
-  const stream = createReadStream(filepath, { encoding: "utf8" })
+async function lines(filepath: string, encoding: Bom.Encoding, opts: { limit: number; offset: number }) {
+  const decoder = new TextDecoder(encoding, { fatal: encoding === "utf-8" })
+  const stream = createReadStream(filepath).pipe(
+    new Transform({
+      transform(chunk, _encoding, callback) {
+        try {
+          callback(null, decoder.decode(chunk, { stream: true }))
+        } catch (error) {
+          callback(error instanceof Error ? error : new Error(String(error)))
+        }
+      },
+      flush(callback) {
+        try {
+          callback(null, decoder.decode())
+        } catch (error) {
+          callback(error instanceof Error ? error : new Error(String(error)))
+        }
+      },
+    }),
+  )
   const rl = createInterface({
     input: stream,
     // Note: we use the crlfDelay option to recognize all instances of CR LF

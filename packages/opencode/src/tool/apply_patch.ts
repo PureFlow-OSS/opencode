@@ -63,6 +63,7 @@ export const ApplyPatchTool = Tool.define(
         additions: number
         deletions: number
         bom: boolean
+        encoding: Bom.Encoding
       }> = []
 
       let totalDiff = ""
@@ -95,6 +96,7 @@ export const ApplyPatchTool = Tool.define(
               additions,
               deletions,
               bom: next.bom,
+              encoding: "utf-8",
             })
 
             totalDiff += diff + "\n"
@@ -146,6 +148,7 @@ export const ApplyPatchTool = Tool.define(
               additions,
               deletions,
               bom,
+              encoding: source.encoding,
             })
 
             totalDiff += diff + "\n"
@@ -176,6 +179,7 @@ export const ApplyPatchTool = Tool.define(
               additions: 0,
               deletions,
               bom: source.bom,
+              encoding: source.encoding,
             })
 
             totalDiff += deleteDiff + "\n"
@@ -217,12 +221,12 @@ export const ApplyPatchTool = Tool.define(
           case "add":
             // Create parent directories (recursive: true is safe on existing/root dirs)
 
-            yield* afs.writeWithDirs(change.filePath, Bom.join(change.newContent, change.bom))
+            yield* Bom.writeFile(afs, change.filePath, change.newContent, change.bom, change.encoding)
             updates.push({ file: change.filePath, event: "add" })
             break
 
           case "update":
-            yield* afs.writeWithDirs(change.filePath, Bom.join(change.newContent, change.bom))
+            yield* Bom.writeFile(afs, change.filePath, change.newContent, change.bom, change.encoding)
             updates.push({ file: change.filePath, event: "change" })
             break
 
@@ -230,7 +234,7 @@ export const ApplyPatchTool = Tool.define(
             if (change.movePath) {
               // Create parent directories (recursive: true is safe on existing/root dirs)
 
-              yield* afs.writeWithDirs(change.movePath!, Bom.join(change.newContent, change.bom))
+              yield* Bom.writeFile(afs, change.movePath!, change.newContent, change.bom, change.encoding)
               yield* afs.remove(change.filePath)
               updates.push({ file: change.filePath, event: "unlink" })
               updates.push({ file: change.movePath, event: "add" })
@@ -244,8 +248,8 @@ export const ApplyPatchTool = Tool.define(
         }
 
         if (edited) {
-          if (yield* format.file(edited)) {
-            yield* Bom.syncFile(afs, edited, change.bom)
+          if (change.encoding === "utf-8" && (yield* format.file(edited))) {
+            yield* Bom.syncFile(afs, edited, change.bom, change.encoding)
           }
           yield* bus.publish(File.Event.Edited, { file: edited })
         }

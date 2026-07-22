@@ -88,7 +88,9 @@ export const EditTool = Tool.define(
             Effect.gen(function* () {
               if (params.oldString === "") {
                 const existed = yield* afs.existsSafe(filePath)
-                const source = existed ? yield* Bom.readFile(afs, filePath) : { bom: false, text: "" }
+                const source = existed
+                  ? yield* Bom.readFile(afs, filePath)
+                  : { bom: false, text: "", encoding: "utf-8" as const }
                 const next = Bom.split(params.newString)
                 const desiredBom = source.bom || next.bom
                 contentOld = source.text
@@ -103,9 +105,9 @@ export const EditTool = Tool.define(
                     diff,
                   },
                 })
-                yield* afs.writeWithDirs(filePath, Bom.join(contentNew, desiredBom))
-                if (yield* format.file(filePath)) {
-                  contentNew = yield* Bom.syncFile(afs, filePath, desiredBom)
+                yield* Bom.writeFile(afs, filePath, contentNew, desiredBom, source.encoding)
+                if (source.encoding === "utf-8" && (yield* format.file(filePath))) {
+                  contentNew = yield* Bom.syncFile(afs, filePath, desiredBom, source.encoding)
                 }
                 yield* bus.publish(File.Event.Edited, { file: filePath })
                 yield* bus.publish(FileWatcher.Event.Updated, {
@@ -147,9 +149,9 @@ export const EditTool = Tool.define(
                 },
               })
 
-              yield* afs.writeWithDirs(filePath, Bom.join(contentNew, desiredBom))
-              if (yield* format.file(filePath)) {
-                contentNew = yield* Bom.syncFile(afs, filePath, desiredBom)
+              yield* Bom.writeFile(afs, filePath, contentNew, desiredBom, source.encoding)
+              if (source.encoding === "utf-8" && (yield* format.file(filePath))) {
+                contentNew = yield* Bom.syncFile(afs, filePath, desiredBom, source.encoding)
               }
               yield* bus.publish(File.Event.Edited, { file: filePath })
               yield* bus.publish(FileWatcher.Event.Updated, {

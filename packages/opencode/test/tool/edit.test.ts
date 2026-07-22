@@ -320,7 +320,7 @@ describe("tool.edit", () => {
       })
     })
 
-    test("refuses to edit non-UTF-8 files without changing their bytes", async () => {
+    test("edits Windows-1252 files without changing their encoding", async () => {
       await using tmp = await tmpdir()
       const filepath = path.join(tmp.path, "legacy.txt")
       const original = Buffer.from([0x47, 0x72, 0xfc, 0xdf, 0x65])
@@ -330,19 +330,17 @@ describe("tool.edit", () => {
         directory: tmp.path,
         fn: async () => {
           const edit = await resolve()
-          await expect(
-            Effect.runPromise(
-              edit.execute(
-                {
-                  filePath: filepath,
-                  oldString: "Grüße",
-                  newString: "Hallo",
-                },
-                ctx,
-              ),
+          await Effect.runPromise(
+            edit.execute(
+              {
+                filePath: filepath,
+                oldString: "Grüße",
+                newString: "Hallo",
+              },
+              ctx,
             ),
-          ).rejects.toThrow()
-          expect(await fs.readFile(filepath)).toEqual(original)
+          )
+          expect(await fs.readFile(filepath)).toEqual(Buffer.from("Hallo", "latin1"))
         },
       })
     })
