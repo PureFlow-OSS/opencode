@@ -112,6 +112,18 @@ describe("tool.write", () => {
       }),
     )
 
+    it.instance("preserves Windows-1252 when overwriting existing files", () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const filepath = path.join(test.directory, "existing.txt")
+        yield* Effect.promise(() => fs.writeFile(filepath, Buffer.from("Grüße", "latin1")))
+
+        yield* run({ filePath: filepath, content: "München" })
+
+        expect(yield* Effect.promise(() => fs.readFile(filepath))).toEqual(Buffer.from("München", "latin1"))
+      }),
+    )
+
     it.instance("preserves BOM when overwriting existing files", () =>
       Effect.gen(function* () {
         const test = yield* TestInstance

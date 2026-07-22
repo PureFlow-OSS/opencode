@@ -108,9 +108,9 @@ export const EditTool = Tool.define(
                     diff,
                   },
                 })
-                yield* afs.writeWithDirs(filePath, Bom.join(contentNew, desiredBom))
+                yield* Bom.writeFile(afs, filePath, contentNew, desiredBom, "utf-8")
                 if (yield* format.file(filePath)) {
-                  contentNew = yield* Bom.syncFile(afs, filePath, desiredBom)
+                  contentNew = yield* Bom.syncFile(afs, filePath, desiredBom, "utf-8")
                 }
                 yield* events.publish(FileSystem.Event.Edited, { file: filePath })
                 yield* events.publish(Watcher.Event.Updated, {
@@ -152,9 +152,9 @@ export const EditTool = Tool.define(
                 },
               })
 
-              yield* afs.writeWithDirs(filePath, Bom.join(contentNew, desiredBom))
-              if (yield* format.file(filePath)) {
-                contentNew = yield* Bom.syncFile(afs, filePath, desiredBom)
+              yield* Bom.writeFile(afs, filePath, contentNew, desiredBom, source.encoding)
+              if (source.encoding === "utf-8" && (yield* format.file(filePath))) {
+                contentNew = yield* Bom.syncFile(afs, filePath, desiredBom, source.encoding)
               }
               yield* events.publish(FileSystem.Event.Edited, { file: filePath })
               yield* events.publish(Watcher.Event.Updated, {

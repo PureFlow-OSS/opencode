@@ -9,6 +9,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
 import { isPdfAttachment, sniffAttachmentMime } from "@/util/media"
+import * as Bom from "@/util/bom"
 
 const DEFAULT_READ_LIMIT = 2000
 const MAX_LINE_LENGTH = 2000
@@ -134,7 +135,11 @@ export const ReadTool = Tool.define<
       )
     })
 
-    const lines = Effect.fn("ReadTool.lines")(function* (filepath: string, opts: { limit: number; offset: number }) {
+    const lines = Effect.fn("ReadTool.lines")(function* (
+      filepath: string,
+      encoding: Bom.Encoding,
+      opts: { limit: number; offset: number },
+    ) {
       const start = opts.offset - 1
       const raw: string[] = []
       const flags = { bytes: 0, count: 0, cut: false, more: false, done: false }
@@ -144,7 +149,7 @@ export const ReadTool = Tool.define<
       // avoid Stream.runForEachWhile (it currently swallows the final unterminated
       // line of the upstream splitLines pipeline) and use a tagged error to stop the
       // upstream file stream as soon as the byte cap is reached.
-      const decoder = new TextDecoder("utf-8")
+      const decoder = new TextDecoder(encoding, { fatal: encoding === "utf-8" })
       yield* fs.stream(filepath).pipe(
         Stream.map((bytes) => decoder.decode(bytes, { stream: true })),
         Stream.splitLines,
@@ -328,7 +333,10 @@ export const ReadTool = Tool.define<
         return yield* Effect.fail(new Error(`Cannot read binary file: ${filepath}`))
       }
 
-      const file = yield* lines(filepath, { limit: params.limit ?? DEFAULT_READ_LIMIT, offset: params.offset || 1 })
+      const file = yield* lines(filepath, Bom.detect(sample), {
+        limit: params.limit ?? DEFAULT_READ_LIMIT,
+        offset: params.offset || 1,
+      })
       if (file.count < file.offset && !(file.count === 0 && file.offset === 1)) {
         return yield* Effect.fail(
           new Error(`Offset ${file.offset} is out of range for this file (${file.count} lines)`),

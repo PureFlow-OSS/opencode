@@ -220,6 +220,18 @@ describe("tool.edit", () => {
       }),
     )
 
+    it.instance("edits Windows-1252 files without changing their encoding", () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const filepath = path.join(test.directory, "legacy.txt")
+        yield* Effect.promise(() => fs.writeFile(filepath, Buffer.from("Grüße", "latin1")))
+
+        yield* run({ filePath: filepath, oldString: "Grüße", newString: "Hallo" })
+
+        expect(yield* Effect.promise(() => fs.readFile(filepath))).toEqual(Buffer.from("Hallo", "latin1"))
+      }),
+    )
+
     it.instance("rejects loose block-anchor matches and leaves content unchanged", () =>
       Effect.gen(function* () {
         const test = yield* TestInstance
