@@ -1,5 +1,6 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import os from "os"
+import * as http from "node:http"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import fuzzysort from "fuzzysort"
 import { Config } from "@/config/config"
@@ -31,12 +32,11 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { ModelStatus } from "./model-status"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderError } from "./error"
-import { readProviderConfig } from "@/config/managed"
+import { PROVIDER_CONFIG_AIFACTORY_API_KEY_HEADER, readProviderConfig, updateBaseUrl } from "@/config/managed"
 
 const OPENAI_HEADER_TIMEOUT_DEFAULT = 10_000
 const AIFACTORY_ID = ProviderV2.ID.make("aifactory")
 const AIFACTORY_BASE_URL = "http://10.53.7.23/v1"
-const AIFACTORY_BYPASS = new URL(AIFACTORY_BASE_URL).host
 const AIFACTORY_CATALOG: ModelsDev.Provider = {
   id: "aifactory",
   name: "RRZ AI Factory",
@@ -46,6 +46,13 @@ const AIFACTORY_CATALOG: ModelsDev.Provider = {
 }
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+type NodeHttpWithEnvProxy = typeof http & { setGlobalProxyFromEnv?: () => void }
+
+function aiFactoryBaseURL(config: Pick<ConfigV1.Info, "aifactory_host">) {
+  const host = (config.aifactory_host?.trim() || AIFACTORY_BASE_URL).replace(/\/+$/, "")
+  if (host.endsWith("/v1")) return host
+  return `${host}/v1`
+}
 
 function mergeNoProxyEntry(value: string | undefined, entry: string) {
   if (!value) return entry
@@ -53,14 +60,17 @@ function mergeNoProxyEntry(value: string | undefined, entry: string) {
   return `${value},${entry}`
 }
 
-function applyProviderProxyConfig(config: ConfigV1.Info) {
-  process.env.NO_PROXY = mergeNoProxyEntry(process.env.NO_PROXY, AIFACTORY_BYPASS)
-  process.env.no_proxy = mergeNoProxyEntry(process.env.no_proxy, AIFACTORY_BYPASS)
-  if (!config.http_proxy) return
-  process.env.HTTP_PROXY = config.http_proxy
-  process.env.HTTPS_PROXY = config.http_proxy
-  process.env.http_proxy = config.http_proxy
-  process.env.https_proxy = config.http_proxy
+async function applyProviderProxyConfig(config: ConfigV1.Info) {
+  const bypass = new URL(aiFactoryBaseURL(config)).host
+  process.env.NO_PROXY = mergeNoProxyEntry(process.env.NO_PROXY, bypass)
+  process.env.no_proxy = mergeNoProxyEntry(process.env.no_proxy, bypass)
+  if (config.use_http_proxy && config.http_proxy) {
+    process.env.HTTP_PROXY = config.http_proxy
+    process.env.HTTPS_PROXY = config.http_proxy
+    process.env.http_proxy = config.http_proxy
+    process.env.https_proxy = config.http_proxy
+  }
+  ;(http as NodeHttpWithEnvProxy).setGlobalProxyFromEnv?.()
 }
 
 function providerFetch(providerID: ProviderV2.ID, proxy: string | undefined, fetchFn: FetchLike = fetch) {
@@ -195,6 +205,11 @@ type AiFactoryRule = {
   output_modalities?: string[]
 }
 
+type AiFactoryVisibilityRule = {
+  pattern: string
+  visible: boolean
+}
+
 function aiFactoryRule(modelID: string, rules: AiFactoryRule[] | undefined) {
   const rule = rules?.find((item) => {
     const pattern = item.pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
@@ -210,25 +225,90 @@ function aiFactoryRule(modelID: string, rules: AiFactoryRule[] | undefined) {
   }
 }
 
+function aiFactoryVisible(modelID: string, rules: AiFactoryVisibilityRule[], defaults: string[]) {
+  if (defaults.includes(modelID)) return true
+  const rule = rules.filter((item) => {
+    const pattern = item.pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
+    return new RegExp(`^${pattern}$`, "i").test(modelID)
+  }).at(-1)
+  if (rule) return rule.visible
+  return !["*embedding*", "all-proxy-models", "all-team-models"].some((pattern) => {
+    const expression = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
+    return new RegExp(`^${expression}$`, "i").test(modelID)
+  })
+}
+
 async function discoverAiFactoryModels(
   token: string,
   baseURL: string,
   rules: AiFactoryRule[] | undefined,
+  visibility: AiFactoryVisibilityRule[],
+  defaults: string[],
   fetchFn: FetchLike = fetch,
 ) {
-  const response = await fetchFn(`${baseURL.replace(/\/$/, "")}/models`, {
+  const url = `${baseURL.replace(/\/$/, "")}/models`
+  console.info("[aifactory] discovering models", { url })
+  const response = await fetchFn(url, {
     headers: {
       Authorization: `Bearer ${token}`,
       "X-OpenCode-AiFactory-Api-Key": token,
     },
     signal: AbortSignal.timeout(5000),
   })
-  if (!response.ok) return {}
+  if (!response.ok) {
+    console.warn("[aifactory] model discovery failed", { url, status: response.status, statusText: response.statusText })
+    return {}
+  }
   const payload = (await response.json()) as { data?: Array<{ id?: string; created?: number | string }> }
-  return Object.fromEntries(
-    (payload.data ?? []).flatMap((item) => {
-      if (!item.id?.trim()) return []
-      const id = item.id.trim()
+  const models = aiFactoryModels(
+    (payload.data ?? []).flatMap((item) => (item.id?.trim() ? [item.id.trim()] : [])),
+    baseURL,
+    rules,
+    visibility,
+    defaults,
+  )
+  console.info("[aifactory] discovered models", { url, count: Object.keys(models).length })
+  return models
+}
+
+async function discoverAiFactoryModelcards(
+  token: string,
+  baseURL: string,
+  rules: AiFactoryRule[] | undefined,
+  visibility: AiFactoryVisibilityRule[],
+  defaults: string[],
+) {
+  const url = `${updateBaseUrl()}/modelcards.json`
+  console.info("[aifactory] using model cards as fallback", { url })
+  const response = await fetch(url, {
+    headers: { [PROVIDER_CONFIG_AIFACTORY_API_KEY_HEADER]: token },
+    signal: AbortSignal.timeout(5000),
+  })
+  if (!response.ok) {
+    console.warn("[aifactory] model card fallback failed", { url, status: response.status, statusText: response.statusText })
+    return {}
+  }
+  const payload = (await response.json()) as { aifactory?: { models?: Array<{ model?: string }> } }
+  const models = aiFactoryModels(
+    (payload.aifactory?.models ?? []).flatMap((item) => (item.model?.trim() ? [item.model.trim()] : [])),
+    baseURL,
+    rules,
+    visibility,
+    defaults,
+  )
+  console.info("[aifactory] discovered models from model cards", { url, count: Object.keys(models).length })
+  return models
+}
+
+function aiFactoryModels(
+  modelIDs: string[],
+  baseURL: string,
+  rules: AiFactoryRule[] | undefined,
+  visibility: AiFactoryVisibilityRule[],
+  defaults: string[],
+) {
+  const models = Object.fromEntries(
+    [...new Set([...modelIDs, ...defaults])].filter((id) => aiFactoryVisible(id, visibility, defaults)).map((id) => {
       const override = aiFactoryRule(id, rules)
       const modality = (value: string) => ({
         text: value === "text",
@@ -237,7 +317,7 @@ async function discoverAiFactoryModels(
         video: value === "video",
         pdf: value === "pdf",
       })
-      return [[id, {
+      return [id, {
         id: ModelV2.ID.make(id),
         providerID: ProviderV2.ID.make("aifactory"),
         api: { id, url: baseURL, npm: "@ai-sdk/openai-compatible" },
@@ -269,11 +349,12 @@ async function discoverAiFactoryModels(
         status: "active",
         options: {},
         headers: {},
-        release_date: typeof item.created === "number" ? new Date(item.created * 1000).toISOString().slice(0, 10) : "",
+        release_date: "",
         variants: {},
-      } satisfies Model] as const]
+      } satisfies Model] as const
     }),
   )
+  return models
 }
 
 function selectAzureLanguageModel(sdk: any, modelID: string, useChat: boolean) {
@@ -1090,9 +1171,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       if (!token) return { autoload: false }
       const baseURL =
         (typeof input.options.baseURL === "string" && input.options.baseURL.trim()) ||
-        configured.aifactory_host?.trim() ||
-        process.env.OPENCODE_AIFACTORY_HOST?.trim() ||
-        AIFACTORY_BASE_URL
+        aiFactoryBaseURL({ aifactory_host: configured.aifactory_host ?? process.env.OPENCODE_AIFACTORY_HOST })
       const config = yield* Effect.promise(() =>
         readProviderConfig(fetch, {
           headers: { "X-OpenCode-AiFactory-Api-Key": token },
@@ -1103,6 +1182,12 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         if (!isRecord(value) || typeof value.pattern !== "string") return []
         return [value as unknown as AiFactoryRule]
       })
+      const rawVisibility = isRecord(config.aifactory) && Array.isArray(config.aifactory.model_visibility) ? config.aifactory.model_visibility : []
+      const visibility = rawVisibility.flatMap((value) => {
+        if (!isRecord(value) || typeof value.pattern !== "string" || typeof value.visible !== "boolean") return []
+        return [value as AiFactoryVisibilityRule]
+      })
+      const defaults = [config.model, config.small_model].flatMap((value) => typeof value === "string" && value.trim() ? [value.trim()] : [])
       return {
         autoload: true,
         async getModel(sdk: any, modelID: string) {
@@ -1110,8 +1195,21 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         },
         async discoverModels() {
           try {
-            return await discoverAiFactoryModels(token, baseURL, rules, providerFetch(AIFACTORY_ID, configured.http_proxy))
-          } catch {
+            const models = await discoverAiFactoryModels(token, baseURL, rules, visibility, defaults, providerFetch(AIFACTORY_ID, configured.http_proxy))
+            if (Object.keys(models).length > 0) return models
+          } catch (error) {
+            console.error("[aifactory] model discovery failed", {
+              url: `${baseURL.replace(/\/$/, "")}/models`,
+              error: error instanceof Error ? error.message : String(error),
+            })
+          }
+          try {
+            return await discoverAiFactoryModelcards(token, baseURL, rules, visibility, defaults)
+          } catch (error) {
+            console.error("[aifactory] model card fallback failed", {
+              url: `${updateBaseUrl()}/modelcards.json`,
+              error: error instanceof Error ? error.message : String(error),
+            })
             return {}
           }
         },
@@ -1499,7 +1597,7 @@ const layer = Layer.effect(
       Effect.gen(function* () {
         const bridge = yield* EffectBridge.make()
         const cfg = yield* config.get()
-        applyProviderProxyConfig(cfg)
+        yield* Effect.promise(() => applyProviderProxyConfig(cfg))
         const modelsDev = yield* modelsDevSvc.get()
         const catalogSource = modelsDev.aifactory ? modelsDev : { ...modelsDev, aifactory: AIFACTORY_CATALOG }
         const catalog = mapValues(catalogSource, fromModelsDevProvider)

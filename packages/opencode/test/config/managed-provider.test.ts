@@ -55,6 +55,12 @@ test("providerConfigPayload accepts lower camel updater payload", () => {
   })
 })
 
+test("aiFactoryModel turns an AI Factory model ID into an OpenCode model reference", () => {
+  expect(ConfigManaged.aiFactoryModel("Qwen/Qwen3.6")).toBe("aifactory/Qwen/Qwen3.6")
+  expect(ConfigManaged.aiFactoryModel("aifactory/Qwen/Qwen3.6")).toBe("aifactory/Qwen/Qwen3.6")
+  expect(ConfigManaged.aiFactoryModel(undefined)).toBeUndefined()
+})
+
 test("mcp keeps executable config and PAT metadata separate", () => {
   expect(
     ConfigManaged.mcp({

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json.Serialization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Sqlite;
@@ -67,6 +68,7 @@ builder.Services.AddDbContext<FeedbackContext>(options =>
 });
 builder.Services.AddSingleton<FeedbackKeyResolver>();
 builder.Services.AddSingleton<UpdaterAdminStore>();
+builder.Services.AddSingleton<UpdaterConfigStore>();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
   options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
@@ -334,6 +336,59 @@ app.MapPost("/opencode/admin/feedback", async (
 });
 
 app.MapGet("/opencode/admin/audit", async (UpdaterAdminStore store) => Results.Json(await store.ListAuditAsync()));
+
+app.MapGet("/opencode/admin/modelcards", async (
+  string? channel,
+  ModelCardStore modelCards,
+  UpdaterConfigStore configStore,
+  HttpContext context
+) =>
+{
+  var isBeta = string.Equals(channel, "beta", StringComparison.OrdinalIgnoreCase);
+  var config = await configStore.LoadUpdaterOptionsAsync(isBeta, context.RequestAborted);
+  var cards = modelCards.BuildSnapshot(isBeta, config.ProviderConfig);
+  return Results.Json(new
+  {
+    version = config.Version,
+    isBeta,
+    generatedAt = cards.GeneratedAt,
+    aifactory = new
+    {
+      models = cards.Models,
+      model_visibility = config.ProviderConfig.AiFactory.ModelVisibility,
+    },
+  });
+});
+
+app.MapPut("/opencode/admin/model-settings", async (
+  string model,
+  string? channel,
+  ModelSettingsRequest settings,
+  UpdaterConfigStore configStore,
+  HttpContext context
+) =>
+{
+  if (string.IsNullOrWhiteSpace(model)) return Results.BadRequest(new { error = "Model is required" });
+  if (settings.Context is < 0 || settings.Output is < 0)
+    return Results.BadRequest(new { error = "Context and output must be positive" });
+
+  var isBeta = string.Equals(channel, "beta", StringComparison.OrdinalIgnoreCase);
+  var result = await configStore.SaveModelSettingsAsync(model, isBeta, settings, context.RequestAborted);
+  return Results.Json(result);
+});
+
+app.MapDelete("/opencode/admin/model-settings", async (
+  string model,
+  string? channel,
+  UpdaterConfigStore configStore,
+  HttpContext context
+) =>
+{
+  var isBeta = string.Equals(channel, "beta", StringComparison.OrdinalIgnoreCase);
+  return await configStore.RemoveModelSettingsAsync(model, isBeta, context.RequestAborted)
+    ? Results.NoContent()
+    : Results.NotFound();
+});
 
 app.MapGet("/", () => Results.Redirect("/opencode/version"));
 
@@ -717,6 +772,7 @@ sealed record ModelCardEntry(
   int? Output,
   bool? Temperature,
   bool? Reasoning,
+  bool? Visible,
   ModelCardPrice? Price,
   ModelCardModalities? Modalities,
   string Source,
@@ -790,6 +846,9 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
         .Where((item) => item.score >= 0)
         .OrderByDescending((item) => item.score)
         .FirstOrDefault()?.rule;
+      var visibility = providerConfig.AiFactory.ModelVisibility
+        .Where((rule) => ScoreRule(rule.Pattern, model.Name) >= 0)
+        .LastOrDefault()?.Visible;
 
       return new ModelCardEntry(
         model.Name,
@@ -797,6 +856,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
         match?.Output ?? model.Output,
         match?.Temperature ?? model.Temperature,
         match?.Reasoning ?? model.Reasoning,
+        visibility,
         model.Price is null ? null : new ModelCardPrice(model.InputPrice is null ? null : model.InputPrice * 1000000m, model.OutputPrice is null ? null : model.OutputPrice * 1000000m),
         match?.Modalities is null ? model.Modalities : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? []),
         model.Source,
@@ -1113,6 +1173,169 @@ sealed class ModelLimitRuleOptions
   public ModalitiesOptions? Modalities { get; set; }
 }
 
+sealed class ModelSettingsRequest
+{
+  [JsonPropertyName("context")]
+  public int? Context { get; set; }
+
+  [JsonPropertyName("output")]
+  public int? Output { get; set; }
+
+  [JsonPropertyName("temperature")]
+  public bool? Temperature { get; set; }
+
+  [JsonPropertyName("reasoning")]
+  public bool? Reasoning { get; set; }
+
+  [JsonPropertyName("visible")]
+  public bool? Visible { get; set; }
+
+  [JsonPropertyName("input_modalities")]
+  public string[]? InputModalities { get; set; }
+
+  [JsonPropertyName("output_modalities")]
+  public string[]? OutputModalities { get; set; }
+}
+
+sealed class UpdaterConfigStore(IWebHostEnvironment environment)
+{
+  readonly SemaphoreSlim gate = new(1, 1);
+  readonly JsonSerializerOptions json = new() { WriteIndented = true };
+
+  public async Task<ModelSettingsRequest> SaveModelSettingsAsync(string model, bool beta, ModelSettingsRequest settings, CancellationToken cancellationToken)
+  {
+    await gate.WaitAsync(cancellationToken);
+    try
+    {
+      var root = await LoadAsync(beta, cancellationToken);
+      var limits = GetModelLimits(root);
+      var existing = limits
+        .OfType<JsonObject>()
+        .FirstOrDefault((rule) => string.Equals(rule["pattern"]?.GetValue<string>(), model, StringComparison.OrdinalIgnoreCase));
+      var rule = existing ?? new JsonObject { ["pattern"] = model };
+      if (existing is null) limits.Add(rule);
+
+      rule["context"] = settings.Context;
+      rule["output"] = settings.Output;
+      rule["temperature"] = settings.Temperature;
+      rule["reasoning"] = settings.Reasoning;
+      rule["modalities"] = new JsonObject
+      {
+        ["input"] = JsonSerializer.SerializeToNode(settings.InputModalities ?? [], json),
+        ["output"] = JsonSerializer.SerializeToNode(settings.OutputModalities ?? [], json),
+      };
+      if (settings.Visible is not null)
+      {
+        var visibility = GetModelVisibility(root);
+        var existingVisibility = visibility
+          .OfType<JsonObject>()
+          .FirstOrDefault((rule) => string.Equals(rule["pattern"]?.GetValue<string>(), model, StringComparison.OrdinalIgnoreCase));
+        var visibilityRule = existingVisibility ?? new JsonObject { ["pattern"] = model };
+        if (existingVisibility is null) visibility.Add(visibilityRule);
+        visibilityRule["visible"] = settings.Visible;
+      }
+      await SaveAsync(root, beta, cancellationToken);
+      return settings;
+    }
+    finally
+    {
+      gate.Release();
+    }
+  }
+
+  public async Task<bool> RemoveModelSettingsAsync(string model, bool beta, CancellationToken cancellationToken)
+  {
+    await gate.WaitAsync(cancellationToken);
+    try
+    {
+      var root = await LoadAsync(beta, cancellationToken);
+      var limits = GetModelLimits(root);
+      var existing = limits
+        .OfType<JsonObject>()
+        .FirstOrDefault((rule) => string.Equals(rule["pattern"]?.GetValue<string>(), model, StringComparison.OrdinalIgnoreCase));
+      if (existing is not null) limits.Remove(existing);
+      var visibility = GetModelVisibility(root);
+      var existingVisibility = visibility
+        .OfType<JsonObject>()
+        .FirstOrDefault((rule) => string.Equals(rule["pattern"]?.GetValue<string>(), model, StringComparison.OrdinalIgnoreCase));
+      if (existingVisibility is not null) visibility.Remove(existingVisibility);
+      if (existing is null && existingVisibility is null) return false;
+      await SaveAsync(root, beta, cancellationToken);
+      return true;
+    }
+    finally
+    {
+      gate.Release();
+    }
+  }
+
+  public async Task<UpdaterOptions> LoadUpdaterOptionsAsync(bool beta, CancellationToken cancellationToken)
+  {
+    var stable = await LoadAsync(false, cancellationToken);
+    var root = beta ? Merge(stable, await LoadAsync(true, cancellationToken)) : stable;
+    return JsonSerializer.Deserialize<UpdaterOptions>(root["Updater"]?.ToJsonString() ?? "{}", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new UpdaterOptions();
+  }
+
+  async Task<JsonObject> LoadAsync(bool beta, CancellationToken cancellationToken)
+  {
+    var path = Path.Combine(environment.ContentRootPath, beta ? "appsettings.beta.json" : "appsettings.json");
+    if (!File.Exists(path)) return new JsonObject();
+    await using var stream = File.OpenRead(path);
+    return await JsonNode.ParseAsync(stream, cancellationToken: cancellationToken) as JsonObject ?? new JsonObject();
+  }
+
+  async Task SaveAsync(JsonObject root, bool beta, CancellationToken cancellationToken)
+  {
+    var path = Path.Combine(environment.ContentRootPath, beta ? "appsettings.beta.json" : "appsettings.json");
+    await File.WriteAllTextAsync(path, root.ToJsonString(json), cancellationToken);
+  }
+
+  static JsonArray GetModelLimits(JsonObject root)
+  {
+    var updater = GetObject(root, "Updater");
+    var provider = GetObject(updater, "ProviderConfig");
+    var aiFactory = GetObject(provider, "aifactory");
+    if (aiFactory["model_limits"] is JsonArray limits) return limits;
+    var created = new JsonArray();
+    aiFactory["model_limits"] = created;
+    return created;
+  }
+
+  static JsonArray GetModelVisibility(JsonObject root)
+  {
+    var updater = GetObject(root, "Updater");
+    var provider = GetObject(updater, "ProviderConfig");
+    var aiFactory = GetObject(provider, "aifactory");
+    if (aiFactory["model_visibility"] is JsonArray visibility) return visibility;
+    var created = new JsonArray();
+    aiFactory["model_visibility"] = created;
+    return created;
+  }
+
+  static JsonObject GetObject(JsonObject parent, string name)
+  {
+    if (parent[name] is JsonObject value) return value;
+    var created = new JsonObject();
+    parent[name] = created;
+    return created;
+  }
+
+  static JsonObject Merge(JsonObject stable, JsonObject beta)
+  {
+    var merged = stable.DeepClone().AsObject();
+    foreach (var item in beta)
+    {
+      if (item.Value is JsonObject betaObject && merged[item.Key] is JsonObject stableObject)
+      {
+        merged[item.Key] = Merge(stableObject, betaObject);
+        continue;
+      }
+      merged[item.Key] = item.Value?.DeepClone();
+    }
+    return merged;
+  }
+}
+
 sealed class ModelVisibilityRuleOptions
 {
   [JsonPropertyName("pattern")]
@@ -1234,38 +1457,38 @@ sealed class UpdaterVersionResolver(IOptions<UpdaterOptions> options, LocalFeed 
 }
 
 sealed class UpdaterRolloutResolver(
-  IOptionsMonitor<UpdaterOptions> options,
   IOptions<UpdaterBetaOptions> betaOptions,
   UpdaterVersionResolver versionResolver,
   LocalFeed feed,
   UpdaterChannelStateStore channelState,
   IHttpClientFactory clientFactory,
-  IMemoryCache cache
+  IMemoryCache cache,
+  UpdaterConfigStore configStore
 )
 {
   public async Task<UpdaterRollout> ResolveAsync(HttpRequest request, CancellationToken cancellationToken)
   {
+    var stable = await configStore.LoadUpdaterOptionsAsync(false, cancellationToken);
     if (request.Query.TryGetValue("beta", out var queryBeta))
     {
       var token = queryBeta.FirstOrDefault()?.Trim();
       if (!string.IsNullOrWhiteSpace(token) && cache.TryGetValue($"beta:{token}", out bool cached) && cached)
-        return CreateRollout(options.Get("beta"), true, token);
+        return CreateRollout(await configStore.LoadUpdaterOptionsAsync(true, cancellationToken), stable, true, token);
     }
 
     var beta = betaOptions.Value;
-    if (!beta.Enabled || !HasBetaRules(beta)) return CreateRollout(options.CurrentValue, false, null);
-    if (string.IsNullOrWhiteSpace(beta.LiteLLM.BaseUrl)) return CreateRollout(options.CurrentValue, false, null);
+    if (!beta.Enabled || !HasBetaRules(beta)) return CreateRollout(stable, stable, false, null);
+    if (string.IsNullOrWhiteSpace(beta.LiteLLM.BaseUrl)) return CreateRollout(stable, stable, false, null);
 
     var key = request.Headers[beta.HeaderName].FirstOrDefault()?.Trim();
-    if (string.IsNullOrWhiteSpace(key)) return CreateRollout(options.CurrentValue, false, null);
+    if (string.IsNullOrWhiteSpace(key)) return CreateRollout(stable, stable, false, null);
     var tokenHash = ComputeHash(key);
-    if (!await IsBetaMemberAsync(key, beta, cancellationToken)) return CreateRollout(options.CurrentValue, false, null);
-    return CreateRollout(options.Get("beta"), true, tokenHash);
+    if (!await IsBetaMemberAsync(key, beta, cancellationToken)) return CreateRollout(stable, stable, false, null);
+    return CreateRollout(await configStore.LoadUpdaterOptionsAsync(true, cancellationToken), stable, true, tokenHash);
   }
 
-  UpdaterRollout CreateRollout(UpdaterOptions resolved, bool isBeta, string? betaToken)
+  UpdaterRollout CreateRollout(UpdaterOptions resolved, UpdaterOptions fallback, bool isBeta, string? betaToken)
   {
-    var fallback = options.CurrentValue;
     var normalStopped = channelState.IsNormalStopped();
     var localVersion = feed.TryReadVersionFromLatestYml(isBeta);
     var version = localVersion ??
