@@ -208,6 +208,18 @@ describe("tool.edit", () => {
       }),
     )
 
+    it.instance("refuses to edit non-UTF-8 files without changing their bytes", () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const filepath = path.join(test.directory, "legacy.txt")
+        const original = Buffer.from([0x47, 0x72, 0xfc, 0xdf, 0x65])
+        yield* Effect.promise(() => fs.writeFile(filepath, original))
+
+        expect(yield* fail({ filePath: filepath, oldString: "Grüße", newString: "Hallo" })).toBeInstanceOf(Error)
+        expect(yield* Effect.promise(() => fs.readFile(filepath))).toEqual(original)
+      }),
+    )
+
     it.instance("rejects loose block-anchor matches and leaves content unchanged", () =>
       Effect.gen(function* () {
         const test = yield* TestInstance
