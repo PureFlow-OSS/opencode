@@ -23,8 +23,8 @@ const envProxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.en
 const parseSse = Effect.fn("McpExa.parseSse")(function* (body: string) {
   for (const line of body.split("\n")) {
     if (!line.startsWith("data: ")) continue
-    const data = yield* decode(line.substring(6))
-    if (data.result.content[0]?.text) return data.result.content[0].text
+    const data = yield* decode(line.substring(6)).pipe(Effect.catch(() => Effect.succeed(undefined)))
+    if (data?.result.content[0]?.text) return data.result.content[0].text
   }
   return undefined
 })
@@ -130,5 +130,10 @@ export const call = <F extends Schema.Struct.Fields>(
               )
             return yield* response.text
           })
-    return yield* parseSse(body)
+    const result = yield* parseSse(body)
+    if (result) return result
+
+    const response = body.replace(/\s+/g, " ").trim().slice(0, 1_000)
+    yield* Effect.logWarning("web search returned an unrecognized MCP response", { tool, response })
+    return yield* Effect.fail(new Error(`${tool} returned an unrecognized MCP response: ${response || "empty body"}`))
   })

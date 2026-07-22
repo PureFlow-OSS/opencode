@@ -9,8 +9,8 @@ import { it } from "../lib/effect"
 const SESSION_ID = "ses_0196aabbccddeeff001122334455"
 
 describe("websearch provider", () => {
-  test("selects a stable provider per session", () => {
-    expect(selectWebSearchProvider(SESSION_ID)).toBe(selectWebSearchProvider(SESSION_ID))
+  test("defaults to Exa", () => {
+    expect(selectWebSearchProvider(SESSION_ID)).toBe("exa")
   })
 
   test("supports an operational override", () => {
@@ -89,6 +89,14 @@ describe("websearch MCP response parser", () => {
   it.effect("ignores non-JSON SSE data frames", () =>
     Effect.gen(function* () {
       const result = yield* parseResponse(`data: [DONE]\ndata: ${payload}\n\n`)
+      expect(result).toBe("search results")
+    }),
+  )
+
+  it.effect("ignores MCP frames without a result", () =>
+    Effect.gen(function* () {
+      const notification = JSON.stringify({ jsonrpc: "2.0", method: "notifications/progress", params: {} })
+      const result = yield* parseResponse(`data: ${notification}\ndata: ${payload}\n\n`)
       expect(result).toBe("search results")
     }),
   )

@@ -5,7 +5,6 @@ import * as Tool from "./tool"
 import * as McpExa from "./mcp-exa"
 import * as McpWebSearch from "./mcp-websearch"
 import DESCRIPTION from "./websearch.txt"
-import { checksum } from "@opencode-ai/core/util/encode"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 
@@ -36,8 +35,7 @@ export function selectWebSearchProvider(sessionID: string, flags = { exa: false,
   if (override === "exa" || override === "parallel") return override
   if (flags.parallel) return "parallel"
   if (flags.exa) return "exa"
-
-  return Number.parseInt(checksum(sessionID) ?? "0", 36) % 2 === 0 ? "exa" : "parallel"
+  return "exa"
 }
 
 export function webSearchProviderLabel(provider: unknown) {
