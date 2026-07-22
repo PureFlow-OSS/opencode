@@ -3,6 +3,10 @@
 ## Added
 
 - Added MCP URL validation so remote servers must use `http://` or `https://`.
+- Added a `session_rename` tool, allowing agents to give sessions concise, descriptive titles automatically.
+- Feedback forms now support file and screenshot attachments.
+- Added desktop application metadata and platform icon assets.
+- Added a merge and reintegration runbook for maintaining this customization against upstream changes.
 
 ## Improved
 
@@ -14,12 +18,18 @@
 - The app now has a session delete context menu.
 - Updater and install path handling has been improved.
 - Desktop and CLI packaging flow updates are included.
+- Session title edits now update immediately in the app and are restored if the server request fails.
+- Desktop packaging and Windows code-signing now support Azure Key Vault and Azure Trusted Signing, including packaged binaries.
+- Tool schema generation now falls back safely for schemas that cannot be converted, and invalid custom tool modules no longer prevent the registry from loading.
 
 ## Fixed
 
 - Fixed MCP server deletion so removed entries stay deleted from global config files instead of reappearing from lower-priority config sources.
 - Fixed stale MCP state races after config changes by waiting for instance invalidation before follow-up reloads.
 - Fixed MCP status lists so failed or deleted entries do not linger in the status popover.
+- Fixed Windows desktop startup failures caused by incompatible schema handling.
+- Fixed edits of non-UTF-8 files: they are now rejected without changing the original bytes.
+- Removed the obsolete beta updater configuration.
 
 # v1.14.35
 
