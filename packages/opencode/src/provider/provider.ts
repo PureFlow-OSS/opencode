@@ -1782,10 +1782,17 @@ const layer: Layer.Layer<
 
         options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
           const opts = init ?? {}
-          const titleRequest =
-            process.env.OPENCODE_DEBUG === "1" &&
-            typeof opts.body === "string" &&
-            opts.body.includes("Generate a title for this conversation:")
+          const titleRequest = typeof opts.body === "string" && opts.body.includes("Generate a title for this conversation:")
+          const traceTitleRequest = process.env.OPENCODE_DEBUG === "1" && titleRequest
+          if (titleRequest && typeof opts.body === "string") {
+            const body = JSON.parse(opts.body)
+            body.user = "opencode-title-generator"
+            opts.body = JSON.stringify(body)
+            const headers = new Headers(opts.headers)
+            headers.set("User-Agent", "opencode-title-generator")
+            headers.set("X-OpenCode-Request-Type", "title-generator")
+            opts.headers = headers
+          }
           const chunkAbortCtl = typeof chunkTimeout === "number" && chunkTimeout > 0 ? new AbortController() : undefined
           const signals: AbortSignal[] = []
 
@@ -1812,7 +1819,7 @@ const layer: Layer.Layer<
             }
           }
 
-          if (titleRequest)
+          if (traceTitleRequest)
             log.info("title provider request", {
               providerID: model.providerID,
               modelID: model.id,
@@ -1824,7 +1831,7 @@ const layer: Layer.Layer<
             // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
             timeout: false,
           })
-          if (titleRequest)
+          if (traceTitleRequest)
             log.info("title provider response", {
               providerID: model.providerID,
               modelID: model.id,
