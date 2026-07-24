@@ -222,8 +222,7 @@ export const layer = Layer.effect(
     const title = Effect.fn("SessionPrompt.ensureTitle")(function* (input: {
       session: Session.Info
       history: MessageV2.WithParts[]
-      providerID: ProviderID
-      modelID: ModelID
+      model: Provider.Model
       small?: boolean
     }) {
       if (input.session.parentID) {
@@ -262,16 +261,10 @@ export const layer = Layer.effect(
         })
         return false
       }
-      const fallbackModel = () =>
-        provider.getModel(input.providerID, input.modelID).pipe(
-          Effect.catch(() =>
-            provider.defaultModel().pipe(Effect.flatMap((model) => provider.getModel(model.providerID, model.modelID))),
-          ),
-        )
       const mdl = ag.model
-        ? yield* provider.getModel(ag.model.providerID, ag.model.modelID).pipe(Effect.catch(() => fallbackModel()))
-        : ((yield* provider.getSmallModel(input.providerID).pipe(Effect.catch(() => Effect.succeed(undefined)))) ??
-          (yield* fallbackModel()))
+        ? yield* provider.getModel(ag.model.providerID, ag.model.modelID).pipe(Effect.catch(() => Effect.succeed(input.model)))
+        : ((yield* provider.getSmallModel(input.model.providerID).pipe(Effect.catch(() => Effect.succeed(undefined)))) ??
+          input.model)
       const msgs = onlySubtasks
         ? [{ role: "user" as const, content: subtasks.map((p) => p.prompt).join("\n") }]
         : yield* MessageV2.toModelMessagesEffect(context, mdl)
@@ -1515,50 +1508,6 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
           let msgs = yield* MessageV2.filterCompactedEffect(sessionID)
 
-          if (!titleScheduled) {
-            titleScheduled = true
-            const firstUser = msgs.find((message) => message.info.role === "user")
-            if (firstUser?.info.role === "user") {
-              yield* elog.info("title generation scheduled", { sessionID, messageID: firstUser.info.id })
-              yield* title({
-                session,
-                modelID: firstUser.info.model.modelID,
-                providerID: firstUser.info.model.providerID,
-                history: msgs,
-              }).pipe(
-                Effect.catchCause((cause) =>
-                  elog.error("title generation failed before request", {
-                    sessionID,
-                    error: Cause.squash(cause),
-                  }).pipe(Effect.as(false)),
-                ),
-                Effect.tap((result) => Deferred.succeed(titleResult, result).pipe(Effect.ignore)),
-                Effect.forkIn(scope),
-              )
-              yield* Effect.gen(function* () {
-                if (yield* Deferred.await(titleResult)) return
-                yield* Deferred.await(normalResponse)
-                const current = yield* sessions.get(sessionID)
-                if (!Session.isDefaultTitle(current.title)) return
-                const retried = yield* title({
-                  session: current,
-                  modelID: firstUser.info.model.modelID,
-                  providerID: firstUser.info.model.providerID,
-                  history: msgs,
-                  small: false,
-                })
-                if (retried) return
-                const fallback = fallbackTitle(firstUser)
-                if (fallback) yield* sessions.setTitle({ sessionID, title: fallback })
-              }).pipe(
-                Effect.catchCause((cause) =>
-                  elog.error("title generation retry failed", { sessionID, error: Cause.squash(cause) }),
-                ),
-                Effect.forkIn(scope),
-              )
-            }
-          }
-
           let lastUser: MessageV2.User | undefined
           let lastAssistant: MessageV2.Assistant | undefined
           let lastFinished: MessageV2.Assistant | undefined
@@ -1598,6 +1547,38 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
           step++
           const model = yield* getModel(lastUser.model.providerID, lastUser.model.modelID, sessionID)
+          if (!titleScheduled) {
+            titleScheduled = true
+            const firstUser = msgs.find((message) => message.info.role === "user")
+            if (firstUser?.info.role === "user") {
+              yield* elog.info("title generation scheduled", { sessionID, messageID: firstUser.info.id })
+              yield* title({ session, model, history: msgs }).pipe(
+                Effect.catchCause((cause) =>
+                  elog.error("title generation failed before request", {
+                    sessionID,
+                    error: Cause.squash(cause),
+                  }).pipe(Effect.as(false)),
+                ),
+                Effect.tap((result) => Deferred.succeed(titleResult, result).pipe(Effect.ignore)),
+                Effect.forkIn(scope),
+              )
+              yield* Effect.gen(function* () {
+                if (yield* Deferred.await(titleResult)) return
+                yield* Deferred.await(normalResponse)
+                const current = yield* sessions.get(sessionID)
+                if (!Session.isDefaultTitle(current.title)) return
+                const retried = yield* title({ session: current, model, history: msgs, small: false })
+                if (retried) return
+                const fallback = fallbackTitle(firstUser)
+                if (fallback) yield* sessions.setTitle({ sessionID, title: fallback })
+              }).pipe(
+                Effect.catchCause((cause) =>
+                  elog.error("title generation retry failed", { sessionID, error: Cause.squash(cause) }),
+                ),
+                Effect.forkIn(scope),
+              )
+            }
+          }
           const task = tasks.pop()
 
           if (task?.type === "subtask") {
