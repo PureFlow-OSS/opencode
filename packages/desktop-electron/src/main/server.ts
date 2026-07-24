@@ -34,6 +34,7 @@ export function setWslConfig(config: WslConfig) {
 
 export async function spawnLocalServer(hostname: string, port: number, password: string, debug = false) {
   await prepareServerEnv(password)
+  if (debug) process.env.OPENCODE_DEBUG = "1"
   const { Log, Server } = await import("virtual:opencode-server")
   await Log.init({ print: debug, level: debug ? "DEBUG" : "WARN" })
   const listener = await Server.listen({

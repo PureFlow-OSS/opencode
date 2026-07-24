@@ -1782,6 +1782,10 @@ const layer: Layer.Layer<
 
         options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
           const opts = init ?? {}
+          const titleRequest =
+            process.env.OPENCODE_DEBUG === "1" &&
+            typeof opts.body === "string" &&
+            opts.body.includes("Generate a title for this conversation:")
           const chunkAbortCtl = typeof chunkTimeout === "number" && chunkTimeout > 0 ? new AbortController() : undefined
           const signals: AbortSignal[] = []
 
@@ -1808,11 +1812,25 @@ const layer: Layer.Layer<
             }
           }
 
+          if (titleRequest)
+            log.info("title provider request", {
+              providerID: model.providerID,
+              modelID: model.id,
+              url: String(input),
+              body: opts.body,
+            })
           const res = await proxiedFetch(input, {
             ...opts,
             // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
             timeout: false,
           })
+          if (titleRequest)
+            log.info("title provider response", {
+              providerID: model.providerID,
+              modelID: model.id,
+              status: res.status,
+              contentType: res.headers.get("content-type"),
+            })
 
           if (!chunkAbortCtl) return res
           return wrapSSE(res, chunkTimeout, chunkAbortCtl)
