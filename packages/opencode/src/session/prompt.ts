@@ -262,8 +262,8 @@ export const layer = Layer.effect(
         return false
       }
       const mdl = ag.model
-        ? yield* provider.getModel(ag.model.providerID, ag.model.modelID).pipe(Effect.catch(() => Effect.succeed(input.model)))
-        : ((yield* provider.getSmallModel(input.model.providerID).pipe(Effect.catch(() => Effect.succeed(undefined)))) ??
+        ? yield* provider.getModel(ag.model.providerID, ag.model.modelID).pipe(Effect.catchCause(() => Effect.succeed(input.model)))
+        : ((yield* provider.getSmallModel(input.model.providerID).pipe(Effect.catchCause(() => Effect.succeed(undefined)))) ??
           input.model)
       const msgs = onlySubtasks
         ? [{ role: "user" as const, content: subtasks.map((p) => p.prompt).join("\n") }]
