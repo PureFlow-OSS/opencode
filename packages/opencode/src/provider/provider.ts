@@ -314,7 +314,12 @@ function shouldUseCopilotResponsesApi(modelID: string): boolean {
   return Number(match[1]) >= 5 && !modelID.startsWith("gpt-5-mini")
 }
 
-function wrapSSE(res: Response, ms: number, ctl: AbortController) {
+function wrapSSE(
+  res: Response,
+  ms: number,
+  ctl: AbortController,
+  trace?: { providerID: ProviderID; modelID: string; started: number },
+) {
   if (typeof ms !== "number" || ms <= 0) return res
   if (!res.body) return res
   if (!res.headers.get("content-type")?.includes("text/event-stream")) return res
@@ -325,6 +330,12 @@ function wrapSSE(res: Response, ms: number, ctl: AbortController) {
       const part = await new Promise<Awaited<ReturnType<typeof reader.read>>>((resolve, reject) => {
         const id = setTimeout(() => {
           const err = new Error("SSE read timed out")
+          if (trace)
+            log.warn("title provider chunk timed out", {
+              providerID: trace.providerID,
+              modelID: trace.modelID,
+              duration: Date.now() - trace.started,
+            })
           ctl.abort(err)
           void reader.cancel(err)
           reject(err)
@@ -343,10 +354,23 @@ function wrapSSE(res: Response, ms: number, ctl: AbortController) {
       })
 
       if (part.done) {
+        if (trace)
+          log.info("title provider stream completed", {
+            providerID: trace.providerID,
+            modelID: trace.modelID,
+            duration: Date.now() - trace.started,
+          })
         ctrl.close()
         return
       }
 
+      if (trace)
+        log.info("title provider chunk", {
+          providerID: trace.providerID,
+          modelID: trace.modelID,
+          duration: Date.now() - trace.started,
+          bytes: part.value.byteLength,
+        })
       ctrl.enqueue(part.value)
     },
     async cancel(reason) {
@@ -1840,7 +1864,12 @@ const layer: Layer.Layer<
             })
 
           if (!chunkAbortCtl) return res
-          return wrapSSE(res, chunkTimeout, chunkAbortCtl)
+          return wrapSSE(
+            res,
+            chunkTimeout,
+            chunkAbortCtl,
+            traceTitleRequest ? { providerID: model.providerID, modelID: model.id, started: Date.now() } : undefined,
+          )
         }
 
         const bundledLoader = BUNDLED_PROVIDERS[model.api.npm]
