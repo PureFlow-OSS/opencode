@@ -379,9 +379,15 @@ const live: Layer.Layer<
                 "x-session-affinity": input.sessionID,
                 ...(input.parentSessionID ? { "x-parent-session-id": input.parentSessionID } : {}),
                 "User-Agent": `opencode/${InstallationVersion}`,
-              }),
+          }),
           ...input.model.headers,
           ...headers,
+          ...(input.agent.name === "title"
+            ? {
+                "User-Agent": "opencode-title-generator",
+                "X-OpenCode-Request-Type": "title-generator",
+              }
+            : {}),
         },
         maxRetries: input.retries ?? 0,
         messages,
