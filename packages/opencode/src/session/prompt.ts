@@ -44,7 +44,7 @@ import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Truncate } from "@/tool"
 import { decodeDataUrl } from "@/util/data-url"
 import { Process } from "@/util"
-import { Cause, Effect, Exit, Layer, Option, Scope, Context, Schema } from "effect"
+import { Cause, Deferred, Effect, Exit, Layer, Option, Scope, Context, Schema } from "effect"
 import { zod } from "@/util/effect-zod"
 import { withStatics } from "@/util/schema"
 import { EffectLogger } from "@/effect"
@@ -224,62 +224,129 @@ export const layer = Layer.effect(
       history: MessageV2.WithParts[]
       providerID: ProviderID
       modelID: ModelID
+      small?: boolean
     }) {
-      if (input.session.parentID) return
-      if (!Session.isDefaultTitle(input.session.title)) return
+      if (input.session.parentID) {
+        yield* elog.debug("title generation skipped", { sessionID: input.session.id, reason: "subsession" })
+        return false
+      }
+      if (!Session.isDefaultTitle(input.session.title)) {
+        yield* elog.debug("title generation skipped", {
+          sessionID: input.session.id,
+          reason: "session already has a title",
+          title: input.session.title,
+        })
+        return false
+      }
 
       const real = (m: MessageV2.WithParts) =>
         m.info.role === "user" && !m.parts.every((p) => "synthetic" in p && p.synthetic)
       const idx = input.history.findIndex(real)
-      if (idx === -1) return
-      if (input.history.filter(real).length !== 1) return
-
+      if (idx === -1) {
+        yield* elog.debug("title generation skipped", { sessionID: input.session.id, reason: "no real user message" })
+        return false
+      }
       const context = input.history.slice(0, idx + 1)
       const firstUser = context[idx]
-      if (!firstUser || firstUser.info.role !== "user") return
+      if (!firstUser || firstUser.info.role !== "user") return false
       const firstInfo = firstUser.info
 
       const subtasks = firstUser.parts.filter((p): p is MessageV2.SubtaskPart => p.type === "subtask")
       const onlySubtasks = subtasks.length > 0 && firstUser.parts.every((p) => p.type === "subtask")
 
       const ag = yield* agents.get("title")
-      if (!ag) return
+      if (!ag) {
+        yield* elog.debug("title generation skipped", {
+          sessionID: input.session.id,
+          reason: "title agent unavailable",
+        })
+        return false
+      }
+      const fallbackModel = () =>
+        provider.getModel(input.providerID, input.modelID).pipe(
+          Effect.catch(() =>
+            provider.defaultModel().pipe(Effect.flatMap((model) => provider.getModel(model.providerID, model.modelID))),
+          ),
+        )
       const mdl = ag.model
-        ? yield* provider.getModel(ag.model.providerID, ag.model.modelID)
-        : ((yield* provider.getSmallModel(input.providerID)) ??
-          (yield* provider.getModel(input.providerID, input.modelID)))
+        ? yield* provider.getModel(ag.model.providerID, ag.model.modelID).pipe(Effect.catch(() => fallbackModel()))
+        : ((yield* provider.getSmallModel(input.providerID).pipe(Effect.catch(() => Effect.succeed(undefined)))) ??
+          (yield* fallbackModel()))
       const msgs = onlySubtasks
         ? [{ role: "user" as const, content: subtasks.map((p) => p.prompt).join("\n") }]
         : yield* MessageV2.toModelMessagesEffect(context, mdl)
+      const messages = [{ role: "user" as const, content: "Generate a title for this conversation:\n" }, ...msgs]
+      const started = Date.now()
+      yield* elog.debug("title generation request", {
+        providerID: mdl.providerID,
+        modelID: mdl.id,
+        request: {
+          system: ag.prompt,
+          messages: messages.map((message) => ({
+            role: message.role,
+            content: typeof message.content === "string" ? message.content : "[multimodal content omitted]",
+          })),
+        },
+      })
       const text = yield* llm
         .stream({
           agent: ag,
           user: firstInfo,
           system: [],
-          small: true,
+          small: input.small ?? true,
           tools: {},
           model: mdl,
           sessionID: input.session.id,
           retries: 2,
-          messages: [{ role: "user", content: "Generate a title for this conversation:\n" }, ...msgs],
+          messages,
         })
         .pipe(
           Stream.filter((e): e is Extract<LLM.Event, { type: "text-delta" }> => e.type === "text-delta"),
           Stream.map((e) => e.text),
           Stream.runCollect,
           Effect.map((chunks) => Array.from(chunks).join("")),
-          Effect.orElseSucceed(() => ""),
+          Effect.timeoutOrElse({
+            duration: 15_000,
+            orElse: () =>
+              elog
+                .warn("title generation timed out", {
+                  providerID: mdl.providerID,
+                  modelID: mdl.id,
+                  duration: Date.now() - started,
+                })
+                .pipe(Effect.as("")),
+          }),
+          Effect.catch((error) =>
+            elog
+              .warn("title generation request failed", {
+                providerID: mdl.providerID,
+                modelID: mdl.id,
+                duration: Date.now() - started,
+                error: error instanceof Error ? error.message : String(error),
+              })
+              .pipe(Effect.as("")),
+          ),
         )
+      yield* elog.debug("title generation response", {
+        providerID: mdl.providerID,
+        modelID: mdl.id,
+        duration: Date.now() - started,
+        text,
+      })
       const cleaned = text
         .replace(/<think>[\s\S]*?<\/think>\s*/g, "")
         .split("\n")
         .map((line: string) => line.trim())
         .find((line: string) => line.length > 0)
-      const t = cleaned ?? fallbackTitle(firstUser)
-      if (!t) return
-      yield* sessions
-        .setTitle({ sessionID: input.session.id, title: t })
-        .pipe(Effect.catchCause((cause) => elog.error("failed to generate title", { error: Cause.squash(cause) })))
+      if (!cleaned) return false
+      return yield* sessions
+        .setTitle({ sessionID: input.session.id, title: cleaned })
+        .pipe(
+          Effect.as(true),
+          Effect.catchCause((cause) =>
+            elog.error("failed to generate title", { error: Cause.squash(cause) }).pipe(Effect.as(false)),
+          ),
+        )
     })
 
     const insertReminders = Effect.fn("SessionPrompt.insertReminders")(function* (input: {
@@ -1437,6 +1504,9 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         const slog = elog.with({ sessionID })
         let structured: unknown | undefined
         let step = 0
+        let titleScheduled = false
+        const titleResult = yield* Deferred.make<boolean>()
+        const normalResponse = yield* Deferred.make<void>()
         const session = yield* sessions.get(sessionID)
 
         while (true) {
@@ -1444,6 +1514,50 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           yield* slog.info("loop", { step })
 
           let msgs = yield* MessageV2.filterCompactedEffect(sessionID)
+
+          if (!titleScheduled) {
+            titleScheduled = true
+            const firstUser = msgs.find((message) => message.info.role === "user")
+            if (firstUser?.info.role === "user") {
+              yield* elog.info("title generation scheduled", { sessionID, messageID: firstUser.info.id })
+              yield* title({
+                session,
+                modelID: firstUser.info.model.modelID,
+                providerID: firstUser.info.model.providerID,
+                history: msgs,
+              }).pipe(
+                Effect.catchCause((cause) =>
+                  elog.error("title generation failed before request", {
+                    sessionID,
+                    error: Cause.squash(cause),
+                  }).pipe(Effect.as(false)),
+                ),
+                Effect.tap((result) => Deferred.succeed(titleResult, result).pipe(Effect.ignore)),
+                Effect.forkIn(scope),
+              )
+              yield* Effect.gen(function* () {
+                if (yield* Deferred.await(titleResult)) return
+                yield* Deferred.await(normalResponse)
+                const current = yield* sessions.get(sessionID)
+                if (!Session.isDefaultTitle(current.title)) return
+                const retried = yield* title({
+                  session: current,
+                  modelID: firstUser.info.model.modelID,
+                  providerID: firstUser.info.model.providerID,
+                  history: msgs,
+                  small: false,
+                })
+                if (retried) return
+                const fallback = fallbackTitle(firstUser)
+                if (fallback) yield* sessions.setTitle({ sessionID, title: fallback })
+              }).pipe(
+                Effect.catchCause((cause) =>
+                  elog.error("title generation retry failed", { sessionID, error: Cause.squash(cause) }),
+                ),
+                Effect.forkIn(scope),
+              )
+            }
+          }
 
           let lastUser: MessageV2.User | undefined
           let lastAssistant: MessageV2.Assistant | undefined
@@ -1477,19 +1591,12 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             !hasToolCalls &&
             lastUser.id < lastAssistant.id
           ) {
+            yield* Deferred.succeed(normalResponse, undefined).pipe(Effect.ignore)
             yield* slog.info("exiting loop")
             break
           }
 
           step++
-          if (step === 1)
-            yield* title({
-              session,
-              modelID: lastUser.model.modelID,
-              providerID: lastUser.model.providerID,
-              history: msgs,
-            }).pipe(Effect.ignore, Effect.forkIn(scope))
-
           const model = yield* getModel(lastUser.model.providerID, lastUser.model.modelID, sessionID)
           const task = tasks.pop()
 

@@ -405,8 +405,12 @@ export function MessageTimeline(props: {
       setTitle("editing", false)
     },
     onError: (err, input) => {
-      const session = sync.session.get(input.id)
-      if (session?.title === input.title) sync.session.remember({ ...session, title: input.previousTitle })
+      sync.set(
+        produce((draft) => {
+          const session = draft.session.find((session) => session.id === input.id)
+          if (session?.title === input.title) session.title = input.previousTitle
+        }),
+      )
       setTitle("editing", false)
       showToast({
         title: language.t("common.requestFailed"),
@@ -483,7 +487,12 @@ export function MessageTimeline(props: {
 
     const session = sync.session.get(id)
     if (!session) return
-    sync.session.remember({ ...session, title: next })
+    sync.set(
+      produce((draft) => {
+        const session = draft.session.find((session) => session.id === id)
+        if (session) session.title = next
+      }),
+    )
     titleMutation.mutate({ id, title: next, previousTitle: session.title ?? "" })
   }
 

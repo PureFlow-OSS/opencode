@@ -202,7 +202,7 @@ export const layer = Layer.effect(
           title: {
             name: "title",
             mode: "primary",
-            options: {},
+            options: { timeout: 15_000, chunkTimeout: 5_000 },
             native: true,
             hidden: true,
             temperature: 0.5,

@@ -36,7 +36,8 @@ const debug =
 app.setName(app.isPackaged ? APP_NAMES[CHANNEL] : "OpenCode Dev")
 app.setAppUserModelId(appId)
 app.setPath("userData", join(app.getPath("appData"), appId))
-const updateCacheRoot = process.env.OPENCODE_UPDATE_CACHE_DIR?.trim()
+const updateCacheRoot = process.platform === "win32" ? "C:/Entwicklung" : undefined
+const updateCacheDirectory = updateCacheRoot ? join(updateCacheRoot, "@opencode-aidesktop-electron-updater") : undefined
 const autoUpdater = pkg.autoUpdater
 
 if (process.platform === "win32" && updateCacheRoot) {
@@ -433,6 +434,7 @@ function setupAutoUpdater() {
     allowDowngrade: autoUpdater.allowDowngrade,
     currentVersion: app.getVersion(),
     cacheRoot: updateCacheRoot ?? null,
+    cacheDirectory: updateCacheDirectory ?? null,
   })
 }
 
@@ -575,7 +577,6 @@ async function installUpdate() {
       "--updated",
       "--force-run",
       ...(typeof packageFile === "string" && packageFile.length > 0 ? [`--package-file=${packageFile}`] : []),
-      ...(typeof installDirectory === "string" && installDirectory.length > 0 ? [`/D=${installDirectory}`] : []),
     ]
 
     if (typeof installerPath === "string" && installerPath.length > 0) {
@@ -654,10 +655,15 @@ async function scheduleWindowsInstaller(installerPath: string, args: string[], i
   const helperId = randomUUID()
   const logPath = join(app.getPath("temp"), `opencode-installer-${helperId}.log`)
   const helperSourcePath = resolveUpdaterHelperPath()
-  const helperTargetPath = join(dirname(installerPath), `OpenCode.UpdaterHelper-${helperId}.exe`)
+  const helperTargetPath = join(
+    updateCacheDirectory ?? dirname(installerPath),
+    "pending",
+    `OpenCode.UpdaterHelper-${helperId}.exe`,
+  )
   const packageFileArg = args.find((value) => value.startsWith("--package-file="))
   const packageFile = packageFileArg ? packageFileArg.slice("--package-file=".length) : undefined
-  const resolvedInstallDirectory = typeof installDirectory === "string" && installDirectory.length > 0 ? installDirectory : undefined
+  const resolvedInstallDirectory =
+    typeof installDirectory === "string" && installDirectory.length > 0 ? installDirectory : undefined
   await mkdir(dirname(helperTargetPath), { recursive: true })
   await writeFile(logPath, `${new Date().toISOString()} helper scheduled\r\n`, "utf8")
   await copyFile(helperSourcePath, helperTargetPath)

@@ -12,11 +12,13 @@ function load<A>(dir: string, fn: (svc: Agent.Interface) => Effect.Effect<A>) {
 }
 
 describe("session.system", () => {
-  test("instructs default models to list all tools and rename clear sessions", () => {
-    const prompt = SystemPrompt.provider({ api: { id: "qwen3-coder" } } as Provider.Model)[0]
+  test("instructs all models to rename clear sessions", () => {
+    const defaultPrompt = SystemPrompt.provider({ api: { id: "qwen3-coder" } } as Provider.Model).join("\n")
+    const codexPrompt = SystemPrompt.provider({ api: { id: "gpt-5-codex" } } as Provider.Model).join("\n")
 
-    expect(prompt).toContain("list every tool exposed in the current tool definitions")
-    expect(prompt).toContain("proactively call `session_rename` once")
+    expect(defaultPrompt).toContain("list every tool exposed in the current tool definitions")
+    expect(defaultPrompt).toContain("proactively call `session_rename` once")
+    expect(codexPrompt).toContain("proactively call `session_rename` once")
   })
 
   test("skills output is sorted by name and stable across calls", async () => {
