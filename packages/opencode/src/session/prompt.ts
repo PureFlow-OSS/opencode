@@ -299,7 +299,7 @@ export const layer = Layer.effect(
           Stream.runCollect,
           Effect.map((chunks) => Array.from(chunks).join("")),
           Effect.timeoutOrElse({
-            duration: 15_000,
+            duration: 30_000,
             orElse: () =>
               elog
                 .warn("title generation timed out", {
