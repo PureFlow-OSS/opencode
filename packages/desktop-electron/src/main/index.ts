@@ -31,6 +31,8 @@ const APP_IDS: Record<string, string> = {
   prod: "ai.opencode.desktop",
 }
 const appId = app.isPackaged ? APP_IDS[CHANNEL] : "ai.opencode.desktop.dev"
+const debug =
+  process.argv.includes("--opencode-debug") || process.argv.slice(process.argv.indexOf("--") + 1).includes("--debug")
 app.setName(app.isPackaged ? APP_NAMES[CHANNEL] : "OpenCode Dev")
 app.setAppUserModelId(appId)
 app.setPath("userData", join(app.getPath("appData"), appId))
@@ -223,7 +225,7 @@ async function initialize() {
     }
 
     logger.log("spawning sidecar", { url })
-    const { listener, health } = await spawnLocalServer(hostname, port, password)
+    const { listener, health } = await spawnLocalServer(hostname, port, password, debug)
     server = listener
     serverReady.resolve({
       url,

@@ -78,6 +78,10 @@ const cli = yargs(args)
     describe: "print logs to stderr",
     type: "boolean",
   })
+  .option("debug", {
+    describe: "print debug logs to stderr",
+    type: "boolean",
+  })
   .option("log-level", {
     describe: "log level",
     type: "string",
@@ -93,9 +97,10 @@ const cli = yargs(args)
     }
 
     await Log.init({
-      print: process.argv.includes("--print-logs"),
+      print: opts.debug || process.argv.includes("--print-logs"),
       dev: Installation.isLocal(),
       level: (() => {
+        if (opts.debug) return "DEBUG"
         if (opts.logLevel) return opts.logLevel as Log.Level
         if (Installation.isLocal()) return "DEBUG"
         return "INFO"
