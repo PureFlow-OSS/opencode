@@ -1,6 +1,9 @@
 import { app, dialog } from "electron"
+import { randomUUID } from "node:crypto"
 import { rmSync } from "node:fs"
-import { join } from "node:path"
+import { copyFile, mkdir, writeFile } from "node:fs/promises"
+import { spawn } from "node:child_process"
+import { dirname, join } from "node:path"
 import pkg from "electron-updater"
 import { UPDATER_ENABLED } from "./constants"
 import { createUpdaterController, type UpdaterReadyRecord } from "./updater-controller"
@@ -10,9 +13,21 @@ import { updateServer } from "./update-server"
 
 const { autoUpdater } = pkg
 const key = "ready"
+const updateCacheRoot = process.platform === "win32" ? "C:/Entwicklung" : undefined
+const updateCacheDirectory = updateCacheRoot ? join(updateCacheRoot, "@opencode-aidesktop-electron-updater") : undefined
+const windowsInstallDirectory = "C:\\Entwicklung\\OpenCode"
 
 export function setupAutoUpdater(stop: () => Promise<void>) {
   const logger = getLogger()
+  if (process.platform === "win32" && updateCacheRoot) {
+    const appAdapter = Reflect.get(autoUpdater, "app")
+    if (appAdapter && typeof appAdapter === "object") {
+      Object.defineProperty(appAdapter, "baseCachePath", {
+        configurable: true,
+        get: () => updateCacheRoot,
+      })
+    }
+  }
   autoUpdater.logger = logger
   autoUpdater.channel = "latest"
   autoUpdater.allowPrerelease = false
@@ -24,6 +39,8 @@ export function setupAutoUpdater(stop: () => Promise<void>) {
     allowPrerelease: autoUpdater.allowPrerelease,
     allowDowngrade: autoUpdater.allowDowngrade,
     currentVersion: app.getVersion(),
+    cacheRoot: updateCacheRoot ?? null,
+    cacheDirectory: updateCacheDirectory ?? null,
   })
 
   const store = getStore("opencode.updater")
@@ -49,7 +66,46 @@ export function setupAutoUpdater(stop: () => Promise<void>) {
         return result
       },
       downloadUpdate: () => autoUpdater.downloadUpdate(),
-      quitAndInstall: () => autoUpdater.quitAndInstall(),
+      quitAndInstall: async () => {
+        if (process.platform !== "win32") return autoUpdater.quitAndInstall()
+        const installerPath = Reflect.get(autoUpdater, "installerPath")
+        const downloadedUpdateHelper = Reflect.get(autoUpdater, "downloadedUpdateHelper")
+        const packageFile = Reflect.get(downloadedUpdateHelper, "packageFile")
+        if (typeof installerPath !== "string" || !installerPath) return autoUpdater.quitAndInstall()
+
+        const helperID = randomUUID()
+        const logPath = join(app.getPath("temp"), `opencode-installer-${helperID}.log`)
+        const helperTargetPath = join(
+          updateCacheDirectory ?? dirname(installerPath),
+          "pending",
+          `OpenCode.UpdaterHelper-${helperID}.exe`,
+        )
+        await mkdir(dirname(helperTargetPath), { recursive: true })
+        await writeFile(logPath, `${new Date().toISOString()} helper scheduled\r\n`)
+        await copyFile(join(process.resourcesPath, "updater-helper", "OpenCode.UpdaterHelper.exe"), helperTargetPath)
+        await new Promise<void>((resolve, reject) => {
+          const child = spawn(
+            helperTargetPath,
+            [
+              "--parent-pid",
+              String(process.pid),
+              "--installer-path",
+              installerPath,
+              "--log-path",
+              logPath,
+              "--install-dir",
+              windowsInstallDirectory,
+              ...(typeof packageFile === "string" && packageFile ? ["--package-file", packageFile] : []),
+            ],
+            { detached: true, stdio: "ignore", windowsHide: true },
+          )
+          child.on("error", reject)
+          child.unref()
+          resolve()
+        })
+        logger.log("scheduling deferred installer launch", { installerPath, helperTargetPath, logPath })
+        app.quit()
+      },
     },
     persistence: {
       get() {

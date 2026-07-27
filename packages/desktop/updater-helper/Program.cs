@@ -92,8 +92,6 @@ try
   var installerArgs = new List<string> { "--updated", "--force-run" };
   if (!string.IsNullOrWhiteSpace(packageFile))
     installerArgs.Add($"--package-file={packageFile}");
-  if (!string.IsNullOrWhiteSpace(installDir))
-    installerArgs.Add($"/D={installDir}");
 
   var startInfo = new ProcessStartInfo
   {
