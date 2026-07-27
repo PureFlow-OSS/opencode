@@ -24,21 +24,24 @@ import { Reference } from "@opencode-ai/core/reference"
 import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 
+const SESSION_RENAME_INSTRUCTION =
+  "As soon as the session has a clear, stable subject, proactively call `session_rename` once with a concise, descriptive title. Do not wait for the user to ask and never claim that a session was renamed unless the tool call succeeded. Do not rename again unless the subject materially changes."
+
 export function provider(model: Provider.Model) {
-  if (model.api.id.includes("muse-spark")) return [PROMPT_META]
+  if (model.api.id.includes("muse-spark")) return [PROMPT_META, SESSION_RENAME_INSTRUCTION]
   if (model.api.id.includes("gpt-4") || model.api.id.includes("o1") || model.api.id.includes("o3"))
-    return [PROMPT_BEAST]
+    return [PROMPT_BEAST, SESSION_RENAME_INSTRUCTION]
   if (model.api.id.includes("gpt")) {
     if (model.api.id.includes("codex")) {
-      return [PROMPT_CODEX]
+      return [PROMPT_CODEX, SESSION_RENAME_INSTRUCTION]
     }
-    return [PROMPT_GPT]
+    return [PROMPT_GPT, SESSION_RENAME_INSTRUCTION]
   }
-  if (model.api.id.includes("gemini-")) return [PROMPT_GEMINI]
-  if (model.api.id.includes("claude")) return [PROMPT_ANTHROPIC]
-  if (model.api.id.toLowerCase().includes("trinity")) return [PROMPT_TRINITY]
-  if (model.api.id.toLowerCase().includes("kimi")) return [PROMPT_KIMI]
-  return [PROMPT_DEFAULT]
+  if (model.api.id.includes("gemini-")) return [PROMPT_GEMINI, SESSION_RENAME_INSTRUCTION]
+  if (model.api.id.includes("claude")) return [PROMPT_ANTHROPIC, SESSION_RENAME_INSTRUCTION]
+  if (model.api.id.toLowerCase().includes("trinity")) return [PROMPT_TRINITY, SESSION_RENAME_INSTRUCTION]
+  if (model.api.id.toLowerCase().includes("kimi")) return [PROMPT_KIMI, SESSION_RENAME_INSTRUCTION]
+  return [PROMPT_DEFAULT, SESSION_RENAME_INSTRUCTION]
 }
 
 export interface Interface {

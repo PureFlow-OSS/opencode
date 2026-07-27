@@ -90,6 +90,13 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
       })
   const options = mergeOptions(mergeOptions(mergeOptions(base, input.model.options), input.agent.options), variant)
   if (
+    input.agent.name === "title" &&
+    input.model.api.npm === "@ai-sdk/openai-compatible" &&
+    input.model.api.id.toLowerCase().includes("qwen3")
+  ) {
+    options["chat_template_kwargs"] = { enable_thinking: false }
+  }
+  if (
     input.model.api.npm === "@ai-sdk/azure" &&
     (input.provider.options.useCompletionUrls || input.model.options.useCompletionUrls || options.useCompletionUrls)
   ) {
@@ -126,7 +133,8 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
         : undefined,
       topP: input.agent.topP ?? ProviderTransform.topP(input.model),
       topK: ProviderTransform.topK(input.model),
-      maxOutputTokens: ProviderTransform.maxOutputTokens(input.model, input.flags.outputTokenMax),
+      maxOutputTokens:
+        input.agent.name === "title" ? 96 : ProviderTransform.maxOutputTokens(input.model, input.flags.outputTokenMax),
       options,
     },
   )
@@ -201,6 +209,12 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
           }),
       ...input.model.headers,
       ...headers,
+      ...(input.agent.name === "title"
+        ? {
+            "User-Agent": "opencode-title-generator",
+            "X-OpenCode-Request-Type": "title-generator",
+          }
+        : {}),
     },
   }
 })

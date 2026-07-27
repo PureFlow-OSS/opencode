@@ -215,8 +215,7 @@ const layer = Layer.effect(
     const title = Effect.fn("SessionPrompt.ensureTitle")(function* (input: {
       session: Session.Info
       history: SessionV1.WithParts[]
-      providerID: ProviderV2.ID
-      modelID: ModelV2.ID
+      model: Provider.Model
     }) {
       if (input.session.parentID) return
       if (!Session.isDefaultTitle(input.session.title)) return
@@ -238,9 +237,9 @@ const layer = Layer.effect(
       const ag = yield* agents.get("title")
       if (!ag) return
       const mdl = ag.model
-        ? yield* provider.getModel(ag.model.providerID, ag.model.modelID)
-        : ((yield* provider.getSmallModel(input.providerID)) ??
-          (yield* provider.getModel(input.providerID, input.modelID)))
+        ? yield* provider.getModel(ag.model.providerID, ag.model.modelID).pipe(Effect.catchCause(() => Effect.succeed(input.model)))
+        : ((yield* provider.getSmallModel(input.model.providerID).pipe(Effect.catchCause(() => Effect.succeed(undefined)))) ??
+          input.model)
       const msgs = onlySubtasks
         ? [{ role: "user" as const, content: subtasks.map((p) => p.prompt).join("\n") }]
         : yield* MessageV2.toModelMessagesEffect(context, mdl)
@@ -261,6 +260,7 @@ const layer = Layer.effect(
           Stream.map((e) => e.text),
           Stream.runCollect,
           Effect.map((chunks) => Array.from(chunks).join("")),
+          Effect.timeoutOrElse({ duration: 30_000, orElse: () => Effect.succeed("") }),
           Effect.orElseSucceed(() => ""),
         )
       const cleaned = text
@@ -1153,15 +1153,8 @@ const layer = Layer.effect(
           }
 
           step++
-          if (step === 1)
-            yield* title({
-              session,
-              modelID: lastUser.model.modelID,
-              providerID: lastUser.model.providerID,
-              history: msgs,
-            }).pipe(Effect.ignore, Effect.forkIn(scope))
-
           const model = yield* getModel(lastUser.model.providerID, lastUser.model.modelID, sessionID)
+          if (step === 1) yield* title({ session, model, history: msgs }).pipe(Effect.ignore, Effect.forkIn(scope))
           const task = tasks.pop()
 
           if (task?.type === "subtask") {
