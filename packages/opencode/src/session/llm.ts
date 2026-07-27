@@ -140,6 +140,13 @@ const live: Layer.Layer<
         mergeDeep(input.agent.options),
         mergeDeep(variant),
       )
+      if (
+        input.agent.name === "title" &&
+        input.model.api.npm === "@ai-sdk/openai-compatible" &&
+        input.model.api.id.toLowerCase().includes("qwen3")
+      ) {
+        options["chat_template_kwargs"] = { enable_thinking: false }
+      }
       if (isOpenaiOauth) {
         options.instructions = system.join("\n")
       }
@@ -174,7 +181,7 @@ const live: Layer.Layer<
             : undefined,
           topP: input.agent.topP ?? ProviderTransform.topP(input.model),
           topK: ProviderTransform.topK(input.model),
-          maxOutputTokens: ProviderTransform.maxOutputTokens(input.model),
+          maxOutputTokens: input.agent.name === "title" ? 96 : ProviderTransform.maxOutputTokens(input.model),
           options,
         },
       )
