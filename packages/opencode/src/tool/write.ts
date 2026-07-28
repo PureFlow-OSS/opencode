@@ -44,7 +44,9 @@ export const WriteTool = Tool.define(
           yield* assertExternalDirectoryEffect(ctx, filepath)
 
           const exists = yield* fs.existsSafe(filepath)
-          const source = exists ? yield* Bom.readFile(fs, filepath) : { bom: false, text: "" }
+          const source = exists
+            ? yield* Bom.readFile(fs, filepath)
+            : { bom: false, text: "", encoding: "utf-8" as const }
           const next = Bom.split(params.content)
           const desiredBom = source.bom || next.bom
           const contentOld = source.text
@@ -61,9 +63,9 @@ export const WriteTool = Tool.define(
             },
           })
 
-          yield* fs.writeWithDirs(filepath, Bom.join(contentNew, desiredBom))
-          if (yield* format.file(filepath)) {
-            yield* Bom.syncFile(fs, filepath, desiredBom)
+          yield* Bom.writeFile(fs, filepath, contentNew, desiredBom, source.encoding)
+          if (source.encoding === "utf-8" && (yield* format.file(filepath))) {
+            yield* Bom.syncFile(fs, filepath, desiredBom, source.encoding)
           }
           yield* events.publish(FileSystem.Event.Edited, { file: filepath })
           yield* events.publish(Watcher.Event.Updated, {

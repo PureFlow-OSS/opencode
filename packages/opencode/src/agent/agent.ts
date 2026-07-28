@@ -234,7 +234,7 @@ const layer = Layer.effect(
           title: {
             name: "title",
             mode: "primary",
-            options: {},
+            options: { timeout: 30_000, chunkTimeout: 30_000 },
             native: true,
             hidden: true,
             temperature: 0.5,
