@@ -14,14 +14,14 @@ export const todoState = (input: {
   count: number
   done: boolean
   live: boolean
-}): "hide" | "clear" | "open" | "close" | "hold" => {
+}): "hide" | "clear" | "open" | "close" => {
   if (input.count === 0) return "hide"
-  if (!input.live) return input.done ? "clear" : "hold"
+  if (!input.live) return "clear"
   if (!input.done) return "open"
   return "close"
 }
 
-export const todoDockAtBoundary = (state: ReturnType<typeof todoState>) => state === "open" || state === "hold"
+export const todoDockAtBoundary = (state: ReturnType<typeof todoState>) => state === "open"
 
 const idle = { type: "idle" as const }
 
@@ -75,19 +75,14 @@ export function createSessionComposerController(options?: { closeMs?: number | (
     return store.responding === perm.id
   })
 
-  const decide = (response: "once" | "always" | "reject" | "full-access") => {
+  const decide = (response: "once" | "always" | "reject") => {
     const perm = permissionRequest()
     if (!perm) return
     if (store.responding === perm.id) return
 
-    if (response === "full-access") permission.enableAutoAcceptDirectory(sdk().directory)
     setStore("responding", perm.id)
     sdk()
-      .client.permission.respond({
-        sessionID: perm.sessionID,
-        permissionID: perm.id,
-        response: response === "full-access" ? "once" : response,
-      })
+      .api.permission.reply({ sessionID: perm.sessionID, requestID: perm.id, reply: response })
       .catch((err: unknown) => {
         const description = err instanceof Error ? err.message : String(err)
         showToast({ title: language.t("common.requestFailed"), description })
@@ -154,13 +149,6 @@ export function createSessionComposerController(options?: { closeMs?: number | (
           if (timer) window.clearTimeout(timer)
           timer = undefined
           clear()
-          return
-        }
-
-        if (next === "hold") {
-          if (timer) window.clearTimeout(timer)
-          timer = undefined
-          setStore({ dock: true, closing: false, opening: false })
           return
         }
 

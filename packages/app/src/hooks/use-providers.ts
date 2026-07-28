@@ -2,30 +2,29 @@ import { useServerSync } from "@/context/server-sync"
 import { decode64 } from "@/utils/base64"
 import { useParams } from "@solidjs/router"
 import { Iterable, pipe } from "effect"
-import type { Accessor } from "solid-js"
+import { createEffect, createMemo, type Accessor } from "solid-js"
 import { selectProviderCatalog } from "./provider-catalog"
 
 export const popularProviders = [
-  "aifactory",
+  "opencode",
+  "opencode-go",
+  "anthropic",
+  "github-copilot",
+  "openai",
+  "google",
+  "openrouter",
+  "vercel",
 ]
 const popularProviderSet = new Set(popularProviders)
 
-export function isVisibleProvider(id: string) {
-  return id === "aifactory" || id.startsWith("github-copilot")
-}
-
-export function isModelProviderVisible(id: string) {
-  return id === "aifactory" || id.startsWith("github-copilot")
-}
-
-export function useProviders(directory?: Accessor<string | undefined>) {
+export function useProviders(directory: Accessor<string | undefined>) {
   const serverSync = useServerSync()
   const params = useParams()
   const dir = () => (directory ? directory() : decode64(params.dir))
   const providers = () => {
     const value = dir()
     const projectStore = value ? serverSync().child(value)[0] : undefined
-    if (directory)
+    if (value)
       return selectProviderCatalog({
         explicit: true,
         directory: value,
@@ -38,6 +37,7 @@ export function useProviders(directory?: Accessor<string | undefined>) {
       global: serverSync().data.provider,
     })
   }
+
   return {
     all: () => providers().all,
     default: () => providers().default,
@@ -59,7 +59,7 @@ export function useProviders(directory?: Accessor<string | undefined>) {
     },
     paid: () => {
       const connected = new Set(providers().connected)
-      return [
+      const paid = [
         ...Iterable.filter(
           providers().all,
           ([id]) =>
@@ -67,6 +67,7 @@ export function useProviders(directory?: Accessor<string | undefined>) {
             (id !== "opencode" || Object.values(providers().all.get(id)?.models ?? {}).some((m) => m.cost?.input)),
         ),
       ]
+      return paid
     },
   }
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { $ } from "bun"
 
-import { resolveChannel } from "./utils"
+import { downloadCliToResources, resolveChannel } from "./utils"
 
 const channel = resolveChannel()
 process.env.OPENCODE_CHANNEL = channel
@@ -10,3 +10,4 @@ await $`bun ./scripts/copy-metainfo.ts ${channel}`
 await $`bun ./scripts/build-updater-helper.ts`
 
 await $`cd ../opencode && bun script/build-node.ts`
+if (channel === "dev") await downloadCliToResources()

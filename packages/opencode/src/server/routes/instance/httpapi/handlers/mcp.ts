@@ -42,7 +42,7 @@ export const mcpHandlers = HttpApiBuilder.group(InstanceHttpApi, "mcp", (handler
       payload: typeof AuthCallbackPayload.Type
     }) {
       return yield* mcp
-        .finishAuth(ctx.params.name, ctx.payload.code)
+        .finishAuth(ctx.params.name, ctx.payload.code, ctx.payload.iss)
         .pipe(
           Effect.catchTag("MCP.NotFoundError", (error) =>
             Effect.fail(

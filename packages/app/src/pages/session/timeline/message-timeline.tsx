@@ -283,6 +283,14 @@ export function MessageTimeline(props: {
     return sync().data.session_status[id] ?? idle
   })
   const sessionMessages = createMemo(() => (sessionID() ? (sync().data.message[sessionID()!] ?? []) : []))
+  const projectedMessages = createMemo(() => {
+    const id = sessionID()
+    if (!id) return []
+    const visible = new Set(props.userMessages.map((message) => message.id))
+    const boundary = sessionMessages().find((message) => message.role === "user" && !visible.has(message.id))?.id
+    const messages = sync().data.session_message[id] ?? []
+    return boundary ? messages.filter((message) => message.id < boundary) : messages
+  })
   const info = createMemo(() => {
     const id = sessionID()
     if (!id) return
@@ -325,6 +333,7 @@ export function MessageTimeline(props: {
   const projection = createTimelineProjection({
     messages: sessionMessages,
     userMessages: () => props.userMessages,
+    sessionMessages: projectedMessages,
     parts: getMsgParts,
     status: sessionStatus,
     showReasoningSummaries: settings.general.showReasoningSummaries,
@@ -664,15 +673,18 @@ export function MessageTimeline(props: {
   }))
 
   const titleMutation = useMutation(() => ({
-    mutationFn: (input: { id: string; title: string; previousTitle: string }) =>
-      sdk().client.session.update({ sessionID: input.id, title: input.title }),
+    mutationFn: (input: { id: string; title: string }) =>
+      sdk().api.session.rename({ sessionID: input.id, title: input.title }),
     onSuccess: (_, input) => {
+      sync().set(
+        produce((draft) => {
+          const index = draft.session.findIndex((s) => s.id === input.id)
+          if (index !== -1) draft.session[index].title = input.title
+        }),
+      )
       setTitle("editing", false)
     },
-    onError: (err, input) => {
-      const session = sync().session.get(input.id)
-      if (session?.title === input.title) sync().session.remember({ ...session, title: input.previousTitle })
-      setTitle("editing", false)
+    onError: (err) => {
       showToast({
         title: language.t("common.requestFailed"),
         description: errorMessage(err),
@@ -775,10 +787,7 @@ export function MessageTimeline(props: {
       return
     }
 
-    const session = sync().session.get(id)
-    if (!session) return
-    sync().session.remember({ ...session, title: next })
-    titleMutation.mutate({ id, title: next, previousTitle: session.title ?? "" })
+    titleMutation.mutate({ id, title: next })
   }
 
   const navigateAfterSessionRemoval = (sessionID: string, parentID?: string, nextSessionID?: string) => {
@@ -803,13 +812,14 @@ export function MessageTimeline(props: {
   const archiveSession = async (sessionID: string) => {
     const session = sync().session.get(sessionID)
     if (!session) return
+    if ((await sdk().protocol) !== "v1") return
 
     const sessions = sync().data.session ?? []
     const index = sessions.findIndex((s) => s.id === sessionID)
     const nextSession = index === -1 ? undefined : (sessions[index + 1] ?? sessions[index - 1])
 
     await sdk()
-      .client.session.update({ sessionID, time: { archived: Date.now() } })
+      .client.session.update({ sessionID, directory: sdk().directory, time: { archived: Date.now() } })
       .then(() => {
         sync().set(
           produce((draft) => {
@@ -838,8 +848,8 @@ export function MessageTimeline(props: {
     const nextSession = index === -1 ? undefined : (sessions[index + 1] ?? sessions[index - 1])
 
     const result = await sdk()
-      .client.session.delete({ sessionID })
-      .then((x) => x.data)
+      .api.session.remove({ sessionID })
+      .then(() => true)
       .catch((err) => {
         showToast({
           title: language.t("session.delete.failed.title"),
