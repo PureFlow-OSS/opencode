@@ -17,7 +17,15 @@ export const popularProviders = [
 ]
 const popularProviderSet = new Set(popularProviders)
 
-export function useProviders(directory: Accessor<string | undefined>) {
+export function isVisibleProvider(id: string) {
+  return id === "aifactory" || id.startsWith("github-copilot")
+}
+
+export function isModelProviderVisible(id: string) {
+  return id === "aifactory" || id.startsWith("github-copilot")
+}
+
+export function useProviders(directory?: Accessor<string | undefined>) {
   const serverSync = useServerSync()
   const params = useParams()
   const dir = () => (directory ? directory() : decode64(params.dir))
