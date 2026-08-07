@@ -283,6 +283,14 @@ function ProviderConnection(props: {
     if (value.type === "api") return language.t("provider.connect.method.apiKey")
     return value.label ?? ""
   }
+  const tokenLabel = () =>
+    props.provider === "aifactory"
+      ? "User token"
+      : language.t("provider.connect.apiKey.label", { provider: providerName() })
+  const tokenDescription = () =>
+    props.provider === "aifactory"
+      ? "Enter your RRZ AI Factory user token to connect and load models from RRZ AI Factory."
+      : language.t("provider.connect.apiKey.description", { provider: providerName() })
 
   function formatError(value: unknown, fallback: string): string {
     if (value && typeof value === "object" && "data" in value) {
@@ -603,17 +611,15 @@ function ProviderConnection(props: {
             </div>
           </Match>
           <Match when={true}>
-            <div class="text-14-regular text-text-base">
-              {language.t("provider.connect.apiKey.description", { provider: providerName() })}
-            </div>
+            <div class="text-14-regular text-text-base">{tokenDescription()}</div>
           </Match>
         </Switch>
         <form onSubmit={handleSubmit} class="flex flex-col items-start gap-4">
           <TextField
             autofocus
             type="text"
-            label={language.t("provider.connect.apiKey.label", { provider: providerName() })}
-            placeholder={language.t("provider.connect.apiKey.placeholder")}
+            label={tokenLabel()}
+            placeholder={props.provider === "aifactory" ? "User token" : language.t("provider.connect.apiKey.placeholder")}
             name="apiKey"
             value={formStore.value}
             onChange={(v) => setFormStore("value", v)}

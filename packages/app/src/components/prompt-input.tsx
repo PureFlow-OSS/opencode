@@ -45,9 +45,11 @@ import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Select } from "@opencode-ai/ui/select"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { DialogConnectProvider, useProviderConnectController } from "@/components/dialog-connect-provider"
 import { ModelSelectorPopover, ModelSelectorPopoverV2 } from "@/components/dialog-select-model"
 import { DialogSelectModelUnpaid } from "@/components/dialog-select-model-unpaid"
 import { DialogSelectModelUnpaidV2 } from "@/components/dialog-select-model-unpaid-v2"
+import { useProviders } from "@/hooks/use-providers"
 import { useCommand } from "@/context/command"
 import { Persist, persisted } from "@/utils/persist"
 import { usePermission } from "@/context/permission"
@@ -220,6 +222,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const layout = useLayout()
   const comments = useComments()
   const dialog = useDialog()
+  const providers = useProviders()
+  const providerConnect = useProviderConnectController()
+  const promptedAiFactory = { value: false }
   const command = useCommand()
   const permission = usePermission()
   const language = useLanguage()
@@ -1543,6 +1548,16 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     () => prompt.ready.promise,
     (p) => p,
   )
+
+  createEffect(() => {
+    if (promptedAiFactory.value) return
+    if (providersLoading()) return
+    if (providers.connected().some((item) => item.id === "aifactory")) return
+
+    promptedAiFactory.value = true
+    providerConnect.select("aifactory")
+    dialog.show(() => <DialogConnectProvider controller={providerConnect} />)
+  })
 
   const designPlaceholder = () => {
     if (store.mode === "shell") return placeholder()
