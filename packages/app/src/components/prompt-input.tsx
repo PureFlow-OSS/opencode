@@ -26,6 +26,7 @@ import { Tooltip, TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Select } from "@opencode-ai/ui/select"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { DialogConnectProvider } from "@/components/dialog-connect-provider"
 import { ModelSelectorPopover } from "@/components/dialog-select-model"
 import { useProviders } from "@/hooks/use-providers"
 import { useCommand } from "@/context/command"
@@ -1272,14 +1273,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     if (store.promptedAiFactory) return
     if (providersLoading()) return
 
-    const configured = sync.data.config.model
-    if (!configured?.startsWith("aifactory/")) return
     if (providers.connected().some((item) => item.id === "aifactory")) return
 
     setStore("promptedAiFactory", true)
-    void import("@/components/dialog-connect-provider").then((x) => {
-      dialog.show(() => <x.DialogConnectProvider provider="aifactory" />)
-    })
+    dialog.show(() => <DialogConnectProvider provider="aifactory" />)
   })
 
   return (
