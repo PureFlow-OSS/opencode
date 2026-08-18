@@ -84,11 +84,12 @@ const elog = EffectLogger.create({ service: "session.prompt" })
 const UNSUPPORTED_DROP_DIR = process.platform === "win32" ? "C:\\Temp" : path.join(os.tmpdir(), "opencode-unsupported")
 const TITLE_MAX_LENGTH = 50
 
-function isModelReadableFile(mime: string) {
+function isModelReadableFile(mime: string, model?: Provider.Model) {
   return (
     mime === "text/plain" ||
     mime === "application/x-directory" ||
-    mime.startsWith("image/")
+    (mime.startsWith("image/") && model?.capabilities.input.image === true) ||
+    (mime === "application/pdf" && model?.capabilities.input.pdf === true)
   )
 }
 
@@ -1018,6 +1019,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       }
 
       const model = input.model ?? ag.model ?? (yield* lastModel(input.sessionID))
+      const modelInfo = yield* provider.getModel(model.providerID, model.modelID).pipe(Effect.option)
+      const readable = (mime: string) => isModelReadableFile(mime, Option.getOrUndefined(modelInfo))
       const same = ag.model && model.providerID === ag.model.providerID && model.modelID === ag.model.modelID
       const full =
         !input.variant && ag.variant && same
@@ -1127,7 +1130,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                   { ...part, messageID: info.id, sessionID: input.sessionID },
                 ]
               }
-              if (!isModelReadableFile(part.mime)) {
+              if (!readable(part.mime)) {
                 const filename = part.filename ?? "attachment"
                 const target = path.join(UNSUPPORTED_DROP_DIR, path.basename(filename))
                 const exit = yield* fsys.writeWithDirs(target, decodeDataUrlBytes(part.url)).pipe(Effect.exit)
@@ -1318,7 +1321,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 ]
               }
 
-              if (!isModelReadableFile(part.mime)) {
+              if (!readable(part.mime)) {
                 const target = path.join(UNSUPPORTED_DROP_DIR, path.basename(filepath))
                 const exit = yield* fsys.readFile(filepath).pipe(
                   Effect.flatMap((content) => fsys.writeWithDirs(target, content)),

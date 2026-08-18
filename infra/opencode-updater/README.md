@@ -377,6 +377,13 @@ Supported per-rule overrides:
 - `reasoning`
 - `modalities.input`
 - `modalities.output`
+- `document_vision` (default: `false`; enabled models accept images and PDFs as direct attachments)
+
+## Document Vision
+
+The **Document Vision** checkbox on each model card persists a per-model setting in the updater database. It is off by default. When enabled, the updater publishes `document_vision: true` for that exact model; OpenCode then sends image and PDF attachments directly to the model. When disabled, OpenCode keeps the existing fallback behavior and copies those attachments to its temporary directory for MCP-based processing.
+
+Use this only for models and LiteLLM routes that are verified to accept the resulting Base64 data URI payloads. A large PDF still expands by roughly one third when Base64 encoded, so the proxy and its upstream worker must permit the corresponding request size.
 
 ## Model visibility example
 
