@@ -1,3 +1,9 @@
+# v1.14.37
+
+## Fixed
+
+- Added thinking effort selection for Qwen3.6-27B-FP8.
+
 # v1.14.36
 
 ## Added
