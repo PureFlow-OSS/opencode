@@ -69,6 +69,7 @@ type AiFactoryModelLimitRule = {
   temperature?: boolean
   reasoning?: boolean
   modalities?: AiFactoryModalities
+  documentVision?: boolean
 }
 
 type AiFactoryModality = "text" | "audio" | "image" | "video" | "pdf"
@@ -82,6 +83,7 @@ type AiFactoryModelOverrides = {
   temperature?: boolean
   reasoning?: boolean
   modalities?: AiFactoryModalities
+  documentVision?: boolean
 }
 
 function globToRegExp(pattern: string) {
@@ -106,6 +108,7 @@ function resolveAiFactoryModelOverrides(modelID: string, rules: AiFactoryModelLi
     temperature: match.temperature,
     reasoning: match.reasoning,
     modalities: match.modalities,
+    documentVision: match.documentVision,
   }
 }
 
@@ -155,6 +158,7 @@ async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch, init: Request
             temperature?: boolean
             reasoning?: boolean
             modalities?: unknown
+            document_vision?: boolean
           }>
         }
       }
@@ -170,6 +174,7 @@ async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch, init: Request
           temperature: typeof rule.temperature === "boolean" ? rule.temperature : undefined,
           reasoning: typeof rule.reasoning === "boolean" ? rule.reasoning : undefined,
           modalities: normalizeAiFactoryModalities(rule.modalities),
+          documentVision: typeof rule.document_vision === "boolean" ? rule.document_vision : undefined,
         } satisfies AiFactoryModelLimitRule,
       ]
     })
@@ -182,6 +187,9 @@ function buildAiFactoryModel(
   rules?: AiFactoryModelLimitRule[],
 ): Model {
   const overrides = resolveAiFactoryModelOverrides(modelID, rules)
+  const inputModalities: AiFactoryModality[] | undefined = overrides.documentVision
+    ? [...new Set<AiFactoryModality>([...(overrides.modalities?.input ?? ["text"]), "image", "pdf"])]
+    : overrides.modalities?.input?.filter((modality) => modality !== "image" && modality !== "pdf")
   const base: Model = {
     id: ModelID.make(modelID),
     providerID: AIFACTORY_ID,
@@ -207,9 +215,9 @@ function buildAiFactoryModel(
     capabilities: {
       temperature: overrides.temperature ?? true,
       reasoning: overrides.reasoning ?? true,
-      attachment: overrides.modalities?.input?.some((item) => item !== "text") ?? false,
+      attachment: inputModalities?.some((item) => item !== "text") ?? false,
       toolcall: true,
-      input: aiFactoryModalityFlags(overrides.modalities?.input, {
+      input: aiFactoryModalityFlags(inputModalities, {
         text: true,
         audio: false,
         image: false,
