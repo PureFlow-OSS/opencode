@@ -2113,6 +2113,24 @@ describe("ProviderTransform.variants", () => {
     expect(result).toEqual({})
   })
 
+  test("qwen 3.6 27B FP8 returns small, medium, and xhigh thinking variants", () => {
+    const model = createMockModel({
+      id: "qwen/Qwen3.6-27B-FP8",
+      providerID: "qwen",
+      api: {
+        id: "Qwen3.6-27B-FP8",
+        url: "https://api.qwen.ai",
+        npm: "@ai-sdk/openai-compatible",
+      },
+    })
+    const result = ProviderTransform.variants(model)
+    expect(result).toEqual({
+      small: { reasoningEffort: "small" },
+      medium: { reasoningEffort: "medium" },
+      xhigh: { reasoningEffort: "xhigh" },
+    })
+  })
+
   test("mistral with reasoning returns variants", () => {
     const model = createMockModel({
       id: "mistral/mistral-small-latest",
