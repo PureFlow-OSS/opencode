@@ -106,6 +106,19 @@
   overflow-wrap: anywhere;
 }
 
+.document-vision span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: rgba(242, 244, 248, 0.76);
+  font-size: 13px;
+}
+
+.document-vision input {
+  accent-color: #5d9cec;
+}
+
 @media (max-width: 900px) {
   .cards {
     grid-template-columns: 1fr;

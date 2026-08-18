@@ -36,6 +36,7 @@ type AuditRecord = {
 
 type ModelCard = {
   model: string
+  documentVision: boolean
   context?: number | null
   output?: number | null
   temperature?: boolean | null
@@ -163,5 +164,15 @@ export class ApiService {
 
   async listModelCards() {
     return this.readJson<ModelCardsResponse>(await fetch("/opencode/modelcards.json"))
+  }
+
+  async setDocumentVision(model: string, enabled: boolean) {
+    return this.readJson<{ model: string; document_vision: boolean }>(
+      await fetch(`/opencode/admin/models/${encodeURIComponent(model)}/document-vision`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      }),
+    )
   }
 }

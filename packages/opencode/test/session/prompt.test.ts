@@ -254,6 +254,26 @@ function providerCfg(url: string) {
   }
 }
 
+const visionCfg = {
+  ...cfg,
+  provider: {
+    ...cfg.provider,
+    test: {
+      ...cfg.provider.test,
+      models: {
+        "test-model": {
+          ...cfg.provider.test.models["test-model"],
+          attachment: true,
+          modalities: {
+            input: ["text", "image", "pdf"] as Array<"text" | "image" | "pdf">,
+            output: ["text"] as Array<"text">,
+          },
+        },
+      },
+    },
+  },
+}
+
 const user = Effect.fn("test.user")(function* (sessionID: SessionID, text: string) {
   const session = yield* Session.Service
   const msg = yield* session.updateMessage({
@@ -1812,6 +1832,38 @@ it.live("copies pdf dropped files for MCP processing", () =>
         yield* sessions.remove(session.id)
       }),
     { git: true, config: cfg },
+  ),
+)
+
+it.live("keeps PDFs as direct attachments for vision-capable models", () =>
+  provideTmpdirInstance(
+    (dir) =>
+      Effect.gen(function* () {
+        const source = path.join(dir, "vision-document.pdf")
+        yield* Effect.promise(() => Bun.write(source, "%PDF-1.7\nvision"))
+
+        const prompt = yield* SessionPrompt.Service
+        const sessions = yield* Session.Service
+        const session = yield* sessions.create({})
+        const msg = yield* prompt.prompt({
+          sessionID: session.id,
+          agent: "build",
+          noReply: true,
+          parts: [
+            {
+              type: "file",
+              mime: "application/pdf",
+              url: `file://${source}`,
+              filename: "vision-document.pdf",
+            },
+          ],
+        })
+
+        expect(msg.parts.some((part) => part.type === "file" && part.mime === "application/pdf")).toBe(true)
+        expect(msg.parts.some((part) => part.type === "text" && part.text.includes("It was copied to"))).toBe(false)
+        yield* sessions.remove(session.id)
+      }),
+    { git: true, config: visionCfg },
   ),
 )
 

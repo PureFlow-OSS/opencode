@@ -13,6 +13,7 @@ using System.Data.Common;
 using System.Data;
 using System.IO.Compression;
 using System.Text.RegularExpressions;
+using System.Collections.Concurrent;
 using Quartz;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -46,6 +47,7 @@ builder.Services.AddSingleton<UpdaterChannelStateStore>();
 builder.Services.AddSingleton<UpdaterVersionResolver>();
 builder.Services.AddSingleton<UpdaterRolloutResolver>();
 builder.Services.AddSingleton<ModelCardStore>();
+builder.Services.AddSingleton<ModelFeatureStore>();
 var modelCardSyncSeconds = Math.Max(60, betaConfiguration.GetSection("UpdaterBeta:LiteLLM:SyncIntervalSeconds").Get<int?>() ?? 600);
 builder.Services.AddQuartz((quartz) =>
 {
@@ -83,6 +85,7 @@ using (var scope = app.Services.CreateScope())
   if (!await HasColumnAsync(db.Database, "Feedbacks", "AttachmentsJson"))
     db.Database.ExecuteSqlRaw(@"ALTER TABLE ""Feedbacks"" ADD COLUMN ""AttachmentsJson"" TEXT NULL");
   await EnsureAdminTablesAsync(db.Database.GetDbConnection(), scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>());
+  await scope.ServiceProvider.GetRequiredService<ModelFeatureStore>().LoadAsync();
 }
 
 app.MapGet("/opencode/admin", () => Results.Redirect("/opencode/admin/"));
@@ -366,17 +369,17 @@ app.MapGet("/opencode/changelog.md", async (HttpContext context, LocalFeed feed,
   return Results.NotFound();
 });
 
-app.MapGet("/opencode/provider-config.json", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver) =>
+app.MapGet("/opencode/provider-config.json", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver, ModelFeatureStore features) =>
 {
   var rollout = await rolloutResolver.ResolveAsync(request, request.HttpContext.RequestAborted);
-  return Results.Json(rollout.Options.ProviderConfig);
+  return Results.Json(features.ApplyDocumentVision(rollout.Options.ProviderConfig));
 });
 
-app.MapGet("/opencode/modelcards.json", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver) =>
+app.MapGet("/opencode/modelcards.json", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver, ModelFeatureStore features) =>
 {
   var rollout = await rolloutResolver.ResolveAsync(request, request.HttpContext.RequestAborted);
   var providerConfig = rollout.Options.ProviderConfig;
-  var cards = request.HttpContext.RequestServices.GetRequiredService<ModelCardStore>().BuildSnapshot(rollout.IsBeta, providerConfig);
+  var cards = request.HttpContext.RequestServices.GetRequiredService<ModelCardStore>().BuildSnapshot(rollout.IsBeta, providerConfig, features);
 
   return Results.Json(new
   {
@@ -389,6 +392,13 @@ app.MapGet("/opencode/modelcards.json", async (HttpRequest request, UpdaterRollo
       model_visibility = providerConfig.AiFactory.ModelVisibility,
     },
   });
+});
+
+app.MapPut("/opencode/admin/models/{model}/document-vision", async (string model, DocumentVisionRequest body, ModelFeatureStore features, CancellationToken cancellationToken) =>
+{
+  if (string.IsNullOrWhiteSpace(model)) return Results.BadRequest(new { error = "Model is required" });
+  await features.SetDocumentVisionAsync(model, body.Enabled, cancellationToken);
+  return Results.Ok(new { model, document_vision = body.Enabled });
 });
 
 app.MapGet("/opencode/feed/{**asset}", async (HttpContext context, LocalFeed feed, UpdaterRolloutResolver rolloutResolver, string? asset) =>
@@ -586,6 +596,12 @@ static async Task EnsureAdminTablesAsync(DbConnection connection, IWebHostEnviro
       Value INTEGER NOT NULL,
       UpdatedAt TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS UpdaterModelFeatures (
+      Model TEXT PRIMARY KEY NOT NULL,
+      DocumentVision INTEGER NOT NULL DEFAULT 0,
+      UpdatedAt TEXT NOT NULL
+    );
     """;
   await command.ExecuteNonQueryAsync();
 }
@@ -663,6 +679,7 @@ sealed record ModelCardEntry(
   int? Output,
   bool? Temperature,
   bool? Reasoning,
+  bool DocumentVision,
   ModelCardPrice? Price,
   ModelCardModalities? Modalities,
   string Source,
@@ -723,7 +740,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
   DateTimeOffset syncedAt = DateTimeOffset.MinValue;
   string? source;
 
-  public ModelCardSnapshot BuildSnapshot(bool isBeta, ProviderConfigOptions providerConfig)
+  public ModelCardSnapshot BuildSnapshot(bool isBeta, ProviderConfigOptions providerConfig, ModelFeatureStore features)
   {
     var models = cached.Select((model) =>
     {
@@ -743,6 +760,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
         match?.Output ?? model.Output,
         match?.Temperature ?? model.Temperature,
         match?.Reasoning ?? model.Reasoning,
+        features.IsDocumentVisionEnabled(model.Name),
         model.Price is null ? null : new ModelCardPrice(model.InputPrice is null ? null : model.InputPrice * 1000000m, model.OutputPrice is null ? null : model.OutputPrice * 1000000m),
         match?.Modalities is null ? model.Modalities : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? []),
         model.Source,
@@ -1038,6 +1056,68 @@ sealed class AiFactoryConfigOptions
   public List<ModelVisibilityRuleOptions> ModelVisibility { get; set; } = [];
 }
 
+sealed class DocumentVisionRequest
+{
+  [JsonPropertyName("enabled")]
+  public bool Enabled { get; set; }
+}
+
+sealed class ModelFeatureStore(IWebHostEnvironment env)
+{
+  readonly string dbPath = Path.Combine(env.ContentRootPath, "data", "feedback.db");
+  readonly ConcurrentDictionary<string, bool> documentVision = new(StringComparer.OrdinalIgnoreCase);
+
+  async Task<SqliteConnection> OpenAsync()
+  {
+    var connection = new SqliteConnection($"Data Source={dbPath}");
+    await connection.OpenAsync();
+    return connection;
+  }
+
+  public async Task LoadAsync()
+  {
+    await using var connection = await OpenAsync();
+    await using var command = connection.CreateCommand();
+    command.CommandText = "SELECT Model, DocumentVision FROM UpdaterModelFeatures WHERE DocumentVision = 1";
+    await using var reader = await command.ExecuteReaderAsync();
+    while (await reader.ReadAsync()) documentVision[reader.GetString(0)] = reader.GetInt64(1) != 0;
+  }
+
+  public bool IsDocumentVisionEnabled(string model) => documentVision.TryGetValue(model, out var enabled) && enabled;
+
+  public async Task SetDocumentVisionAsync(string model, bool enabled, CancellationToken cancellationToken)
+  {
+    await using var connection = await OpenAsync();
+    await using var command = connection.CreateCommand();
+    command.CommandText = """
+      INSERT INTO UpdaterModelFeatures (Model, DocumentVision, UpdatedAt)
+      VALUES ($model, $enabled, $updatedAt)
+      ON CONFLICT(Model) DO UPDATE SET DocumentVision = excluded.DocumentVision, UpdatedAt = excluded.UpdatedAt
+      """;
+    command.Parameters.AddWithValue("$model", model.Trim());
+    command.Parameters.AddWithValue("$enabled", enabled ? 1 : 0);
+    command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));
+    await command.ExecuteNonQueryAsync(cancellationToken);
+    if (enabled) documentVision[model.Trim()] = true;
+    else documentVision.TryRemove(model.Trim(), out _);
+  }
+
+  public ProviderConfigOptions ApplyDocumentVision(ProviderConfigOptions config) => new()
+  {
+    Model = config.Model,
+    SmallModel = config.SmallModel,
+    Mcp = config.Mcp,
+    AiFactory = new AiFactoryConfigOptions
+    {
+      ModelVisibility = config.AiFactory.ModelVisibility,
+      ModelLimits = documentVision.Keys
+        .Select((model) => new ModelLimitRuleOptions { Pattern = model, DocumentVision = true })
+        .Concat(config.AiFactory.ModelLimits)
+        .ToList(),
+    },
+  };
+}
+
 sealed class ModelLimitRuleOptions
 {
   [JsonPropertyName("pattern")]
@@ -1057,6 +1137,10 @@ sealed class ModelLimitRuleOptions
 
   [JsonPropertyName("modalities")]
   public ModalitiesOptions? Modalities { get; set; }
+
+  [ConfigurationKeyName("document_vision")]
+  [JsonPropertyName("document_vision")]
+  public bool? DocumentVision { get; set; }
 }
 
 sealed class ModelVisibilityRuleOptions

@@ -26,6 +26,18 @@ import { ApiService } from "./api.service"
                 </div>
               </div>
               <div class="meta-grid">
+                <label class="meta-item document-vision">
+                  <small>Document Vision</small>
+                  <span>
+                    <input
+                      type="checkbox"
+                      [checked]="model.documentVision"
+                      [disabled]="updating === model.model"
+                      (change)="setDocumentVision(model.model, $any($event.target).checked)"
+                    />
+                    Send images and PDFs directly
+                  </span>
+                </label>
                 <div class="meta-item">
                   <small>Context</small>
                   <strong>{{ formatNumber(model.context ?? model.config?.context) }}</strong>
@@ -74,6 +86,17 @@ export class ModelStatusPanelComponent {
   }))
 
   readonly models = () => this.modelCards.data()?.aifactory?.models ?? []
+  updating?: string
+
+  async setDocumentVision(model: string, enabled: boolean) {
+    this.updating = model
+    try {
+      await this.api.setDocumentVision(model, enabled)
+      await this.modelCards.refetch()
+    } finally {
+      this.updating = undefined
+    }
+  }
 
   formatNumber(value?: number | null) {
     if (value === undefined || value === null) return "n/a"
