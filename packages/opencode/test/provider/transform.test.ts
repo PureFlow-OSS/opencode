@@ -2113,12 +2113,12 @@ describe("ProviderTransform.variants", () => {
     expect(result).toEqual({})
   })
 
-  test("qwen 3.6 27B FP8 returns small, medium, and xhigh thinking variants", () => {
+  test("qwen 3.8 27B returns small, medium, and xhigh thinking variants", () => {
     const model = createMockModel({
-      id: "qwen/Qwen3.6-27B-FP8",
+      id: "qwen/Qwen3.8-27B",
       providerID: "qwen",
       api: {
-        id: "Qwen3.6-27B-FP8",
+        id: "Qwen3.8-27B",
         url: "https://api.qwen.ai",
         npm: "@ai-sdk/openai-compatible",
       },
