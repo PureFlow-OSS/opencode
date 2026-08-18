@@ -444,7 +444,7 @@ export function variants(model: Provider.Model): Record<string, Record<string, a
   const adaptiveEfforts = anthropicAdaptiveEfforts(model.api.id)
   if (id.includes("qwen3.8-27b")) {
     return Object.fromEntries(
-      ["small", "medium", "xhigh"].map((effort) => [effort, { reasoningEffort: effort }]),
+      ["low", "medium", "xhigh"].map((effort) => [effort, { reasoningEffort: effort }]),
     )
   }
   if (
