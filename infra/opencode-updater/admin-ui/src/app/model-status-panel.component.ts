@@ -64,6 +64,7 @@ import { ApiService, ModelSettings } from "./api.service"
                     </fieldset>
                   }
                   <label><input type="checkbox" [ngModel]="draft().document_vision" (ngModelChange)="setBoolean('document_vision', $event)" name="documentVision" /> Document Vision</label>
+                  <label><input type="checkbox" [ngModel]="draft().document_vision_native" (ngModelChange)="setBoolean('document_vision_native', $event)" name="documentVisionNative" /> Document Vision Native</label>
                   <label><input type="checkbox" [ngModel]="draft().visible" (ngModelChange)="setBoolean('visible', $event)" name="visible" /> Visible in OpenCode</label>
                   <label>Input modalities <input [ngModel]="draft().input_modalities?.join(', ')" (ngModelChange)="setModalities('input_modalities', $event)" name="inputModalities" placeholder="text, image" /></label>
                   <label>Output modalities <input [ngModel]="draft().output_modalities?.join(', ')" (ngModelChange)="setModalities('output_modalities', $event)" name="outputModalities" placeholder="text" /></label>
@@ -82,6 +83,7 @@ import { ApiService, ModelSettings } from "./api.service"
                     <div class="meta-item"><small>Default reasoning</small><strong>{{ model.config?.defaultReasoningVariant ?? model.defaultReasoningVariant ?? 'n/a' }}</strong></div>
                   }
                   <div class="meta-item"><small>Document Vision</small><strong>{{ formatBoolean(model.config?.documentVision ?? model.documentVision) }}</strong></div>
+                  <div class="meta-item"><small>Document Vision Native</small><strong>{{ formatBoolean(model.config?.documentVisionNative ?? model.documentVisionNative) }}</strong></div>
                   <div class="meta-item"><small>Visible in OpenCode</small><strong>{{ formatBoolean(model.visible) }}</strong></div>
                   <div class="meta-item"><small>Input Cost /1M</small><strong>{{ formatPrice(model.price?.input ?? model.liteLLM?.inputCostPerMillionTokens) }}</strong></div>
                   <div class="meta-item"><small>Output Cost /1M</small><strong>{{ formatPrice(model.price?.output ?? model.liteLLM?.outputCostPerMillionTokens) }}</strong></div>
@@ -121,7 +123,7 @@ export class ModelStatusPanelComponent {
     this.success.set(null)
   }
 
-  edit(model: { model: string; context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; reasoningVariants?: string[] | null; defaultReasoningVariant?: string | null; documentVision?: boolean; visible?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null; config?: { context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; reasoningVariants?: string[] | null; defaultReasoningVariant?: string | null; documentVision?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null } | null }) {
+  edit(model: { model: string; context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; reasoningVariants?: string[] | null; defaultReasoningVariant?: string | null; documentVision?: boolean; documentVisionNative?: boolean; visible?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null; config?: { context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; reasoningVariants?: string[] | null; defaultReasoningVariant?: string | null; documentVision?: boolean | null; documentVisionNative?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null } | null }) {
     this.editing.set(model.model)
     this.draft.set({
       context: model.config?.context ?? model.context ?? null,
@@ -131,6 +133,7 @@ export class ModelStatusPanelComponent {
       reasoning_variants: model.config?.reasoningVariants ?? model.reasoningVariants ?? [],
       default_reasoning_variant: model.config?.defaultReasoningVariant ?? model.defaultReasoningVariant ?? null,
       document_vision: model.config?.documentVision ?? model.documentVision ?? false,
+      document_vision_native: model.config?.documentVisionNative ?? model.documentVisionNative ?? false,
       visible: model.visible ?? true,
       input_modalities: model.modalities?.input ?? model.config?.modalities?.input ?? [],
       output_modalities: model.modalities?.output ?? model.config?.modalities?.output ?? [],
@@ -141,7 +144,7 @@ export class ModelStatusPanelComponent {
     this.draft.update((draft) => ({ ...draft, [key]: value === "" ? null : Number(value) }))
   }
 
-  setBoolean(key: "temperature" | "reasoning" | "document_vision" | "visible", value: boolean) {
+  setBoolean(key: "temperature" | "reasoning" | "document_vision" | "document_vision_native" | "visible", value: boolean) {
     this.draft.update((draft) => key === "reasoning" && !value ? { ...draft, reasoning: value, reasoning_variants: [], default_reasoning_variant: null } : { ...draft, [key]: value })
   }
 

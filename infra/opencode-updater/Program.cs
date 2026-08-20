@@ -837,6 +837,7 @@ sealed record ModelCardEntry(
   string[]? ReasoningVariants,
   string? DefaultReasoningVariant,
   bool DocumentVision,
+  bool DocumentVisionNative,
   bool? Visible,
   ModelCardPrice? Price,
   ModelCardModalities? Modalities,
@@ -854,6 +855,7 @@ sealed record ModelCardConfig(
   string[]? ReasoningVariants,
   string? DefaultReasoningVariant,
   bool? DocumentVision,
+  bool? DocumentVisionNative,
   ModelCardModalities? Modalities
 );
 
@@ -927,6 +929,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
         match?.ReasoningVariants,
         match?.DefaultReasoningVariant,
         match?.DocumentVision ?? false,
+        match?.DocumentVisionNative ?? false,
         visibility,
         model.Price is null ? null : new ModelCardPrice(model.InputPrice is null ? null : model.InputPrice * 1000000m, model.OutputPrice is null ? null : model.OutputPrice * 1000000m),
         match?.Modalities is null ? model.Modalities : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? []),
@@ -942,6 +945,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
             match.ReasoningVariants,
             match.DefaultReasoningVariant,
             match.DocumentVision,
+            match.DocumentVisionNative,
             match.Modalities is null ? null : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? [])
           ),
         new ModelCardLiteLLM(
@@ -1263,6 +1267,10 @@ sealed class ModelLimitRuleOptions
   [ConfigurationKeyName("document_vision")]
   [JsonPropertyName("document_vision")]
   public bool? DocumentVision { get; set; }
+
+  [ConfigurationKeyName("document_vision_native")]
+  [JsonPropertyName("document_vision_native")]
+  public bool? DocumentVisionNative { get; set; }
 }
 
 sealed class ModelSettingsRequest
@@ -1287,6 +1295,9 @@ sealed class ModelSettingsRequest
 
   [JsonPropertyName("document_vision")]
   public bool? DocumentVision { get; set; }
+
+  [JsonPropertyName("document_vision_native")]
+  public bool? DocumentVisionNative { get; set; }
 
   [JsonPropertyName("visible")]
   public bool? Visible { get; set; }
@@ -1323,6 +1334,7 @@ sealed class UpdaterConfigStore(IWebHostEnvironment environment)
       rule["reasoning_variants"] = JsonSerializer.SerializeToNode(settings.ReasoningVariants ?? [], json);
       rule["default_reasoning_variant"] = settings.DefaultReasoningVariant;
       rule["document_vision"] = settings.DocumentVision;
+      rule["document_vision_native"] = settings.DocumentVisionNative;
       rule["modalities"] = new JsonObject
       {
         ["input"] = JsonSerializer.SerializeToNode(settings.InputModalities ?? [], json),

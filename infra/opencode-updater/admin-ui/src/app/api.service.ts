@@ -42,6 +42,7 @@ type ModelCard = {
   reasoningVariants?: string[] | null
   defaultReasoningVariant?: string | null
   documentVision?: boolean
+  documentVisionNative?: boolean
   visible?: boolean | null
   price?: { input?: number | null; output?: number | null } | null
   modalities?: { input?: string[]; output?: string[] } | null
@@ -55,6 +56,7 @@ type ModelCard = {
     reasoningVariants?: string[] | null
     defaultReasoningVariant?: string | null
     documentVision?: boolean | null
+    documentVisionNative?: boolean | null
     modalities?: { input?: string[]; output?: string[] } | null
   } | null
   liteLLM?: {
@@ -92,6 +94,7 @@ export type ModelSettings = {
   reasoning_variants?: string[] | null
   default_reasoning_variant?: string | null
   document_vision?: boolean | null
+  document_vision_native?: boolean | null
   visible?: boolean | null
   input_modalities?: string[]
   output_modalities?: string[]

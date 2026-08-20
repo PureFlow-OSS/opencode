@@ -70,6 +70,7 @@ type AiFactoryModelLimitRule = {
   reasoning?: boolean
   modalities?: AiFactoryModalities
   documentVision?: boolean
+  documentVisionNative?: boolean
   options?: Record<string, any>
   variants?: Record<string, Record<string, any>>
 }
@@ -86,6 +87,7 @@ type AiFactoryModelOverrides = {
   reasoning?: boolean
   modalities?: AiFactoryModalities
   documentVision?: boolean
+  documentVisionNative?: boolean
   options?: Record<string, any>
   variants?: Record<string, Record<string, any>>
 }
@@ -118,6 +120,7 @@ function resolveAiFactoryModelOverrides(
     reasoning: value<boolean>("reasoning"),
     modalities: value<AiFactoryModalities>("modalities"),
     documentVision: value<boolean>("documentVision"),
+    documentVisionNative: value<boolean>("documentVisionNative"),
     options: value<Record<string, any>>("options"),
     variants: value<Record<string, Record<string, any>>>("variants"),
   }
@@ -180,6 +183,7 @@ async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch, init: Request
               reasoning?: boolean
               modalities?: unknown
               document_vision?: boolean
+              document_vision_native?: boolean
               options?: unknown
               variants?: unknown
             }>
@@ -198,6 +202,8 @@ async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch, init: Request
         reasoning: typeof rule.reasoning === "boolean" ? rule.reasoning : undefined,
         modalities: normalizeAiFactoryModalities(rule.modalities),
         documentVision: typeof rule.document_vision === "boolean" ? rule.document_vision : undefined,
+        documentVisionNative:
+          typeof rule.document_vision_native === "boolean" ? rule.document_vision_native : undefined,
         options: isRecord(rule.options) ? rule.options : undefined,
         variants: normalizeAiFactoryVariants(rule.variants),
       } satisfies AiFactoryModelLimitRule,
@@ -212,14 +218,16 @@ function buildAiFactoryModel(
   rules?: AiFactoryModelLimitRule[],
 ): Model {
   const overrides = resolveAiFactoryModelOverrides(modelID, rules)
-  const inputModalities: AiFactoryModality[] | undefined = overrides.documentVision
-    ? [
-        ...new Set<AiFactoryModality>([
-          ...(overrides.modalities?.input ?? ["text"]).filter((item) => item !== "pdf"),
-          "image",
-        ]),
-      ]
-    : overrides.modalities?.input?.filter((modality) => modality !== "image" && modality !== "pdf")
+  const inputModalities: AiFactoryModality[] | undefined = overrides.documentVisionNative
+    ? [...new Set<AiFactoryModality>([...(overrides.modalities?.input ?? ["text"]), "pdf"])]
+    : overrides.documentVision
+      ? [
+          ...new Set<AiFactoryModality>([
+            ...(overrides.modalities?.input ?? ["text"]).filter((item) => item !== "pdf"),
+            "image",
+          ]),
+        ]
+      : overrides.modalities?.input?.filter((modality) => modality !== "image" && modality !== "pdf")
   const base: Model = {
     id: ModelID.make(modelID),
     providerID: AIFACTORY_ID,
