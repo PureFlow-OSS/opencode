@@ -1,8 +1,21 @@
 # v1.14.37
 
+## Added
+
+- Added document-vision settings for AI Factory models, configurable from the updater admin console.
+- Added selectable model reasoning levels, including a configurable default, in the updater admin console and model settings.
+- Added PDF analysis for vision-capable models that do not natively accept PDF input. Documents are rendered and processed in page chunks.
+
+## Improved
+
+- Refreshed the updater admin console with improved model-status, MCP, feedback, and audit-management views.
+
 ## Fixed
 
-- Added thinking effort selection for Qwen3.8-27B.
+- Fixed session lists disappearing during transient refreshes or after the app resumes from sleep.
+- Fixed unsupported PDF attachments so they are handled safely instead of being sent to models without PDF support.
+- Fixed Qwen 3.8 27B thinking-effort selection, including the low-effort variant.
+- Fixed saving MCP edits from the updater admin console.
 
 # v1.14.36
 
