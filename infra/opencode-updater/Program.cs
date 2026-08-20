@@ -807,6 +807,7 @@ sealed record ModelCardEntry(
   int? Output,
   bool? Temperature,
   bool? Reasoning,
+  bool DocumentVision,
   bool? Visible,
   ModelCardPrice? Price,
   ModelCardModalities? Modalities,
@@ -821,6 +822,7 @@ sealed record ModelCardConfig(
   int? Output,
   bool? Temperature,
   bool? Reasoning,
+  bool? DocumentVision,
   ModelCardModalities? Modalities
 );
 
@@ -891,6 +893,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
         match?.Output ?? model.Output,
         match?.Temperature ?? model.Temperature,
         match?.Reasoning ?? model.Reasoning,
+        match?.DocumentVision ?? false,
         visibility,
         model.Price is null ? null : new ModelCardPrice(model.InputPrice is null ? null : model.InputPrice * 1000000m, model.OutputPrice is null ? null : model.OutputPrice * 1000000m),
         match?.Modalities is null ? model.Modalities : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? []),
@@ -903,6 +906,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
             match.Output,
             match.Temperature,
             match.Reasoning,
+            match.DocumentVision,
             match.Modalities is null ? null : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? [])
           ),
         new ModelCardLiteLLM(
@@ -1206,6 +1210,10 @@ sealed class ModelLimitRuleOptions
 
   [JsonPropertyName("modalities")]
   public ModalitiesOptions? Modalities { get; set; }
+
+  [ConfigurationKeyName("document_vision")]
+  [JsonPropertyName("document_vision")]
+  public bool? DocumentVision { get; set; }
 }
 
 sealed class ModelSettingsRequest
@@ -1221,6 +1229,9 @@ sealed class ModelSettingsRequest
 
   [JsonPropertyName("reasoning")]
   public bool? Reasoning { get; set; }
+
+  [JsonPropertyName("document_vision")]
+  public bool? DocumentVision { get; set; }
 
   [JsonPropertyName("visible")]
   public bool? Visible { get; set; }
@@ -1254,6 +1265,7 @@ sealed class UpdaterConfigStore(IWebHostEnvironment environment)
       rule["output"] = settings.Output;
       rule["temperature"] = settings.Temperature;
       rule["reasoning"] = settings.Reasoning;
+      rule["document_vision"] = settings.DocumentVision;
       rule["modalities"] = new JsonObject
       {
         ["input"] = JsonSerializer.SerializeToNode(settings.InputModalities ?? [], json),

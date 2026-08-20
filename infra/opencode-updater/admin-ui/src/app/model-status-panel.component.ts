@@ -47,6 +47,7 @@ import { ApiService, ModelSettings } from "./api.service"
                   <label>Output <input type="number" min="0" [ngModel]="draft().output" (ngModelChange)="setNumber('output', $event)" name="output" /></label>
                   <label><input type="checkbox" [ngModel]="draft().temperature" (ngModelChange)="setBoolean('temperature', $event)" name="temperature" /> Temperature</label>
                   <label><input type="checkbox" [ngModel]="draft().reasoning" (ngModelChange)="setBoolean('reasoning', $event)" name="reasoning" /> Thinking</label>
+                  <label><input type="checkbox" [ngModel]="draft().document_vision" (ngModelChange)="setBoolean('document_vision', $event)" name="documentVision" /> Document Vision</label>
                   <label><input type="checkbox" [ngModel]="draft().visible" (ngModelChange)="setBoolean('visible', $event)" name="visible" /> Visible in OpenCode</label>
                   <label>Input modalities <input [ngModel]="draft().input_modalities?.join(', ')" (ngModelChange)="setModalities('input_modalities', $event)" name="inputModalities" placeholder="text, image" /></label>
                   <label>Output modalities <input [ngModel]="draft().output_modalities?.join(', ')" (ngModelChange)="setModalities('output_modalities', $event)" name="outputModalities" placeholder="text" /></label>
@@ -60,6 +61,7 @@ import { ApiService, ModelSettings } from "./api.service"
                   <div class="meta-item"><small>Context</small><strong>{{ formatNumber(model.config?.context ?? model.context) }}</strong></div>
                   <div class="meta-item"><small>Output</small><strong>{{ formatNumber(model.config?.output ?? model.output) }}</strong></div>
                   <div class="meta-item"><small>Thinking</small><strong>{{ formatBoolean(model.config?.reasoning ?? model.reasoning) }}</strong></div>
+                  <div class="meta-item"><small>Document Vision</small><strong>{{ formatBoolean(model.config?.documentVision ?? model.documentVision) }}</strong></div>
                   <div class="meta-item"><small>Visible in OpenCode</small><strong>{{ formatBoolean(model.visible) }}</strong></div>
                   <div class="meta-item"><small>Input Cost /1M</small><strong>{{ formatPrice(model.price?.input ?? model.liteLLM?.inputCostPerMillionTokens) }}</strong></div>
                   <div class="meta-item"><small>Output Cost /1M</small><strong>{{ formatPrice(model.price?.output ?? model.liteLLM?.outputCostPerMillionTokens) }}</strong></div>
@@ -98,13 +100,14 @@ export class ModelStatusPanelComponent {
     this.success.set(null)
   }
 
-  edit(model: { model: string; context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; visible?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null; config?: { context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null } | null }) {
+  edit(model: { model: string; context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; documentVision?: boolean; visible?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null; config?: { context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; documentVision?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null } | null }) {
     this.editing.set(model.model)
     this.draft.set({
       context: model.config?.context ?? model.context ?? null,
       output: model.config?.output ?? model.output ?? null,
       temperature: model.config?.temperature ?? model.temperature ?? null,
       reasoning: model.config?.reasoning ?? model.reasoning ?? null,
+      document_vision: model.config?.documentVision ?? model.documentVision ?? false,
       visible: model.visible ?? true,
       input_modalities: model.modalities?.input ?? model.config?.modalities?.input ?? [],
       output_modalities: model.modalities?.output ?? model.config?.modalities?.output ?? [],
@@ -115,7 +118,7 @@ export class ModelStatusPanelComponent {
     this.draft.update((draft) => ({ ...draft, [key]: value === "" ? null : Number(value) }))
   }
 
-  setBoolean(key: "temperature" | "reasoning" | "visible", value: boolean) {
+  setBoolean(key: "temperature" | "reasoning" | "document_vision" | "visible", value: boolean) {
     this.draft.update((draft) => ({ ...draft, [key]: value }))
   }
 
