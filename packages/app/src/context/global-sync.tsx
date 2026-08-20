@@ -188,6 +188,10 @@ function createGlobalSync() {
                 .filter((s) => !!s?.id)
                 .filter((s) => !s.time?.archived)
                 .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+              if (nonArchived.length === 0 && store.session.some((session) => !session.parentID)) {
+                console.warn("Ignoring an empty session list while sessions are already loaded", { directory })
+                return
+              }
               const childSessions = store.session.filter((s) => !!s.parentID)
               const sessions = [...nonArchived, ...childSessions].sort((a, b) =>
                 a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
@@ -374,23 +378,15 @@ function createGlobalSync() {
       }, 0)
     }
     void bootstrap()
-    const resumeTimers: ReturnType<typeof setTimeout>[] = []
     const refreshAfterResume = () => {
-      resumeTimers.splice(0).forEach(clearTimeout)
-      const refresh = () => {
-        for (const directory of Object.keys(children.children)) {
-          void bootstrapInstance(directory)
-        }
+      for (const directory of Object.keys(children.children)) {
+        void bootstrapInstance(directory)
       }
-      refresh()
-      resumeTimers.push(setTimeout(refresh, 1_500), setTimeout(refresh, 5_000))
     }
     makeEventListener(document, "visibilitychange", () => {
       if (document.visibilityState !== "visible") return
       refreshAfterResume()
     })
-    makeEventListener(window, "focus", refreshAfterResume)
-    onCleanup(() => resumeTimers.forEach(clearTimeout))
   })
 
   const projectApi = {
