@@ -374,7 +374,7 @@ export async function bootstrapDirectory(input: {
             directory: input.directory,
             error: debugServerError(err),
           })
-          throw err
+          input.setStore("mcp_ready", true)
         }),
       () =>
         input.queryClient.ensureQueryData({

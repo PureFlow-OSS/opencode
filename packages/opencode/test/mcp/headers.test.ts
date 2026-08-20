@@ -6,13 +6,13 @@ import type { MCP as MCPNS } from "../../src/mcp/index"
 const transportCalls: Array<{
   type: "streamable" | "sse"
   url: string
-  options: { authProvider?: unknown; requestInit?: RequestInit }
+  options: { authProvider?: unknown; fetch?: typeof fetch; requestInit?: RequestInit }
 }> = []
 
 // Mock the transport constructors to capture their arguments
 void mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
   StreamableHTTPClientTransport: class MockStreamableHTTP {
-    constructor(url: URL, options?: { authProvider?: unknown; requestInit?: RequestInit }) {
+    constructor(url: URL, options?: { authProvider?: unknown; fetch?: typeof fetch; requestInit?: RequestInit }) {
       transportCalls.push({
         type: "streamable",
         url: url.toString(),
@@ -27,7 +27,7 @@ void mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
 
 void mock.module("@modelcontextprotocol/sdk/client/sse.js", () => ({
   SSEClientTransport: class MockSSE {
-    constructor(url: URL, options?: { authProvider?: unknown; requestInit?: RequestInit }) {
+    constructor(url: URL, options?: { authProvider?: unknown; fetch?: typeof fetch; requestInit?: RequestInit }) {
       transportCalls.push({
         type: "sse",
         url: url.toString(),
@@ -173,6 +173,31 @@ test("no requestInit when headers are not provided", async () => {
         // No headers means requestInit should be undefined
         expect(call.options.requestInit).toBeUndefined()
       }
+    },
+  })
+})
+
+test("uses a dedicated fetch implementation when TLS certificate validation is disabled", async () => {
+  await using tmp = await tmpdir()
+
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      await AppRuntime.runPromise(
+        Effect.gen(function* () {
+          const mcp = yield* service
+          yield* mcp
+            .add("test-server-insecure-tls", {
+              type: "remote",
+              url: "https://example.com/mcp",
+              tls: { rejectUnauthorized: false },
+            })
+            .pipe(Effect.catch(() => Effect.void))
+        }),
+      )
+
+      expect(transportCalls.length).toBeGreaterThanOrEqual(1)
+      expect(transportCalls.every((call) => call.options.fetch !== fetch)).toBe(true)
     },
   })
 })

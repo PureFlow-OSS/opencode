@@ -127,6 +127,12 @@ function isMcpConfigured(entry: McpEntry): entry is ConfigMCP.Info {
   return typeof entry === "object" && entry !== null && "type" in entry
 }
 
+function remoteFetch(mcp: ConfigMCP.Remote) {
+  if (mcp.tls?.rejectUnauthorized !== false) return fetch
+  return (input: RequestInfo | URL, init?: RequestInit) =>
+    fetch(input, { ...init, tls: { rejectUnauthorized: false } } as RequestInit)
+}
+
 let managedMcpCache:
   | Record<
       string,
@@ -364,6 +370,7 @@ export const layer = Layer.effect(
       key: string,
       mcp: ConfigMCP.Info & { type: "remote" },
     ) {
+      const fetch = remoteFetch(mcp)
       const oauthDisabled = mcp.oauth === false
       const oauthConfig = typeof mcp.oauth === "object" ? mcp.oauth : undefined
       let authProvider: McpOAuthProvider | undefined
@@ -392,6 +399,7 @@ export const layer = Layer.effect(
           name: "StreamableHTTP",
           transport: new StreamableHTTPClientTransport(new URL(mcp.url), {
             authProvider,
+            fetch,
             requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
           }),
         },
@@ -399,6 +407,7 @@ export const layer = Layer.effect(
           name: "SSE",
           transport: new SSEClientTransport(new URL(mcp.url), {
             authProvider,
+            fetch,
             requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
           }),
         },
@@ -876,7 +885,11 @@ export const layer = Layer.effect(
         auth,
       )
 
-      const transport = new StreamableHTTPClientTransport(new URL(mcpConfig.url), { authProvider })
+      const transport = new StreamableHTTPClientTransport(new URL(mcpConfig.url), {
+        authProvider,
+        fetch: remoteFetch(mcpConfig),
+        requestInit: mcpConfig.headers ? { headers: mcpConfig.headers } : undefined,
+      })
 
       return yield* Effect.tryPromise({
         try: () => {

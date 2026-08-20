@@ -158,9 +158,11 @@ function setupApp() {
 
   void app.whenReady().then(async () => {
     app.setAsDefaultProtocolClient("opencode")
-    session.defaultSession.setCertificateVerifyProc((request, callback) => {
-      callback(shouldTrustUpdateServerCertificate(request.hostname) ? 0 : -3)
-    })
+    for (const current of [session.defaultSession, session.fromPartition("electron-updater", { cache: false })]) {
+      current.setCertificateVerifyProc((request, callback) => {
+        callback(shouldTrustUpdateServerCertificate(request.hostname) ? 0 : -3)
+      })
+    }
     registerRendererProtocol()
     setDockIcon()
     setupAutoUpdater()

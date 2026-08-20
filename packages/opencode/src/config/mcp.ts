@@ -46,6 +46,13 @@ export const Remote = Schema.Struct({
   headers: Schema.optional(Schema.Record(Schema.String, Schema.String)).annotate({
     description: "Headers to send with the request",
   }),
+  tls: Schema.optional(
+    Schema.Struct({
+      rejectUnauthorized: Schema.optional(Schema.Boolean).annotate({
+        description: "Whether to reject invalid TLS certificates. Defaults to true.",
+      }),
+    }),
+  ).annotate({ description: "TLS settings for this remote MCP server" }),
   oauth: Schema.optional(Schema.Union([OAuth, Schema.Literal(false)])).annotate({
     description: "OAuth authentication configuration for the MCP server. Set to false to disable OAuth auto-detection.",
   }),
