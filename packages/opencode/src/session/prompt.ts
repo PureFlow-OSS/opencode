@@ -10,7 +10,7 @@ import * as Session from "./session"
 import { Agent } from "../agent/agent"
 import { Provider } from "../provider"
 import { ModelID, ProviderID } from "../provider/schema"
-import { type Tool as AITool, tool, jsonSchema, type ToolExecutionOptions, asSchema } from "ai"
+import { type Tool as AITool, tool, jsonSchema, type ToolExecutionOptions, asSchema, type ModelMessage } from "ai"
 import type { JSONSchema7 } from "@ai-sdk/provider"
 import { SessionCompaction } from "./compaction"
 import { Bus } from "../bus"
@@ -52,6 +52,8 @@ import { InstanceState } from "@/effect"
 import { TaskTool, type TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { EffectBridge } from "@/effect"
+import { createCanvas } from "@napi-rs/canvas"
+import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -83,6 +85,9 @@ function toToolSchema(schema: Parameters<typeof EffectZod.toJsonSchema>[0]) {
 const elog = EffectLogger.create({ service: "session.prompt" })
 const UNSUPPORTED_DROP_DIR = process.platform === "win32" ? "C:\\Temp" : path.join(os.tmpdir(), "opencode-unsupported")
 const TITLE_MAX_LENGTH = 50
+const PDF_VISION_CHUNK_SIZE = 4
+const PDF_VISION_MAX_PAGES = 16
+const PDF_VISION_TEXT_LIMIT = 24_000
 
 function isModelReadableFile(mime: string, model?: Provider.Model) {
   return (
@@ -108,6 +113,29 @@ function decodeDataUrlBytes(url: string) {
   const body = url.slice(idx + 1)
   if (head.includes(";base64")) return Buffer.from(body, "base64")
   return Buffer.from(decodeURIComponent(body))
+}
+
+async function renderPdfForVision(data: Uint8Array) {
+  const pdf = await getDocument({ data: new Uint8Array(data), useSystemFonts: true }).promise
+  const pageCount = Math.min(pdf.numPages, PDF_VISION_MAX_PAGES)
+  const pages = await Promise.all(
+    Array.from({ length: pageCount }, async (_, index) => {
+      const page = await pdf.getPage(index + 1)
+      const viewport = page.getViewport({ scale: 1.75 })
+      const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
+      const context = canvas.getContext("2d")
+      await page.render({ canvas: null, canvasContext: context as unknown as CanvasRenderingContext2D, viewport }).promise
+      const text = (await page.getTextContent()).items
+        .flatMap((item) => ("str" in item ? [item.str] : []))
+        .join(" ")
+      return { image: canvas.toBuffer("image/jpeg", 85), text }
+    }),
+  )
+  const text = pages
+    .map((page, index) => `Page ${index + 1}: ${page.text}`)
+    .join("\n")
+    .slice(0, PDF_VISION_TEXT_LIMIT)
+  return { pages, text, total: pdf.numPages }
 }
 
 export function fallbackTitle(message: MessageV2.WithParts) {
@@ -1051,6 +1079,157 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         ...part,
         id: part.id ? PartID.make(part.id) : PartID.ascending(),
       })
+      const renderVisionPdf = Effect.fn("SessionPrompt.renderVisionPdf")(function* (
+        data: Uint8Array,
+        filename: string,
+        source: MessageV2.FilePart["source"],
+      ) {
+        const rendered = yield* Effect.promise(() => renderPdfForVision(data)).pipe(Effect.exit)
+        if (Exit.isFailure(rendered)) {
+          log.warn("failed to render PDF for vision", { error: Cause.squash(rendered.cause), filename })
+          return
+        }
+        const pageLabel = rendered.value.total > rendered.value.pages.length
+          ? `pages 1-${rendered.value.pages.length} of ${rendered.value.total}`
+          : `${rendered.value.pages.length} page${rendered.value.pages.length === 1 ? "" : "s"}`
+        const stem = path.parse(filename).name || "document"
+        const rawPages = rendered.value.pages.slice(0, PDF_VISION_CHUNK_SIZE)
+        const rawPageLabel = rendered.value.total > rawPages.length
+          ? `pages 1-${rawPages.length} of ${rendered.value.total}`
+          : `${rawPages.length} page${rawPages.length === 1 ? "" : "s"}`
+        const rawParts = [
+          {
+            messageID: info.id,
+            sessionID: input.sessionID,
+            type: "text",
+            synthetic: true,
+            text: [
+              `PDF "${filename}" was rendered as ${rawPageLabel} for vision analysis.`,
+              rawPages.length === rendered.value.pages.length && rendered.value.text && `Extracted text:\n${rendered.value.text}`,
+            ]
+              .filter(Boolean)
+              .join("\n\n"),
+          },
+          ...rawPages.map((page, index) => ({
+            messageID: info.id,
+            sessionID: input.sessionID,
+            type: "file" as const,
+            mime: "image/jpeg",
+            filename: `${stem}-page-${index + 1}.jpg`,
+            url: `data:image/jpeg;base64,${Buffer.from(page.image).toString("base64")}`,
+            ...(source && { source }),
+          })),
+        ] satisfies Draft<MessageV2.Part>[]
+
+        if (rendered.value.pages.length <= PDF_VISION_CHUNK_SIZE || input.noReply) return rawParts
+
+        const current = Option.getOrUndefined(modelInfo)
+        if (!current) return rawParts
+        const question = input.parts
+          .flatMap((part) => (part.type === "text" ? [part.text] : []))
+          .join("\n")
+          .trim()
+        const chunks = Array.from({ length: Math.ceil(rendered.value.pages.length / PDF_VISION_CHUNK_SIZE) }, (_, index) =>
+          rendered.value.pages.slice(index * PDF_VISION_CHUNK_SIZE, (index + 1) * PDF_VISION_CHUNK_SIZE),
+        )
+        const summaries = yield* Effect.forEach(
+          chunks,
+          (pages, index) => {
+            const start = index * PDF_VISION_CHUNK_SIZE + 1
+            const end = start + pages.length - 1
+            const messages: ModelMessage[] = [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: [
+                      `Analyze PDF \"${filename}\", pages ${start}-${end}.`,
+                      `User request: ${question || "Summarize this document."}`,
+                      "Return concise factual notes for these pages. Preserve tables, figures, layout details, and page references.",
+                    ].join("\n"),
+                  },
+                  ...pages.flatMap((page, pageIndex) => [
+                    ...(page.text
+                      ? [
+                          {
+                            type: "text" as const,
+                            text: `Extracted text from page ${start + pageIndex}:\n${page.text}`,
+                          },
+                        ]
+                      : []),
+                    {
+                      type: "file" as const,
+                      mediaType: "image/jpeg",
+                      data: page.image,
+                    },
+                  ]),
+                ],
+              },
+            ]
+            const started = Date.now()
+            return llm
+              .stream({
+                agent: ag,
+                user: info,
+                system: [],
+                tools: {},
+                model: current,
+                sessionID: input.sessionID,
+                retries: 0,
+                messages,
+              })
+              .pipe(
+                Stream.filter((event): event is Extract<LLM.Event, { type: "text-delta" }> => event.type === "text-delta"),
+                Stream.map((event) => event.text),
+                Stream.runCollect,
+                Effect.map((parts) => Array.from(parts).join("").trim()),
+                Effect.timeoutOrElse({
+                  duration: 120_000,
+                  orElse: () =>
+                    elog
+                      .warn("PDF vision chunk timed out", { filename, start, end, duration: Date.now() - started })
+                      .pipe(Effect.as("")),
+                }),
+                Effect.catch((error) =>
+                  elog
+                    .warn("PDF vision chunk failed", {
+                      filename,
+                      start,
+                      end,
+                      error: error instanceof Error ? error.message : String(error),
+                    })
+                    .pipe(Effect.as("")),
+                ),
+              )
+          },
+          { concurrency: 1 },
+        )
+        if (!summaries.some(Boolean)) return rawParts
+        return [
+          {
+            messageID: info.id,
+            sessionID: input.sessionID,
+            type: "text",
+            synthetic: true,
+            text: [
+              `PDF \"${filename}\" was analyzed in ${chunks.length} sequential vision chunks (${pageLabel}).`,
+              rendered.value.total > rendered.value.pages.length &&
+                `Only the first ${rendered.value.pages.length} pages were included.`,
+              ...summaries.flatMap((summary, index) => {
+                if (!summary) return []
+                const start = index * PDF_VISION_CHUNK_SIZE + 1
+                const end = Math.min(start + PDF_VISION_CHUNK_SIZE - 1, rendered.value.pages.length)
+                return [`Pages ${start}-${end}:\n${summary}`]
+              }),
+            ].join("\n\n"),
+          },
+        ] satisfies Draft<MessageV2.Part>[]
+      })
+      const shouldRenderPdfForVision = (mime: string) => {
+        const current = Option.getOrUndefined(modelInfo)
+        return mime === "application/pdf" && current?.capabilities.input.image === true && current.capabilities.input.pdf !== true
+      }
 
       const resolvePart: (part: PromptInput["parts"][number]) => Effect.Effect<Draft<MessageV2.Part>[]> = Effect.fn(
         "SessionPrompt.resolveUserPart",
@@ -1129,6 +1308,14 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                   },
                   { ...part, messageID: info.id, sessionID: input.sessionID },
                 ]
+              }
+              if (shouldRenderPdfForVision(part.mime)) {
+                const rendered = yield* renderVisionPdf(
+                  decodeDataUrlBytes(part.url),
+                  part.filename ?? "document.pdf",
+                  part.source,
+                )
+                if (rendered) return rendered
               }
               if (!readable(part.mime)) {
                 const filename = part.filename ?? "attachment"
@@ -1319,6 +1506,14 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                   },
                   { ...part, messageID: info.id, sessionID: input.sessionID },
                 ]
+              }
+
+              if (shouldRenderPdfForVision(part.mime)) {
+                const content = yield* fsys.readFile(filepath).pipe(Effect.exit)
+                if (Exit.isSuccess(content)) {
+                  const rendered = yield* renderVisionPdf(content.value, part.filename ?? path.basename(filepath), part.source)
+                  if (rendered) return rendered
+                }
               }
 
               if (!readable(part.mime)) {

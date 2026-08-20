@@ -209,7 +209,7 @@ function buildAiFactoryModel(
 ): Model {
   const overrides = resolveAiFactoryModelOverrides(modelID, rules)
   const inputModalities: AiFactoryModality[] | undefined = overrides.documentVision
-    ? [...new Set<AiFactoryModality>([...(overrides.modalities?.input ?? ["text"]), "image", "pdf"])]
+    ? [...new Set<AiFactoryModality>([...(overrides.modalities?.input ?? ["text"]).filter((item) => item !== "pdf"), "image"])]
     : overrides.modalities?.input?.filter((modality) => modality !== "image" && modality !== "pdf")
   const base: Model = {
     id: ModelID.make(modelID),

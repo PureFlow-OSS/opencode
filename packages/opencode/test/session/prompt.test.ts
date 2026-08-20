@@ -274,6 +274,50 @@ const visionCfg = {
   },
 }
 
+const pdfVisionCfg = {
+  ...visionCfg,
+  provider: {
+    ...visionCfg.provider,
+    test: {
+      ...visionCfg.provider.test,
+      models: {
+        "test-model": {
+          ...visionCfg.provider.test.models["test-model"],
+          modalities: {
+            input: ["text", "image"] as Array<"text" | "image">,
+            output: ["text"] as Array<"text">,
+          },
+        },
+      },
+    },
+  },
+}
+
+function pdf(text: string | string[]) {
+  const pages = Array.isArray(text) ? text : [text]
+  const font = pages.length + 3
+  const streams = pages.map((page) => `BT\n/F1 18 Tf\n20 100 Td\n(${page}) Tj\nET`)
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    `<< /Type /Pages /Kids [${pages.map((_, index) => `${index + 3} 0 R`).join(" ")}] /Count ${pages.length} >>`,
+    ...pages.map(
+      (_, index) =>
+        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << /Font << /F1 ${font} 0 R >> >> /Contents ${font + index + 1} 0 R >>`,
+    ),
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ...streams.map((stream) => `<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`),
+  ]
+  let output = "%PDF-1.4\n"
+  const offsets = objects.map((object, index) => {
+    const offset = Buffer.byteLength(output)
+    output += `${index + 1} 0 obj\n${object}\nendobj\n`
+    return offset
+  })
+  return Buffer.from(
+    `${output}xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((offset) => `${String(offset).padStart(10, "0")} 00000 n `).join("\n")}\ntrailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${Buffer.byteLength(output)}\n%%EOF`,
+  )
+}
+
 const user = Effect.fn("test.user")(function* (sessionID: SessionID, text: string) {
   const session = yield* Session.Service
   const msg = yield* session.updateMessage({
@@ -1864,6 +1908,71 @@ it.live("keeps PDFs as direct attachments for vision-capable models", () =>
         yield* sessions.remove(session.id)
       }),
     { git: true, config: visionCfg },
+  ),
+)
+
+it.live("renders PDFs as images for vision models without native PDF support", () =>
+  provideTmpdirInstance(
+    (dir) =>
+      Effect.gen(function* () {
+        const source = path.join(dir, "vision-document.pdf")
+        yield* Effect.promise(() => Bun.write(source, pdf("Hello PDF vision")))
+
+        const prompt = yield* SessionPrompt.Service
+        const sessions = yield* Session.Service
+        const session = yield* sessions.create({})
+        const msg = yield* prompt.prompt({
+          sessionID: session.id,
+          agent: "build",
+          noReply: true,
+          parts: [
+            {
+              type: "file",
+              mime: "application/pdf",
+              url: `file://${source}`,
+              filename: "vision-document.pdf",
+            },
+          ],
+        })
+
+        expect(msg.parts.some((part) => part.type === "file" && part.mime === "image/jpeg")).toBe(true)
+        expect(msg.parts.some((part) => part.type === "text" && part.text.includes("Hello PDF vision"))).toBe(true)
+        expect(msg.parts.some((part) => part.type === "file" && part.mime === "application/pdf")).toBe(false)
+        yield* sessions.remove(session.id)
+      }),
+    { git: true, config: pdfVisionCfg },
+  ),
+)
+
+it.live("limits the direct PDF vision fallback to one page chunk", () =>
+  provideTmpdirInstance(
+    (dir) =>
+      Effect.gen(function* () {
+        const source = path.join(dir, "many-pages.pdf")
+        yield* Effect.promise(() => Bun.write(source, pdf(["Page one", "Page two", "Page three", "Page four", "Page five"])))
+
+        const prompt = yield* SessionPrompt.Service
+        const sessions = yield* Session.Service
+        const session = yield* sessions.create({})
+        const msg = yield* prompt.prompt({
+          sessionID: session.id,
+          agent: "build",
+          noReply: true,
+          parts: [
+            {
+              type: "file",
+              mime: "application/pdf",
+              url: `file://${source}`,
+              filename: "many-pages.pdf",
+            },
+          ],
+        })
+
+        expect(msg.parts.filter((part) => part.type === "file" && part.mime === "image/jpeg")).toHaveLength(4)
+        expect(msg.parts.some((part) => part.type === "text" && part.text.includes("pages 1-4 of 5"))).toBe(true)
+        yield* sessions.remove(session.id)
+      }),
+    { git: true, config: pdfVisionCfg },
   ),
 )
 
