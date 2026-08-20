@@ -1812,6 +1812,14 @@ export default function Page() {
 
   onMount(() => {
     makeEventListener(document, "keydown", handleKeyDown)
+    makeEventListener(document, "visibilitychange", () => {
+      if (document.visibilityState !== "visible") return
+      const id = params.id
+      if (!id) return
+      void sync.session.sync(id, { force: true }).catch((error) => {
+        console.error("[session] failed to refresh after returning to the app", { directory: sdk.directory, sessionID: id, error })
+      })
+    })
   })
 
   onCleanup(() => {

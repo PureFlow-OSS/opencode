@@ -37,7 +37,7 @@
       "@opentui/core": "0.1.105",
       "@opentui/solid": "0.1.105",
       "ulid": "3.0.1",
-      "@kobalte/core": "0.13.11",
+      "@kobalte/core": "0.13.13",
       "@types/luxon": "3.7.1",
       "@types/node": "22.13.9",
       "@types/semver": "7.7.1",
@@ -98,6 +98,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.933.0",
+    "@floating-ui/dom": "1.8.0",
     "@opencode-ai/plugin": "workspace:*",
     "@opencode-ai/script": "workspace:*",
     "@opencode-ai/sdk": "workspace:*",

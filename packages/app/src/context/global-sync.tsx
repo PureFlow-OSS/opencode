@@ -25,6 +25,7 @@ import { directoryKey } from "./global-sync/utils"
 import { debugServerError, formatUserFacingServerError } from "@/utils/server-errors"
 import { queryOptions, skipToken, useQueryClient } from "@tanstack/solid-query"
 import { Persist, persisted } from "@/utils/persist"
+import { makeEventListener } from "@solid-primitives/event-listener"
 
 type GlobalStore = {
   ready: boolean
@@ -373,6 +374,12 @@ function createGlobalSync() {
       }, 0)
     }
     void bootstrap()
+    makeEventListener(document, "visibilitychange", () => {
+      if (document.visibilityState !== "visible") return
+      for (const directory of Object.keys(children.children)) {
+        void bootstrapInstance(directory)
+      }
+    })
   })
 
   const projectApi = {
