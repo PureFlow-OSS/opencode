@@ -3,6 +3,10 @@ services:
     build: .
     ports:
       - "80:8080"
+    volumes:
+      - opencode-updater-data:/app/data
+      - ./appsettings.json:/app/appsettings.json
+      - ./appsettings.beta.json:/app/appsettings.beta.json
     restart: unless-stopped
 
   opencode-updater-admin-ui:
@@ -13,3 +17,6 @@ services:
     restart: unless-stopped
     depends_on:
       - opencode-updater
+
+volumes:
+  opencode-updater-data:

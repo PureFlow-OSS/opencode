@@ -6,6 +6,59 @@
   min-height: 240px;
 }
 
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin: 18px 0 22px;
+}
+
+.toolbar label {
+  flex: 1 1 180px;
+  margin: 0;
+}
+
+.toolbar select {
+  margin-top: 6px;
+  color-scheme: dark;
+  background-color: #171b23;
+}
+
+.toolbar select option {
+  color: #f2f4f8;
+  background-color: #171b23;
+}
+
+.toolbar select option:checked {
+  color: #fff;
+  background-color: #5e73ff;
+}
+
+.refresh {
+  min-width: 172px;
+}
+
+.refresh:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.refresh-icon {
+  display: inline-block;
+  margin-right: 7px;
+}
+
+.refresh-icon.spinning {
+  animation: refresh-spin 0.8s linear infinite;
+}
+
+@keyframes refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .item.empty {
   opacity: 0.95;
 }
@@ -18,4 +71,31 @@
   display: block;
   margin-top: 10px;
   color: rgba(242, 244, 248, 0.68);
+}
+
+.attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.attachment {
+  display: block;
+  overflow: hidden;
+  border: 1px solid rgba(242, 244, 248, 0.2);
+  border-radius: 8px;
+  color: inherit;
+}
+
+.attachment img {
+  display: block;
+  max-width: 240px;
+  max-height: 160px;
+  object-fit: cover;
+}
+
+.attachment span {
+  display: block;
+  padding: 8px 10px;
 }

@@ -4,13 +4,14 @@
       <p class="eyebrow">OpenCode Updater</p>
       <h1>Admin Console</h1>
       <p class="lede">
-        One screen per job. Upload ZIP into beta, review beta feedback, or inspect inbox and audit trail.
+        One screen per job. Upload ZIP into beta, review beta feedback, or inspect the general inbox.
       </p>
       <nav class="nav">
         <button type="button" [class.active]="page === 'upload'" (click)="show('upload')">ZIP Upload</button>
         <button type="button" [class.active]="page === 'beta-feedback'" (click)="show('beta-feedback')">Beta Feedback</button>
         <button type="button" [class.active]="page === 'inbox'" (click)="show('inbox')">Feedback Inbox</button>
         <button type="button" [class.active]="page === 'model-status'" (click)="show('model-status')">Model Status</button>
+        <button type="button" [class.active]="page === 'mcp'" (click)="show('mcp')">MCP</button>
       </nav>
     </div>
     <div class="hero-panel">
@@ -22,8 +23,10 @@
           Beta review
         } @else if (page === 'model-status') {
           Model cards
+        } @else if (page === 'mcp') {
+          Managed MCPs
         } @else {
-          Inbox + audit
+          General inbox
         }
       </strong>
       <p>
@@ -33,6 +36,8 @@
           Beta feedback is real data from OpenCode and promotion happens after 50% positive.
         } @else if (page === 'model-status') {
           Live model cards are synced from the updater server.
+        } @else if (page === 'mcp') {
+          Centrally manage the MCP servers delivered to OpenCode clients.
         } @else {
           General inbox shows live feedback from OpenCode.
         }
@@ -52,6 +57,10 @@
   } @else if (page === 'model-status') {
     <section class="single">
       <app-model-status-panel />
+    </section>
+  } @else if (page === 'mcp') {
+    <section class="single">
+      <app-mcp-panel />
     </section>
   } @else {
     <section class="single">
