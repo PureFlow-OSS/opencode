@@ -94,6 +94,10 @@ const getBase = (): Configuration => ({
     ...(process.platform === "win32"
       ? [
           {
+            from: "../opencode/node_modules/@napi-rs/canvas-win32-x64-msvc/skia.win32-x64-msvc.node",
+            to: "native/canvas/skia.win32-x64-msvc.node",
+          },
+          {
             from: "build/updater-helper/win-x64/",
             to: "updater-helper/",
             filter: ["OpenCode.UpdaterHelper.exe"],

@@ -180,6 +180,9 @@
     "zod": "catalog:",
     "zod-to-json-schema": "3.24.5"
   },
+  "optionalDependencies": {
+    "@napi-rs/canvas-win32-x64-msvc": "1.0.7"
+  },
   "overrides": {
     "drizzle-orm": "catalog:"
   }

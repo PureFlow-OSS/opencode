@@ -1,5 +1,6 @@
 import path from "path"
 import os from "os"
+import { existsSync } from "fs"
 import z from "zod"
 import * as EffectZod from "@/util/effect-zod"
 import { SessionID, MessageID, PartID } from "./schema"
@@ -116,6 +117,8 @@ function decodeDataUrlBytes(url: string) {
 }
 
 async function renderPdfForVision(data: Uint8Array) {
+  const nativeCanvas = path.join(process.resourcesPath ?? "", "native", "canvas", "skia.win32-x64-msvc.node")
+  if (process.platform === "win32" && existsSync(nativeCanvas)) process.env.NAPI_RS_NATIVE_LIBRARY_PATH = nativeCanvas
   const [{ createCanvas }, { getDocument }] = await Promise.all([
     import("@napi-rs/canvas"),
     import("pdfjs-dist/legacy/build/pdf.mjs"),
