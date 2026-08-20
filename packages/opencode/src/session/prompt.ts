@@ -125,6 +125,7 @@ async function renderPdfForVision(data: Uint8Array) {
     ImageData: canvas.ImageData,
     Path2D: canvas.Path2D,
   })
+  Object.assign(globalThis, { pdfjsWorker: await import("pdfjs-dist/legacy/build/pdf.worker.mjs") })
   const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs")
   const pdf = await getDocument({ data: new Uint8Array(data), useSystemFonts: true }).promise
   const pageCount = Math.min(pdf.numPages, PDF_VISION_MAX_PAGES)
