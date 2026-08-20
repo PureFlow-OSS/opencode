@@ -108,6 +108,9 @@ export const Info = Schema.Struct({
   aifactory_host: Schema.optional(Schema.String).annotate({
     description: "RRZ AI Factory host. Defaults to http://10.53.7.23.",
   }),
+  updater: Schema.optional(Schema.String).annotate({
+    description: "Updater server base URL. Overrides the URL embedded in the desktop build.",
+  }),
   use_http_proxy: Schema.optional(Schema.Boolean).annotate({
     description: "Whether the configured global HTTP proxy should be used. Defaults to true.",
   }),
@@ -602,8 +605,21 @@ export const layer = Layer.effect(
         const global = yield* getGlobal()
         yield* merge(Global.Path.config, global, "global")
 
+        const updater =
+          (yield* Effect.forEach(
+            [
+              ...(Flag.OPENCODE_CONFIG ? [Flag.OPENCODE_CONFIG] : []),
+              ...(yield* ConfigPaths.files("opencode", ctx.directory, ctx.worktree).pipe(Effect.orDie)),
+            ],
+            (file) => loadFile(file).pipe(Effect.map((config) => config.updater)),
+          ))
+            .filter(Boolean)
+            .at(-1) ?? global.updater
+
         const remoteProviderConfig = yield* Effect.promise(() =>
-          ConfigManaged.readProviderConfig(fetch, ConfigManaged.providerConfigRequestInit({ config: global, auth })),
+          ConfigManaged.readProviderConfig(fetch, ConfigManaged.providerConfigRequestInit({ config: global, auth }), {
+            updater,
+          }),
         )
         yield* merge(
           "updater-provider-config",

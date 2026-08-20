@@ -95,7 +95,10 @@ function globToRegExp(pattern: string) {
   return new RegExp(`^${escaped}$`, "i")
 }
 
-function resolveAiFactoryModelOverrides(modelID: string, rules: AiFactoryModelLimitRule[] | undefined): AiFactoryModelOverrides {
+function resolveAiFactoryModelOverrides(
+  modelID: string,
+  rules: AiFactoryModelLimitRule[] | undefined,
+): AiFactoryModelOverrides {
   const fallback: AiFactoryModelOverrides = {
     limit: {
       context: 100_000,
@@ -159,46 +162,47 @@ function aiFactoryModalityFlags(
   }
 }
 
-async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch, init: RequestInit = {}) {
-  return (await fetchFn(ConfigManaged.providerConfigUrl(), {
-    ...init,
-    signal: AbortSignal.timeout(3000),
-  })
-    .then(async (res) => {
-      if (!res.ok) return
-      return ConfigManaged.providerConfigPayload(await res.json()) as {
-        aifactory?: {
-          model_limits?: Array<{
-            pattern?: string
-            context?: number
-            output?: number
-            temperature?: boolean
-            reasoning?: boolean
-            modalities?: unknown
-            document_vision?: boolean
-            options?: unknown
-            variants?: unknown
-          }>
+async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch, init: RequestInit = {}, config?: Config.Info) {
+  return (
+    await fetchFn(ConfigManaged.providerConfigUrl(config), {
+      ...init,
+      signal: AbortSignal.timeout(3000),
+    })
+      .then(async (res) => {
+        if (!res.ok) return
+        return ConfigManaged.providerConfigPayload(await res.json()) as {
+          aifactory?: {
+            model_limits?: Array<{
+              pattern?: string
+              context?: number
+              output?: number
+              temperature?: boolean
+              reasoning?: boolean
+              modalities?: unknown
+              document_vision?: boolean
+              options?: unknown
+              variants?: unknown
+            }>
+          }
         }
-      }
-    })
-    .catch(() => undefined))?.aifactory?.model_limits
-    ?.flatMap((rule) => {
-      if (typeof rule?.pattern !== "string" || !rule.pattern.trim()) return []
-      return [
-        {
-          pattern: rule.pattern.trim(),
-          context: typeof rule.context === "number" ? rule.context : undefined,
-          output: typeof rule.output === "number" ? rule.output : undefined,
-          temperature: typeof rule.temperature === "boolean" ? rule.temperature : undefined,
-          reasoning: typeof rule.reasoning === "boolean" ? rule.reasoning : undefined,
-          modalities: normalizeAiFactoryModalities(rule.modalities),
-          documentVision: typeof rule.document_vision === "boolean" ? rule.document_vision : undefined,
-          options: isRecord(rule.options) ? rule.options : undefined,
-          variants: normalizeAiFactoryVariants(rule.variants),
-        } satisfies AiFactoryModelLimitRule,
-      ]
-    })
+      })
+      .catch(() => undefined)
+  )?.aifactory?.model_limits?.flatMap((rule) => {
+    if (typeof rule?.pattern !== "string" || !rule.pattern.trim()) return []
+    return [
+      {
+        pattern: rule.pattern.trim(),
+        context: typeof rule.context === "number" ? rule.context : undefined,
+        output: typeof rule.output === "number" ? rule.output : undefined,
+        temperature: typeof rule.temperature === "boolean" ? rule.temperature : undefined,
+        reasoning: typeof rule.reasoning === "boolean" ? rule.reasoning : undefined,
+        modalities: normalizeAiFactoryModalities(rule.modalities),
+        documentVision: typeof rule.document_vision === "boolean" ? rule.document_vision : undefined,
+        options: isRecord(rule.options) ? rule.options : undefined,
+        variants: normalizeAiFactoryVariants(rule.variants),
+      } satisfies AiFactoryModelLimitRule,
+    ]
+  })
 }
 
 function buildAiFactoryModel(
@@ -209,7 +213,12 @@ function buildAiFactoryModel(
 ): Model {
   const overrides = resolveAiFactoryModelOverrides(modelID, rules)
   const inputModalities: AiFactoryModality[] | undefined = overrides.documentVision
-    ? [...new Set<AiFactoryModality>([...(overrides.modalities?.input ?? ["text"]).filter((item) => item !== "pdf"), "image"])]
+    ? [
+        ...new Set<AiFactoryModality>([
+          ...(overrides.modalities?.input ?? ["text"]).filter((item) => item !== "pdf"),
+          "image",
+        ]),
+      ]
     : overrides.modalities?.input?.filter((modality) => modality !== "image" && modality !== "pdf")
   const base: Model = {
     id: ModelID.make(modelID),
@@ -269,9 +278,10 @@ async function discoverAiFactoryModels(
   baseURL: string,
   fetchFn: FetchLike = fetch,
   providerConfigInit: RequestInit = {},
+  config?: Config.Info,
 ) {
   const [rules, payload] = await Promise.all([
-    discoverAiFactoryConfig(fetchFn, providerConfigInit),
+    discoverAiFactoryConfig(fetchFn, providerConfigInit, config),
     fetchFn(`${baseURL}/models`, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -556,6 +566,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
               config,
               auth: auth ? { aifactory: auth } : undefined,
             }),
+            config,
           )
         },
       }
@@ -1767,7 +1778,10 @@ const layer: Layer.Layer<
           models: languages,
           providers,
           proxy: Object.fromEntries(
-            Object.keys(providers).map((providerID) => [providerID, resolveProviderProxy(cfg, ProviderID.make(providerID))]),
+            Object.keys(providers).map((providerID) => [
+              providerID,
+              resolveProviderProxy(cfg, ProviderID.make(providerID)),
+            ]),
           ),
           sdk,
           modelLoaders,
@@ -1840,7 +1854,8 @@ const layer: Layer.Layer<
 
         options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
           const opts = init ?? {}
-          const titleRequest = typeof opts.body === "string" && opts.body.includes("Generate a title for this conversation:")
+          const titleRequest =
+            typeof opts.body === "string" && opts.body.includes("Generate a title for this conversation:")
           const traceTitleRequest = process.env.OPENCODE_DEBUG === "1" && titleRequest
           if (titleRequest && typeof opts.body === "string") {
             const body = JSON.parse(opts.body)

@@ -10,6 +10,7 @@ import { Agent as AgentSvc } from "../../src/agent/agent"
 import { Bus } from "../../src/bus"
 import { Command } from "../../src/command"
 import { Config } from "../../src/config"
+import { Auth } from "../../src/auth"
 import { LSP } from "../../src/lsp"
 import { MCP } from "../../src/mcp"
 import { Permission } from "../../src/permission"
@@ -164,6 +165,7 @@ function makeHttp() {
     Command.defaultLayer,
     Permission.defaultLayer,
     Plugin.defaultLayer,
+    Auth.defaultLayer,
     Config.defaultLayer,
     ProviderSvc.defaultLayer,
     lsp,
@@ -1949,7 +1951,9 @@ it.live("limits the direct PDF vision fallback to one page chunk", () =>
     (dir) =>
       Effect.gen(function* () {
         const source = path.join(dir, "many-pages.pdf")
-        yield* Effect.promise(() => Bun.write(source, pdf(["Page one", "Page two", "Page three", "Page four", "Page five"])))
+        yield* Effect.promise(() =>
+          Bun.write(source, pdf(["Page one", "Page two", "Page three", "Page four", "Page five"])),
+        )
 
         const prompt = yield* SessionPrompt.Service
         const sessions = yield* Session.Service

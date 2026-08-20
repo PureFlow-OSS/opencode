@@ -31,7 +31,8 @@ import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import * as Stream from "effect/Stream"
 import { Command } from "../command"
 import { pathToFileURL, fileURLToPath } from "url"
-import { Config, ConfigMarkdown } from "../config"
+import { Config, ConfigManaged, ConfigMarkdown } from "../config"
+import { Auth } from "../auth"
 import { SessionSummary } from "./summary"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { SessionProcessor } from "./processor"
@@ -43,7 +44,7 @@ import { Shell } from "@/shell/shell"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Truncate } from "@/tool"
 import { decodeDataUrl } from "@/util/data-url"
-import { Process } from "@/util"
+import { Process, Wildcard } from "@/util"
 import { Cause, Deferred, Effect, Exit, Layer, Option, Scope, Context, Schema } from "effect"
 import { zod } from "@/util/effect-zod"
 import { withStatics } from "@/util/schema"
@@ -52,6 +53,7 @@ import { InstanceState } from "@/effect"
 import { TaskTool, type TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { EffectBridge } from "@/effect"
+import { isRecord } from "@/util/record"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -126,10 +128,9 @@ async function renderPdfForVision(data: Uint8Array) {
       const viewport = page.getViewport({ scale: 1.75 })
       const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
       const context = canvas.getContext("2d")
-      await page.render({ canvas: null, canvasContext: context as unknown as CanvasRenderingContext2D, viewport }).promise
-      const text = (await page.getTextContent()).items
-        .flatMap((item) => ("str" in item ? [item.str] : []))
-        .join(" ")
+      await page.render({ canvas: null, canvasContext: context as unknown as CanvasRenderingContext2D, viewport })
+        .promise
+      const text = (await page.getTextContent()).items.flatMap((item) => ("str" in item ? [item.str] : [])).join(" ")
       return { image: canvas.toBuffer("image/jpeg", 85), text }
     }),
   )
@@ -185,6 +186,7 @@ export const layer = Layer.effect(
     const plugin = yield* Plugin.Service
     const commands = yield* Command.Service
     const config = yield* Config.Service
+    const auth = yield* Auth.Service
     const permission = yield* Permission.Service
     const fsys = yield* AppFileSystem.Service
     const mcp = yield* MCP.Service
@@ -293,9 +295,12 @@ export const layer = Layer.effect(
         return false
       }
       const mdl = ag.model
-        ? yield* provider.getModel(ag.model.providerID, ag.model.modelID).pipe(Effect.catchCause(() => Effect.succeed(input.model)))
-        : ((yield* provider.getSmallModel(input.model.providerID).pipe(Effect.catchCause(() => Effect.succeed(undefined)))) ??
-          input.model)
+        ? yield* provider
+            .getModel(ag.model.providerID, ag.model.modelID)
+            .pipe(Effect.catchCause(() => Effect.succeed(input.model)))
+        : ((yield* provider
+            .getSmallModel(input.model.providerID)
+            .pipe(Effect.catchCause(() => Effect.succeed(undefined)))) ?? input.model)
       const msgs = onlySubtasks
         ? [{ role: "user" as const, content: subtasks.map((p) => p.prompt).join("\n") }]
         : yield* MessageV2.toModelMessagesEffect(context, mdl)
@@ -363,14 +368,12 @@ export const layer = Layer.effect(
         .map((line: string) => line.trim())
         .find((line: string) => line.length > 0)
       if (!cleaned) return false
-      return yield* sessions
-        .setTitle({ sessionID: input.session.id, title: cleaned })
-        .pipe(
-          Effect.as(true),
-          Effect.catchCause((cause) =>
-            elog.error("failed to generate title", { error: Cause.squash(cause) }).pipe(Effect.as(false)),
-          ),
-        )
+      return yield* sessions.setTitle({ sessionID: input.session.id, title: cleaned }).pipe(
+        Effect.as(true),
+        Effect.catchCause((cause) =>
+          elog.error("failed to generate title", { error: Cause.squash(cause) }).pipe(Effect.as(false)),
+        ),
+      )
     })
 
     const insertReminders = Effect.fn("SessionPrompt.insertReminders")(function* (input: {
@@ -1091,14 +1094,16 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           log.warn("failed to render PDF for vision", { error: Cause.squash(rendered.cause), filename })
           return
         }
-        const pageLabel = rendered.value.total > rendered.value.pages.length
-          ? `pages 1-${rendered.value.pages.length} of ${rendered.value.total}`
-          : `${rendered.value.pages.length} page${rendered.value.pages.length === 1 ? "" : "s"}`
+        const pageLabel =
+          rendered.value.total > rendered.value.pages.length
+            ? `pages 1-${rendered.value.pages.length} of ${rendered.value.total}`
+            : `${rendered.value.pages.length} page${rendered.value.pages.length === 1 ? "" : "s"}`
         const stem = path.parse(filename).name || "document"
         const rawPages = rendered.value.pages.slice(0, PDF_VISION_CHUNK_SIZE)
-        const rawPageLabel = rendered.value.total > rawPages.length
-          ? `pages 1-${rawPages.length} of ${rendered.value.total}`
-          : `${rawPages.length} page${rawPages.length === 1 ? "" : "s"}`
+        const rawPageLabel =
+          rendered.value.total > rawPages.length
+            ? `pages 1-${rawPages.length} of ${rendered.value.total}`
+            : `${rawPages.length} page${rawPages.length === 1 ? "" : "s"}`
         const rawParts = [
           {
             messageID: info.id,
@@ -1107,7 +1112,9 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             synthetic: true,
             text: [
               `PDF "${filename}" was rendered as ${rawPageLabel} for vision analysis.`,
-              rawPages.length === rendered.value.pages.length && rendered.value.text && `Extracted text:\n${rendered.value.text}`,
+              rawPages.length === rendered.value.pages.length &&
+                rendered.value.text &&
+                `Extracted text:\n${rendered.value.text}`,
             ]
               .filter(Boolean)
               .join("\n\n"),
@@ -1131,8 +1138,9 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           .flatMap((part) => (part.type === "text" ? [part.text] : []))
           .join("\n")
           .trim()
-        const chunks = Array.from({ length: Math.ceil(rendered.value.pages.length / PDF_VISION_CHUNK_SIZE) }, (_, index) =>
-          rendered.value.pages.slice(index * PDF_VISION_CHUNK_SIZE, (index + 1) * PDF_VISION_CHUNK_SIZE),
+        const chunks = Array.from(
+          { length: Math.ceil(rendered.value.pages.length / PDF_VISION_CHUNK_SIZE) },
+          (_, index) => rendered.value.pages.slice(index * PDF_VISION_CHUNK_SIZE, (index + 1) * PDF_VISION_CHUNK_SIZE),
         )
         const summaries = yield* Effect.forEach(
           chunks,
@@ -1182,7 +1190,9 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 messages,
               })
               .pipe(
-                Stream.filter((event): event is Extract<LLM.Event, { type: "text-delta" }> => event.type === "text-delta"),
+                Stream.filter(
+                  (event): event is Extract<LLM.Event, { type: "text-delta" }> => event.type === "text-delta",
+                ),
                 Stream.map((event) => event.text),
                 Stream.runCollect,
                 Effect.map((parts) => Array.from(parts).join("").trim()),
@@ -1228,10 +1238,33 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           },
         ] satisfies Draft<MessageV2.Part>[]
       })
-      const shouldRenderPdfForVision = (mime: string) => {
+      const shouldRenderPdfForVision = Effect.fn("SessionPrompt.shouldRenderPdfForVision")(function* (mime: string) {
         const current = Option.getOrUndefined(modelInfo)
-        return mime === "application/pdf" && current?.capabilities.input.image === true && current.capabilities.input.pdf !== true
-      }
+        if (mime !== "application/pdf" || current?.capabilities.input.pdf === true) return false
+        if (current?.capabilities.input.image === true) return true
+        if (model.providerID !== "aifactory") return false
+
+        const currentConfig = yield* config.get()
+        const auths = yield* auth.all().pipe(Effect.orDie)
+        const rules = yield* Effect.promise(() =>
+          ConfigManaged.readProviderConfig(
+            fetch,
+            ConfigManaged.providerConfigRequestInit({ config: currentConfig, auth: auths }),
+            currentConfig,
+          ),
+        ).pipe(
+          Effect.map((providerConfig) => {
+            const aifactory = isRecord(providerConfig.aifactory) ? providerConfig.aifactory : undefined
+            if (!aifactory || !Array.isArray(aifactory.model_limits)) return []
+            return aifactory.model_limits.filter(isRecord)
+          }),
+        )
+        const rule = rules.find((rule) => {
+          if (typeof rule.pattern !== "string") return false
+          return Wildcard.match(model.modelID, rule.pattern)
+        })
+        return rule?.document_vision === true
+      })
 
       const resolvePart: (part: PromptInput["parts"][number]) => Effect.Effect<Draft<MessageV2.Part>[]> = Effect.fn(
         "SessionPrompt.resolveUserPart",
@@ -1311,7 +1344,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                   { ...part, messageID: info.id, sessionID: input.sessionID },
                 ]
               }
-              if (shouldRenderPdfForVision(part.mime)) {
+              if (yield* shouldRenderPdfForVision(part.mime)) {
                 const rendered = yield* renderVisionPdf(
                   decodeDataUrlBytes(part.url),
                   part.filename ?? "document.pdf",
@@ -1510,10 +1543,14 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 ]
               }
 
-              if (shouldRenderPdfForVision(part.mime)) {
+              if (yield* shouldRenderPdfForVision(part.mime)) {
                 const content = yield* fsys.readFile(filepath).pipe(Effect.exit)
                 if (Exit.isSuccess(content)) {
-                  const rendered = yield* renderVisionPdf(content.value, part.filename ?? path.basename(filepath), part.source)
+                  const rendered = yield* renderVisionPdf(
+                    content.value,
+                    part.filename ?? path.basename(filepath),
+                    part.source,
+                  )
                   if (rendered) return rendered
                 }
               }
@@ -1754,10 +1791,12 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               yield* elog.info("title generation scheduled", { sessionID, messageID: firstUser.info.id })
               yield* title({ session, model, history: msgs }).pipe(
                 Effect.catchCause((cause) =>
-                  elog.error("title generation failed before request", {
-                    sessionID,
-                    error: Cause.squash(cause),
-                  }).pipe(Effect.as(false)),
+                  elog
+                    .error("title generation failed before request", {
+                      sessionID,
+                      error: Cause.squash(cause),
+                    })
+                    .pipe(Effect.as(false)),
                 ),
                 Effect.tap((result) => Deferred.succeed(titleResult, result).pipe(Effect.ignore)),
                 Effect.forkIn(scope),
@@ -2103,6 +2142,7 @@ export const defaultLayer = Layer.suspend(() =>
     Layer.provide(Truncate.defaultLayer),
     Layer.provide(Provider.defaultLayer),
     Layer.provide(Config.defaultLayer),
+    Layer.provide(Auth.defaultLayer),
     Layer.provide(Instruction.defaultLayer),
     Layer.provide(AppFileSystem.defaultLayer),
     Layer.provide(Plugin.defaultLayer),
