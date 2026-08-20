@@ -13,6 +13,8 @@ import { usePlatform } from "@/context/platform"
 
 type ModelCard = {
   model: string
+  reasoningVariants?: string[]
+  defaultReasoningVariant?: string | null
   context?: number | null
   output?: number | null
   temperature?: boolean | null
@@ -25,6 +27,8 @@ type ModelCard = {
     output?: number | null
     temperature?: boolean | null
     reasoning?: boolean | null
+    reasoningVariants?: string[]
+    defaultReasoningVariant?: string | null
     modalities?: { input?: string[]; output?: string[] } | null
   } | null
   liteLLM?: {
@@ -204,6 +208,8 @@ export const SettingsModels: Component = () => {
                     const context = card.context ?? card.config?.context ?? null
                     const output = card.output ?? card.config?.output ?? null
                     const thinking = card.reasoning ?? card.config?.reasoning ?? null
+                    const reasoningVariants = card.reasoningVariants ?? card.config?.reasoningVariants ?? []
+                    const defaultReasoningVariant = card.defaultReasoningVariant ?? card.config?.defaultReasoningVariant
                     const inputCost = card.liteLLM?.inputCostPerMillionTokens ?? null
                     const outputCost = card.liteLLM?.outputCostPerMillionTokens ?? null
 
@@ -228,6 +234,16 @@ export const SettingsModels: Component = () => {
                         <div class="text-text-strong text-12-medium">Thinking</div>
                         <div>{thinking === null ? "n/a" : thinking ? "Yes" : "No"}</div>
                       </div>
+                      <Show when={thinking && reasoningVariants.length > 0}>
+                        <div>
+                          <div class="text-text-strong text-12-medium">Reasoning levels</div>
+                          <div>{reasoningVariants.join(", ")}</div>
+                        </div>
+                        <div>
+                          <div class="text-text-strong text-12-medium">Default reasoning</div>
+                          <div>{defaultReasoningVariant ?? "Provider default"}</div>
+                        </div>
+                      </Show>
                       <div>
                         <div class="text-text-strong text-12-medium">Input Cost /1M</div>
                         <div>{formatMoney(inputCost)}</div>
