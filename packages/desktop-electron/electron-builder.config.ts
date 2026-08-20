@@ -98,6 +98,10 @@ const getBase = (): Configuration => ({
             to: "native/canvas/skia.win32-x64-msvc.node",
           },
           {
+            from: "../opencode/node_modules/@napi-rs/canvas-win32-x64-msvc/icudtl.dat",
+            to: "native/canvas/icudtl.dat",
+          },
+          {
             from: "build/updater-helper/win-x64/",
             to: "updater-helper/",
             filter: ["OpenCode.UpdaterHelper.exe"],

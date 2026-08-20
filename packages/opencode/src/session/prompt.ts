@@ -119,22 +119,25 @@ function decodeDataUrlBytes(url: string) {
 async function renderPdfForVision(data: Uint8Array) {
   const nativeCanvas = path.join(process.resourcesPath ?? "", "native", "canvas", "skia.win32-x64-msvc.node")
   if (process.platform === "win32" && existsSync(nativeCanvas)) process.env.NAPI_RS_NATIVE_LIBRARY_PATH = nativeCanvas
-  const [{ createCanvas }, { getDocument }] = await Promise.all([
-    import("@napi-rs/canvas"),
-    import("pdfjs-dist/legacy/build/pdf.mjs"),
-  ])
+  const canvas = await import("@napi-rs/canvas")
+  Object.assign(globalThis, {
+    DOMMatrix: canvas.DOMMatrix,
+    ImageData: canvas.ImageData,
+    Path2D: canvas.Path2D,
+  })
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs")
   const pdf = await getDocument({ data: new Uint8Array(data), useSystemFonts: true }).promise
   const pageCount = Math.min(pdf.numPages, PDF_VISION_MAX_PAGES)
   const pages = await Promise.all(
     Array.from({ length: pageCount }, async (_, index) => {
       const page = await pdf.getPage(index + 1)
       const viewport = page.getViewport({ scale: 1.75 })
-      const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
-      const context = canvas.getContext("2d")
+      const image = canvas.createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
+      const context = image.getContext("2d")
       await page.render({ canvas: null, canvasContext: context as unknown as CanvasRenderingContext2D, viewport })
         .promise
       const text = (await page.getTextContent()).items.flatMap((item) => ("str" in item ? [item.str] : [])).join(" ")
-      return { image: canvas.toBuffer("image/jpeg", 85), text }
+      return { image: image.toBuffer("image/jpeg", 85), text }
     }),
   )
   const text = pages
