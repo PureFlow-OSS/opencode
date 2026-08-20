@@ -52,8 +52,6 @@ import { InstanceState } from "@/effect"
 import { TaskTool, type TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { EffectBridge } from "@/effect"
-import { createCanvas } from "@napi-rs/canvas"
-import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -116,6 +114,10 @@ function decodeDataUrlBytes(url: string) {
 }
 
 async function renderPdfForVision(data: Uint8Array) {
+  const [{ createCanvas }, { getDocument }] = await Promise.all([
+    import("@napi-rs/canvas"),
+    import("pdfjs-dist/legacy/build/pdf.mjs"),
+  ])
   const pdf = await getDocument({ data: new Uint8Array(data), useSystemFonts: true }).promise
   const pageCount = Math.min(pdf.numPages, PDF_VISION_MAX_PAGES)
   const pages = await Promise.all(
