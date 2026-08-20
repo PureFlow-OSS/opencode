@@ -62,12 +62,12 @@ Important behavior:
 
 - `appsettings.json` stays the stable config
 - `appsettings.beta.json` is only used for requests that match beta rollout
-- for beta requests, `Updater` values from `appsettings.beta.json` override stable values
-- if `Updater.PublicBaseUrl` is missing in `appsettings.beta.json`, beta falls back to the stable `Updater.PublicBaseUrl`
+- for beta requests, values in `appsettings.beta.json` override the matching stable values recursively; values not defined there fall back to `appsettings.json`
+- this includes `Updater.ProviderConfig`, so beta can override individual model settings without copying the stable configuration
 - if `feed/beta/latest.yml` exists, beta users get that version first
 - if `feed/beta/latest.yml` does not exist, beta users fall back to `appsettings.beta.json -> Updater.Version`
-- if `UpdaterBeta.LiteLLM.ApiKey` is set, updater calls LiteLLM with that admin key and passes the user key as `?key=<user-key>`
-- if `UpdaterBeta.LiteLLM.ApiKey` is empty, updater uses the user key itself as `Authorization: Bearer <user-key>`
+- if `UpdaterBeta.LiteLLM.ApiKey` is set, updater calls LiteLLM with that management key in `x-litellm-api-key` and passes the user key as `?key=<user-key>`
+- if `UpdaterBeta.LiteLLM.ApiKey` is empty, updater uses the user key itself in `x-litellm-api-key`
 - URLs in JSON must be quoted strings
 
 ### Matching logic
@@ -306,6 +306,8 @@ If `Updater.Motd` is not configured, the server defaults to `RRZ AI Factory`. Se
 
 `/opencode/modelcards.json` returns a consolidated model-card payload for the currently active rollout.
 
+The **Model Status** page in the admin UI can edit a model's context, output, temperature, thinking, and modalities. Saving creates or updates an exact model rule in the selected `appsettings.json` or `appsettings.beta.json`. For beta, **Use stable fallback** removes that exact beta rule so the stable setting applies again.
+
 The response includes:
 
 - `version`
@@ -377,21 +379,6 @@ Supported per-rule overrides:
 - `reasoning`
 - `modalities.input`
 - `modalities.output`
-- `document_vision` (default: `false`; enabled models accept images and PDFs as direct attachments)
-
-## Document Vision
-
-The **Document Vision** checkbox on each model card persists a per-model setting in the updater database. It is off by default. When enabled, the updater publishes `document_vision: true` for that exact model; OpenCode then sends image and PDF attachments directly to the model. When disabled, OpenCode keeps the existing fallback behavior and copies those attachments to its temporary directory for MCP-based processing.
-
-Use this only for models and LiteLLM routes that are verified to accept the resulting Base64 data URI payloads. A large PDF still expands by roughly one third when Base64 encoded, so the proxy and its upstream worker must permit the corresponding request size.
-
-## Reasoning levels
-
-The **Model Status** page can persist the enabled reasoning levels and one default per model. Select any combination of `low`, `medium`, and `xhigh`, then choose the default in the dropdown.
-
-The updater publishes the setting as an exact model rule before the configured `model_limits`: the default becomes `options.reasoningEffort`, while each selected level becomes a selectable model variant. The client therefore uses the selected default even when no variant was chosen in the session UI.
-
-The setting is stored in the updater database. If the updater cannot be reached, OpenCode ignores the remote configuration as before and continues with its local model configuration and generated variants.
 
 ## Model visibility example
 

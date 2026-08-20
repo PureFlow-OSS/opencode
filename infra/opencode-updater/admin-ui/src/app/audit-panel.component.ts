@@ -11,35 +11,33 @@ type ReleaseRecord = {
   notes?: string | null
 }
 
-type AuditRecord = {
-  id: string
-  feedbackId: string
-  actor: string
-  action: string
-  details: string
-  createdAt: string
-}
-
 @Component({
   selector: "app-audit-panel",
   standalone: true,
   template: `
     <article class="card">
-      <h2>Beta Feedback</h2>
-      <p>Promote only after 50% positive beta feedback. Normal channel can be stopped here.</p>
+      <h2>Beta uploads</h2>
+      <p>Promote the active beta upload after the configured number of positive beta feedback items. Normal channel can be stopped here.</p>
       <div class="controls">
         <button type="button" class="secondary" (click)="refresh()">Refresh</button>
         <button type="button" class="secondary" (click)="stopNormal()" [disabled]="statusQuery.data()?.normalStopped">Stop normal</button>
         <button type="button" class="secondary" (click)="clearNormal()" [disabled]="!statusQuery.data()?.normalStopped">Clear stop</button>
       </div>
       <div class="list">
+        @if ((statusQuery.data()?.releases ?? []).length === 0) {
+          <section class="item empty">
+            <strong>No beta uploads yet</strong>
+            <p>Upload a ZIP to make a beta release available for review and promotion.</p>
+          </section>
+        }
         @for (release of statusQuery.data()?.releases ?? []; track release.id) {
           <section class="item">
             <div class="item-top">
               <strong>{{ release.version }}</strong>
               <span>{{ release.channel }}</span>
             </div>
-            <p>{{ release.positiveCount }}/{{ release.totalCount }} positive beta feedback</p>
+            <p>{{ release.positiveCount }}/{{ betaPositiveThreshold }} positive beta feedback required</p>
+            <small>{{ release.totalCount }} beta feedback item(s) submitted</small>
             @if (release.notes) {
               <small>{{ release.notes }}</small>
             }
@@ -56,7 +54,9 @@ type AuditRecord = {
               </button>
               @if (!canPromote(release)) {
                 <small>
-                  @if (release.totalCount === 0) {
+                  @if (isSuperseded(release)) {
+                    A newer beta release is active.
+                  } @else if (release.totalCount === 0) {
                     Waiting for beta feedback.
                   } @else {
                     Need {{ remainingPositive(release) }} more positive feedback item(s).
@@ -64,19 +64,6 @@ type AuditRecord = {
                 </small>
               }
             }
-          </section>
-        }
-      </div>
-      <h3>Audit trail</h3>
-      <div class="list">
-        @for (event of auditQuery.data() ?? []; track event.id) {
-          <section class="item">
-            <div class="item-top">
-              <strong>{{ event.action }}</strong>
-              <span>{{ event.createdAt }}</span>
-            </div>
-            <p>{{ event.details }}</p>
-            <small>{{ event.actor }} · {{ event.feedbackId }}</small>
           </section>
         }
       </div>
@@ -89,10 +76,6 @@ export class AuditPanelComponent {
   readonly statusQuery = injectQuery(() => ({
     queryKey: ["release-status"],
     queryFn: () => this.api.listReleaseStatus(),
-  }))
-  readonly auditQuery = injectQuery(() => ({
-    queryKey: ["audit-trail"],
-    queryFn: () => this.api.listAudit(),
   }))
   readonly promoteMutation = injectMutation(() => ({
     mutationFn: (id: string) => this.api.promoteRelease(id),
@@ -110,20 +93,27 @@ export class AuditPanelComponent {
 
   refresh() {
     void this.statusQuery.refetch()
-    void this.auditQuery.refetch()
+  }
+
+  get betaPositiveThreshold() {
+    return this.statusQuery.data()?.betaPositiveThreshold ?? 1
   }
 
   progress(release: ReleaseRecord) {
-    if (release.totalCount === 0) return 0
-    return Math.min(100, (release.positiveCount / release.totalCount) * 100)
+    return Math.min(100, (release.positiveCount / this.betaPositiveThreshold) * 100)
   }
 
   canPromote(release: ReleaseRecord) {
-    return release.channel !== "normal" && release.totalCount > 0 && release.positiveCount * 2 >= release.totalCount
+    return !this.isSuperseded(release) && release.channel !== "normal" && release.positiveCount >= this.betaPositiveThreshold
+  }
+
+  isSuperseded(release: ReleaseRecord) {
+    const activeBetaVersion = this.statusQuery.data()?.betaFeedVersion
+    return release.channel !== "normal" && !!activeBetaVersion && release.version !== activeBetaVersion
   }
 
   remainingPositive(release: ReleaseRecord) {
-    return Math.max(0, Math.ceil(release.totalCount / 2) - release.positiveCount)
+    return Math.max(0, this.betaPositiveThreshold - release.positiveCount)
   }
 
   promote(id: string) {

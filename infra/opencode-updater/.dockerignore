@@ -1,3 +1,6 @@
 bin
 obj
 .vs
+admin-ui/node_modules
+admin-ui/.angular
+admin-ui/dist

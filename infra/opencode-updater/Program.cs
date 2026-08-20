@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json.Serialization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Sqlite;
@@ -13,7 +14,6 @@ using System.Data.Common;
 using System.Data;
 using System.IO.Compression;
 using System.Text.RegularExpressions;
-using System.Collections.Concurrent;
 using Quartz;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -47,7 +47,7 @@ builder.Services.AddSingleton<UpdaterChannelStateStore>();
 builder.Services.AddSingleton<UpdaterVersionResolver>();
 builder.Services.AddSingleton<UpdaterRolloutResolver>();
 builder.Services.AddSingleton<ModelCardStore>();
-builder.Services.AddSingleton<ModelFeatureStore>();
+builder.Services.AddSingleton<McpConfigStore>();
 var modelCardSyncSeconds = Math.Max(60, betaConfiguration.GetSection("UpdaterBeta:LiteLLM:SyncIntervalSeconds").Get<int?>() ?? 600);
 builder.Services.AddQuartz((quartz) =>
 {
@@ -69,6 +69,7 @@ builder.Services.AddDbContext<FeedbackContext>(options =>
 });
 builder.Services.AddSingleton<FeedbackKeyResolver>();
 builder.Services.AddSingleton<UpdaterAdminStore>();
+builder.Services.AddSingleton<UpdaterConfigStore>();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
   options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
@@ -84,12 +85,9 @@ using (var scope = app.Services.CreateScope())
   db.Database.EnsureCreated();
   if (!await HasColumnAsync(db.Database, "Feedbacks", "AttachmentsJson"))
     db.Database.ExecuteSqlRaw(@"ALTER TABLE ""Feedbacks"" ADD COLUMN ""AttachmentsJson"" TEXT NULL");
+  if (!await HasColumnAsync(db.Database, "Feedbacks", "BetaSentiment"))
+    db.Database.ExecuteSqlRaw(@"ALTER TABLE ""Feedbacks"" ADD COLUMN ""BetaSentiment"" TEXT NULL");
   await EnsureAdminTablesAsync(db.Database.GetDbConnection(), scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>());
-  if (!await HasColumnAsync(db.Database, "UpdaterModelFeatures", "ReasoningVariants"))
-    db.Database.ExecuteSqlRaw("ALTER TABLE UpdaterModelFeatures ADD COLUMN ReasoningVariants TEXT NULL");
-  if (!await HasColumnAsync(db.Database, "UpdaterModelFeatures", "DefaultReasoningVariant"))
-    db.Database.ExecuteSqlRaw("ALTER TABLE UpdaterModelFeatures ADD COLUMN DefaultReasoningVariant TEXT NULL");
-  await scope.ServiceProvider.GetRequiredService<ModelFeatureStore>().LoadAsync();
 }
 
 app.MapGet("/opencode/admin", () => Results.Redirect("/opencode/admin/"));
@@ -104,6 +102,8 @@ app.MapGet("/opencode/admin/", () =>
 app.MapPost("/opencode/feedback", async (
   HttpRequest request,
   FeedbackContext db,
+  LocalFeed feed,
+  UpdaterAdminStore store,
   FeedbackKeyResolver keyResolver,
   IOptions<UpdaterBetaOptions> betaOptions,
   IHttpClientFactory clientFactory
@@ -126,22 +126,22 @@ app.MapPost("/opencode/feedback", async (
     userName = await keyResolver.ResolveBetaUserNameAsync(key, betaOptions.Value, clientFactory, request.HttpContext.RequestAborted);
   }
 
-  var category = body.Category?.Trim() ?? "general";
+  var category = (body.Category?.Trim() ?? "general").ToLowerInvariant();
+  var betaSentiment = body.BetaSentiment?.Trim().ToLowerInvariant();
   if (category == "beta")
   {
-    var betaMatch = ParseBetaFeedback(body.Text!);
-    if (betaMatch is null)
-      return Results.BadRequest(new { error = "Beta feedback must start with either 'Version erfolgreich getestet' or 'Fehler gefunden'" });
-
-    body.Text = (betaMatch == "positive" ? "Version erfolgreich getestet" : "Fehler gefunden") + "\n" + body.Text!.Trim().Replace("\r\n", "\n");
+    if (betaSentiment is not "positive" and not "negative") betaSentiment = ParseBetaFeedback(body.Text!);
+    if (betaSentiment is null)
+      return Results.BadRequest(new { error = "Beta feedback requires beta_sentiment 'positive' or 'negative'" });
   }
 
   var entry = new FeedbackEntry
   {
     Text = body.Text!.Trim(),
     Category = category,
+    BetaSentiment = category == "beta" ? betaSentiment : null,
     UserName = userName,
-    AppVersion = body.AppVersion?.Trim(),
+    AppVersion = category == "beta" ? await ResolveActiveBetaVersionAsync(feed, store) ?? body.AppVersion?.Trim() : body.AppVersion?.Trim(),
     Platform = body.Platform?.Trim(),
     AttachmentsJson = body.Attachments is { Length: > 0 } ? JsonSerializer.Serialize(body.Attachments) : null,
     CreatedAt = DateTimeOffset.UtcNow,
@@ -153,14 +153,17 @@ app.MapPost("/opencode/feedback", async (
   return Results.Ok(new { id = entry.Id });
 });
 
-app.MapGet("/opencode/feedback", async (FeedbackContext db) =>
+app.MapGet("/opencode/feedback", async (FeedbackContext db, LocalFeed feed, UpdaterAdminStore store) =>
 {
+  var releases = await store.ListReleasesAsync();
+  await BackfillBetaFeedbackVersionAsync(db, await ResolveActiveBetaVersionAsync(feed, store, releases), releases);
   var items = (await db.Feedbacks
     .Select(f => new
     {
       id = f.Id,
       text = f.Text,
       category = f.Category,
+      beta_sentiment = f.BetaSentiment,
       user_name = f.UserName,
       app_version = f.AppVersion,
       platform = f.Platform,
@@ -185,7 +188,8 @@ app.MapGet("/opencode/admin/releases/status", async (
 ) =>
 {
   var releases = await store.ListReleasesAsync();
-  var trackedVersion = feed.TryReadVersionFromLatestYml(true) ?? releases.FirstOrDefault()?.Version;
+  var trackedVersion = await ResolveActiveBetaVersionAsync(feed, store, releases);
+  await BackfillBetaFeedbackVersionAsync(feedbackDb, trackedVersion, releases);
   var feedbackCounts = string.IsNullOrWhiteSpace(trackedVersion) ? (0L, 0L) : await GetBetaFeedbackCountsAsync(feedbackDb, trackedVersion);
   return Results.Json(new
   {
@@ -194,16 +198,12 @@ app.MapGet("/opencode/admin/releases/status", async (
       : release),
     normalStopped = await channelState.IsNormalStoppedAsync(),
     betaUserCount = betaOptions.Value.Users.Length,
-    betaPositiveThreshold = (int)Math.Ceiling(betaOptions.Value.Users.Length / 2.0),
-    betaRelease = string.IsNullOrWhiteSpace(trackedVersion)
-      ? null
-      : releases.FirstOrDefault((release) => string.Equals(release.Version, trackedVersion, StringComparison.OrdinalIgnoreCase)) with
-      {
-        PositiveCount = feedbackCounts.Item1,
-        TotalCount = feedbackCounts.Item2,
-      },
+    betaPositiveThreshold = BetaPositiveThreshold(betaOptions.Value),
+    betaRelease = releases.FirstOrDefault((release) => string.Equals(release.Version, trackedVersion, StringComparison.OrdinalIgnoreCase)) is { } betaRelease
+      ? betaRelease with { PositiveCount = feedbackCounts.Item1, TotalCount = feedbackCounts.Item2 }
+      : null,
     normalRelease = releases.FirstOrDefault((release) => release.Channel == "normal"),
-    betaFeedVersion = feed.TryReadVersionFromLatestYml(true),
+    betaFeedVersion = trackedVersion,
     normalFeedVersion = feed.TryReadVersionFromLatestYml(false),
   });
 });
@@ -281,6 +281,7 @@ app.MapPost("/opencode/admin/releases/{id}/promote", async (
   string id,
   UpdaterAdminStore store,
   LocalFeed feed,
+  IOptions<UpdaterBetaOptions> betaOptions,
   HttpRequest request,
   FeedbackContext feedbackDb
 ) =>
@@ -288,8 +289,11 @@ app.MapPost("/opencode/admin/releases/{id}/promote", async (
   var releases = await store.ListReleasesAsync();
   var release = releases.FirstOrDefault((item) => item.Id == id);
   if (release is null) return Results.NotFound();
+  var activeBetaVersion = await ResolveActiveBetaVersionAsync(feed, store, releases);
+  if (!string.Equals(release.Version, activeBetaVersion, StringComparison.OrdinalIgnoreCase))
+    return Results.BadRequest(new { error = "A newer beta release is active and must be promoted instead" });
   var counts = await GetBetaFeedbackCountsAsync(feedbackDb, release.Version);
-  if (counts.totalCount == 0 || counts.positiveCount * 2 < counts.totalCount)
+  if (counts.positiveCount < BetaPositiveThreshold(betaOptions.Value))
     return Results.BadRequest(new { error = "Not enough validated beta feedback to promote" });
 
   var promoted = await store.PromoteReleaseAsync(id, request.HttpContext.RequestAborted);
@@ -334,6 +338,59 @@ app.MapPost("/opencode/admin/feedback", async (
 
 app.MapGet("/opencode/admin/audit", async (UpdaterAdminStore store) => Results.Json(await store.ListAuditAsync()));
 
+app.MapGet("/opencode/admin/modelcards", async (
+  string? channel,
+  ModelCardStore modelCards,
+  UpdaterConfigStore configStore,
+  HttpContext context
+) =>
+{
+  var isBeta = string.Equals(channel, "beta", StringComparison.OrdinalIgnoreCase);
+  var config = await configStore.LoadUpdaterOptionsAsync(isBeta, context.RequestAborted);
+  var cards = modelCards.BuildSnapshot(isBeta, config.ProviderConfig);
+  return Results.Json(new
+  {
+    version = config.Version,
+    isBeta,
+    generatedAt = cards.GeneratedAt,
+    aifactory = new
+    {
+      models = cards.Models,
+      model_visibility = config.ProviderConfig.AiFactory.ModelVisibility,
+    },
+  });
+});
+
+app.MapPut("/opencode/admin/model-settings", async (
+  string model,
+  string? channel,
+  ModelSettingsRequest settings,
+  UpdaterConfigStore configStore,
+  HttpContext context
+) =>
+{
+  if (string.IsNullOrWhiteSpace(model)) return Results.BadRequest(new { error = "Model is required" });
+  if (settings.Context is < 0 || settings.Output is < 0)
+    return Results.BadRequest(new { error = "Context and output must be positive" });
+
+  var isBeta = string.Equals(channel, "beta", StringComparison.OrdinalIgnoreCase);
+  var result = await configStore.SaveModelSettingsAsync(model, isBeta, settings, context.RequestAborted);
+  return Results.Json(result);
+});
+
+app.MapDelete("/opencode/admin/model-settings", async (
+  string model,
+  string? channel,
+  UpdaterConfigStore configStore,
+  HttpContext context
+) =>
+{
+  var isBeta = string.Equals(channel, "beta", StringComparison.OrdinalIgnoreCase);
+  return await configStore.RemoveModelSettingsAsync(model, isBeta, context.RequestAborted)
+    ? Results.NoContent()
+    : Results.NotFound();
+});
+
 app.MapGet("/", () => Results.Redirect("/opencode/version"));
 
 app.MapGet("/opencode/version", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver) =>
@@ -370,20 +427,46 @@ app.MapGet("/opencode/changelog.md", async (HttpContext context, LocalFeed feed,
 {
   var rollout = await rolloutResolver.ResolveAsync(context.Request, context.RequestAborted);
   if (feed.TryGet("changelog.md", rollout.IsBeta, out var local)) return await LocalFileAsync(context, local);
+  if (rollout.IsBeta && feed.TryGet("changelog.md", false, out var stable)) return await LocalFileAsync(context, stable);
   return Results.NotFound();
 });
 
-app.MapGet("/opencode/provider-config.json", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver, ModelFeatureStore features) =>
+app.MapGet("/opencode/provider-config.json", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver, McpConfigStore mcps) =>
 {
   var rollout = await rolloutResolver.ResolveAsync(request, request.HttpContext.RequestAborted);
-  return Results.Json(features.ApplyFeatures(rollout.Options.ProviderConfig));
+  var config = rollout.Options.ProviderConfig;
+  config.Mcp = await mcps.ApplyAsync(config.Mcp, rollout.IsBeta ? "beta" : "normal", request.HttpContext.RequestAborted);
+  return Results.Json(config);
 });
 
-app.MapGet("/opencode/modelcards.json", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver, ModelFeatureStore features) =>
+app.MapGet("/opencode/admin/mcp", async (string? channel, UpdaterConfigStore configStore, McpConfigStore mcps, CancellationToken cancellationToken) =>
+{
+  var selectedChannel = McpConfigStore.NormalizeChannel(channel);
+  var options = await configStore.LoadUpdaterOptionsAsync(selectedChannel == "beta", cancellationToken);
+  var items = await mcps.ApplyAsync(options.ProviderConfig.Mcp, selectedChannel, cancellationToken);
+  return Results.Json(items.OrderBy((item) => item.Key).ToDictionary((item) => item.Key, (item) => item.Value));
+});
+
+app.MapPut("/opencode/admin/mcp/{name}", async (string name, string? channel, McpConfigOptions body, McpConfigStore mcps, CancellationToken cancellationToken) =>
+{
+  var error = McpConfigStore.Validate(name, body);
+  if (error is not null) return Results.BadRequest(new { error });
+  await mcps.SetAsync(McpConfigStore.NormalizeChannel(channel), name, body, cancellationToken);
+  return Results.Ok(new { name = name.Trim(), config = body });
+});
+
+app.MapDelete("/opencode/admin/mcp/{name}", async (string name, string? channel, McpConfigStore mcps, CancellationToken cancellationToken) =>
+{
+  if (string.IsNullOrWhiteSpace(name)) return Results.BadRequest(new { error = "MCP name is required" });
+  await mcps.DeleteAsync(McpConfigStore.NormalizeChannel(channel), name, cancellationToken);
+  return Results.NoContent();
+});
+
+app.MapGet("/opencode/modelcards.json", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver) =>
 {
   var rollout = await rolloutResolver.ResolveAsync(request, request.HttpContext.RequestAborted);
   var providerConfig = rollout.Options.ProviderConfig;
-  var cards = request.HttpContext.RequestServices.GetRequiredService<ModelCardStore>().BuildSnapshot(rollout.IsBeta, providerConfig, features);
+  var cards = request.HttpContext.RequestServices.GetRequiredService<ModelCardStore>().BuildSnapshot(rollout.IsBeta, providerConfig);
 
   return Results.Json(new
   {
@@ -396,28 +479,6 @@ app.MapGet("/opencode/modelcards.json", async (HttpRequest request, UpdaterRollo
       model_visibility = providerConfig.AiFactory.ModelVisibility,
     },
   });
-});
-
-app.MapPut("/opencode/admin/models/{model}/document-vision", async (string model, DocumentVisionRequest body, ModelFeatureStore features, CancellationToken cancellationToken) =>
-{
-  if (string.IsNullOrWhiteSpace(model)) return Results.BadRequest(new { error = "Model is required" });
-  await features.SetDocumentVisionAsync(model, body.Enabled, cancellationToken);
-  return Results.Ok(new { model, document_vision = body.Enabled });
-});
-
-app.MapPut("/opencode/admin/models/{model}/reasoning", async (string model, ReasoningRequest body, ModelFeatureStore features, CancellationToken cancellationToken) =>
-{
-  if (string.IsNullOrWhiteSpace(model)) return Results.BadRequest(new { error = "Model is required" });
-  var variants = (body.Variants ?? [])
-    .Select((variant) => variant.Trim())
-    .Where((variant) => !string.IsNullOrWhiteSpace(variant))
-    .Distinct(StringComparer.OrdinalIgnoreCase)
-    .ToArray();
-  var defaultVariant = body.DefaultVariant?.Trim();
-  if (defaultVariant is not null && !variants.Contains(defaultVariant, StringComparer.OrdinalIgnoreCase))
-    return Results.BadRequest(new { error = "The default reasoning level must be enabled" });
-  await features.SetReasoningAsync(model, variants, defaultVariant, cancellationToken);
-  return Results.Ok(new { model, variants, default_variant = defaultVariant });
 });
 
 app.MapGet("/opencode/feed/{**asset}", async (HttpContext context, LocalFeed feed, UpdaterRolloutResolver rolloutResolver, string? asset) =>
@@ -561,12 +622,30 @@ static async Task<(long positiveCount, long totalCount)> GetBetaFeedbackCountsAs
 {
   var feedbacks = await db.Feedbacks
     .Where((feedback) => feedback.Category == "beta" && feedback.AppVersion == version)
-    .Select((feedback) => feedback.Text)
+    .Select((feedback) => new { feedback.BetaSentiment, feedback.Text })
     .ToListAsync();
 
   var totalCount = feedbacks.LongCount();
-  var positiveCount = feedbacks.LongCount((text) => ParseBetaFeedback(text) == "positive");
+  var positiveCount = feedbacks.LongCount((feedback) => feedback.BetaSentiment == "positive" || (string.IsNullOrWhiteSpace(feedback.BetaSentiment) && ParseBetaFeedback(feedback.Text) == "positive"));
   return (positiveCount, totalCount);
+}
+
+static int BetaPositiveThreshold(UpdaterBetaOptions options) => Math.Max(1, (int)Math.Ceiling(options.Users.Length / 2.0));
+
+static async Task<string?> ResolveActiveBetaVersionAsync(LocalFeed feed, UpdaterAdminStore store, List<ReleaseRecord>? releases = null)
+{
+  var feedVersion = feed.TryReadVersionFromLatestYml(true);
+  if (!string.IsNullOrWhiteSpace(feedVersion)) return feedVersion;
+  return (releases ?? await store.ListReleasesAsync()).FirstOrDefault((release) => release.Channel == "beta")?.Version;
+}
+
+static async Task BackfillBetaFeedbackVersionAsync(FeedbackContext db, string? version, List<ReleaseRecord> releases)
+{
+  if (string.IsNullOrWhiteSpace(version)) return;
+  var betaVersions = releases.Where((release) => release.Channel == "beta").Select((release) => release.Version).ToArray();
+  await db.Feedbacks
+    .Where((feedback) => feedback.Category == "beta" && (feedback.AppVersion == null || feedback.AppVersion == "" || !betaVersions.Contains(feedback.AppVersion!)))
+    .ExecuteUpdateAsync((setters) => setters.SetProperty((feedback) => feedback.AppVersion, version));
 }
 
 static async Task EnsureAdminTablesAsync(DbConnection connection, IWebHostEnvironment env)
@@ -615,11 +694,41 @@ static async Task EnsureAdminTablesAsync(DbConnection connection, IWebHostEnviro
       Value INTEGER NOT NULL,
       UpdatedAt TEXT NOT NULL
     );
+    """;
+  await command.ExecuteNonQueryAsync();
 
-    CREATE TABLE IF NOT EXISTS UpdaterModelFeatures (
-      Model TEXT PRIMARY KEY NOT NULL,
-      DocumentVision INTEGER NOT NULL DEFAULT 0,
-      UpdatedAt TEXT NOT NULL
+  command.CommandText = """
+    UPDATE UpdaterFeedback
+    SET ReleaseId = (
+      SELECT replacement.Id
+      FROM UpdaterReleases original
+      JOIN UpdaterReleases replacement ON replacement.Channel = 'beta' AND replacement.Version = original.Version
+      WHERE original.Id = UpdaterFeedback.ReleaseId
+      ORDER BY replacement.rowid DESC
+      LIMIT 1
+    )
+    WHERE ReleaseId IN (SELECT Id FROM UpdaterReleases WHERE Channel = 'beta');
+
+    DELETE FROM UpdaterReleases
+    WHERE Channel = 'beta'
+      AND rowid NOT IN (
+        SELECT MAX(rowid)
+        FROM UpdaterReleases
+        WHERE Channel = 'beta'
+        GROUP BY Version
+      );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS UpdaterReleases_BetaVersion
+    ON UpdaterReleases (Version)
+    WHERE Channel = 'beta';
+
+    CREATE TABLE IF NOT EXISTS UpdaterMcpConfigs (
+      Channel TEXT NOT NULL,
+      Name TEXT NOT NULL,
+      Config TEXT NOT NULL,
+      Deleted INTEGER NOT NULL DEFAULT 0,
+      UpdatedAt TEXT NOT NULL,
+      PRIMARY KEY (Channel, Name)
     );
     """;
   await command.ExecuteNonQueryAsync();
@@ -698,9 +807,7 @@ sealed record ModelCardEntry(
   int? Output,
   bool? Temperature,
   bool? Reasoning,
-  bool DocumentVision,
-  string[] ReasoningVariants,
-  string? DefaultReasoningVariant,
+  bool? Visible,
   ModelCardPrice? Price,
   ModelCardModalities? Modalities,
   string Source,
@@ -714,9 +821,7 @@ sealed record ModelCardConfig(
   int? Output,
   bool? Temperature,
   bool? Reasoning,
-  ModelCardModalities? Modalities,
-  string[] ReasoningVariants,
-  string? DefaultReasoningVariant
+  ModelCardModalities? Modalities
 );
 
 sealed record ModelCardLiteLLM(
@@ -763,7 +868,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
   DateTimeOffset syncedAt = DateTimeOffset.MinValue;
   string? source;
 
-  public ModelCardSnapshot BuildSnapshot(bool isBeta, ProviderConfigOptions providerConfig, ModelFeatureStore features)
+  public ModelCardSnapshot BuildSnapshot(bool isBeta, ProviderConfigOptions providerConfig)
   {
     var models = cached.Select((model) =>
     {
@@ -776,6 +881,9 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
         .Where((item) => item.score >= 0)
         .OrderByDescending((item) => item.score)
         .FirstOrDefault()?.rule;
+      var visibility = providerConfig.AiFactory.ModelVisibility
+        .Where((rule) => ScoreRule(rule.Pattern, model.Name) >= 0)
+        .LastOrDefault()?.Visible;
 
       return new ModelCardEntry(
         model.Name,
@@ -783,9 +891,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
         match?.Output ?? model.Output,
         match?.Temperature ?? model.Temperature,
         match?.Reasoning ?? model.Reasoning,
-        features.IsDocumentVisionEnabled(model.Name),
-        features.GetReasoning(model.Name)?.Variants ?? [],
-        features.GetReasoning(model.Name)?.DefaultVariant,
+        visibility,
         model.Price is null ? null : new ModelCardPrice(model.InputPrice is null ? null : model.InputPrice * 1000000m, model.OutputPrice is null ? null : model.OutputPrice * 1000000m),
         match?.Modalities is null ? model.Modalities : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? []),
         model.Source,
@@ -797,9 +903,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
             match.Output,
             match.Temperature,
             match.Reasoning,
-            match.Modalities is null ? null : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? []),
-            features.GetReasoning(model.Name)?.Variants ?? [],
-            features.GetReasoning(model.Name)?.DefaultVariant
+            match.Modalities is null ? null : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? [])
           ),
         new ModelCardLiteLLM(
           model.Name,
@@ -1083,120 +1187,6 @@ sealed class AiFactoryConfigOptions
   public List<ModelVisibilityRuleOptions> ModelVisibility { get; set; } = [];
 }
 
-sealed class DocumentVisionRequest
-{
-  [JsonPropertyName("enabled")]
-  public bool Enabled { get; set; }
-}
-
-sealed class ReasoningRequest
-{
-  [JsonPropertyName("variants")]
-  public string[]? Variants { get; set; }
-
-  [ConfigurationKeyName("default_variant")]
-  [JsonPropertyName("default_variant")]
-  public string? DefaultVariant { get; set; }
-}
-
-sealed record ReasoningFeature(string[] Variants, string? DefaultVariant);
-
-sealed class ModelFeatureStore(IWebHostEnvironment env)
-{
-  readonly string dbPath = Path.Combine(env.ContentRootPath, "data", "feedback.db");
-  readonly ConcurrentDictionary<string, bool> documentVision = new(StringComparer.OrdinalIgnoreCase);
-  readonly ConcurrentDictionary<string, ReasoningFeature> reasoning = new(StringComparer.OrdinalIgnoreCase);
-
-  async Task<SqliteConnection> OpenAsync()
-  {
-    var connection = new SqliteConnection($"Data Source={dbPath}");
-    await connection.OpenAsync();
-    return connection;
-  }
-
-  public async Task LoadAsync()
-  {
-    await using var connection = await OpenAsync();
-    await using var command = connection.CreateCommand();
-    command.CommandText = "SELECT Model, DocumentVision, ReasoningVariants, DefaultReasoningVariant FROM UpdaterModelFeatures WHERE DocumentVision = 1 OR ReasoningVariants IS NOT NULL";
-    await using var reader = await command.ExecuteReaderAsync();
-    while (await reader.ReadAsync())
-    {
-      var model = reader.GetString(0);
-      if (reader.GetInt64(1) != 0) documentVision[model] = true;
-      if (reader.IsDBNull(2)) continue;
-      var variants = JsonSerializer.Deserialize<string[]>(reader.GetString(2)) ?? [];
-      if (variants.Length > 0) reasoning[model] = new ReasoningFeature(variants, reader.IsDBNull(3) ? null : reader.GetString(3));
-    }
-  }
-
-  public bool IsDocumentVisionEnabled(string model) => documentVision.TryGetValue(model, out var enabled) && enabled;
-  public ReasoningFeature? GetReasoning(string model) => reasoning.GetValueOrDefault(model);
-
-  public async Task SetDocumentVisionAsync(string model, bool enabled, CancellationToken cancellationToken)
-  {
-    await using var connection = await OpenAsync();
-    await using var command = connection.CreateCommand();
-    command.CommandText = """
-      INSERT INTO UpdaterModelFeatures (Model, DocumentVision, UpdatedAt)
-      VALUES ($model, $enabled, $updatedAt)
-      ON CONFLICT(Model) DO UPDATE SET DocumentVision = excluded.DocumentVision, UpdatedAt = excluded.UpdatedAt
-      """;
-    command.Parameters.AddWithValue("$model", model.Trim());
-    command.Parameters.AddWithValue("$enabled", enabled ? 1 : 0);
-    command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));
-    await command.ExecuteNonQueryAsync(cancellationToken);
-    if (enabled) documentVision[model.Trim()] = true;
-    else documentVision.TryRemove(model.Trim(), out _);
-  }
-
-  public async Task SetReasoningAsync(string model, string[] variants, string? defaultVariant, CancellationToken cancellationToken)
-  {
-    await using var connection = await OpenAsync();
-    await using var command = connection.CreateCommand();
-    command.CommandText = """
-      INSERT INTO UpdaterModelFeatures (Model, DocumentVision, ReasoningVariants, DefaultReasoningVariant, UpdatedAt)
-      VALUES ($model, 0, $variants, $defaultVariant, $updatedAt)
-      ON CONFLICT(Model) DO UPDATE SET ReasoningVariants = excluded.ReasoningVariants, DefaultReasoningVariant = excluded.DefaultReasoningVariant, UpdatedAt = excluded.UpdatedAt
-      """;
-    command.Parameters.AddWithValue("$model", model.Trim());
-    command.Parameters.AddWithValue("$variants", variants.Length > 0 ? JsonSerializer.Serialize(variants) : DBNull.Value);
-    command.Parameters.AddWithValue("$defaultVariant", defaultVariant ?? (object)DBNull.Value);
-    command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));
-    await command.ExecuteNonQueryAsync(cancellationToken);
-    if (variants.Length > 0) reasoning[model.Trim()] = new ReasoningFeature(variants, defaultVariant);
-    else reasoning.TryRemove(model.Trim(), out _);
-  }
-
-  public ProviderConfigOptions ApplyFeatures(ProviderConfigOptions config) => new()
-  {
-    Model = config.Model,
-    SmallModel = config.SmallModel,
-    Mcp = config.Mcp,
-    AiFactory = new AiFactoryConfigOptions
-    {
-      ModelVisibility = config.AiFactory.ModelVisibility,
-      ModelLimits = documentVision.Keys
-        .Concat(reasoning.Keys)
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .Select((model) => new ModelLimitRuleOptions
-        {
-          Pattern = model,
-          DocumentVision = IsDocumentVisionEnabled(model) ? true : null,
-          Options = GetReasoning(model)?.DefaultVariant is { } defaultVariant
-            ? new Dictionary<string, object> { ["reasoningEffort"] = defaultVariant }
-            : null,
-          Variants = GetReasoning(model)?.Variants.ToDictionary(
-            (variant) => variant,
-            (variant) => new Dictionary<string, object> { ["reasoningEffort"] = variant },
-            StringComparer.OrdinalIgnoreCase),
-        })
-        .Concat(config.AiFactory.ModelLimits)
-        .ToList(),
-    },
-  };
-}
-
 sealed class ModelLimitRuleOptions
 {
   [JsonPropertyName("pattern")]
@@ -1216,16 +1206,169 @@ sealed class ModelLimitRuleOptions
 
   [JsonPropertyName("modalities")]
   public ModalitiesOptions? Modalities { get; set; }
+}
 
-  [ConfigurationKeyName("document_vision")]
-  [JsonPropertyName("document_vision")]
-  public bool? DocumentVision { get; set; }
+sealed class ModelSettingsRequest
+{
+  [JsonPropertyName("context")]
+  public int? Context { get; set; }
 
-  [JsonPropertyName("options")]
-  public Dictionary<string, object>? Options { get; set; }
+  [JsonPropertyName("output")]
+  public int? Output { get; set; }
 
-  [JsonPropertyName("variants")]
-  public Dictionary<string, Dictionary<string, object>>? Variants { get; set; }
+  [JsonPropertyName("temperature")]
+  public bool? Temperature { get; set; }
+
+  [JsonPropertyName("reasoning")]
+  public bool? Reasoning { get; set; }
+
+  [JsonPropertyName("visible")]
+  public bool? Visible { get; set; }
+
+  [JsonPropertyName("input_modalities")]
+  public string[]? InputModalities { get; set; }
+
+  [JsonPropertyName("output_modalities")]
+  public string[]? OutputModalities { get; set; }
+}
+
+sealed class UpdaterConfigStore(IWebHostEnvironment environment)
+{
+  readonly SemaphoreSlim gate = new(1, 1);
+  readonly JsonSerializerOptions json = new() { WriteIndented = true };
+
+  public async Task<ModelSettingsRequest> SaveModelSettingsAsync(string model, bool beta, ModelSettingsRequest settings, CancellationToken cancellationToken)
+  {
+    await gate.WaitAsync(cancellationToken);
+    try
+    {
+      var root = await LoadAsync(beta, cancellationToken);
+      var limits = GetModelLimits(root);
+      var existing = limits
+        .OfType<JsonObject>()
+        .FirstOrDefault((rule) => string.Equals(rule["pattern"]?.GetValue<string>(), model, StringComparison.OrdinalIgnoreCase));
+      var rule = existing ?? new JsonObject { ["pattern"] = model };
+      if (existing is null) limits.Add(rule);
+
+      rule["context"] = settings.Context;
+      rule["output"] = settings.Output;
+      rule["temperature"] = settings.Temperature;
+      rule["reasoning"] = settings.Reasoning;
+      rule["modalities"] = new JsonObject
+      {
+        ["input"] = JsonSerializer.SerializeToNode(settings.InputModalities ?? [], json),
+        ["output"] = JsonSerializer.SerializeToNode(settings.OutputModalities ?? [], json),
+      };
+      if (settings.Visible is not null)
+      {
+        var visibility = GetModelVisibility(root);
+        var existingVisibility = visibility
+          .OfType<JsonObject>()
+          .FirstOrDefault((rule) => string.Equals(rule["pattern"]?.GetValue<string>(), model, StringComparison.OrdinalIgnoreCase));
+        var visibilityRule = existingVisibility ?? new JsonObject { ["pattern"] = model };
+        if (existingVisibility is null) visibility.Add(visibilityRule);
+        visibilityRule["visible"] = settings.Visible;
+      }
+      await SaveAsync(root, beta, cancellationToken);
+      return settings;
+    }
+    finally
+    {
+      gate.Release();
+    }
+  }
+
+  public async Task<bool> RemoveModelSettingsAsync(string model, bool beta, CancellationToken cancellationToken)
+  {
+    await gate.WaitAsync(cancellationToken);
+    try
+    {
+      var root = await LoadAsync(beta, cancellationToken);
+      var limits = GetModelLimits(root);
+      var existing = limits
+        .OfType<JsonObject>()
+        .FirstOrDefault((rule) => string.Equals(rule["pattern"]?.GetValue<string>(), model, StringComparison.OrdinalIgnoreCase));
+      if (existing is not null) limits.Remove(existing);
+      var visibility = GetModelVisibility(root);
+      var existingVisibility = visibility
+        .OfType<JsonObject>()
+        .FirstOrDefault((rule) => string.Equals(rule["pattern"]?.GetValue<string>(), model, StringComparison.OrdinalIgnoreCase));
+      if (existingVisibility is not null) visibility.Remove(existingVisibility);
+      if (existing is null && existingVisibility is null) return false;
+      await SaveAsync(root, beta, cancellationToken);
+      return true;
+    }
+    finally
+    {
+      gate.Release();
+    }
+  }
+
+  public async Task<UpdaterOptions> LoadUpdaterOptionsAsync(bool beta, CancellationToken cancellationToken)
+  {
+    var stable = await LoadAsync(false, cancellationToken);
+    var root = beta ? Merge(stable, await LoadAsync(true, cancellationToken)) : stable;
+    return JsonSerializer.Deserialize<UpdaterOptions>(root["Updater"]?.ToJsonString() ?? "{}", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new UpdaterOptions();
+  }
+
+  async Task<JsonObject> LoadAsync(bool beta, CancellationToken cancellationToken)
+  {
+    var path = Path.Combine(environment.ContentRootPath, beta ? "appsettings.beta.json" : "appsettings.json");
+    if (!File.Exists(path)) return new JsonObject();
+    await using var stream = File.OpenRead(path);
+    return await JsonNode.ParseAsync(stream, cancellationToken: cancellationToken) as JsonObject ?? new JsonObject();
+  }
+
+  async Task SaveAsync(JsonObject root, bool beta, CancellationToken cancellationToken)
+  {
+    var path = Path.Combine(environment.ContentRootPath, beta ? "appsettings.beta.json" : "appsettings.json");
+    await File.WriteAllTextAsync(path, root.ToJsonString(json), cancellationToken);
+  }
+
+  static JsonArray GetModelLimits(JsonObject root)
+  {
+    var updater = GetObject(root, "Updater");
+    var provider = GetObject(updater, "ProviderConfig");
+    var aiFactory = GetObject(provider, "aifactory");
+    if (aiFactory["model_limits"] is JsonArray limits) return limits;
+    var created = new JsonArray();
+    aiFactory["model_limits"] = created;
+    return created;
+  }
+
+  static JsonArray GetModelVisibility(JsonObject root)
+  {
+    var updater = GetObject(root, "Updater");
+    var provider = GetObject(updater, "ProviderConfig");
+    var aiFactory = GetObject(provider, "aifactory");
+    if (aiFactory["model_visibility"] is JsonArray visibility) return visibility;
+    var created = new JsonArray();
+    aiFactory["model_visibility"] = created;
+    return created;
+  }
+
+  static JsonObject GetObject(JsonObject parent, string name)
+  {
+    if (parent[name] is JsonObject value) return value;
+    var created = new JsonObject();
+    parent[name] = created;
+    return created;
+  }
+
+  static JsonObject Merge(JsonObject stable, JsonObject beta)
+  {
+    var merged = stable.DeepClone().AsObject();
+    foreach (var item in beta)
+    {
+      if (item.Value is JsonObject betaObject && merged[item.Key] is JsonObject stableObject)
+      {
+        merged[item.Key] = Merge(stableObject, betaObject);
+        continue;
+      }
+      merged[item.Key] = item.Value?.DeepClone();
+    }
+    return merged;
+  }
 }
 
 sealed class ModelVisibilityRuleOptions
@@ -1312,6 +1455,90 @@ sealed class McpManagedAuthOptions
   public string? Prefix { get; set; }
 }
 
+sealed class McpConfigStore(IWebHostEnvironment env)
+{
+  readonly string dbPath = Path.Combine(env.ContentRootPath, "data", "feedback.db");
+
+  async Task<SqliteConnection> OpenAsync()
+  {
+    Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+    var connection = new SqliteConnection($"Data Source={dbPath}");
+    await connection.OpenAsync();
+    return connection;
+  }
+
+  public static string NormalizeChannel(string? channel) => string.Equals(channel, "beta", StringComparison.OrdinalIgnoreCase) ? "beta" : "normal";
+
+  public static string? Validate(string name, McpConfigOptions config)
+  {
+    if (string.IsNullOrWhiteSpace(name)) return "MCP name is required";
+    if (name.Trim().Length > 128) return "MCP name must not exceed 128 characters";
+    if (config.Type is not ("local" or "remote")) return "MCP type must be local or remote";
+    if (config.Type == "local" && config.Command is not { Length: > 0 }) return "Local MCPs require a command";
+    if (config.Type == "remote")
+    {
+      if (!Uri.TryCreate(config.Url, UriKind.Absolute, out var uri)) return "Remote MCPs require an absolute URL";
+      if (uri.Scheme is not ("http" or "https")) return "Remote MCP URLs must use HTTP or HTTPS";
+    }
+    if (config.Timeout is <= 0) return "MCP timeout must be positive";
+    if (config.Auth is { Type: not "pat" }) return "Managed authentication must use PAT";
+    return null;
+  }
+
+  public async Task<Dictionary<string, McpConfigOptions>> ApplyAsync(Dictionary<string, McpConfigOptions> defaults, string channel, CancellationToken cancellationToken)
+  {
+    var result = new Dictionary<string, McpConfigOptions>(defaults, StringComparer.Ordinal);
+    await using var connection = await OpenAsync();
+    await using var command = connection.CreateCommand();
+    command.CommandText = "SELECT Name, Config, Deleted FROM UpdaterMcpConfigs WHERE Channel = $channel";
+    command.Parameters.AddWithValue("$channel", channel);
+    await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+    while (await reader.ReadAsync(cancellationToken))
+    {
+      var name = reader.GetString(0);
+      if (reader.GetInt64(2) != 0)
+      {
+        result.Remove(name);
+        continue;
+      }
+      var config = JsonSerializer.Deserialize<McpConfigOptions>(reader.GetString(1));
+      if (config is not null) result[name] = config;
+    }
+    return result;
+  }
+
+  public async Task SetAsync(string channel, string name, McpConfigOptions config, CancellationToken cancellationToken)
+  {
+    await using var connection = await OpenAsync();
+    await using var command = connection.CreateCommand();
+    command.CommandText = """
+      INSERT INTO UpdaterMcpConfigs (Channel, Name, Config, Deleted, UpdatedAt)
+      VALUES ($channel, $name, $config, 0, $updatedAt)
+      ON CONFLICT(Channel, Name) DO UPDATE SET Config = excluded.Config, Deleted = 0, UpdatedAt = excluded.UpdatedAt
+      """;
+    command.Parameters.AddWithValue("$channel", channel);
+    command.Parameters.AddWithValue("$name", name.Trim());
+    command.Parameters.AddWithValue("$config", JsonSerializer.Serialize(config));
+    command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));
+    await command.ExecuteNonQueryAsync(cancellationToken);
+  }
+
+  public async Task DeleteAsync(string channel, string name, CancellationToken cancellationToken)
+  {
+    await using var connection = await OpenAsync();
+    await using var command = connection.CreateCommand();
+    command.CommandText = """
+      INSERT INTO UpdaterMcpConfigs (Channel, Name, Config, Deleted, UpdatedAt)
+      VALUES ($channel, $name, '{}', 1, $updatedAt)
+      ON CONFLICT(Channel, Name) DO UPDATE SET Deleted = 1, UpdatedAt = excluded.UpdatedAt
+      """;
+    command.Parameters.AddWithValue("$channel", channel);
+    command.Parameters.AddWithValue("$name", name.Trim());
+    command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));
+    await command.ExecuteNonQueryAsync(cancellationToken);
+  }
+}
+
 sealed class LocalFeed(string root)
 {
   public bool TryGet(string relativePath, bool beta, out string file)
@@ -1349,38 +1576,38 @@ sealed class UpdaterVersionResolver(IOptions<UpdaterOptions> options, LocalFeed 
 }
 
 sealed class UpdaterRolloutResolver(
-  IOptionsMonitor<UpdaterOptions> options,
   IOptions<UpdaterBetaOptions> betaOptions,
   UpdaterVersionResolver versionResolver,
   LocalFeed feed,
   UpdaterChannelStateStore channelState,
   IHttpClientFactory clientFactory,
-  IMemoryCache cache
+  IMemoryCache cache,
+  UpdaterConfigStore configStore
 )
 {
   public async Task<UpdaterRollout> ResolveAsync(HttpRequest request, CancellationToken cancellationToken)
   {
+    var stable = await configStore.LoadUpdaterOptionsAsync(false, cancellationToken);
     if (request.Query.TryGetValue("beta", out var queryBeta))
     {
       var token = queryBeta.FirstOrDefault()?.Trim();
       if (!string.IsNullOrWhiteSpace(token) && cache.TryGetValue($"beta:{token}", out bool cached) && cached)
-        return CreateRollout(options.Get("beta"), true, token);
+        return CreateRollout(await configStore.LoadUpdaterOptionsAsync(true, cancellationToken), stable, true, token);
     }
 
     var beta = betaOptions.Value;
-    if (!beta.Enabled || !HasBetaRules(beta)) return CreateRollout(options.CurrentValue, false, null);
-    if (string.IsNullOrWhiteSpace(beta.LiteLLM.BaseUrl)) return CreateRollout(options.CurrentValue, false, null);
+    if (!beta.Enabled || !HasBetaRules(beta)) return CreateRollout(stable, stable, false, null);
+    if (string.IsNullOrWhiteSpace(beta.LiteLLM.BaseUrl)) return CreateRollout(stable, stable, false, null);
 
     var key = request.Headers[beta.HeaderName].FirstOrDefault()?.Trim();
-    if (string.IsNullOrWhiteSpace(key)) return CreateRollout(options.CurrentValue, false, null);
+    if (string.IsNullOrWhiteSpace(key)) return CreateRollout(stable, stable, false, null);
     var tokenHash = ComputeHash(key);
-    if (!await IsBetaMemberAsync(key, beta, cancellationToken)) return CreateRollout(options.CurrentValue, false, null);
-    return CreateRollout(options.Get("beta"), true, tokenHash);
+    if (!await IsBetaMemberAsync(key, beta, cancellationToken)) return CreateRollout(stable, stable, false, null);
+    return CreateRollout(await configStore.LoadUpdaterOptionsAsync(true, cancellationToken), stable, true, tokenHash);
   }
 
-  UpdaterRollout CreateRollout(UpdaterOptions resolved, bool isBeta, string? betaToken)
+  UpdaterRollout CreateRollout(UpdaterOptions resolved, UpdaterOptions fallback, bool isBeta, string? betaToken)
   {
-    var fallback = options.CurrentValue;
     var normalStopped = channelState.IsNormalStopped();
     var localVersion = feed.TryReadVersionFromLatestYml(isBeta);
     var version = localVersion ??
@@ -1410,7 +1637,7 @@ sealed class UpdaterRolloutResolver(
     if (cache.TryGetValue(cacheKey, out bool cached)) return cached;
 
     using var request = new HttpRequestMessage(HttpMethod.Get, BuildLiteLLMKeyInfoUrl(beta, key));
-    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ResolveLiteLLMApiKey(beta, key));
+    request.Headers.TryAddWithoutValidation("x-litellm-api-key", ResolveLiteLLMApiKey(beta, key));
 
     try
     {
@@ -1575,6 +1802,9 @@ sealed class FeedbackRequest
   [JsonPropertyName("category")]
   public string? Category { get; set; }
 
+  [JsonPropertyName("beta_sentiment")]
+  public string? BetaSentiment { get; set; }
+
   [JsonPropertyName("key")]
   public string? Key { get; set; }
 
@@ -1605,6 +1835,7 @@ sealed class FeedbackEntry
   public int Id { get; set; }
   public string Text { get; set; } = "";
   public string Category { get; set; } = "general";
+  public string? BetaSentiment { get; set; }
   public string UserName { get; set; } = "";
   public string? AppVersion { get; set; }
   public string? Platform { get; set; }
@@ -1669,6 +1900,12 @@ sealed class UpdaterAdminStore(IWebHostEnvironment env)
     command.CommandText = """
       INSERT INTO UpdaterReleases (Id, Version, Channel, ZipName, ZipSha256, ZipSize, Notes, Promoted, PositiveCount, TotalCount, CreatedAt)
       VALUES ($id, $version, 'beta', $zipName, $zipSha256, $zipSize, $notes, 0, 0, 0, $createdAt)
+      ON CONFLICT(Version) WHERE Channel = 'beta' DO UPDATE SET
+        ZipName = excluded.ZipName,
+        ZipSha256 = excluded.ZipSha256,
+        ZipSize = excluded.ZipSize,
+        Notes = excluded.Notes,
+        CreatedAt = excluded.CreatedAt
       """;
     command.Parameters.AddWithValue("$id", Guid.NewGuid().ToString("N"));
     command.Parameters.AddWithValue("$version", body.Version.Trim());
