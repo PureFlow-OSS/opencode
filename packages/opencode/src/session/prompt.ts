@@ -125,9 +125,31 @@ async function renderPdfForVision(data: Uint8Array) {
     ImageData: canvas.ImageData,
     Path2D: canvas.Path2D,
   })
-  Object.assign(globalThis, { pdfjsWorker: await import("pdfjs-dist/legacy/build/pdf.worker.mjs") })
+  Object.assign(globalThis, {
+    // @ts-expect-error PDF.js does not declare its worker entry point.
+    pdfjsWorker: await import("pdfjs-dist/legacy/build/pdf.worker.mjs"),
+  })
   const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs")
-  const pdf = await getDocument({ data: new Uint8Array(data), useSystemFonts: true }).promise
+  class PdfCanvasFactory {
+    constructor(_options: { enableHWA?: boolean }) {}
+
+    create(width: number, height: number) {
+      const image = canvas.createCanvas(width, height)
+      return { canvas: image, context: image.getContext("2d") }
+    }
+
+    reset(target: { canvas: ReturnType<typeof canvas.createCanvas> }, width: number, height: number) {
+      target.canvas.width = width
+      target.canvas.height = height
+    }
+
+    destroy(target: { canvas: ReturnType<typeof canvas.createCanvas> }) {
+      target.canvas.width = 0
+      target.canvas.height = 0
+    }
+  }
+  const pdf = await getDocument({ data: new Uint8Array(data), useSystemFonts: true, CanvasFactory: PdfCanvasFactory })
+    .promise
   const pageCount = Math.min(pdf.numPages, PDF_VISION_MAX_PAGES)
   const pages = await Promise.all(
     Array.from({ length: pageCount }, async (_, index) => {
