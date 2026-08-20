@@ -119,9 +119,11 @@ export class McpPanelComponent {
       this.error = "Enter a unique MCP name."
       return
     }
+    this.error = ""
     const headers = this.parseEntries(this.draft.headers, "headers")
+    if (this.error) return
     const environment = this.parseEntries(this.draft.environment, "environment variables")
-    if (!headers || !environment) return
+    if (this.error) return
     const timeout = this.draft.timeout.trim() ? Number(this.draft.timeout) : undefined
     if (timeout !== undefined && (!Number.isInteger(timeout) || timeout <= 0)) {
       this.error = "Timeout must be a positive whole number."
@@ -148,7 +150,6 @@ export class McpPanelComponent {
           }
         : {}),
     }
-    this.error = ""
     this.status = "Saving…"
     this.saveMutation.mutate(
       { name, config },
