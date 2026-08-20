@@ -417,6 +417,7 @@ export const layer = Layer.effect(
     const accountSvc = yield* Account.Service
     const env = yield* Env.Service
     const npmSvc = yield* Npm.Service
+    const flock = yield* EffectFlock.Service
 
     const readConfigFile = Effect.fnUntraced(function* (filepath: string) {
       return yield* fs.readFileString(filepath).pipe(
@@ -652,28 +653,43 @@ export const layer = Layer.effect(
 
           yield* ensureGitignore(dir).pipe(Effect.orDie)
 
-          const dep = yield* npmSvc
-            .install(dir, {
-              add: [
-                {
-                  name: "@opencode-ai/plugin",
-                  version: "latest",
-                },
-              ],
-            })
-            .pipe(
-              Effect.exit,
-              Effect.tap((exit) =>
-                Exit.isFailure(exit)
-                  ? Effect.sync(() => {
-                      log.warn("background dependency install failed", { dir, error: String(exit.cause) })
-                    })
-                  : Effect.void,
+          const bundledPlugin = process.env.OPENCODE_BUNDLED_PLUGIN_PATH
+          if (bundledPlugin) {
+            yield* flock.withLock(
+              Effect.promise(() =>
+                fsNode.cp(bundledPlugin, path.join(dir, "node_modules", "@opencode-ai", "plugin"), {
+                  recursive: true,
+                  force: true,
+                }),
               ),
-              Effect.asVoid,
-              Effect.forkDetach,
+              `bundled-plugin:${dir}`,
             )
-          deps.push(dep)
+          }
+
+          if (!bundledPlugin) {
+            const dep = yield* npmSvc
+              .install(dir, {
+                add: [
+                  {
+                    name: "@opencode-ai/plugin",
+                    version: "latest",
+                  },
+                ],
+              })
+              .pipe(
+                Effect.exit,
+                Effect.tap((exit) =>
+                  Exit.isFailure(exit)
+                    ? Effect.sync(() => {
+                        log.warn("background dependency install failed", { dir, error: String(exit.cause) })
+                      })
+                    : Effect.void,
+                ),
+                Effect.asVoid,
+                Effect.forkDetach,
+              )
+            deps.push(dep)
+          }
 
           result.command = mergeDeep(result.command ?? {}, yield* Effect.promise(() => ConfigCommand.load(dir)))
           result.agent = mergeDeep(result.agent ?? {}, yield* Effect.promise(() => ConfigAgent.load(dir)))

@@ -91,6 +91,10 @@ const getBase = (): Configuration => ({
       from: "../opencode/bin/reset-opencode.ps1",
       to: "reset-opencode.ps1",
     },
+    {
+      from: "build/offline-plugin/",
+      to: "opencode-plugin/",
+    },
     ...(process.platform === "win32"
       ? [
           {

@@ -73,6 +73,9 @@ async function prepareServerEnv(password: string) {
     OPENCODE_CLIENT: "desktop",
     OPENCODE_SERVER_USERNAME: "opencode",
     OPENCODE_SERVER_PASSWORD: password,
+    OPENCODE_BUNDLED_PLUGIN_PATH: app.isPackaged
+      ? join(process.resourcesPath, "opencode-plugin")
+      : join(app.getAppPath(), "build", "offline-plugin"),
     ...(ripgrepPath ? { OPENCODE_RIPGREP_PATH: ripgrepPath } : {}),
     XDG_STATE_HOME: app.getPath("userData"),
   }

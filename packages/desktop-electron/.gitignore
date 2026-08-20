@@ -28,3 +28,4 @@ out/
 resources/opencode-cli*
 resources/icons
 build/updater-helper/
+build/offline-plugin/

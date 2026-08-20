@@ -9,3 +9,4 @@ if (process.platform === "win32") await $`bun ./scripts/build-updater-helper.ts`
 if (process.platform === "win32") await $`bun ./scripts/bundle-ripgrep.ts`
 
 await $`cd ../opencode && bun script/build-node.ts`
+await $`bun ./scripts/bundle-plugin-sdk.ts`
