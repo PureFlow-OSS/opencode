@@ -70,6 +70,8 @@ type AiFactoryModelLimitRule = {
   reasoning?: boolean
   modalities?: AiFactoryModalities
   documentVision?: boolean
+  options?: Record<string, any>
+  variants?: Record<string, Record<string, any>>
 }
 
 type AiFactoryModality = "text" | "audio" | "image" | "video" | "pdf"
@@ -84,6 +86,8 @@ type AiFactoryModelOverrides = {
   reasoning?: boolean
   modalities?: AiFactoryModalities
   documentVision?: boolean
+  options?: Record<string, any>
+  variants?: Record<string, Record<string, any>>
 }
 
 function globToRegExp(pattern: string) {
@@ -98,17 +102,21 @@ function resolveAiFactoryModelOverrides(modelID: string, rules: AiFactoryModelLi
       output: 32_000,
     },
   }
-  const match = rules?.find((rule) => rule.pattern && globToRegExp(rule.pattern).test(modelID))
-  if (!match) return fallback
+  const matches = rules?.filter((rule) => rule.pattern && globToRegExp(rule.pattern).test(modelID)) ?? []
+  if (!matches.length) return fallback
+  const value = <T>(key: keyof AiFactoryModelLimitRule) =>
+    matches.map((rule) => rule[key] as T | undefined).find((item) => item !== undefined)
   return {
     limit: {
-      context: match.context ?? fallback.limit.context,
-      output: match.output ?? fallback.limit.output,
+      context: value<number>("context") ?? fallback.limit.context,
+      output: value<number>("output") ?? fallback.limit.output,
     },
-    temperature: match.temperature,
-    reasoning: match.reasoning,
-    modalities: match.modalities,
-    documentVision: match.documentVision,
+    temperature: value<boolean>("temperature"),
+    reasoning: value<boolean>("reasoning"),
+    modalities: value<AiFactoryModalities>("modalities"),
+    documentVision: value<boolean>("documentVision"),
+    options: value<Record<string, any>>("options"),
+    variants: value<Record<string, Record<string, any>>>("variants"),
   }
 }
 
@@ -126,6 +134,15 @@ function normalizeAiFactoryModalities(value: unknown): AiFactoryModalities | und
     ...(input?.length && { input }),
     ...(output?.length && { output }),
   }
+}
+
+function normalizeAiFactoryVariants(value: unknown) {
+  if (!isRecord(value)) return
+  const variants = Object.entries(value).flatMap(([name, options]) => {
+    if (!name.trim() || !isRecord(options)) return []
+    return [[name, options] as const]
+  })
+  return variants.length ? Object.fromEntries(variants) : undefined
 }
 
 function aiFactoryModalityFlags(
@@ -159,6 +176,8 @@ async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch, init: Request
             reasoning?: boolean
             modalities?: unknown
             document_vision?: boolean
+            options?: unknown
+            variants?: unknown
           }>
         }
       }
@@ -175,6 +194,8 @@ async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch, init: Request
           reasoning: typeof rule.reasoning === "boolean" ? rule.reasoning : undefined,
           modalities: normalizeAiFactoryModalities(rule.modalities),
           documentVision: typeof rule.document_vision === "boolean" ? rule.document_vision : undefined,
+          options: isRecord(rule.options) ? rule.options : undefined,
+          variants: normalizeAiFactoryVariants(rule.variants),
         } satisfies AiFactoryModelLimitRule,
       ]
     })
@@ -202,7 +223,7 @@ function buildAiFactoryModel(
     },
     status: "active",
     headers: {},
-    options: {},
+    options: overrides.options ?? {},
     cost: {
       input: 0,
       output: 0,
@@ -239,7 +260,7 @@ function buildAiFactoryModel(
 
   return {
     ...base,
-    variants: mapValues(ProviderTransform.variants(base), (value) => value),
+    variants: mergeDeep(ProviderTransform.variants(base), overrides.variants ?? {}),
   }
 }
 
@@ -1713,7 +1734,12 @@ const layer: Layer.Layer<
             )
               delete provider.models[modelID]
 
-            model.variants = mapValues(ProviderTransform.variants(model), (v) => v)
+            model.variants = mapValues(
+              providerID === AIFACTORY_ID
+                ? mergeDeep(ProviderTransform.variants(model), model.variants ?? {})
+                : ProviderTransform.variants(model),
+              (v) => v,
+            )
 
             const configVariants = configProvider?.models?.[modelID]?.variants
             if (configVariants && model.variants) {

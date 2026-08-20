@@ -385,6 +385,14 @@ The **Document Vision** checkbox on each model card persists a per-model setting
 
 Use this only for models and LiteLLM routes that are verified to accept the resulting Base64 data URI payloads. A large PDF still expands by roughly one third when Base64 encoded, so the proxy and its upstream worker must permit the corresponding request size.
 
+## Reasoning levels
+
+The **Model Status** page can persist the enabled reasoning levels and one default per model. Select any combination of `low`, `medium`, and `xhigh`, then choose the default in the dropdown.
+
+The updater publishes the setting as an exact model rule before the configured `model_limits`: the default becomes `options.reasoningEffort`, while each selected level becomes a selectable model variant. The client therefore uses the selected default even when no variant was chosen in the session UI.
+
+The setting is stored in the updater database. If the updater cannot be reached, OpenCode ignores the remote configuration as before and continues with its local model configuration and generated variants.
+
 ## Model visibility example
 
 Example `appsettings.json`:

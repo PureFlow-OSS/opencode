@@ -85,6 +85,10 @@ using (var scope = app.Services.CreateScope())
   if (!await HasColumnAsync(db.Database, "Feedbacks", "AttachmentsJson"))
     db.Database.ExecuteSqlRaw(@"ALTER TABLE ""Feedbacks"" ADD COLUMN ""AttachmentsJson"" TEXT NULL");
   await EnsureAdminTablesAsync(db.Database.GetDbConnection(), scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>());
+  if (!await HasColumnAsync(db.Database, "UpdaterModelFeatures", "ReasoningVariants"))
+    db.Database.ExecuteSqlRaw("ALTER TABLE UpdaterModelFeatures ADD COLUMN ReasoningVariants TEXT NULL");
+  if (!await HasColumnAsync(db.Database, "UpdaterModelFeatures", "DefaultReasoningVariant"))
+    db.Database.ExecuteSqlRaw("ALTER TABLE UpdaterModelFeatures ADD COLUMN DefaultReasoningVariant TEXT NULL");
   await scope.ServiceProvider.GetRequiredService<ModelFeatureStore>().LoadAsync();
 }
 
@@ -372,7 +376,7 @@ app.MapGet("/opencode/changelog.md", async (HttpContext context, LocalFeed feed,
 app.MapGet("/opencode/provider-config.json", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver, ModelFeatureStore features) =>
 {
   var rollout = await rolloutResolver.ResolveAsync(request, request.HttpContext.RequestAborted);
-  return Results.Json(features.ApplyDocumentVision(rollout.Options.ProviderConfig));
+  return Results.Json(features.ApplyFeatures(rollout.Options.ProviderConfig));
 });
 
 app.MapGet("/opencode/modelcards.json", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver, ModelFeatureStore features) =>
@@ -399,6 +403,21 @@ app.MapPut("/opencode/admin/models/{model}/document-vision", async (string model
   if (string.IsNullOrWhiteSpace(model)) return Results.BadRequest(new { error = "Model is required" });
   await features.SetDocumentVisionAsync(model, body.Enabled, cancellationToken);
   return Results.Ok(new { model, document_vision = body.Enabled });
+});
+
+app.MapPut("/opencode/admin/models/{model}/reasoning", async (string model, ReasoningRequest body, ModelFeatureStore features, CancellationToken cancellationToken) =>
+{
+  if (string.IsNullOrWhiteSpace(model)) return Results.BadRequest(new { error = "Model is required" });
+  var variants = (body.Variants ?? [])
+    .Select((variant) => variant.Trim())
+    .Where((variant) => !string.IsNullOrWhiteSpace(variant))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+  var defaultVariant = body.DefaultVariant?.Trim();
+  if (defaultVariant is not null && !variants.Contains(defaultVariant, StringComparer.OrdinalIgnoreCase))
+    return Results.BadRequest(new { error = "The default reasoning level must be enabled" });
+  await features.SetReasoningAsync(model, variants, defaultVariant, cancellationToken);
+  return Results.Ok(new { model, variants, default_variant = defaultVariant });
 });
 
 app.MapGet("/opencode/feed/{**asset}", async (HttpContext context, LocalFeed feed, UpdaterRolloutResolver rolloutResolver, string? asset) =>
@@ -680,6 +699,8 @@ sealed record ModelCardEntry(
   bool? Temperature,
   bool? Reasoning,
   bool DocumentVision,
+  string[] ReasoningVariants,
+  string? DefaultReasoningVariant,
   ModelCardPrice? Price,
   ModelCardModalities? Modalities,
   string Source,
@@ -693,7 +714,9 @@ sealed record ModelCardConfig(
   int? Output,
   bool? Temperature,
   bool? Reasoning,
-  ModelCardModalities? Modalities
+  ModelCardModalities? Modalities,
+  string[] ReasoningVariants,
+  string? DefaultReasoningVariant
 );
 
 sealed record ModelCardLiteLLM(
@@ -761,6 +784,8 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
         match?.Temperature ?? model.Temperature,
         match?.Reasoning ?? model.Reasoning,
         features.IsDocumentVisionEnabled(model.Name),
+        features.GetReasoning(model.Name)?.Variants ?? [],
+        features.GetReasoning(model.Name)?.DefaultVariant,
         model.Price is null ? null : new ModelCardPrice(model.InputPrice is null ? null : model.InputPrice * 1000000m, model.OutputPrice is null ? null : model.OutputPrice * 1000000m),
         match?.Modalities is null ? model.Modalities : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? []),
         model.Source,
@@ -772,7 +797,9 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
             match.Output,
             match.Temperature,
             match.Reasoning,
-            match.Modalities is null ? null : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? [])
+            match.Modalities is null ? null : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? []),
+            features.GetReasoning(model.Name)?.Variants ?? [],
+            features.GetReasoning(model.Name)?.DefaultVariant
           ),
         new ModelCardLiteLLM(
           model.Name,
@@ -1062,10 +1089,23 @@ sealed class DocumentVisionRequest
   public bool Enabled { get; set; }
 }
 
+sealed class ReasoningRequest
+{
+  [JsonPropertyName("variants")]
+  public string[]? Variants { get; set; }
+
+  [ConfigurationKeyName("default_variant")]
+  [JsonPropertyName("default_variant")]
+  public string? DefaultVariant { get; set; }
+}
+
+sealed record ReasoningFeature(string[] Variants, string? DefaultVariant);
+
 sealed class ModelFeatureStore(IWebHostEnvironment env)
 {
   readonly string dbPath = Path.Combine(env.ContentRootPath, "data", "feedback.db");
   readonly ConcurrentDictionary<string, bool> documentVision = new(StringComparer.OrdinalIgnoreCase);
+  readonly ConcurrentDictionary<string, ReasoningFeature> reasoning = new(StringComparer.OrdinalIgnoreCase);
 
   async Task<SqliteConnection> OpenAsync()
   {
@@ -1078,12 +1118,20 @@ sealed class ModelFeatureStore(IWebHostEnvironment env)
   {
     await using var connection = await OpenAsync();
     await using var command = connection.CreateCommand();
-    command.CommandText = "SELECT Model, DocumentVision FROM UpdaterModelFeatures WHERE DocumentVision = 1";
+    command.CommandText = "SELECT Model, DocumentVision, ReasoningVariants, DefaultReasoningVariant FROM UpdaterModelFeatures WHERE DocumentVision = 1 OR ReasoningVariants IS NOT NULL";
     await using var reader = await command.ExecuteReaderAsync();
-    while (await reader.ReadAsync()) documentVision[reader.GetString(0)] = reader.GetInt64(1) != 0;
+    while (await reader.ReadAsync())
+    {
+      var model = reader.GetString(0);
+      if (reader.GetInt64(1) != 0) documentVision[model] = true;
+      if (reader.IsDBNull(2)) continue;
+      var variants = JsonSerializer.Deserialize<string[]>(reader.GetString(2)) ?? [];
+      if (variants.Length > 0) reasoning[model] = new ReasoningFeature(variants, reader.IsDBNull(3) ? null : reader.GetString(3));
+    }
   }
 
   public bool IsDocumentVisionEnabled(string model) => documentVision.TryGetValue(model, out var enabled) && enabled;
+  public ReasoningFeature? GetReasoning(string model) => reasoning.GetValueOrDefault(model);
 
   public async Task SetDocumentVisionAsync(string model, bool enabled, CancellationToken cancellationToken)
   {
@@ -1102,7 +1150,25 @@ sealed class ModelFeatureStore(IWebHostEnvironment env)
     else documentVision.TryRemove(model.Trim(), out _);
   }
 
-  public ProviderConfigOptions ApplyDocumentVision(ProviderConfigOptions config) => new()
+  public async Task SetReasoningAsync(string model, string[] variants, string? defaultVariant, CancellationToken cancellationToken)
+  {
+    await using var connection = await OpenAsync();
+    await using var command = connection.CreateCommand();
+    command.CommandText = """
+      INSERT INTO UpdaterModelFeatures (Model, DocumentVision, ReasoningVariants, DefaultReasoningVariant, UpdatedAt)
+      VALUES ($model, 0, $variants, $defaultVariant, $updatedAt)
+      ON CONFLICT(Model) DO UPDATE SET ReasoningVariants = excluded.ReasoningVariants, DefaultReasoningVariant = excluded.DefaultReasoningVariant, UpdatedAt = excluded.UpdatedAt
+      """;
+    command.Parameters.AddWithValue("$model", model.Trim());
+    command.Parameters.AddWithValue("$variants", variants.Length > 0 ? JsonSerializer.Serialize(variants) : DBNull.Value);
+    command.Parameters.AddWithValue("$defaultVariant", defaultVariant ?? (object)DBNull.Value);
+    command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));
+    await command.ExecuteNonQueryAsync(cancellationToken);
+    if (variants.Length > 0) reasoning[model.Trim()] = new ReasoningFeature(variants, defaultVariant);
+    else reasoning.TryRemove(model.Trim(), out _);
+  }
+
+  public ProviderConfigOptions ApplyFeatures(ProviderConfigOptions config) => new()
   {
     Model = config.Model,
     SmallModel = config.SmallModel,
@@ -1111,7 +1177,20 @@ sealed class ModelFeatureStore(IWebHostEnvironment env)
     {
       ModelVisibility = config.AiFactory.ModelVisibility,
       ModelLimits = documentVision.Keys
-        .Select((model) => new ModelLimitRuleOptions { Pattern = model, DocumentVision = true })
+        .Concat(reasoning.Keys)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Select((model) => new ModelLimitRuleOptions
+        {
+          Pattern = model,
+          DocumentVision = IsDocumentVisionEnabled(model) ? true : null,
+          Options = GetReasoning(model)?.DefaultVariant is { } defaultVariant
+            ? new Dictionary<string, object> { ["reasoningEffort"] = defaultVariant }
+            : null,
+          Variants = GetReasoning(model)?.Variants.ToDictionary(
+            (variant) => variant,
+            (variant) => new Dictionary<string, object> { ["reasoningEffort"] = variant },
+            StringComparer.OrdinalIgnoreCase),
+        })
         .Concat(config.AiFactory.ModelLimits)
         .ToList(),
     },
@@ -1141,6 +1220,12 @@ sealed class ModelLimitRuleOptions
   [ConfigurationKeyName("document_vision")]
   [JsonPropertyName("document_vision")]
   public bool? DocumentVision { get; set; }
+
+  [JsonPropertyName("options")]
+  public Dictionary<string, object>? Options { get; set; }
+
+  [JsonPropertyName("variants")]
+  public Dictionary<string, Dictionary<string, object>>? Variants { get; set; }
 }
 
 sealed class ModelVisibilityRuleOptions

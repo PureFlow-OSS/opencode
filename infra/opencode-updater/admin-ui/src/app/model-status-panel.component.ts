@@ -50,6 +50,35 @@ import { ApiService } from "./api.service"
                   <small>Thinking</small>
                   <strong>{{ formatBoolean(model.reasoning ?? model.config?.reasoning) }}</strong>
                 </div>
+                @if (supportsReasoning(model)) {
+                  <div class="meta-item reasoning-levels">
+                    <small>Reasoning levels</small>
+                    <div class="reasoning-options">
+                      @for (effort of reasoningEfforts; track effort) {
+                        <label>
+                          <input
+                            type="checkbox"
+                            [checked]="hasReasoningVariant(model, effort)"
+                            [disabled]="updating === model.model"
+                            (change)="toggleReasoningVariant(model, effort, $any($event.target).checked)"
+                          />
+                          {{ effort }}
+                        </label>
+                      }
+                    </div>
+                    @if (reasoningVariants(model).length > 0) {
+                      <select
+                        [value]="reasoningDefault(model) || ''"
+                        [disabled]="updating === model.model"
+                        (change)="setReasoningDefault(model, $any($event.target).value)"
+                      >
+                        @for (effort of reasoningVariants(model); track effort) {
+                          <option [value]="effort">Default: {{ effort }}</option>
+                        }
+                      </select>
+                    }
+                  </div>
+                }
                 <div class="meta-item">
                   <small>Input Cost /1M</small>
                   <strong>{{ formatPrice(model.price?.input ?? model.liteLLM?.inputCostPerMillionTokens) }}</strong>
@@ -86,12 +115,55 @@ export class ModelStatusPanelComponent {
   }))
 
   readonly models = () => this.modelCards.data()?.aifactory?.models ?? []
+  readonly reasoningEfforts = ["low", "medium", "xhigh"]
   updating?: string
 
   async setDocumentVision(model: string, enabled: boolean) {
     this.updating = model
     try {
       await this.api.setDocumentVision(model, enabled)
+      await this.modelCards.refetch()
+    } finally {
+      this.updating = undefined
+    }
+  }
+
+  reasoningVariants(model: ReturnType<ModelStatusPanelComponent["models"]>[number]) {
+    return model.reasoningVariants ?? model.config?.reasoningVariants ?? []
+  }
+
+  reasoningDefault(model: ReturnType<ModelStatusPanelComponent["models"]>[number]) {
+    return model.defaultReasoningVariant ?? model.config?.defaultReasoningVariant
+  }
+
+  supportsReasoning(model: ReturnType<ModelStatusPanelComponent["models"]>[number]) {
+    return model.reasoning ?? model.config?.reasoning ?? false
+  }
+
+  hasReasoningVariant(model: ReturnType<ModelStatusPanelComponent["models"]>[number], effort: string) {
+    return this.reasoningVariants(model).includes(effort)
+  }
+
+  async toggleReasoningVariant(model: ReturnType<ModelStatusPanelComponent["models"]>[number], effort: string, enabled: boolean) {
+    const variants = enabled
+      ? [...this.reasoningVariants(model), effort]
+      : this.reasoningVariants(model).filter((variant) => variant !== effort)
+    const current = this.reasoningDefault(model)
+    await this.setReasoning(
+      model.model,
+      variants,
+      typeof current === "string" && variants.includes(current) ? current : variants[0],
+    )
+  }
+
+  async setReasoningDefault(model: ReturnType<ModelStatusPanelComponent["models"]>[number], defaultVariant: string) {
+    await this.setReasoning(model.model, this.reasoningVariants(model), defaultVariant)
+  }
+
+  async setReasoning(model: string, variants: string[], defaultVariant?: string) {
+    this.updating = model
+    try {
+      await this.api.setReasoning(model, variants, defaultVariant)
       await this.modelCards.refetch()
     } finally {
       this.updating = undefined

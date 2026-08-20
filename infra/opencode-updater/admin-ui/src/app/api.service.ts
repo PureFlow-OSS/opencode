@@ -37,6 +37,8 @@ type AuditRecord = {
 type ModelCard = {
   model: string
   documentVision: boolean
+  reasoningVariants?: string[]
+  defaultReasoningVariant?: string | null
   context?: number | null
   output?: number | null
   temperature?: boolean | null
@@ -50,6 +52,8 @@ type ModelCard = {
     output?: number | null
     temperature?: boolean | null
     reasoning?: boolean | null
+    reasoningVariants?: string[]
+    defaultReasoningVariant?: string | null
     modalities?: { input?: string[]; output?: string[] } | null
   } | null
   liteLLM?: {
@@ -172,6 +176,16 @@ export class ApiService {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ enabled }),
+      }),
+    )
+  }
+
+  async setReasoning(model: string, variants: string[], defaultVariant?: string) {
+    return this.readJson<{ model: string; variants: string[]; default_variant?: string | null }>(
+      await fetch(`/opencode/admin/models/${encodeURIComponent(model)}/reasoning`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ variants, default_variant: defaultVariant }),
       }),
     )
   }
