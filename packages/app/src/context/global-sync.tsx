@@ -16,7 +16,7 @@ import type { InitError } from "../pages/error"
 import { useGlobalSDK } from "./global-sdk"
 import { bootstrapDirectory, bootstrapGlobal, clearProviderRev } from "./global-sync/bootstrap"
 import { createChildStoreManager } from "./global-sync/child-store"
-import { applyDirectoryEvent, applyGlobalEvent, cleanupDroppedSessionCaches } from "./global-sync/event-reducer"
+import { applyDirectoryEvent, applyGlobalEvent } from "./global-sync/event-reducer"
 import { createRefreshQueue } from "./global-sync/queue"
 import { clearSessionPrefetchDirectory } from "./global-sync/session-prefetch"
 import { estimateRootSessionTotal, loadRootSessionsWithFallback } from "./global-sync/session-load"
@@ -192,10 +192,15 @@ function createGlobalSync() {
                 console.warn("Ignoring an empty session list while sessions are already loaded", { directory })
                 return
               }
-              const childSessions = store.session.filter((s) => !!s.parentID)
-              const sessions = [...nonArchived, ...childSessions].sort((a, b) =>
-                a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
-              )
+              // A server can briefly return an incomplete root list while it is
+              // reconnecting after sleep. Treat that response as a refresh, not
+              // as proof that locally known sessions were deleted: deleting the
+              // entry also drops its message cache and makes the active composer
+              // unable to resolve its own session.
+              const localSessions = store.session.filter((session) => !session.time?.archived)
+              const sessions = [
+                ...new Map([...localSessions, ...nonArchived].map((session) => [session.id, session])).values(),
+              ].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
               batch(() => {
                 setStore(
                   "sessionTotal",
@@ -206,7 +211,6 @@ function createGlobalSync() {
                   }),
                 )
                 setStore("session", reconcile(sessions, { key: "id" }))
-                cleanupDroppedSessionCaches(store, setStore, sessions, setSessionTodo)
               })
             })
             .catch((err) => {
