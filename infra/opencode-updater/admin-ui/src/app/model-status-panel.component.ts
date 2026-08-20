@@ -47,6 +47,22 @@ import { ApiService, ModelSettings } from "./api.service"
                   <label>Output <input type="number" min="0" [ngModel]="draft().output" (ngModelChange)="setNumber('output', $event)" name="output" /></label>
                   <label><input type="checkbox" [ngModel]="draft().temperature" (ngModelChange)="setBoolean('temperature', $event)" name="temperature" /> Temperature</label>
                   <label><input type="checkbox" [ngModel]="draft().reasoning" (ngModelChange)="setBoolean('reasoning', $event)" name="reasoning" /> Thinking</label>
+                  @if (draft().reasoning) {
+                    <fieldset class="reasoning-settings">
+                      <legend>Reasoning levels for users</legend>
+                      @for (level of reasoningLevels; track level) {
+                        <label><input type="checkbox" [checked]="hasReasoningLevel(level)" (change)="setReasoningLevel(level, $any($event.target).checked)" /> {{ level }}</label>
+                      }
+                      <label>Default
+                        <select [ngModel]="draft().default_reasoning_variant" (ngModelChange)="setDefaultReasoningLevel($event)" name="defaultReasoning" [disabled]="!draft().reasoning_variants?.length">
+                          <option [ngValue]="null">Select a default</option>
+                          @for (level of draft().reasoning_variants || []; track level) {
+                            <option [value]="level">{{ level }}</option>
+                          }
+                        </select>
+                      </label>
+                    </fieldset>
+                  }
                   <label><input type="checkbox" [ngModel]="draft().document_vision" (ngModelChange)="setBoolean('document_vision', $event)" name="documentVision" /> Document Vision</label>
                   <label><input type="checkbox" [ngModel]="draft().visible" (ngModelChange)="setBoolean('visible', $event)" name="visible" /> Visible in OpenCode</label>
                   <label>Input modalities <input [ngModel]="draft().input_modalities?.join(', ')" (ngModelChange)="setModalities('input_modalities', $event)" name="inputModalities" placeholder="text, image" /></label>
@@ -61,6 +77,10 @@ import { ApiService, ModelSettings } from "./api.service"
                   <div class="meta-item"><small>Context</small><strong>{{ formatNumber(model.config?.context ?? model.context) }}</strong></div>
                   <div class="meta-item"><small>Output</small><strong>{{ formatNumber(model.config?.output ?? model.output) }}</strong></div>
                   <div class="meta-item"><small>Thinking</small><strong>{{ formatBoolean(model.config?.reasoning ?? model.reasoning) }}</strong></div>
+                  @if ((model.config?.reasoning ?? model.reasoning) && (model.config?.reasoningVariants ?? model.reasoningVariants)?.length) {
+                    <div class="meta-item"><small>Reasoning levels</small><strong>{{ (model.config?.reasoningVariants ?? model.reasoningVariants ?? []).join(', ') }}</strong></div>
+                    <div class="meta-item"><small>Default reasoning</small><strong>{{ model.config?.defaultReasoningVariant ?? model.defaultReasoningVariant ?? 'n/a' }}</strong></div>
+                  }
                   <div class="meta-item"><small>Document Vision</small><strong>{{ formatBoolean(model.config?.documentVision ?? model.documentVision) }}</strong></div>
                   <div class="meta-item"><small>Visible in OpenCode</small><strong>{{ formatBoolean(model.visible) }}</strong></div>
                   <div class="meta-item"><small>Input Cost /1M</small><strong>{{ formatPrice(model.price?.input ?? model.liteLLM?.inputCostPerMillionTokens) }}</strong></div>
@@ -86,6 +106,7 @@ export class ModelStatusPanelComponent {
   readonly saving = signal(false)
   readonly error = signal<string | null>(null)
   readonly success = signal<string | null>(null)
+  readonly reasoningLevels = ["low", "medium", "xhigh"] as const
   readonly modelCards = injectQuery(() => ({
     queryKey: ["model-cards", this.channel()],
     queryFn: () => this.api.listModelCards(this.channel()),
@@ -100,13 +121,15 @@ export class ModelStatusPanelComponent {
     this.success.set(null)
   }
 
-  edit(model: { model: string; context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; documentVision?: boolean; visible?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null; config?: { context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; documentVision?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null } | null }) {
+  edit(model: { model: string; context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; reasoningVariants?: string[] | null; defaultReasoningVariant?: string | null; documentVision?: boolean; visible?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null; config?: { context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; reasoningVariants?: string[] | null; defaultReasoningVariant?: string | null; documentVision?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null } | null }) {
     this.editing.set(model.model)
     this.draft.set({
       context: model.config?.context ?? model.context ?? null,
       output: model.config?.output ?? model.output ?? null,
       temperature: model.config?.temperature ?? model.temperature ?? null,
       reasoning: model.config?.reasoning ?? model.reasoning ?? null,
+      reasoning_variants: model.config?.reasoningVariants ?? model.reasoningVariants ?? [],
+      default_reasoning_variant: model.config?.defaultReasoningVariant ?? model.defaultReasoningVariant ?? null,
       document_vision: model.config?.documentVision ?? model.documentVision ?? false,
       visible: model.visible ?? true,
       input_modalities: model.modalities?.input ?? model.config?.modalities?.input ?? [],
@@ -119,7 +142,22 @@ export class ModelStatusPanelComponent {
   }
 
   setBoolean(key: "temperature" | "reasoning" | "document_vision" | "visible", value: boolean) {
-    this.draft.update((draft) => ({ ...draft, [key]: value }))
+    this.draft.update((draft) => key === "reasoning" && !value ? { ...draft, reasoning: value, reasoning_variants: [], default_reasoning_variant: null } : { ...draft, [key]: value })
+  }
+
+  hasReasoningLevel(level: string) {
+    return this.draft().reasoning_variants?.includes(level) ?? false
+  }
+
+  setReasoningLevel(level: string, enabled: boolean) {
+    this.draft.update((draft) => {
+      const reasoning_variants = enabled ? [...new Set([...(draft.reasoning_variants ?? []), level])] : (draft.reasoning_variants ?? []).filter((item) => item !== level)
+      return { ...draft, reasoning_variants, default_reasoning_variant: reasoning_variants.includes(draft.default_reasoning_variant ?? "") ? draft.default_reasoning_variant : reasoning_variants[0] ?? null }
+    })
+  }
+
+  setDefaultReasoningLevel(value: string | null) {
+    this.draft.update((draft) => ({ ...draft, default_reasoning_variant: value || null }))
   }
 
   setModalities(key: "input_modalities" | "output_modalities", value: string) {

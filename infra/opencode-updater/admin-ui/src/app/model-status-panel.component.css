@@ -149,6 +149,29 @@ button.secondary {
   align-items: center;
 }
 
+.reasoning-settings {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, max-content);
+  gap: 10px 16px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+}
+
+.reasoning-settings legend {
+  padding: 0 4px;
+  color: rgba(242, 244, 248, 0.82);
+  font-size: 13px;
+}
+
+.reasoning-settings > label:last-child {
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
 .settings-form input[type="checkbox"] {
   width: 16px;
   height: 16px;

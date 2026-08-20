@@ -39,6 +39,8 @@ type ModelCard = {
   output?: number | null
   temperature?: boolean | null
   reasoning?: boolean | null
+  reasoningVariants?: string[] | null
+  defaultReasoningVariant?: string | null
   documentVision?: boolean
   visible?: boolean | null
   price?: { input?: number | null; output?: number | null } | null
@@ -50,6 +52,8 @@ type ModelCard = {
     output?: number | null
     temperature?: boolean | null
     reasoning?: boolean | null
+    reasoningVariants?: string[] | null
+    defaultReasoningVariant?: string | null
     documentVision?: boolean | null
     modalities?: { input?: string[]; output?: string[] } | null
   } | null
@@ -85,6 +89,8 @@ export type ModelSettings = {
   output?: number | null
   temperature?: boolean | null
   reasoning?: boolean | null
+  reasoning_variants?: string[] | null
+  default_reasoning_variant?: string | null
   document_vision?: boolean | null
   visible?: boolean | null
   input_modalities?: string[]

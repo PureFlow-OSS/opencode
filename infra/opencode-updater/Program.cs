@@ -372,6 +372,13 @@ app.MapPut("/opencode/admin/model-settings", async (
   if (string.IsNullOrWhiteSpace(model)) return Results.BadRequest(new { error = "Model is required" });
   if (settings.Context is < 0 || settings.Output is < 0)
     return Results.BadRequest(new { error = "Context and output must be positive" });
+  var reasoningVariants = (settings.ReasoningVariants ?? []).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+  if (reasoningVariants.Any((item) => item is not ("low" or "medium" or "xhigh")))
+    return Results.BadRequest(new { error = "Reasoning levels must be low, medium, or xhigh" });
+  if (settings.DefaultReasoningVariant is not null && !reasoningVariants.Contains(settings.DefaultReasoningVariant, StringComparer.OrdinalIgnoreCase))
+    return Results.BadRequest(new { error = "The default reasoning level must be enabled" });
+  settings.ReasoningVariants = settings.Reasoning == true ? reasoningVariants : [];
+  settings.DefaultReasoningVariant = settings.Reasoning == true ? settings.DefaultReasoningVariant : null;
 
   var isBeta = string.Equals(channel, "beta", StringComparison.OrdinalIgnoreCase);
   var result = await configStore.SaveModelSettingsAsync(model, isBeta, settings, context.RequestAborted);
@@ -434,7 +441,7 @@ app.MapGet("/opencode/changelog.md", async (HttpContext context, LocalFeed feed,
 app.MapGet("/opencode/provider-config.json", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver, McpConfigStore mcps) =>
 {
   var rollout = await rolloutResolver.ResolveAsync(request, request.HttpContext.RequestAborted);
-  var config = rollout.Options.ProviderConfig;
+  var config = ApplyReasoningSettings(rollout.Options.ProviderConfig);
   config.Mcp = await mcps.ApplyAsync(config.Mcp, rollout.IsBeta ? "beta" : "normal", request.HttpContext.RequestAborted);
   return Results.Json(config);
 });
@@ -465,7 +472,7 @@ app.MapDelete("/opencode/admin/mcp/{name}", async (string name, string? channel,
 app.MapGet("/opencode/modelcards.json", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver) =>
 {
   var rollout = await rolloutResolver.ResolveAsync(request, request.HttpContext.RequestAborted);
-  var providerConfig = rollout.Options.ProviderConfig;
+  var providerConfig = ApplyReasoningSettings(rollout.Options.ProviderConfig);
   var cards = request.HttpContext.RequestServices.GetRequiredService<ModelCardStore>().BuildSnapshot(rollout.IsBeta, providerConfig);
 
   return Results.Json(new
@@ -493,6 +500,26 @@ app.MapGet("/opencode/feed/{**asset}", async (HttpContext context, LocalFeed fee
 });
 
 app.Run();
+
+static ProviderConfigOptions ApplyReasoningSettings(ProviderConfigOptions config)
+{
+  foreach (var rule in config.AiFactory.ModelLimits)
+  {
+    var variants = (rule.ReasoningVariants ?? []).Where((item) => item is "low" or "medium" or "xhigh").Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    if (rule.Reasoning != true || variants.Length == 0)
+    {
+      rule.Options = null;
+      rule.Variants = null;
+      continue;
+    }
+
+    var defaultVariant = variants.Contains(rule.DefaultReasoningVariant, StringComparer.OrdinalIgnoreCase) ? rule.DefaultReasoningVariant! : variants[0];
+    rule.Options = new JsonObject { ["reasoningEffort"] = defaultVariant };
+    rule.Variants = new JsonObject();
+    foreach (var variant in variants) rule.Variants[variant] = new JsonObject { ["reasoningEffort"] = variant };
+  }
+  return config;
+}
 
 static string GetPublicBaseUrl(UpdaterOptions options, HttpRequest request)
 {
@@ -807,6 +834,8 @@ sealed record ModelCardEntry(
   int? Output,
   bool? Temperature,
   bool? Reasoning,
+  string[]? ReasoningVariants,
+  string? DefaultReasoningVariant,
   bool DocumentVision,
   bool? Visible,
   ModelCardPrice? Price,
@@ -822,6 +851,8 @@ sealed record ModelCardConfig(
   int? Output,
   bool? Temperature,
   bool? Reasoning,
+  string[]? ReasoningVariants,
+  string? DefaultReasoningVariant,
   bool? DocumentVision,
   ModelCardModalities? Modalities
 );
@@ -893,6 +924,8 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
         match?.Output ?? model.Output,
         match?.Temperature ?? model.Temperature,
         match?.Reasoning ?? model.Reasoning,
+        match?.ReasoningVariants,
+        match?.DefaultReasoningVariant,
         match?.DocumentVision ?? false,
         visibility,
         model.Price is null ? null : new ModelCardPrice(model.InputPrice is null ? null : model.InputPrice * 1000000m, model.OutputPrice is null ? null : model.OutputPrice * 1000000m),
@@ -906,6 +939,8 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
             match.Output,
             match.Temperature,
             match.Reasoning,
+            match.ReasoningVariants,
+            match.DefaultReasoningVariant,
             match.DocumentVision,
             match.Modalities is null ? null : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? [])
           ),
@@ -1208,6 +1243,20 @@ sealed class ModelLimitRuleOptions
   [JsonPropertyName("reasoning")]
   public bool? Reasoning { get; set; }
 
+  [ConfigurationKeyName("reasoning_variants")]
+  [JsonPropertyName("reasoning_variants")]
+  public string[]? ReasoningVariants { get; set; }
+
+  [ConfigurationKeyName("default_reasoning_variant")]
+  [JsonPropertyName("default_reasoning_variant")]
+  public string? DefaultReasoningVariant { get; set; }
+
+  [JsonPropertyName("options")]
+  public JsonObject? Options { get; set; }
+
+  [JsonPropertyName("variants")]
+  public JsonObject? Variants { get; set; }
+
   [JsonPropertyName("modalities")]
   public ModalitiesOptions? Modalities { get; set; }
 
@@ -1229,6 +1278,12 @@ sealed class ModelSettingsRequest
 
   [JsonPropertyName("reasoning")]
   public bool? Reasoning { get; set; }
+
+  [JsonPropertyName("reasoning_variants")]
+  public string[]? ReasoningVariants { get; set; }
+
+  [JsonPropertyName("default_reasoning_variant")]
+  public string? DefaultReasoningVariant { get; set; }
 
   [JsonPropertyName("document_vision")]
   public bool? DocumentVision { get; set; }
@@ -1265,6 +1320,8 @@ sealed class UpdaterConfigStore(IWebHostEnvironment environment)
       rule["output"] = settings.Output;
       rule["temperature"] = settings.Temperature;
       rule["reasoning"] = settings.Reasoning;
+      rule["reasoning_variants"] = JsonSerializer.SerializeToNode(settings.ReasoningVariants ?? [], json);
+      rule["default_reasoning_variant"] = settings.DefaultReasoningVariant;
       rule["document_vision"] = settings.DocumentVision;
       rule["modalities"] = new JsonObject
       {
