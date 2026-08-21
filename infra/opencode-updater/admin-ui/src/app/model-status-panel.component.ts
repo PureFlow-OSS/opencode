@@ -108,7 +108,7 @@ export class ModelStatusPanelComponent {
   readonly saving = signal(false)
   readonly error = signal<string | null>(null)
   readonly success = signal<string | null>(null)
-  readonly reasoningLevels = ["low", "medium", "xhigh"] as const
+  readonly reasoningLevels = ["low", "medium", "high", "xhigh"] as const
   readonly modelCards = injectQuery(() => ({
     queryKey: ["model-cards", this.channel()],
     queryFn: () => this.api.listModelCards(this.channel()),

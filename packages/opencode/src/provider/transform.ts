@@ -443,9 +443,7 @@ export function variants(model: Provider.Model): Record<string, Record<string, a
   const id = model.id.toLowerCase()
   const adaptiveEfforts = anthropicAdaptiveEfforts(model.api.id)
   if (id.includes("qwen3.8-27b")) {
-    return Object.fromEntries(
-      ["low", "medium", "xhigh"].map((effort) => [effort, { reasoningEffort: effort }]),
-    )
+    return Object.fromEntries(["low", "medium", "high", "xhigh"].map((effort) => [effort, { reasoningEffort: effort }]))
   }
   if (
     id.includes("deepseek-chat") ||

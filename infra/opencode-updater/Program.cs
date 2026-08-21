@@ -373,8 +373,8 @@ app.MapPut("/opencode/admin/model-settings", async (
   if (settings.Context is < 0 || settings.Output is < 0)
     return Results.BadRequest(new { error = "Context and output must be positive" });
   var reasoningVariants = (settings.ReasoningVariants ?? []).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-  if (reasoningVariants.Any((item) => item is not ("low" or "medium" or "xhigh")))
-    return Results.BadRequest(new { error = "Reasoning levels must be low, medium, or xhigh" });
+  if (reasoningVariants.Any((item) => item is not ("low" or "medium" or "high" or "xhigh")))
+    return Results.BadRequest(new { error = "Reasoning levels must be low, medium, high, or xhigh" });
   if (settings.DefaultReasoningVariant is not null && !reasoningVariants.Contains(settings.DefaultReasoningVariant, StringComparer.OrdinalIgnoreCase))
     return Results.BadRequest(new { error = "The default reasoning level must be enabled" });
   settings.ReasoningVariants = settings.Reasoning == true ? reasoningVariants : [];
@@ -505,7 +505,7 @@ static ProviderConfigOptions ApplyReasoningSettings(ProviderConfigOptions config
 {
   foreach (var rule in config.AiFactory.ModelLimits)
   {
-    var variants = (rule.ReasoningVariants ?? []).Where((item) => item is "low" or "medium" or "xhigh").Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    var variants = (rule.ReasoningVariants ?? []).Where((item) => item is "low" or "medium" or "high" or "xhigh").Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     if (rule.Reasoning != true || variants.Length == 0)
     {
       rule.Options = null;

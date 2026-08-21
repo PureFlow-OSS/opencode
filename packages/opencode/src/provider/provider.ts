@@ -97,6 +97,13 @@ function globToRegExp(pattern: string) {
   return new RegExp(`^${escaped}$`, "i")
 }
 
+function aiFactoryRuleScore(pattern: string, modelID: string) {
+  if (pattern === "*") return 0
+  if (pattern.toLowerCase() === modelID.toLowerCase()) return 1000 + pattern.length
+  if (globToRegExp(pattern).test(modelID)) return 100 - (pattern.split("*").length - 1) * 10 + pattern.length
+  return -1
+}
+
 function resolveAiFactoryModelOverrides(
   modelID: string,
   rules: AiFactoryModelLimitRule[] | undefined,
@@ -107,7 +114,12 @@ function resolveAiFactoryModelOverrides(
       output: 32_000,
     },
   }
-  const matches = rules?.filter((rule) => rule.pattern && globToRegExp(rule.pattern).test(modelID)) ?? []
+  const matches =
+    rules
+      ?.map((rule) => ({ rule, score: aiFactoryRuleScore(rule.pattern, modelID) }))
+      .filter((item) => item.score >= 0)
+      .sort((a, b) => b.score - a.score)
+      .map((item) => item.rule) ?? []
   if (!matches.length) return fallback
   const value = <T>(key: keyof AiFactoryModelLimitRule) =>
     matches.map((rule) => rule[key] as T | undefined).find((item) => item !== undefined)

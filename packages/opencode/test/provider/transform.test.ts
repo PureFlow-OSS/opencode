@@ -2113,7 +2113,7 @@ describe("ProviderTransform.variants", () => {
     expect(result).toEqual({})
   })
 
-  test("qwen 3.8 27B returns low, medium, and xhigh thinking variants", () => {
+  test("qwen 3.8 27B returns low, medium, high, and xhigh thinking variants", () => {
     const model = createMockModel({
       id: "qwen/Qwen3.8-27B",
       providerID: "qwen",
@@ -2127,6 +2127,7 @@ describe("ProviderTransform.variants", () => {
     expect(result).toEqual({
       low: { reasoningEffort: "low" },
       medium: { reasoningEffort: "medium" },
+      high: { reasoningEffort: "high" },
       xhigh: { reasoningEffort: "xhigh" },
     })
   })
