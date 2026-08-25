@@ -73,6 +73,41 @@ button.secondary {
   text-transform: uppercase;
 }
 
+.global-settings {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid rgba(123, 140, 255, 0.3);
+  border-radius: 16px;
+  background: rgba(123, 140, 255, 0.08);
+}
+
+.global-settings h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.global-settings p {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(242, 244, 248, 0.68);
+}
+
+.global-settings label {
+  display: grid;
+  gap: 6px;
+  color: rgba(242, 244, 248, 0.82);
+  font-size: 13px;
+}
+
+.global-settings button {
+  align-self: end;
+  margin-bottom: 14px;
+}
+
 .empty-state {
   padding: 18px;
   border-radius: 18px;
@@ -102,6 +137,13 @@ button.secondary {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.model-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .model-name {
@@ -149,6 +191,29 @@ button.secondary {
   align-items: center;
 }
 
+.reasoning-settings {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, max-content);
+  gap: 10px 16px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+}
+
+.reasoning-settings legend {
+  padding: 0 4px;
+  color: rgba(242, 244, 248, 0.82);
+  font-size: 13px;
+}
+
+.reasoning-settings > label:last-child {
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
 .settings-form input[type="checkbox"] {
   width: 16px;
   height: 16px;
@@ -193,6 +258,10 @@ button.secondary {
   }
 
   .settings-form {
+    grid-template-columns: 1fr;
+  }
+
+  .global-settings {
     grid-template-columns: 1fr;
   }
 }

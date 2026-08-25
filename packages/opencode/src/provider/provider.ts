@@ -203,6 +203,8 @@ type AiFactoryRule = {
   reasoning?: boolean
   input?: string[]
   output_modalities?: string[]
+  options?: Record<string, unknown>
+  variants?: Record<string, Record<string, unknown>>
 }
 
 type AiFactoryVisibilityRule = {
@@ -222,6 +224,8 @@ function aiFactoryRule(modelID: string, rules: AiFactoryRule[] | undefined) {
     reasoning: rule?.reasoning ?? /(^o[134]\b)|(^gpt-5\b)|claude|reason|r1|deepseek|gemini/i.test(modelID),
     input: rule?.input ?? ["text"],
     outputModalities: rule?.output_modalities ?? ["text"],
+    options: rule?.options ?? {},
+    variants: rule?.variants ?? {},
   }
 }
 
@@ -347,10 +351,10 @@ function aiFactoryModels(
         cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
         limit: { context: override.context, output: override.output },
         status: "active",
-        options: {},
+        options: override.options,
         headers: {},
         release_date: "",
-        variants: {},
+        variants: override.variants,
       } satisfies Model] as const
     }),
   )

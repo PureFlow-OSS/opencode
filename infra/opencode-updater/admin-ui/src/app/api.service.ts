@@ -39,6 +39,12 @@ type ModelCard = {
   output?: number | null
   temperature?: boolean | null
   reasoning?: boolean | null
+  reasoningVariants?: string[] | null
+  defaultReasoningVariant?: string | null
+  documentVision?: boolean
+  documentVisionNative?: boolean
+  documentOcrModel?: string | null
+  documentVisionModel?: string | null
   visible?: boolean | null
   price?: { input?: number | null; output?: number | null } | null
   modalities?: { input?: string[]; output?: string[] } | null
@@ -49,6 +55,12 @@ type ModelCard = {
     output?: number | null
     temperature?: boolean | null
     reasoning?: boolean | null
+    reasoningVariants?: string[] | null
+    defaultReasoningVariant?: string | null
+    documentVision?: boolean | null
+    documentVisionNative?: boolean | null
+    documentOcrModel?: string | null
+    documentVisionModel?: string | null
     modalities?: { input?: string[]; output?: string[] } | null
   } | null
   liteLLM?: {
@@ -83,9 +95,32 @@ export type ModelSettings = {
   output?: number | null
   temperature?: boolean | null
   reasoning?: boolean | null
+  reasoning_variants?: string[] | null
+  default_reasoning_variant?: string | null
+  document_vision?: boolean | null
+  document_vision_native?: boolean | null
+  document_ocr_model?: string | null
+  document_vision_model?: string | null
   visible?: boolean | null
   input_modalities?: string[]
   output_modalities?: string[]
+}
+
+export type ProviderSettings = {
+  model?: string | null
+  small_model?: string | null
+}
+
+export type McpConfig = {
+  type: "local" | "remote"
+  enabled?: boolean
+  timeout?: number
+  environment?: Record<string, string>
+  command?: string[]
+  url?: string
+  headers?: Record<string, string>
+  oauth?: { clientId?: string; clientSecret?: string; scope?: string; redirectUri?: string }
+  auth?: { type: "pat"; label?: string; description?: string; placeholder?: string; header?: string; prefix?: string }
 }
 
 type ReleaseStatus = {
@@ -183,9 +218,46 @@ export class ApiService {
     }))
   }
 
+  async syncModelContext(model: string, channel: "stable" | "beta") {
+    return this.readJson<{ context: number }>(await fetch(`/opencode/admin/model-settings/sync-context?channel=${channel}&model=${encodeURIComponent(model)}`, {
+      method: "POST",
+    }))
+  }
+
   async resetModelSettings(model: string, channel: "stable" | "beta") {
     const response = await fetch(`/opencode/admin/model-settings?channel=${channel}&model=${encodeURIComponent(model)}`, { method: "DELETE" })
     if (response.status === 404) throw new Error(`No exact ${channel} override exists for ${model}`)
+    if (!response.ok) throw new Error(await response.text())
+  }
+
+  async getProviderSettings(channel: "stable" | "beta") {
+    return this.readJson<ProviderSettings>(await fetch(`/opencode/admin/provider-settings?channel=${channel}`, { cache: "no-store" }))
+  }
+
+  async saveProviderSettings(channel: "stable" | "beta", settings: ProviderSettings) {
+    return this.readJson<ProviderSettings>(await fetch(`/opencode/admin/provider-settings?channel=${channel}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(settings),
+    }))
+  }
+
+  async listMcps(channel: "normal" | "beta") {
+    return this.readJson<Record<string, McpConfig>>(await fetch(`/opencode/admin/mcp?channel=${channel}`))
+  }
+
+  async saveMcp(channel: "normal" | "beta", name: string, config: McpConfig) {
+    return this.readJson<{ name: string; config: McpConfig }>(
+      await fetch(`/opencode/admin/mcp/${encodeURIComponent(name)}?channel=${channel}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(config),
+      }),
+    )
+  }
+
+  async deleteMcp(channel: "normal" | "beta", name: string) {
+    const response = await fetch(`/opencode/admin/mcp/${encodeURIComponent(name)}?channel=${channel}`, { method: "DELETE" })
     if (!response.ok) throw new Error(await response.text())
   }
 }

@@ -43,6 +43,20 @@ export const SIDECAR_BINARIES: Array<{ rustTarget: string; ocBinary: string; ass
 
 export const RUST_TARGET = Bun.env.RUST_TARGET
 
+function hasWindowsSigningConfiguration() {
+  const keyVault =
+    (Bun.env.AZURE_KEYVAULT_URL || Bun.env.KEYVAULT_URL) &&
+    (Bun.env.AZURE_KEYVAULT_CLIENT_ID || Bun.env.AZURE_CLIENT_ID) &&
+    (Bun.env.AZURE_KEYVAULT_CLIENT_SECRET || Bun.env.AZURE_CLIENT_SECRET) &&
+    (Bun.env.AZURE_KEYVAULT_TENANT_ID || Bun.env.AZURE_TENANT_ID) &&
+    (Bun.env.AZURE_KEYVAULT_CERT || Bun.env.CERT_ALIAS || Bun.env.CertificateName)
+  const trustedSigning =
+    Bun.env.AZURE_TRUSTED_SIGNING_ENDPOINT &&
+    Bun.env.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME &&
+    Bun.env.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE
+  return Boolean(keyVault || trustedSigning)
+}
+
 function nativeTarget() {
   const { platform, arch } = process
   if (platform === "darwin") return arch === "arm64" ? "aarch64-apple-darwin" : "x86_64-apple-darwin"
@@ -63,7 +77,7 @@ export async function copyBinaryToSidecarFolder(source: string) {
   await $`mkdir -p ${dir}`
   const dest = windowsify(`${dir}/opencode-cli`)
   await $`cp ${source} ${dest}`
-  if (process.platform === "win32" && process.env.GITHUB_ACTIONS === "true") {
+  if (process.platform === "win32" && hasWindowsSigningConfiguration()) {
     await $`pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ../../script/sign-windows.ps1 ${dest}`
   }
   if (process.platform === "darwin") await $`codesign --force --sign - ${dest}`
