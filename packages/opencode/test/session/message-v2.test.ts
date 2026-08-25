@@ -385,6 +385,55 @@ describe("session.message-v2.toModelMessage", () => {
     ])
   })
 
+  test("keeps only the latest vision recall media in the active user turn", async () => {
+    const userID = "m-user"
+    const firstAssistantID = "m-assistant-1"
+    const secondAssistantID = "m-assistant-2"
+    const toolPart = (messageID: string, id: string, callID: string, output: string, data: string) =>
+      ({
+        ...basePart(messageID, id),
+        type: "tool" as const,
+        callID,
+        tool: "vision_recall",
+        state: {
+          status: "completed" as const,
+          input: { cache_id: "cache" },
+          output,
+          title: "Vision recall",
+          metadata: {},
+          time: { start: 0, end: 1 },
+          attachments: [
+            {
+              ...basePart(messageID, `${id}-file`),
+              type: "file" as const,
+              mime: "image/jpeg",
+              filename: `${id}.jpg`,
+              url: `data:image/jpeg;base64,${data}`,
+            },
+          ],
+        },
+      })
+    const input: MessageV2.WithParts[] = [
+      {
+        info: userInfo(userID),
+        parts: [{ ...basePart(userID, "u1"), type: "text", text: "find Rustam" }] as MessageV2.Part[],
+      },
+      {
+        info: assistantInfo(firstAssistantID, userID),
+        parts: [toolPart(firstAssistantID, "a1", "call-1", "old result", "b2xk")],
+      },
+      {
+        info: assistantInfo(secondAssistantID, userID),
+        parts: [toolPart(secondAssistantID, "a2", "call-2", "fresh result", "ZnJlc2g=")],
+      },
+    ]
+
+    const output = JSON.stringify(await MessageV2.toModelMessages(input, model))
+    expect(output).toContain("old result")
+    expect(output).not.toContain("b2xk")
+    expect(output).toContain("ZnJlc2g=")
+  })
+
   test("preserves jpeg tool-result media for anthropic models", async () => {
     const anthropicModel: Provider.Model = {
       ...model,

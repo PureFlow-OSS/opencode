@@ -361,6 +361,32 @@ app.MapGet("/opencode/admin/modelcards", async (
   });
 });
 
+app.MapGet("/opencode/admin/provider-settings", async (
+  string? channel,
+  UpdaterConfigStore configStore,
+  HttpContext context
+) =>
+{
+  var config = await configStore.LoadUpdaterOptionsAsync(string.Equals(channel, "beta", StringComparison.OrdinalIgnoreCase), context.RequestAborted);
+  return Results.Json(new ProviderSettingsRequest { Model = config.ProviderConfig.Model, SmallModel = config.ProviderConfig.SmallModel });
+});
+
+app.MapPut("/opencode/admin/provider-settings", async (
+  string? channel,
+  ProviderSettingsRequest settings,
+  UpdaterConfigStore configStore,
+  HttpContext context
+) =>
+{
+  if (string.IsNullOrWhiteSpace(settings.Model) || string.IsNullOrWhiteSpace(settings.SmallModel))
+    return Results.BadRequest(new { error = "Model and small model are required" });
+  return Results.Json(await configStore.SaveProviderSettingsAsync(
+    string.Equals(channel, "beta", StringComparison.OrdinalIgnoreCase),
+    settings,
+    context.RequestAborted
+  ));
+});
+
 app.MapPut("/opencode/admin/model-settings", async (
   string model,
   string? channel,
@@ -838,6 +864,8 @@ sealed record ModelCardEntry(
   string? DefaultReasoningVariant,
   bool DocumentVision,
   bool DocumentVisionNative,
+  string? DocumentOcrModel,
+  string? DocumentVisionModel,
   bool? Visible,
   ModelCardPrice? Price,
   ModelCardModalities? Modalities,
@@ -856,6 +884,8 @@ sealed record ModelCardConfig(
   string? DefaultReasoningVariant,
   bool? DocumentVision,
   bool? DocumentVisionNative,
+  string? DocumentOcrModel,
+  string? DocumentVisionModel,
   ModelCardModalities? Modalities
 );
 
@@ -930,6 +960,8 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
         match?.DefaultReasoningVariant,
         match?.DocumentVision ?? false,
         match?.DocumentVisionNative ?? false,
+        match?.DocumentOcrModel,
+        match?.DocumentVisionModel,
         visibility,
         model.Price is null ? null : new ModelCardPrice(model.InputPrice is null ? null : model.InputPrice * 1000000m, model.OutputPrice is null ? null : model.OutputPrice * 1000000m),
         match?.Modalities is null ? model.Modalities : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? []),
@@ -946,6 +978,8 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
             match.DefaultReasoningVariant,
             match.DocumentVision,
             match.DocumentVisionNative,
+            match.DocumentOcrModel,
+            match.DocumentVisionModel,
             match.Modalities is null ? null : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? [])
           ),
         new ModelCardLiteLLM(
@@ -1271,6 +1305,14 @@ sealed class ModelLimitRuleOptions
   [ConfigurationKeyName("document_vision_native")]
   [JsonPropertyName("document_vision_native")]
   public bool? DocumentVisionNative { get; set; }
+
+  [ConfigurationKeyName("document_ocr_model")]
+  [JsonPropertyName("document_ocr_model")]
+  public string? DocumentOcrModel { get; set; }
+
+  [ConfigurationKeyName("document_vision_model")]
+  [JsonPropertyName("document_vision_model")]
+  public string? DocumentVisionModel { get; set; }
 }
 
 sealed class ModelSettingsRequest
@@ -1299,6 +1341,12 @@ sealed class ModelSettingsRequest
   [JsonPropertyName("document_vision_native")]
   public bool? DocumentVisionNative { get; set; }
 
+  [JsonPropertyName("document_ocr_model")]
+  public string? DocumentOcrModel { get; set; }
+
+  [JsonPropertyName("document_vision_model")]
+  public string? DocumentVisionModel { get; set; }
+
   [JsonPropertyName("visible")]
   public bool? Visible { get; set; }
 
@@ -1307,6 +1355,15 @@ sealed class ModelSettingsRequest
 
   [JsonPropertyName("output_modalities")]
   public string[]? OutputModalities { get; set; }
+}
+
+sealed class ProviderSettingsRequest
+{
+  [JsonPropertyName("model")]
+  public string? Model { get; set; }
+
+  [JsonPropertyName("small_model")]
+  public string? SmallModel { get; set; }
 }
 
 sealed class UpdaterConfigStore(IWebHostEnvironment environment)
@@ -1335,6 +1392,8 @@ sealed class UpdaterConfigStore(IWebHostEnvironment environment)
       rule["default_reasoning_variant"] = settings.DefaultReasoningVariant;
       rule["document_vision"] = settings.DocumentVision;
       rule["document_vision_native"] = settings.DocumentVisionNative;
+      rule["document_ocr_model"] = settings.DocumentOcrModel;
+      rule["document_vision_model"] = settings.DocumentVisionModel;
       rule["modalities"] = new JsonObject
       {
         ["input"] = JsonSerializer.SerializeToNode(settings.InputModalities ?? [], json),
@@ -1350,6 +1409,24 @@ sealed class UpdaterConfigStore(IWebHostEnvironment environment)
         if (existingVisibility is null) visibility.Add(visibilityRule);
         visibilityRule["visible"] = settings.Visible;
       }
+      await SaveAsync(root, beta, cancellationToken);
+      return settings;
+    }
+    finally
+    {
+      gate.Release();
+    }
+  }
+
+  public async Task<ProviderSettingsRequest> SaveProviderSettingsAsync(bool beta, ProviderSettingsRequest settings, CancellationToken cancellationToken)
+  {
+    await gate.WaitAsync(cancellationToken);
+    try
+    {
+      var root = await LoadAsync(beta, cancellationToken);
+      var provider = GetObject(GetObject(root, "Updater"), "ProviderConfig");
+      provider["model"] = settings.Model?.Trim();
+      provider["small_model"] = settings.SmallModel?.Trim();
       await SaveAsync(root, beta, cancellationToken);
       return settings;
     }

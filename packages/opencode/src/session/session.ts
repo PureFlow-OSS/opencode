@@ -1,5 +1,6 @@
 import { Slug } from "@opencode-ai/core/util/slug"
 import path from "path"
+import { rm } from "fs/promises"
 import { BusEvent } from "@/bus/bus-event"
 import { Bus } from "@/bus"
 import { Decimal } from "decimal.js"
@@ -503,6 +504,9 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service> =
           SyncEvent.run(Event.Deleted, { sessionID, info: session }, { publish: hasInstance })
           SyncEvent.remove(sessionID)
         })
+        yield* Effect.promise(() =>
+          rm(path.join(Global.Path.data, "vision-cache", sessionID), { recursive: true, force: true }),
+        ).pipe(Effect.ignore)
       } catch (e) {
         log.error(e)
       }

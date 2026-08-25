@@ -43,6 +43,8 @@ type ModelCard = {
   defaultReasoningVariant?: string | null
   documentVision?: boolean
   documentVisionNative?: boolean
+  documentOcrModel?: string | null
+  documentVisionModel?: string | null
   visible?: boolean | null
   price?: { input?: number | null; output?: number | null } | null
   modalities?: { input?: string[]; output?: string[] } | null
@@ -57,6 +59,8 @@ type ModelCard = {
     defaultReasoningVariant?: string | null
     documentVision?: boolean | null
     documentVisionNative?: boolean | null
+    documentOcrModel?: string | null
+    documentVisionModel?: string | null
     modalities?: { input?: string[]; output?: string[] } | null
   } | null
   liteLLM?: {
@@ -95,9 +99,16 @@ export type ModelSettings = {
   default_reasoning_variant?: string | null
   document_vision?: boolean | null
   document_vision_native?: boolean | null
+  document_ocr_model?: string | null
+  document_vision_model?: string | null
   visible?: boolean | null
   input_modalities?: string[]
   output_modalities?: string[]
+}
+
+export type ProviderSettings = {
+  model?: string | null
+  small_model?: string | null
 }
 
 export type McpConfig = {
@@ -211,6 +222,18 @@ export class ApiService {
     const response = await fetch(`/opencode/admin/model-settings?channel=${channel}&model=${encodeURIComponent(model)}`, { method: "DELETE" })
     if (response.status === 404) throw new Error(`No exact ${channel} override exists for ${model}`)
     if (!response.ok) throw new Error(await response.text())
+  }
+
+  async getProviderSettings(channel: "stable" | "beta") {
+    return this.readJson<ProviderSettings>(await fetch(`/opencode/admin/provider-settings?channel=${channel}`, { cache: "no-store" }))
+  }
+
+  async saveProviderSettings(channel: "stable" | "beta", settings: ProviderSettings) {
+    return this.readJson<ProviderSettings>(await fetch(`/opencode/admin/provider-settings?channel=${channel}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(settings),
+    }))
   }
 
   async listMcps(channel: "normal" | "beta") {

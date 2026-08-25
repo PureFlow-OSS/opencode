@@ -289,7 +289,7 @@ function buildAiFactoryModel(
 
   return {
     ...base,
-    variants: mergeDeep(ProviderTransform.variants(base), overrides.variants ?? {}),
+    variants: overrides.variants ?? ProviderTransform.variants(base),
   }
 }
 
@@ -1767,7 +1767,7 @@ const layer: Layer.Layer<
 
             model.variants = mapValues(
               providerID === AIFACTORY_ID
-                ? mergeDeep(ProviderTransform.variants(model), model.variants ?? {})
+                ? (model.variants ?? ProviderTransform.variants(model))
                 : ProviderTransform.variants(model),
               (v) => v,
             )

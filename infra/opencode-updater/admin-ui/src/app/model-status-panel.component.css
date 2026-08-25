@@ -73,6 +73,36 @@ button.secondary {
   text-transform: uppercase;
 }
 
+.global-settings {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid rgba(123, 140, 255, 0.3);
+  border-radius: 16px;
+  background: rgba(123, 140, 255, 0.08);
+}
+
+.global-settings h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.global-settings p {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(242, 244, 248, 0.68);
+}
+
+.global-settings label {
+  display: grid;
+  gap: 6px;
+  color: rgba(242, 244, 248, 0.82);
+  font-size: 13px;
+}
+
 .empty-state {
   padding: 18px;
   border-radius: 18px;
@@ -216,6 +246,10 @@ button.secondary {
   }
 
   .settings-form {
+    grid-template-columns: 1fr;
+  }
+
+  .global-settings {
     grid-template-columns: 1fr;
   }
 }

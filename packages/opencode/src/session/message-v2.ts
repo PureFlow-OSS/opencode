@@ -716,6 +716,16 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
 ) {
   const result: UIMessage[] = []
   const toolNames = new Set<string>()
+  const latestVisionRecall = input
+    .slice(input.findLastIndex((message) => message.info.role === "user") + 1)
+    .flatMap((message) => message.parts)
+    .findLast(
+      (part) =>
+        part.type === "tool" &&
+        part.tool === "vision_recall" &&
+        part.state.status === "completed" &&
+        (part.state.attachments ?? []).some((attachment) => isMedia(attachment.mime)),
+    )
   // Track media from tool results that need to be injected as user messages
   // for providers that don't support media in tool results.
   //
@@ -857,7 +867,12 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
             const outputText = part.state.time.compacted
               ? "[Old tool result content cleared]"
               : truncateToolOutput(part.state.output, options?.toolOutputMaxChars)
-            const attachments = part.state.time.compacted || options?.stripMedia ? [] : (part.state.attachments ?? [])
+            const attachments =
+              part.state.time.compacted ||
+              options?.stripMedia ||
+              (part.tool === "vision_recall" && part !== latestVisionRecall)
+                ? []
+                : (part.state.attachments ?? [])
 
             // For providers that don't support media in tool results, extract media files
             // (images, PDFs) to be sent as a separate user message
