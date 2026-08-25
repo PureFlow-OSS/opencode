@@ -102,6 +102,10 @@ const getBase = (): Configuration => ({
             to: "native/canvas/icudtl.dat",
           },
           {
+            from: "../opencode/node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+            to: "pdfjs/pdf.worker.mjs",
+          },
+          {
             from: "build/updater-helper/win-x64/",
             to: "updater-helper/",
             filter: ["OpenCode.UpdaterHelper.exe"],

@@ -71,6 +71,8 @@ type AiFactoryModelLimitRule = {
   modalities?: AiFactoryModalities
   documentVision?: boolean
   documentVisionNative?: boolean
+  documentOcrModel?: string
+  documentVisionModel?: string
   options?: Record<string, any>
   variants?: Record<string, Record<string, any>>
 }
@@ -88,6 +90,8 @@ type AiFactoryModelOverrides = {
   modalities?: AiFactoryModalities
   documentVision?: boolean
   documentVisionNative?: boolean
+  documentOcrModel?: string
+  documentVisionModel?: string
   options?: Record<string, any>
   variants?: Record<string, Record<string, any>>
 }
@@ -133,6 +137,8 @@ function resolveAiFactoryModelOverrides(
     modalities: value<AiFactoryModalities>("modalities"),
     documentVision: value<boolean>("documentVision"),
     documentVisionNative: value<boolean>("documentVisionNative"),
+    documentOcrModel: value<string>("documentOcrModel"),
+    documentVisionModel: value<string>("documentVisionModel"),
     options: value<Record<string, any>>("options"),
     variants: value<Record<string, Record<string, any>>>("variants"),
   }
@@ -196,6 +202,8 @@ async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch, init: Request
               modalities?: unknown
               document_vision?: boolean
               document_vision_native?: boolean
+              document_ocr_model?: string
+              document_vision_model?: string
               options?: unknown
               variants?: unknown
             }>
@@ -216,6 +224,10 @@ async function discoverAiFactoryConfig(fetchFn: FetchLike = fetch, init: Request
         documentVision: typeof rule.document_vision === "boolean" ? rule.document_vision : undefined,
         documentVisionNative:
           typeof rule.document_vision_native === "boolean" ? rule.document_vision_native : undefined,
+        documentOcrModel:
+          typeof rule.document_ocr_model === "string" ? rule.document_ocr_model.trim() || undefined : undefined,
+        documentVisionModel:
+          typeof rule.document_vision_model === "string" ? rule.document_vision_model.trim() || undefined : undefined,
         options: isRecord(rule.options) ? rule.options : undefined,
         variants: normalizeAiFactoryVariants(rule.variants),
       } satisfies AiFactoryModelLimitRule,
@@ -285,6 +297,10 @@ function buildAiFactoryModel(
     },
     release_date: normalizeAiFactoryReleaseDate(created),
     variants: {},
+    document: {
+      ocr: overrides.documentOcrModel,
+      vision: overrides.documentVisionModel,
+    },
   }
 
   return {
@@ -1279,6 +1295,12 @@ export const Model = Schema.Struct({
   headers: Schema.Record(Schema.String, Schema.String),
   release_date: Schema.String,
   variants: Schema.optional(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Any))),
+  document: Schema.optional(
+    Schema.Struct({
+      ocr: Schema.optional(Schema.String),
+      vision: Schema.optional(Schema.String),
+    }),
+  ),
 })
   .annotate({ identifier: "Model" })
   .pipe(withStatics((s) => ({ zod: zod(s) })))

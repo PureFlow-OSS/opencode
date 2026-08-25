@@ -65,4 +65,21 @@ describe("model visibility", () => {
     )
     expect(headers?.get("X-OpenCode-AiFactory-Api-Key")).toBe("rrz-key")
   })
+
+  test("provider config fetch uses the configured updater", async () => {
+    let url: string | undefined
+    const fetchFn = Object.assign(
+      async (input: URL | RequestInfo) => {
+        url = String(input)
+        return new Response(JSON.stringify({ aifactory: { model_visibility: [] } }), {
+          headers: {
+            "content-type": "application/json",
+          },
+        })
+      },
+      { preconnect: fetch.preconnect },
+    ) satisfies typeof fetch
+    await readAiFactoryModelVisibilityRules(fetchFn, { updater: "http://localhost/opencode/" })
+    expect(url).toBe("http://localhost/opencode/provider-config.json")
+  })
 })

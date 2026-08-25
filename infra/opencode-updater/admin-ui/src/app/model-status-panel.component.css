@@ -103,6 +103,11 @@ button.secondary {
   font-size: 13px;
 }
 
+.global-settings button {
+  align-self: end;
+  margin-bottom: 14px;
+}
+
 .empty-state {
   padding: 18px;
   border-radius: 18px;
@@ -132,6 +137,13 @@ button.secondary {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.model-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .model-name {

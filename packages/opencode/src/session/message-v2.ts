@@ -938,7 +938,7 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
               ...(differentModel ? {} : { callProviderMetadata: providerMeta(part.metadata) }),
             })
         }
-        if (part.type === "reasoning") {
+        if (part.type === "reasoning" && model.providerID !== "aifactory") {
           assistantMessage.parts.push({
             type: "reasoning",
             text: part.text,

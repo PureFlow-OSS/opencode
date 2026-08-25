@@ -1,3 +1,21 @@
+# v1.14.38
+
+## Added
+
+- Added a hybrid PDF pipeline: digital text extraction, targeted GLM-OCR for table pages, and Qwen3-VL visual recall for diagrams, screenshots, and other visual details.
+- Added automatic document-aware compaction for large multi-PDF conversations.
+
+## Improved
+
+- PDF attachments remain visible in the chat after indexing and compaction without sending the original PDF to non-native models again.
+- PDF follow-up tools now retain page-aware document caches and restrict the main model to document-relevant tools.
+- The updater admin console now offers selectable global, OCR, and vision models, LiteLLM context synchronization, and model visibility controls.
+
+## Fixed
+
+- Fixed duplicate session creation when a new prompt with multiple attachments is submitted concurrently.
+- Fixed AI Factory reasoning content being sent back into subsequent Qwen requests.
+
 # v1.14.37
 
 ## Added

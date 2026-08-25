@@ -391,6 +391,7 @@ app.MapPut("/opencode/admin/model-settings", async (
   string model,
   string? channel,
   ModelSettingsRequest settings,
+  ModelCardStore modelCards,
   UpdaterConfigStore configStore,
   HttpContext context
 ) =>
@@ -398,6 +399,10 @@ app.MapPut("/opencode/admin/model-settings", async (
   if (string.IsNullOrWhiteSpace(model)) return Results.BadRequest(new { error = "Model is required" });
   if (settings.Context is < 0 || settings.Output is < 0)
     return Results.BadRequest(new { error = "Context and output must be positive" });
+  await modelCards.SyncAsync(context.RequestAborted);
+  var maxInputTokens = modelCards.GetMaxInputTokens(model);
+  if (settings.Context is not null && maxInputTokens is not null && settings.Context > maxInputTokens)
+    return Results.BadRequest(new { error = $"Context cannot exceed LiteLLM max_input_tokens ({maxInputTokens})" });
   var reasoningVariants = (settings.ReasoningVariants ?? []).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
   if (reasoningVariants.Any((item) => item is not ("low" or "medium" or "high" or "xhigh")))
     return Results.BadRequest(new { error = "Reasoning levels must be low, medium, high, or xhigh" });
@@ -409,6 +414,26 @@ app.MapPut("/opencode/admin/model-settings", async (
   var isBeta = string.Equals(channel, "beta", StringComparison.OrdinalIgnoreCase);
   var result = await configStore.SaveModelSettingsAsync(model, isBeta, settings, context.RequestAborted);
   return Results.Json(result);
+});
+
+app.MapPost("/opencode/admin/model-settings/sync-context", async (
+  string model,
+  string? channel,
+  ModelCardStore modelCards,
+  UpdaterConfigStore configStore,
+  HttpContext context
+) =>
+{
+  if (string.IsNullOrWhiteSpace(model)) return Results.BadRequest(new { error = "Model is required" });
+  await modelCards.SyncAsync(context.RequestAborted);
+  var maxInputTokens = modelCards.GetMaxInputTokens(model);
+  if (maxInputTokens is null) return Results.NotFound(new { error = $"LiteLLM has no max_input_tokens value for {model}" });
+  return Results.Json(new { context = await configStore.SyncModelContextAsync(
+    model,
+    string.Equals(channel, "beta", StringComparison.OrdinalIgnoreCase),
+    maxInputTokens.Value,
+    context.RequestAborted
+  ) });
 });
 
 app.MapDelete("/opencode/admin/model-settings", async (
@@ -1023,6 +1048,10 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
     }
   }
 
+  public int? GetMaxInputTokens(string model) => cached
+    .FirstOrDefault((item) => string.Equals(item.Name, model, StringComparison.OrdinalIgnoreCase))
+    ?.Context;
+
   async Task<ModelCardData[]> TryLoadModelInfoAsync(UpdaterBetaOptions beta, CancellationToken cancellationToken)
   {
     using var request = new HttpRequestMessage(HttpMethod.Get, BuildLiteLLMUrl(beta, beta.LiteLLM.ModelInfoPath));
@@ -1064,7 +1093,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
           null,
           null,
           null,
-          null,
+          TryGetInt(item, "max_input_tokens") ?? TryGetInt(item, "context_window") ?? TryGetInt(item, "max_tokens"),
           null,
           null,
           null,
@@ -1093,7 +1122,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
       ReadString(info, "mode"),
       ReadString(info, "litellm_provider"),
       ReadString(info, "provider_specific_entry"),
-      TryGetInt(info, "context_window") ?? TryGetInt(info, "max_input_tokens") ?? TryGetInt(info, "max_tokens"),
+      TryGetInt(info, "max_input_tokens") ?? TryGetInt(info, "context_window") ?? TryGetInt(info, "max_tokens"),
       TryGetInt(info, "max_output_tokens"),
       TryGetBool(info, "temperature"),
       TryGetBool(info, "reasoning") ?? TryGetBool(info, "supports_reasoning") ?? (TryGetString(info, "mode", out var mode) && mode == "reasoning" ? true : null),
@@ -1429,6 +1458,31 @@ sealed class UpdaterConfigStore(IWebHostEnvironment environment)
       provider["small_model"] = settings.SmallModel?.Trim();
       await SaveAsync(root, beta, cancellationToken);
       return settings;
+    }
+    finally
+    {
+      gate.Release();
+    }
+  }
+
+  public async Task<int> SyncModelContextAsync(string model, bool beta, int context, CancellationToken cancellationToken)
+  {
+    await gate.WaitAsync(cancellationToken);
+    try
+    {
+      var root = await LoadAsync(beta, cancellationToken);
+      var limits = GetModelLimits(root);
+      var rule = limits
+        .OfType<JsonObject>()
+        .FirstOrDefault((item) => string.Equals(item["pattern"]?.GetValue<string>(), model, StringComparison.OrdinalIgnoreCase));
+      if (rule is null)
+      {
+        rule = new JsonObject { ["pattern"] = model };
+        limits.Add(rule);
+      }
+      rule["context"] = context;
+      await SaveAsync(root, beta, cancellationToken);
+      return context;
     }
     finally
     {

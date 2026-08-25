@@ -218,6 +218,12 @@ export class ApiService {
     }))
   }
 
+  async syncModelContext(model: string, channel: "stable" | "beta") {
+    return this.readJson<{ context: number }>(await fetch(`/opencode/admin/model-settings/sync-context?channel=${channel}&model=${encodeURIComponent(model)}`, {
+      method: "POST",
+    }))
+  }
+
   async resetModelSettings(model: string, channel: "stable" | "beta") {
     const response = await fetch(`/opencode/admin/model-settings?channel=${channel}&model=${encodeURIComponent(model)}`, { method: "DELETE" })
     if (response.status === 404) throw new Error(`No exact ${channel} override exists for ${model}`)

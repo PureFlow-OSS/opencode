@@ -212,6 +212,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
   const layout = useLayout()
   const language = useLanguage()
   const params = useParams()
+  let creatingNewSession = false
 
   const errorMessage = (err: unknown) => {
     if (err && typeof err === "object" && "data" in err) {
@@ -315,6 +316,8 @@ export function createPromptSubmit(input: PromptSubmitInput) {
 
     const projectDirectory = sdk.directory
     const isNewSession = !params.id
+    if (isNewSession && creatingNewSession) return
+    if (isNewSession) creatingNewSession = true
     const shouldAutoAccept = isNewSession && input.autoAccept()
     const worktreeSelection = input.newSessionWorktree?.() || "main"
 
@@ -335,6 +338,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
           })
 
         if (!createdWorktree?.directory) {
+          creatingNewSession = false
           showToast({
             title: language.t("prompt.toast.worktreeCreateFailed.title"),
             description: language.t("common.requestFailed"),
@@ -382,6 +386,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
           })
           return undefined
         })
+      creatingNewSession = false
       if (created) {
         seed(sessionDirectory, created)
         session = created
@@ -392,6 +397,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       }
     }
     if (!session) {
+      creatingNewSession = false
       showToast({
         title: language.t("prompt.toast.promptSendFailed.title"),
         description: language.t("prompt.toast.promptSendFailed.description"),

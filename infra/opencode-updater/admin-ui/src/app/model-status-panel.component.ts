@@ -33,9 +33,21 @@ import { ApiService, ModelSettings, ProviderSettings } from "./api.service"
           <h3>Globale Modellvorgaben</h3>
           <p>Diese Modelle gelten für alle OpenCode-Clients des gewählten Kanals, sofern keine lokale Konfiguration sie überschreibt.</p>
         </div>
-        <label>Model <input [ngModel]="providerDraft().model" (ngModelChange)="setProviderModel('model', $event)" name="providerModel" required /></label>
-        <label>Small model <input [ngModel]="providerDraft().small_model" (ngModelChange)="setProviderModel('small_model', $event)" name="providerSmallModel" required /></label>
-        <button type="submit" [disabled]="savingProvider()">{{ savingProvider() ? 'Saving…' : 'Save global models' }}</button>
+        <label>Model
+          <select [ngModel]="providerDraft().model" (ngModelChange)="setProviderModel('model', $event)" name="providerModel" required>
+            @for (model of models(); track model.model) {
+              <option [value]="model.model">{{ model.model }}</option>
+            }
+          </select>
+        </label>
+        <label>Small model
+          <select [ngModel]="providerDraft().small_model" (ngModelChange)="setProviderModel('small_model', $event)" name="providerSmallModel" required>
+            @for (model of models(); track model.model) {
+              <option [value]="model.model">{{ model.model }}</option>
+            }
+          </select>
+        </label>
+        <button type="submit" [disabled]="savingProvider() || models().length === 0">{{ savingProvider() ? 'Saving…' : 'Save global models' }}</button>
       </form>
       @if (models().length === 0) {
         <div class="empty-state">No model cards available yet.</div>
@@ -48,11 +60,14 @@ import { ApiService, ModelSettings, ProviderSettings } from "./api.service"
                   <strong>{{ model.model }}</strong>
                   <span>{{ model.config?.pattern || 'All models' }}</span>
                 </div>
-                <button type="button" class="secondary" (click)="edit(model)">Settings</button>
+                <div class="model-card-actions">
+                  <button type="button" class="secondary" (click)="syncContext(model.model)" [disabled]="syncingContext() === model.model">{{ syncingContext() === model.model ? 'Syncing…' : 'Sync context' }}</button>
+                  <button type="button" class="secondary" (click)="edit(model)">Settings</button>
+                </div>
               </div>
               @if (editing() === model.model) {
                 <form class="settings-form" (ngSubmit)="save(model.model)">
-                  <label>Context <input type="number" min="0" [ngModel]="draft().context" (ngModelChange)="setNumber('context', $event)" name="context" /></label>
+                  <label>Context <input type="number" min="0" [max]="model.liteLLM?.maxInputTokens ?? null" [ngModel]="draft().context" (ngModelChange)="setNumber('context', $event)" name="context" /></label>
                   <label>Output <input type="number" min="0" [ngModel]="draft().output" (ngModelChange)="setNumber('output', $event)" name="output" /></label>
                   <label><input type="checkbox" [ngModel]="draft().temperature" (ngModelChange)="setBoolean('temperature', $event)" name="temperature" /> Temperature</label>
                   <label><input type="checkbox" [ngModel]="draft().reasoning" (ngModelChange)="setBoolean('reasoning', $event)" name="reasoning" /> Thinking</label>
@@ -74,8 +89,22 @@ import { ApiService, ModelSettings, ProviderSettings } from "./api.service"
                   }
                   <label><input type="checkbox" [ngModel]="draft().document_vision" (ngModelChange)="setBoolean('document_vision', $event)" name="documentVision" /> Document Vision</label>
                   <label><input type="checkbox" [ngModel]="draft().document_vision_native" (ngModelChange)="setBoolean('document_vision_native', $event)" name="documentVisionNative" /> Document Vision Native</label>
-                  <label>Document OCR model <input [ngModel]="draft().document_ocr_model" (ngModelChange)="setText('document_ocr_model', $event)" name="documentOcrModel" placeholder="GLM-OCR" /></label>
-                  <label>Document Vision model <input [ngModel]="draft().document_vision_model" (ngModelChange)="setText('document_vision_model', $event)" name="documentVisionModel" placeholder="Qwen3-VL-4B-Instruct" /></label>
+                  <label>Document OCR model
+                    <select [ngModel]="draft().document_ocr_model" (ngModelChange)="setText('document_ocr_model', $event)" name="documentOcrModel">
+                      <option [ngValue]="null">No OCR model</option>
+                      @for (availableModel of models(); track availableModel.model) {
+                        <option [value]="availableModel.model">{{ availableModel.model }}</option>
+                      }
+                    </select>
+                  </label>
+                  <label>Document Vision model
+                    <select [ngModel]="draft().document_vision_model" (ngModelChange)="setText('document_vision_model', $event)" name="documentVisionModel">
+                      <option [ngValue]="null">No Vision model</option>
+                      @for (availableModel of models(); track availableModel.model) {
+                        <option [value]="availableModel.model">{{ availableModel.model }}</option>
+                      }
+                    </select>
+                  </label>
                   <label><input type="checkbox" [ngModel]="draft().visible" (ngModelChange)="setBoolean('visible', $event)" name="visible" /> Visible in OpenCode</label>
                   <label>Input modalities <input [ngModel]="draft().input_modalities?.join(', ')" (ngModelChange)="setModalities('input_modalities', $event)" name="inputModalities" placeholder="text, image" /></label>
                   <label>Output modalities <input [ngModel]="draft().output_modalities?.join(', ')" (ngModelChange)="setModalities('output_modalities', $event)" name="outputModalities" placeholder="text" /></label>
@@ -87,6 +116,9 @@ import { ApiService, ModelSettings, ProviderSettings } from "./api.service"
               } @else {
                 <div class="meta-grid">
                   <div class="meta-item"><small>Context</small><strong>{{ formatNumber(model.config?.context ?? model.context) }}</strong></div>
+                  @if (model.liteLLM?.maxInputTokens) {
+                    <div class="meta-item"><small>LiteLLM max input</small><strong>{{ formatNumber(model.liteLLM?.maxInputTokens) }}</strong></div>
+                  }
                   <div class="meta-item"><small>Output</small><strong>{{ formatNumber(model.config?.output ?? model.output) }}</strong></div>
                   <div class="meta-item"><small>Thinking</small><strong>{{ formatBoolean(model.config?.reasoning ?? model.reasoning) }}</strong></div>
                   @if ((model.config?.reasoning ?? model.reasoning) && (model.config?.reasoningVariants ?? model.reasoningVariants)?.length) {
@@ -121,6 +153,7 @@ export class ModelStatusPanelComponent {
   readonly providerDraft = signal<ProviderSettings>({})
   readonly saving = signal(false)
   readonly savingProvider = signal(false)
+  readonly syncingContext = signal<string | null>(null)
   readonly error = signal<string | null>(null)
   readonly success = signal<string | null>(null)
   readonly reasoningLevels = ["low", "medium", "high", "xhigh"] as const
@@ -168,7 +201,7 @@ export class ModelStatusPanelComponent {
     }
   }
 
-  edit(model: { model: string; context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; reasoningVariants?: string[] | null; defaultReasoningVariant?: string | null; documentVision?: boolean; documentVisionNative?: boolean; documentOcrModel?: string | null; documentVisionModel?: string | null; visible?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null; config?: { context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; reasoningVariants?: string[] | null; defaultReasoningVariant?: string | null; documentVision?: boolean | null; documentVisionNative?: boolean | null; documentOcrModel?: string | null; documentVisionModel?: string | null; modalities?: { input?: string[]; output?: string[] } | null } | null }) {
+  edit(model: { model: string; context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; reasoningVariants?: string[] | null; defaultReasoningVariant?: string | null; documentVision?: boolean; documentVisionNative?: boolean; documentOcrModel?: string | null; documentVisionModel?: string | null; visible?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null; liteLLM?: { maxInputTokens?: number | null } | null; config?: { context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; reasoningVariants?: string[] | null; defaultReasoningVariant?: string | null; documentVision?: boolean | null; documentVisionNative?: boolean | null; documentOcrModel?: string | null; documentVisionModel?: string | null; modalities?: { input?: string[]; output?: string[] } | null } | null }) {
     this.editing.set(model.model)
     this.draft.set({
       context: model.config?.context ?? model.context ?? null,
@@ -185,6 +218,21 @@ export class ModelStatusPanelComponent {
       input_modalities: model.modalities?.input ?? model.config?.modalities?.input ?? [],
       output_modalities: model.modalities?.output ?? model.config?.modalities?.output ?? [],
     })
+  }
+
+  async syncContext(model: string) {
+    this.syncingContext.set(model)
+    this.error.set(null)
+    this.success.set(null)
+    try {
+      const result = await this.api.syncModelContext(model, this.channel())
+      await this.modelCards.refetch()
+      this.success.set(`Synced ${model} context to ${this.formatNumber(result.context)} from LiteLLM`)
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : "Could not sync context from LiteLLM")
+    } finally {
+      this.syncingContext.set(null)
+    }
   }
 
   setNumber(key: "context" | "output", value: string) {

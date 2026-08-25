@@ -1,5 +1,4 @@
 const UPDATE_SERVER_BASE_URL = import.meta.env.VITE_OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode"
-const PROVIDER_CONFIG_URL = `${UPDATE_SERVER_BASE_URL}/provider-config.json`
 const AIFACTORY_API_KEY_HEADER = "X-OpenCode-AiFactory-Api-Key"
 const DEFAULT_RULES = [
   { pattern: "*embedding*", visible: false },
@@ -58,8 +57,12 @@ function buildRequestInit(input: { apiKey?: string } = {}) {
   } satisfies RequestInit
 }
 
-export async function readAiFactoryModelVisibilityRules(fetchFn: typeof fetch = fetch, input: { apiKey?: string } = {}) {
-  return fetchFn(PROVIDER_CONFIG_URL, {
+export async function readAiFactoryModelVisibilityRules(
+  fetchFn: typeof fetch = fetch,
+  input: { apiKey?: string; updater?: string } = {},
+) {
+  const baseUrl = (input.updater?.trim() || UPDATE_SERVER_BASE_URL).replace(/\/+$/, "")
+  return fetchFn(`${baseUrl}/provider-config.json`, {
     ...buildRequestInit(input),
   })
     .then((result) => (result.ok ? result.json() : undefined))

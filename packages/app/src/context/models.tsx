@@ -49,8 +49,12 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
       const key = globalSync.data.config.provider?.["aifactory"]?.options?.apiKey
       return typeof key === "string" && key.trim() ? key.trim() : undefined
     })
+    const updater = createMemo(() => {
+      const value = (globalSync.data.config as { updater?: unknown }).updater
+      return typeof value === "string" && value.trim() ? value.trim() : undefined
+    })
     const [serverRules] = createResource(
-      () => ({ apiKey: aifactoryApiKey() }),
+      () => ({ apiKey: aifactoryApiKey(), updater: updater() }),
       (input) => readAiFactoryModelVisibilityRules(platform.fetch ?? fetch, input),
       { initialValue: [] as Array<{ pattern: string; visible: boolean }> },
     )
