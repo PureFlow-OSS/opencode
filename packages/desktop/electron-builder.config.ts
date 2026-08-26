@@ -83,6 +83,14 @@ const getBase = (appId: string): Configuration => ({
     await signWindowsOutput(context)
   },
   extraResources: [
+    ...(process.platform === "win32"
+      ? [
+          {
+            from: "../opencode/node_modules/@napi-rs/canvas-win32-x64-msvc/skia.win32-x64-msvc.node",
+            to: "native/canvas/skia.win32-x64-msvc.node",
+          },
+        ]
+      : []),
     {
       from: "native/",
       to: "native/",

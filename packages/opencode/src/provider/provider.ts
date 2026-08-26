@@ -201,6 +201,8 @@ type AiFactoryRule = {
   output?: number
   temperature?: boolean
   reasoning?: boolean
+  document_vision?: boolean
+  document_vision_native?: boolean
   input?: string[]
   output_modalities?: string[]
   options?: Record<string, unknown>
@@ -222,7 +224,11 @@ function aiFactoryRule(modelID: string, rules: AiFactoryRule[] | undefined) {
     output: rule?.output ?? 32_000,
     temperature: rule?.temperature ?? true,
     reasoning: rule?.reasoning ?? /(^o[134]\b)|(^gpt-5\b)|claude|reason|r1|deepseek|gemini/i.test(modelID),
-    input: rule?.input ?? ["text"],
+    input: rule?.document_vision_native
+      ? [...new Set([...(rule.input ?? ["text"]), "pdf"])]
+      : rule?.document_vision
+        ? [...new Set([...(rule.input ?? ["text"]).filter((value) => value !== "pdf"), "image"])]
+        : rule?.input ?? ["text"],
     outputModalities: rule?.output_modalities ?? ["text"],
     options: rule?.options ?? {},
     variants: rule?.variants ?? {},

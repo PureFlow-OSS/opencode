@@ -1,6 +1,7 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import path from "path"
+import { existsSync } from "fs"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import os from "os"
 import { SessionID, MessageID, PartID } from "./schema"
@@ -64,6 +65,7 @@ const decodeMessageInfo = Schema.decodeUnknownExit(SessionV1.Info)
 const decodeMessagePart = Schema.decodeUnknownExit(SessionV1.Part)
 const MAX_MCP_RESOURCE_BLOB_BYTES = 10 * 1024 * 1024
 const TITLE_MAX_LENGTH = 50
+const PDF_VISION_PAGE_LIMIT = 4
 const SUPPORTED_MCP_RESOURCE_ATTACHMENT_MIMES = new Set([
   "application/pdf",
   "image/gif",
@@ -92,6 +94,56 @@ function formatMcpResourceBytes(value: number) {
   if (value < 1024) return `${value} B`
   if (value < 1024 * 1024) return `${Math.ceil(value / 1024)} KB`
   return `${Math.ceil(value / (1024 * 1024))} MB`
+}
+
+async function renderPdfPages(data: Uint8Array) {
+  const nativeCanvas = path.join(process.resourcesPath ?? "", "native", "canvas", "skia.win32-x64-msvc.node")
+  if (process.platform === "win32" && existsSync(nativeCanvas)) process.env.NAPI_RS_NATIVE_LIBRARY_PATH = nativeCanvas
+  const canvas = await import("@napi-rs/canvas")
+  Object.assign(globalThis, {
+    DOMMatrix: canvas.DOMMatrix,
+    ImageData: canvas.ImageData,
+    Path2D: canvas.Path2D,
+  })
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
+  const worker = process.resourcesPath ? path.join(process.resourcesPath, "pdfjs", "pdf.worker.mjs") : ""
+  pdfjs.GlobalWorkerOptions.workerSrc = existsSync(worker)
+    ? pathToFileURL(worker).href
+    : import.meta.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs")
+  class PdfCanvasFactory {
+    constructor(_options: { enableHWA?: boolean }) {}
+
+    create(width: number, height: number) {
+      const image = canvas.createCanvas(width, height)
+      return { canvas: image, context: image.getContext("2d") }
+    }
+
+    reset(target: { canvas: ReturnType<typeof canvas.createCanvas> }, width: number, height: number) {
+      target.canvas.width = width
+      target.canvas.height = height
+    }
+
+    destroy(target: { canvas: ReturnType<typeof canvas.createCanvas> }) {
+      target.canvas.width = 0
+      target.canvas.height = 0
+    }
+  }
+  const pdf = await pdfjs.getDocument({
+    data: new Uint8Array(data),
+    useSystemFonts: true,
+    CanvasFactory: PdfCanvasFactory,
+  }).promise
+  const pages = [] as Array<{ number: number; image: Uint8Array; text: string }>
+  for (const number of Array.from({ length: Math.min(pdf.numPages, PDF_VISION_PAGE_LIMIT) }, (_, index) => index + 1)) {
+    const page = await pdf.getPage(number)
+    const viewport = page.getViewport({ scale: 1.75 })
+    const image = canvas.createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
+    const context = image.getContext("2d")
+    await page.render({ canvas: null, canvasContext: context as unknown as CanvasRenderingContext2D, viewport }).promise
+    const text = (await page.getTextContent()).items.flatMap((item) => ("str" in item ? [item.str] : [])).join(" ")
+    pages.push({ number, image: image.toBuffer("image/jpeg", 85), text })
+  }
+  return { pages, total: pdf.numPages }
 }
 
 function isOrphanedInterruptedTool(part: SessionV1.ToolPart) {
@@ -718,6 +770,54 @@ const layer = Layer.effect(
         ...part,
         id: part.id ? PartID.make(part.id) : PartID.ascending(),
       })
+      const modelInfo = yield* provider.getModel(info.model.providerID, info.model.modelID).pipe(Effect.option)
+      const renderVisionPdf = Effect.fn("SessionPrompt.renderVisionPdf")(function* (
+        data: Uint8Array,
+        filename: string,
+        source: SessionV1.FilePart["source"],
+      ) {
+        if (Option.isNone(modelInfo) || modelInfo.value.capabilities.input.pdf || !modelInfo.value.capabilities.input.image)
+          return
+        const rendered = yield* Effect.tryPromise({
+          try: () => renderPdfPages(data),
+          catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+        }).pipe(Effect.option)
+        if (Option.isNone(rendered) || !rendered.value.pages.length) return
+        const suffix = rendered.value.total > rendered.value.pages.length
+          ? `; only the first ${rendered.value.pages.length} of ${rendered.value.total} pages are included`
+          : ""
+        return [
+          {
+            messageID: info.id,
+            sessionID: input.sessionID,
+            type: "text" as const,
+            synthetic: true,
+            text: `PDF \"${filename}\" was rendered as page images for vision analysis${suffix}.`,
+          },
+          ...rendered.value.pages.flatMap((page) => [
+            ...(page.text
+              ? [
+                  {
+                    messageID: info.id,
+                    sessionID: input.sessionID,
+                    type: "text" as const,
+                    synthetic: true,
+                    text: `PDF page ${page.number} text:\n${page.text}`,
+                  },
+                ]
+              : []),
+            {
+              messageID: info.id,
+              sessionID: input.sessionID,
+              type: "file" as const,
+              mime: "image/jpeg",
+              filename: `${path.parse(filename).name || "document"}-page-${page.number}.jpg`,
+              url: `data:image/jpeg;base64,${Buffer.from(page.image).toString("base64")}`,
+              source,
+            },
+          ]),
+        ] satisfies Draft<SessionV1.Part>[]
+      })
 
       const resolvePart: (part: PromptInput["parts"][number]) => Effect.Effect<Draft<SessionV1.Part>[]> = Effect.fn(
         "SessionPrompt.resolveUserPart",
@@ -827,11 +927,27 @@ const layer = Layer.effect(
                   { ...part, messageID: info.id, sessionID: input.sessionID },
                 ]
               }
+              if (part.mime === "application/pdf") {
+                const rendered = yield* renderVisionPdf(
+                  Buffer.from(decodeDataUrl(part.url)),
+                  part.filename ?? "document.pdf",
+                  part.source,
+                )
+                if (rendered) return [...rendered, { ...part, messageID: info.id, sessionID: input.sessionID }]
+              }
               break
             case "file:": {
               yield* Effect.logInfo("file", { mime: part.mime })
               const filepath = fileURLToPath(part.url)
               const mime = (yield* fsys.isDir(filepath)) ? "application/x-directory" : part.mime
+
+              if (mime === "application/pdf") {
+                const content = yield* fsys.readFile(filepath).pipe(Effect.option)
+                if (Option.isSome(content)) {
+                  const rendered = yield* renderVisionPdf(content.value, part.filename ?? path.basename(filepath), part.source)
+                  if (rendered) return [...rendered, { ...part, messageID: info.id, sessionID: input.sessionID }]
+                }
+              }
 
               const { read } = yield* registry.named()
               const execRead = (args: Parameters<typeof read.execute>[0], extra?: Tool.Context["extra"]) => {
