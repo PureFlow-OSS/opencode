@@ -362,6 +362,16 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     }
 
     let session = input.info()
+    if (!session && !isNewSession && params.id) {
+      const recovered = await client.session
+        .get({ sessionID: params.id })
+        .then((result) => result.data ?? undefined)
+        .catch(() => undefined)
+      if (recovered) {
+        session = recovered
+        seed(sessionDirectory, recovered)
+      }
+    }
     if (!session && isNewSession) {
       const created = await client.session
         .create()

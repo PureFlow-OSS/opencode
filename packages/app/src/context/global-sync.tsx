@@ -16,7 +16,7 @@ import type { InitError } from "../pages/error"
 import { useGlobalSDK } from "./global-sdk"
 import { bootstrapDirectory, bootstrapGlobal, clearProviderRev } from "./global-sync/bootstrap"
 import { createChildStoreManager } from "./global-sync/child-store"
-import { applyDirectoryEvent, applyGlobalEvent, cleanupDroppedSessionCaches } from "./global-sync/event-reducer"
+import { applyDirectoryEvent, applyGlobalEvent } from "./global-sync/event-reducer"
 import { createRefreshQueue } from "./global-sync/queue"
 import { clearSessionPrefetchDirectory } from "./global-sync/session-prefetch"
 import { estimateRootSessionTotal, loadRootSessionsWithFallback } from "./global-sync/session-load"
@@ -25,6 +25,7 @@ import { directoryKey } from "./global-sync/utils"
 import { debugServerError, formatUserFacingServerError } from "@/utils/server-errors"
 import { queryOptions, skipToken, useQueryClient } from "@tanstack/solid-query"
 import { Persist, persisted } from "@/utils/persist"
+import { makeEventListener } from "@solid-primitives/event-listener"
 
 type GlobalStore = {
   ready: boolean
@@ -187,10 +188,14 @@ function createGlobalSync() {
                 .filter((s) => !!s?.id)
                 .filter((s) => !s.time?.archived)
                 .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-              const childSessions = store.session.filter((s) => !!s.parentID)
-              const sessions = [...nonArchived, ...childSessions].sort((a, b) =>
-                a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
-              )
+              if (nonArchived.length === 0 && store.session.some((session) => !session.parentID)) {
+                console.warn("Ignoring an empty session list while sessions are already loaded", { directory })
+                return
+              }
+              const localSessions = store.session.filter((session) => !session.time?.archived)
+              const sessions = [
+                ...new Map([...localSessions, ...nonArchived].map((session) => [session.id, session])).values(),
+              ].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
               batch(() => {
                 setStore(
                   "sessionTotal",
@@ -201,7 +206,6 @@ function createGlobalSync() {
                   }),
                 )
                 setStore("session", reconcile(sessions, { key: "id" }))
-                cleanupDroppedSessionCaches(store, setStore, sessions, setSessionTodo)
               })
             })
             .catch((err) => {
@@ -373,6 +377,15 @@ function createGlobalSync() {
       }, 0)
     }
     void bootstrap()
+    const refreshAfterResume = () => {
+      for (const directory of Object.keys(children.children)) {
+        void bootstrapInstance(directory)
+      }
+    }
+    makeEventListener(document, "visibilitychange", () => {
+      if (document.visibilityState !== "visible") return
+      refreshAfterResume()
+    })
   })
 
   const projectApi = {
