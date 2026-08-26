@@ -377,15 +377,23 @@ function createGlobalSync() {
       }, 0)
     }
     void bootstrap()
+    const resumeTimers: ReturnType<typeof setTimeout>[] = []
     const refreshAfterResume = () => {
-      for (const directory of Object.keys(children.children)) {
-        void bootstrapInstance(directory)
+      resumeTimers.splice(0).forEach(clearTimeout)
+      const refresh = () => {
+        for (const directory of Object.keys(children.children)) {
+          void bootstrapInstance(directory)
+        }
       }
+      refresh()
+      resumeTimers.push(setTimeout(refresh, 1_500), setTimeout(refresh, 5_000))
     }
     makeEventListener(document, "visibilitychange", () => {
       if (document.visibilityState !== "visible") return
       refreshAfterResume()
     })
+    makeEventListener(window, "focus", refreshAfterResume)
+    onCleanup(() => resumeTimers.forEach(clearTimeout))
   })
 
   const projectApi = {
