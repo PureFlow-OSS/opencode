@@ -203,6 +203,8 @@ type AiFactoryRule = {
   reasoning?: boolean
   document_vision?: boolean
   document_vision_native?: boolean
+  document_ocr_model?: string
+  document_vision_model?: string
   input?: string[]
   output_modalities?: string[]
   options?: Record<string, unknown>
@@ -229,6 +231,10 @@ function aiFactoryRule(modelID: string, rules: AiFactoryRule[] | undefined) {
       : rule?.document_vision
         ? [...new Set([...(rule.input ?? ["text"]).filter((value) => value !== "pdf"), "image"])]
         : rule?.input ?? ["text"],
+    document: {
+      ocr: rule?.document_ocr_model,
+      vision: rule?.document_vision_model,
+    },
     outputModalities: rule?.output_modalities ?? ["text"],
     options: rule?.options ?? {},
     variants: rule?.variants ?? {},
@@ -361,6 +367,7 @@ function aiFactoryModels(
         headers: {},
         release_date: "",
         variants: override.variants,
+        document: override.document,
       } satisfies Model] as const
     }),
   )
@@ -1309,6 +1316,12 @@ export const Model = Schema.Struct({
   headers: Schema.Record(Schema.String, Schema.String),
   release_date: Schema.String,
   variants: optional(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Any))),
+  document: optional(
+    Schema.Struct({
+      ocr: optional(Schema.String),
+      vision: optional(Schema.String),
+    }),
+  ),
 }).annotate({ identifier: "Model" })
 export type Model = Types.DeepMutable<Schema.Schema.Type<typeof Model>>
 
