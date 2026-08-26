@@ -707,6 +707,9 @@ export function variants(model: Provider.Model): Record<string, Record<string, a
       max: { effort: "max" },
     }
   }
+  if (id.includes("qwen3.8-27b")) {
+    return Object.fromEntries(["low", "medium", "high", "xhigh"].map((effort) => [effort, { reasoningEffort: effort }]))
+  }
   if (
     id.includes("deepseek-chat") ||
     id.includes("deepseek-reasoner") ||

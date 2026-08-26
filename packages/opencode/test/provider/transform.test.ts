@@ -3329,6 +3329,24 @@ describe("ProviderTransform.variants", () => {
     })
   })
 
+  test("qwen 3.8 27B returns its supported thinking variants", () => {
+    const model = createMockModel({
+      id: "qwen/Qwen3.8-27B",
+      providerID: "qwen",
+      api: {
+        id: "Qwen3.8-27B",
+        url: "https://api.qwen.ai",
+        npm: "@ai-sdk/openai-compatible",
+      },
+    })
+    expect(ProviderTransform.variants(model)).toEqual({
+      low: { reasoningEffort: "low" },
+      medium: { reasoningEffort: "medium" },
+      high: { reasoningEffort: "high" },
+      xhigh: { reasoningEffort: "xhigh" },
+    })
+  })
+
   test("glm returns empty object", () => {
     const model = createMockModel({
       id: "glm/glm-4",
