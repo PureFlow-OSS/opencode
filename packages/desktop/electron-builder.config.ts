@@ -89,6 +89,14 @@ const getBase = (appId: string): Configuration => ({
             from: "../opencode/node_modules/@napi-rs/canvas-win32-x64-msvc/skia.win32-x64-msvc.node",
             to: "native/canvas/skia.win32-x64-msvc.node",
           },
+          {
+            from: "../opencode/node_modules/@napi-rs/canvas-win32-x64-msvc/icudtl.dat",
+            to: "native/canvas/icudtl.dat",
+          },
+          {
+            from: "../opencode/node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+            to: "pdfjs/pdf.worker.mjs",
+          },
         ]
       : []),
     {
