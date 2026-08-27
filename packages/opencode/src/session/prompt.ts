@@ -1834,7 +1834,7 @@ const layer = Layer.effect(
             )
             if (hasDocumentPdf) {
               for (const key of Object.keys(tools)) {
-                if (!["document_search", "document_ocr", "vision_recall", "question"].includes(key)) delete tools[key]
+                if (!["document_search", "document_ocr", "vision_recall", "question", "invalid"].includes(key)) delete tools[key]
               }
             }
 
