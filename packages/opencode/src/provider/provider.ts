@@ -216,11 +216,20 @@ type AiFactoryVisibilityRule = {
   visible: boolean
 }
 
+function aiFactoryRuleScore(pattern: string, modelID: string) {
+  if (pattern === "*") return 0
+  if (pattern.toLowerCase() === modelID.toLowerCase()) return 1000 + pattern.length
+  const expression = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
+  if (new RegExp(`^${expression}$`, "i").test(modelID)) return 100 - (pattern.split("*").length - 1) * 10 + pattern.length
+  return -1
+}
+
 function aiFactoryRule(modelID: string, rules: AiFactoryRule[] | undefined) {
-  const rule = rules?.find((item) => {
-    const pattern = item.pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
-    return new RegExp(`^${pattern}$`, "i").test(modelID)
-  })
+  const rule = rules
+    ?.map((item) => ({ item, score: aiFactoryRuleScore(item.pattern, modelID) }))
+    .filter((item) => item.score >= 0)
+    .sort((a, b) => b.score - a.score)
+    .at(0)?.item
   return {
     context: rule?.context ?? 200_000,
     output: rule?.output ?? 32_000,
