@@ -4,6 +4,7 @@ import { Slug } from "@opencode-ai/core/util/slug"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { serviceUse } from "@opencode-ai/core/effect/service-use"
 import path from "path"
+import { rm } from "fs/promises"
 import { BackgroundJob } from "@/background/job"
 import { Decimal } from "decimal.js"
 import type { ProviderMetadata, Usage } from "@opencode-ai/llm"
@@ -623,6 +624,9 @@ const layer: Layer.Layer<
 
         yield* events.publish(SessionV1.Event.Deleted, { sessionID, info: session })
         yield* events.remove(sessionID)
+        yield* Effect.promise(() =>
+          rm(path.join(Global.Path.data, "vision-cache", sessionID), { recursive: true, force: true }),
+        ).pipe(Effect.ignore)
       } catch (error) {
         yield* Effect.logError("failed to remove session", { sessionID, error })
       }
