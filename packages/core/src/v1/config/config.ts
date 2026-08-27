@@ -40,6 +40,9 @@ export const Info = Schema.Struct({
   aifactory_host: Schema.optional(Schema.String).annotate({
     description: "RRZ AI Factory host. Defaults to http://10.53.7.23.",
   }),
+  updater: Schema.optional(Schema.String).annotate({
+    description: "Updater server base URL. Overrides the URL embedded in the desktop build.",
+  }),
   use_http_proxy: Schema.optional(Schema.Boolean).annotate({
     description: "Whether the configured global HTTP proxy should be used. Defaults to true.",
   }),

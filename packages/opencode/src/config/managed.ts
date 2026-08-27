@@ -98,13 +98,14 @@ export function mcp(payload: Record<string, unknown>): Record<string, Mcp> {
   )
 }
 
-export function updateBaseUrl() {
+export function updateBaseUrl(config?: unknown) {
   const embedded = typeof OPENCODE_UPDATE_BASE_URL !== "undefined" ? OPENCODE_UPDATE_BASE_URL : undefined
-  return (process.env.OPENCODE_UPDATE_BASE_URL?.trim() || embedded || DEFAULT_UPDATE_BASE_URL).replace(/\/+$/, "")
+  const override = isRecord(config) && typeof config.updater === "string" ? config.updater.trim() : undefined
+  return (override || process.env.OPENCODE_UPDATE_BASE_URL?.trim() || embedded || DEFAULT_UPDATE_BASE_URL).replace(/\/+$/, "")
 }
 
-export function providerConfigUrl() {
-  return `${updateBaseUrl()}/provider-config.json`
+export function providerConfigUrl(config?: unknown) {
+  return `${updateBaseUrl(config)}/provider-config.json`
 }
 
 function aifactoryApiKey(input: { config?: unknown; auth?: Record<string, unknown> }) {
@@ -130,8 +131,9 @@ export function providerConfigRequestInit(input: { config?: unknown; auth?: Reco
 export async function readProviderConfig(
   fetchFn: typeof fetch = fetch,
   init: RequestInit = {},
+  config?: unknown,
 ): Promise<Record<string, unknown>> {
-  return fetchFn(providerConfigUrl(), {
+  return fetchFn(providerConfigUrl(config), {
     ...init,
     signal: AbortSignal.timeout(3000),
   })
