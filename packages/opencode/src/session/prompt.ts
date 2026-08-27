@@ -1530,24 +1530,50 @@ const layer = Layer.effect(
               })
             }
 
+            const resolveDocumentCacheID = async (value: unknown) => {
+              const requested = typeof value === "string" && /^[A-Za-z0-9_-]+$/.test(value) ? value : ""
+              const entries = await Effect.runPromise(
+                fsys.readDirectoryEntries(path.join(VISION_CACHE_DIR, sessionID)).pipe(Effect.catch(() => Effect.succeed([]))),
+              )
+              const cacheIDs = entries.filter((entry) => entry.type === "directory").map((entry) => entry.name)
+              if (requested && cacheIDs.includes(requested)) return requested
+              const documents = await Promise.all(
+                cacheIDs.map(async (cacheID) => {
+                  const manifest = await Effect.runPromise(
+                    fsys.readFile(path.join(visionCacheDirectory(sessionID, cacheID), "manifest.json")).pipe(Effect.option),
+                  )
+                  if (Option.isNone(manifest)) return
+                  const parsed = await Effect.runPromise(
+                    Effect.try({
+                      try: () => JSON.parse(Buffer.from(manifest.value).toString()) as { kind?: unknown },
+                      catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+                    }).pipe(Effect.option),
+                  )
+                  return Option.isSome(parsed) && parsed.value.kind === "document" ? cacheID : undefined
+                }),
+              )
+              const available = documents.filter((cacheID): cacheID is string => !!cacheID)
+              return available.length === 1 ? available[0] : requested
+            }
+
             tools["document_search"] = tool({
               description:
-                "Searches the extracted text of an earlier PDF. Use this first for questions about a [Vision Cache: ...] PDF. It returns page-numbered evidence without sending page images.",
+                "Searches the extracted text of an earlier PDF. Use only for textual questions. Do not use it for logos, images, diagrams, screenshots, or other visual details; use vision_recall for those. The PDF cache is resolved automatically when this session has one document.",
               inputSchema: jsonSchema({
                 type: "object",
                 properties: {
-                  cache_id: { type: "string", description: "The cache ID from a Vision Cache reference" },
+                  cache_id: { type: "string", description: "Optional Vision Cache ID. Omit it when this session has one PDF." },
                   query: { type: "string", description: "The words, name, number, or topic to find" },
                 },
-                required: ["cache_id", "query"],
+                required: ["query"],
                 additionalProperties: false,
               }),
               async execute(args) {
                 const input = args as { cache_id?: unknown; query?: unknown }
-                const cacheID = typeof input.cache_id === "string" ? input.cache_id : ""
+                const cacheID = await resolveDocumentCacheID(input.cache_id)
                 const query = typeof input.query === "string" ? input.query.trim() : ""
                 if (!/^[A-Za-z0-9_-]+$/.test(cacheID) || !query)
-                  return { title: "Document search", metadata: {}, output: "A valid cache ID and search query are required." }
+                  return { title: "Document search", metadata: {}, output: "A document cache and search query are required." }
                 const manifest = await Effect.runPromise(
                   fsys.readFile(path.join(visionCacheDirectory(sessionID, cacheID), "manifest.json")).pipe(Effect.option),
                 )
@@ -1582,24 +1608,24 @@ const layer = Layer.effect(
 
             tools["document_ocr"] = tool({
               description:
-                "Runs the configured OCR worker on one specific scanned PDF page and stores the resulting text in the document index.",
+                "Runs the configured OCR worker on one specific scanned PDF page and stores the resulting text in the document index. The PDF cache is resolved automatically when this session has one document.",
               inputSchema: jsonSchema({
                 type: "object",
                 properties: {
-                  cache_id: { type: "string", description: "The cache ID from a Vision Cache reference" },
+                  cache_id: { type: "string", description: "Optional Vision Cache ID. Omit it when this session has one PDF." },
                   pages: { type: "array", items: { type: "number" }, description: "One one-based PDF page number" },
                 },
-                required: ["cache_id", "pages"],
+                required: ["pages"],
                 additionalProperties: false,
               }),
               async execute(args) {
                 const input = args as { cache_id?: unknown; pages?: unknown }
-                const cacheID = typeof input.cache_id === "string" ? input.cache_id : ""
+                const cacheID = await resolveDocumentCacheID(input.cache_id)
                 const pages = Array.isArray(input.pages)
                   ? input.pages.filter((page): page is number => typeof page === "number" && Number.isInteger(page) && page > 0)
                   : []
                 if (!/^[A-Za-z0-9_-]+$/.test(cacheID) || !pages.length)
-                  return { title: "Document OCR", metadata: {}, output: "A valid cache ID and page number are required." }
+                  return { title: "Document OCR", metadata: {}, output: "A document cache and page number are required." }
                 if (!model.document?.ocr)
                   return { title: "Document OCR", metadata: {}, output: "No document OCR worker is configured for this model." }
                 const worker = await Effect.runPromise(provider.getModel(model.providerID, ModelV2.ID.make(model.document.ocr)).pipe(Effect.option))
@@ -1691,24 +1717,24 @@ const layer = Layer.effect(
 
             tools["vision_recall"] = tool({
               description:
-                "Reloads cached PDF pages from an earlier attachment into the current conversation. Use it when a follow-up question needs visual details from a [Vision Cache: ...] reference.",
+                "Reloads cached PDF pages from an earlier attachment into the current conversation. Use this for logos, images, diagrams, screenshots, charts, layout, colors, or any other visual detail. Do not use document_search for visual questions. The PDF cache is resolved automatically when this session has one document.",
               inputSchema: jsonSchema({
                 type: "object",
                 properties: {
-                  cache_id: { type: "string", description: "The cache ID from a Vision Cache reference" },
+                  cache_id: { type: "string", description: "Optional Vision Cache ID. Omit it when this session has one PDF." },
                   pages: { type: "array", items: { type: "number" }, description: "One-based PDF page numbers" },
                 },
-                required: ["cache_id", "pages"],
+                required: ["pages"],
                 additionalProperties: false,
               }),
               async execute(args) {
                 const input = args as { cache_id?: unknown; pages?: unknown }
-                const cacheID = typeof input.cache_id === "string" ? input.cache_id : ""
+                const cacheID = await resolveDocumentCacheID(input.cache_id)
                 const pages = Array.isArray(input.pages)
                   ? input.pages.filter((page): page is number => typeof page === "number" && Number.isInteger(page) && page > 0)
                   : []
                 if (!/^[A-Za-z0-9_-]+$/.test(cacheID) || !pages.length)
-                  return { title: "Vision recall", metadata: {}, output: "A valid cache ID and one or more page numbers are required." }
+                  return { title: "Vision recall", metadata: {}, output: "A document cache and one or more page numbers are required." }
                 const directory = visionCacheDirectory(sessionID, cacheID)
                 const manifest = await Effect.runPromise(fsys.readFile(path.join(directory, "manifest.json")).pipe(Effect.option))
                 if (Option.isNone(manifest))
