@@ -1803,6 +1803,19 @@ const layer = Layer.effect(
               },
             })
 
+            const hasIndexedPdf = msgs.some((message) => {
+              if (message.info.role !== "user") return false
+              const synthetic = message.parts.flatMap((part) =>
+                part.type === "text" && part.synthetic ? [part.text] : [],
+              )
+              return synthetic.some((text) => text.includes("[Vision Cache:")) && synthetic.some((text) => text.includes("was indexed"))
+            })
+            if (hasIndexedPdf) {
+              for (const key of Object.keys(tools)) {
+                if (!["document_search", "document_ocr", "vision_recall", "question"].includes(key)) delete tools[key]
+              }
+            }
+
             if (step === 1)
               yield* summary.summarize({ sessionID, messageID: lastUser.id }).pipe(Effect.ignore, Effect.forkIn(scope))
 
