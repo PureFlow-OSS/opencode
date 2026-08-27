@@ -264,6 +264,19 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
     scope,
     url: server.http.url,
     client: sdk,
+    request(path: string, init?: RequestInit) {
+      const headers = new Headers(init?.headers)
+      if (server.http.password) {
+        headers.set(
+          "Authorization",
+          `Basic ${btoa(`${server.http.username ?? "opencode"}:${server.http.password}`)}`,
+        )
+      }
+      return (platform.fetch ?? fetch)(`${server.http.url}${path}`, {
+        ...init,
+        headers,
+      })
+    },
     event: {
       on: emitter.on.bind(emitter),
       listen: emitter.listen.bind(emitter),
