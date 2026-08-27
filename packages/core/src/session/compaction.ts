@@ -43,6 +43,7 @@ Rules:
 - Keep every section, even when empty.
 - Use terse bullets, not prose paragraphs.
 - Preserve exact file paths, symbols, commands, error strings, URLs, and identifiers when known.
+- Preserve every \`[Vision Cache: ...]\` reference in Critical Context, including cache IDs and page numbers. The original image or PDF may no longer be available after compaction.
 - Do not mention the summary process or that context was compacted.`
 
 type Entry = {
