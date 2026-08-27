@@ -302,8 +302,9 @@ async function discoverAiFactoryModelcards(
   rules: AiFactoryRule[] | undefined,
   visibility: AiFactoryVisibilityRule[],
   defaults: string[],
+  config?: ConfigV1.Info,
 ) {
-  const url = `${updateBaseUrl()}/modelcards.json`
+  const url = `${updateBaseUrl(config)}/modelcards.json`
   console.info("[aifactory] using model cards as fallback", { url })
   const response = await fetch(url, {
     headers: { [PROVIDER_CONFIG_AIFACTORY_API_KEY_HEADER]: token },
@@ -1201,7 +1202,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       const config = yield* Effect.promise(() =>
         readProviderConfig(fetch, {
           headers: { "X-OpenCode-AiFactory-Api-Key": token },
-        }),
+        }, configured),
       )
       const rawRules = isRecord(config.aifactory) && Array.isArray(config.aifactory.model_limits) ? config.aifactory.model_limits : []
       const rules = rawRules.flatMap((value) => {
@@ -1230,10 +1231,10 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
             })
           }
           try {
-            return await discoverAiFactoryModelcards(token, baseURL, rules, visibility, defaults)
+            return await discoverAiFactoryModelcards(token, baseURL, rules, visibility, defaults, configured)
           } catch (error) {
             console.error("[aifactory] model card fallback failed", {
-              url: `${updateBaseUrl()}/modelcards.json`,
+              url: `${updateBaseUrl(configured)}/modelcards.json`,
               error: error instanceof Error ? error.message : String(error),
             })
             return {}
