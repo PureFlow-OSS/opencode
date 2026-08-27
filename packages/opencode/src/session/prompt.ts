@@ -862,7 +862,6 @@ const layer = Layer.effect(
       const renderVisionPdf = Effect.fn("SessionPrompt.renderVisionPdf")(function* (
         data: Uint8Array,
         filename: string,
-        source: SessionV1.FilePart["source"],
       ) {
         if (Option.isNone(modelInfo) || modelInfo.value.capabilities.input.pdf || !modelInfo.value.capabilities.input.image)
           return
@@ -935,55 +934,38 @@ const layer = Layer.effect(
               }),
             )
             .pipe(Effect.catch(() => Effect.void))
-        const rendered = yield* Effect.tryPromise({
-          try: () => renderPdfPages(data),
-          catch: (error) => (error instanceof Error ? error : new Error(String(error))),
-        }).pipe(Effect.option)
-        if (Option.isNone(rendered) || !rendered.value.pages.length) return
-        const suffix = rendered.value.total > rendered.value.pages.length
-          ? `; only the first ${rendered.value.pages.length} of ${rendered.value.total} pages are included`
-          : ""
+        if (Option.isNone(cached)) return
+        const pages = cached.value.pages.map((page) => {
+          const ocr = tableOcr.find((result) => result.number === page.number)
+          return ocr?.text ? { ...page, text: ocr.text } : page
+        })
+        const question = input.parts
+          .flatMap((part) => (part.type === "text" ? [part.text] : []))
+          .join("\n")
+          .trim()
+        const extracted = findDocumentPages(pages, question)
+          .flatMap((page) => (page.text ? [`## Page ${page.number}\n${page.text}`] : []))
+          .join("\n\n")
+          .slice(0, DOCUMENT_SEARCH_TEXT_LIMIT)
         return [
           {
             messageID: info.id,
             sessionID: input.sessionID,
             type: "text" as const,
             synthetic: true,
-            text: `PDF \"${filename}\" was rendered as page images for vision analysis${suffix}.`,
+            text: `[Vision Cache: ${cached.value.cacheID}] ${filename}; pages ${pages.map((page) => page.number).join(", ")}.`,
           },
-          ...(Option.isSome(cached)
-            ? [
-                {
-                  messageID: info.id,
-                  sessionID: input.sessionID,
-                  type: "text" as const,
-                  synthetic: true,
-                  text: `[Vision Cache: ${cached.value.cacheID}] ${filename}; pages 1-${cached.value.total}. Use document_search for follow-up questions or vision_recall for visual details.`,
-                },
-              ]
-            : []),
-          ...rendered.value.pages.flatMap((page) => [
-            ...(page.text
-              ? [
-                  {
-                    messageID: info.id,
-                    sessionID: input.sessionID,
-                    type: "text" as const,
-                    synthetic: true,
-                    text: `PDF page ${page.number} text:\n${page.text}`,
-                  },
-                ]
-              : []),
-            {
-              messageID: info.id,
-              sessionID: input.sessionID,
-              type: "file" as const,
-              mime: "image/jpeg",
-              filename: `${path.parse(filename).name || "document"}-page-${page.number}.jpg`,
-              url: `data:image/jpeg;base64,${Buffer.from(page.image).toString("base64")}`,
-              source,
-            },
-          ]),
+          {
+            messageID: info.id,
+            sessionID: input.sessionID,
+            type: "text" as const,
+            synthetic: true,
+            text: [
+              `PDF \"${filename}\" was indexed (${cached.value.total} pages).`,
+              "Use document_search for follow-up questions. Use vision_recall only for a specifically relevant page that needs visual inspection.",
+              extracted ? `Relevant extracted text:\n${extracted}` : "No digital text was extracted from the relevant pages.",
+            ].join("\n\n"),
+          },
         ] satisfies Draft<SessionV1.Part>[]
       })
 
@@ -1099,7 +1081,6 @@ const layer = Layer.effect(
                 const rendered = yield* renderVisionPdf(
                   Buffer.from(decodeDataUrl(part.url)),
                   part.filename ?? "document.pdf",
-                  part.source,
                 )
                 if (rendered) return [...rendered, { ...part, messageID: info.id, sessionID: input.sessionID }]
               }
@@ -1112,7 +1093,7 @@ const layer = Layer.effect(
               if (mime === "application/pdf") {
                 const content = yield* fsys.readFile(filepath).pipe(Effect.option)
                 if (Option.isSome(content)) {
-                  const rendered = yield* renderVisionPdf(content.value, part.filename ?? path.basename(filepath), part.source)
+                  const rendered = yield* renderVisionPdf(content.value, part.filename ?? path.basename(filepath))
                   if (rendered) return [...rendered, { ...part, messageID: info.id, sessionID: input.sessionID }]
                 }
               }
