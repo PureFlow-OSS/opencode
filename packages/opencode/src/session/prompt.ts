@@ -903,7 +903,7 @@ const layer = Layer.effect(
           return
         const cached = yield* cacheDocumentPdf(data, filename).pipe(Effect.option)
         const tablePages = Option.isSome(cached)
-          ? cached.value.pages.filter((page) => page.table).slice(0, DOCUMENT_TABLE_OCR_PAGE_LIMIT)
+          ? cached.value.pages.filter((page) => page.table && !page.text.trim()).slice(0, DOCUMENT_TABLE_OCR_PAGE_LIMIT)
           : []
         const ocrWorker = modelInfo.value.document?.ocr
           ? yield* provider.getModel(model.providerID, ModelV2.ID.make(modelInfo.value.document.ocr)).pipe(Effect.option)
