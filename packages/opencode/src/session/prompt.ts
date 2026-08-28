@@ -883,7 +883,12 @@ const layer = Layer.effect(
             ? yield* Effect.tryPromise({
                 try: () => renderPdfPages(data, tablePages.map((page) => page.number)),
                 catch: (error) => (error instanceof Error ? error : new Error(String(error))),
-              }).pipe(Effect.option)
+              }).pipe(
+                Effect.tapError((error) =>
+                  Effect.logWarning("PDF table rendering failed", { filename, sessionID: input.sessionID, error }),
+                ),
+                Effect.option,
+              )
             : Option.none()
         const tableOcr =
           Option.isSome(ocrWorker) && Option.isSome(tableImages)
@@ -1646,7 +1651,10 @@ const layer = Layer.effect(
                   Effect.tryPromise({
                     try: () => renderPdfPages(source.value, pages.slice(0, 1)),
                     catch: (error) => (error instanceof Error ? error : new Error(String(error))),
-                  }).pipe(Effect.option),
+                  }).pipe(
+                    Effect.tapError((error) => Effect.logWarning("PDF OCR rendering failed", { sessionID, cacheID, error })),
+                    Effect.option,
+                  ),
                 )
                 if (Option.isNone(rendered) || !rendered.value.pages.length)
                   return { title: "Document OCR", metadata: {}, output: "The requested PDF pages could not be rendered for OCR." }
@@ -1760,7 +1768,10 @@ const layer = Layer.effect(
                   Effect.tryPromise({
                     try: () => renderPdfPages(source.value, pages.slice(0, PDF_VISION_PAGE_LIMIT)),
                     catch: (error) => (error instanceof Error ? error : new Error(String(error))),
-                  }).pipe(Effect.option),
+                  }).pipe(
+                    Effect.tapError((error) => Effect.logWarning("PDF vision rendering failed", { sessionID, cacheID, error })),
+                    Effect.option,
+                  ),
                 )
                 if (Option.isNone(rendered) || !rendered.value.pages.length)
                   return { title: "Vision recall", metadata: {}, output: "The requested PDF pages could not be rendered." }
