@@ -846,13 +846,19 @@ const layer = Layer.effect(
         data: Uint8Array,
         filename: string,
       ) {
-        const extracted = yield* Effect.tryPromise({
-          try: () => extractPdfText(data),
-          catch: (error) => (error instanceof Error ? error : new Error(String(error))),
-        })
         const cacheID = ulid()
         const directory = visionCacheDirectory(input.sessionID, cacheID)
         yield* fsys.writeWithDirs(path.join(directory, "source.pdf"), data)
+        const extracted = yield* Effect.tryPromise({
+          try: () => extractPdfText(data),
+          catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+        }).pipe(
+          Effect.catch((error) =>
+            Effect.logWarning("PDF text extraction failed; retaining PDF for visual recall", { filename, error }).pipe(
+              Effect.as({ pages: [], total: 0 }),
+            ),
+          ),
+        )
         yield* fsys.writeWithDirs(
           path.join(directory, "manifest.json"),
           JSON.stringify({ kind: "document", filename, source: "source.pdf", pages: extracted.pages }),
