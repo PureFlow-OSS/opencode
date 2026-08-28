@@ -1623,30 +1623,65 @@ const layer = Layer.effect(
             }
 
             const availableDocumentCacheIDs = async () => {
-              const entries = await Effect.runPromise(
-                fsys
-                  .readDirectoryEntries(path.join(VISION_CACHE_DIR, sessionID))
-                  .pipe(Effect.catch(() => Effect.succeed([]))),
+              const list = async () => {
+                const entries = await Effect.runPromise(
+                  fsys
+                    .readDirectoryEntries(path.join(VISION_CACHE_DIR, sessionID))
+                    .pipe(Effect.catch(() => Effect.succeed([]))),
+                )
+                const cacheIDs = entries.filter((entry) => entry.type === "directory").map((entry) => entry.name)
+                const documents = await Promise.all(
+                  cacheIDs.map(async (cacheID) => {
+                    const manifest = await Effect.runPromise(
+                      fsys
+                        .readFile(path.join(visionCacheDirectory(sessionID, cacheID), "manifest.json"))
+                        .pipe(Effect.option),
+                    )
+                    if (Option.isNone(manifest)) return
+                    const parsed = await Effect.runPromise(
+                      Effect.try({
+                        try: () => JSON.parse(Buffer.from(manifest.value).toString()) as { kind?: unknown },
+                        catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+                      }).pipe(Effect.option),
+                    )
+                    return Option.isSome(parsed) && parsed.value.kind === "document" ? cacheID : undefined
+                  }),
+                )
+                return documents.filter((cacheID): cacheID is string => !!cacheID)
+              }
+              const cached = await list()
+              if (cached.length) return cached
+              const attachments = msgs.flatMap((message) =>
+                message.parts.flatMap((part) =>
+                  part.type === "file" && part.mime === "application/pdf" && part.url.startsWith("data:") ? [part] : [],
+                ),
               )
-              const cacheIDs = entries.filter((entry) => entry.type === "directory").map((entry) => entry.name)
-              const documents = await Promise.all(
-                cacheIDs.map(async (cacheID) => {
-                  const manifest = await Effect.runPromise(
-                    fsys
-                      .readFile(path.join(visionCacheDirectory(sessionID, cacheID), "manifest.json"))
-                      .pipe(Effect.option),
-                  )
-                  if (Option.isNone(manifest)) return
-                  const parsed = await Effect.runPromise(
-                    Effect.try({
-                      try: () => JSON.parse(Buffer.from(manifest.value).toString()) as { kind?: unknown },
+              await Promise.all(
+                attachments.map(async (part) => {
+                  const data = decodeDataUrlBytes(part.url)
+                  const cacheID = ulid()
+                  const directory = visionCacheDirectory(sessionID, cacheID)
+                  const extracted = await Effect.runPromise(
+                    Effect.tryPromise({
+                      try: () => extractPdfText(data),
                       catch: (error) => (error instanceof Error ? error : new Error(String(error))),
-                    }).pipe(Effect.option),
+                    }).pipe(Effect.catch(() => Effect.succeed({ pages: [], total: 0 }))),
                   )
-                  return Option.isSome(parsed) && parsed.value.kind === "document" ? cacheID : undefined
+                  await Effect.runPromise(fsys.writeWithDirs(path.join(directory, "source.pdf"), data))
+                  await Effect.runPromise(
+                    fsys.writeWithDirs(
+                      path.join(directory, "manifest.json"),
+                      JSON.stringify({
+                        kind: "document",
+                        filename: part.filename ?? "document.pdf",
+                        source: "source.pdf",
+                        pages: extracted.pages,
+                      }),
+                    ),
+                  )
                 }),
               )
-              return documents.filter((cacheID): cacheID is string => !!cacheID)
+              return list()
             }
 
             const resolveDocumentCacheID = async (value: unknown) => {
