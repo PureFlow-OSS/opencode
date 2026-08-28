@@ -2274,7 +2274,7 @@ const layer = Layer.effect(
             ]
             if (hasDocumentPdf)
               system.push(
-                "A PDF is attached. Before answering questions about document text, data, rankings, totals, comparisons, summaries, or facts that may span pages, use the document tools. For a summary, synthesis, or comparison across one or more PDFs, call document_summary; it processes every indexed document before combining the result. For a focused fact lookup, call document_search. Never infer a document-wide answer from an attachment preview or a single page. Use vision_recall for visual questions.",
+                "A PDF is attached. Before answering questions about document text, data, rankings, totals, comparisons, summaries, or facts that may span pages, use the document tools. For any fact lookup or question about one PDF, call document_search and use its result. Call document_summary only when the user explicitly asks to summarize, synthesize, or compare multiple PDFs; it processes every indexed document before combining the result. Never infer a document-wide answer from an attachment preview or a single page. Use vision_recall for visual questions.",
               )
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
