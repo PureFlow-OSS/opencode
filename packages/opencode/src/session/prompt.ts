@@ -108,6 +108,14 @@ function visionCacheDirectory(sessionID: SessionID, cacheID: string) {
 }
 
 async function loadPdfJs(): Promise<PdfJs> {
+  const nativeCanvas = path.join(process.resourcesPath ?? "", "native", "canvas", "skia.win32-x64-msvc.node")
+  if (process.platform === "win32" && existsSync(nativeCanvas)) process.env.NAPI_RS_NATIVE_LIBRARY_PATH = nativeCanvas
+  const canvas = await import("@napi-rs/canvas")
+  Object.assign(globalThis, {
+    DOMMatrix: canvas.DOMMatrix,
+    ImageData: canvas.ImageData,
+    Path2D: canvas.Path2D,
+  })
   const bundled = path.join(process.resourcesPath ?? "", "pdfjs", "pdf.mjs")
   if (existsSync(bundled)) return (await import(/* @vite-ignore */ pathToFileURL(bundled).href)) as PdfJs
   return import("pdfjs-dist/legacy/build/pdf.mjs")
@@ -171,16 +179,7 @@ async function extractPdfText(data: Uint8Array) {
 }
 
 async function renderPdfPages(data: Uint8Array, requestedPages?: number[]) {
-  const nativeCanvas = path.join(process.resourcesPath ?? "", "native", "canvas", "skia.win32-x64-msvc.node")
-  if (process.platform === "win32" && existsSync(nativeCanvas)) process.env.NAPI_RS_NATIVE_LIBRARY_PATH = nativeCanvas
   const canvas = await import("@napi-rs/canvas")
-  Object.assign(globalThis, {
-    DOMMatrix: canvas.DOMMatrix,
-    ImageData: canvas.ImageData,
-    Path2D: canvas.Path2D,
-    // @ts-expect-error PDF.js does not declare its worker entry point.
-    pdfjsWorker: await import("pdfjs-dist/legacy/build/pdf.worker.mjs"),
-  })
   const pdfjs = await loadPdfJs()
   const worker = process.resourcesPath ? path.join(process.resourcesPath, "pdfjs", "pdf.worker.mjs") : ""
   pdfjs.GlobalWorkerOptions.workerSrc = existsSync(worker)
