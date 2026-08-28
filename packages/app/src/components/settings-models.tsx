@@ -119,7 +119,10 @@ const SettingsModelsContent: Component = () => {
         .catch(() => null) ?? null,
     { initialValue: null as ModelCardResponse | null },
   )
-  const cards = () => modelcards()?.aifactory?.models ?? []
+  const cards = () =>
+    (modelcards()?.aifactory?.models ?? []).filter((card: ModelCard) =>
+      models.policyVisible({ providerID: AIFACTORY_PROVIDER_ID, modelID: card.model }),
+    )
   const formatBoolean = (value?: boolean | null) => {
     if (value === undefined || value === null) return "n/a"
     return value ? "yes" : "no"

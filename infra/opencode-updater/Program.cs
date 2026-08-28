@@ -524,7 +524,7 @@ app.MapGet("/opencode/modelcards.json", async (HttpRequest request, UpdaterRollo
 {
   var rollout = await rolloutResolver.ResolveAsync(request, request.HttpContext.RequestAborted);
   var providerConfig = ApplyReasoningSettings(rollout.Options.ProviderConfig);
-  var cards = request.HttpContext.RequestServices.GetRequiredService<ModelCardStore>().BuildSnapshot(rollout.IsBeta, providerConfig);
+  var cards = request.HttpContext.RequestServices.GetRequiredService<ModelCardStore>().BuildSnapshot(rollout.IsBeta, providerConfig, includeHidden: false);
 
   return Results.Json(new
   {
@@ -960,7 +960,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
   DateTimeOffset syncedAt = DateTimeOffset.MinValue;
   string? source;
 
-  public ModelCardSnapshot BuildSnapshot(bool isBeta, ProviderConfigOptions providerConfig)
+  public ModelCardSnapshot BuildSnapshot(bool isBeta, ProviderConfigOptions providerConfig, bool includeHidden = true)
   {
     var models = cached.Select((model) =>
     {
@@ -1027,7 +1027,9 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
           model.Modalities
         )
       );
-    }).ToArray();
+    })
+      .Where((model) => includeHidden || model.Visible is not false)
+      .ToArray();
 
     return new ModelCardSnapshot(DateTimeOffset.UtcNow, models.Length, models, new ModelCardSyncInfo(source, syncedAt, isBeta));
   }
