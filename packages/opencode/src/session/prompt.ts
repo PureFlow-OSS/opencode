@@ -147,8 +147,30 @@ function hasPdfTableLayout(items: unknown[]) {
   )
 }
 
+async function preparePdfJs() {
+  const nativeCanvas = path.join(process.resourcesPath ?? "", "native", "canvas", "skia.win32-x64-msvc.node")
+  if (process.platform === "win32" && existsSync(nativeCanvas)) process.env.NAPI_RS_NATIVE_LIBRARY_PATH = nativeCanvas
+  const canvas = await import("@napi-rs/canvas")
+  Object.assign(globalThis, {
+    DOMMatrix: canvas.DOMMatrix,
+    ImageData: canvas.ImageData,
+    Path2D: canvas.Path2D,
+  })
+  return canvas
+}
+
+async function loadPdfJs() {
+  await preparePdfJs()
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
+  const worker = process.resourcesPath ? path.join(process.resourcesPath, "pdfjs", "pdf.worker.mjs") : ""
+  pdfjs.GlobalWorkerOptions.workerSrc = existsSync(worker)
+    ? pathToFileURL(worker).href
+    : import.meta.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs")
+  return pdfjs
+}
+
 async function extractPdfText(data: Uint8Array) {
-  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs")
+  const { getDocument } = await loadPdfJs()
   const pdf = await getDocument({ data: new Uint8Array(data), useSystemFonts: true }).promise
   const pages = [] as Array<{ number: number; text: string; table: boolean }>
   for (const number of Array.from({ length: pdf.numPages }, (_, index) => index + 1)) {
@@ -164,17 +186,8 @@ async function extractPdfText(data: Uint8Array) {
 }
 
 async function renderPdfPages(data: Uint8Array, requestedPages?: number[]) {
-  const nativeCanvas = path.join(process.resourcesPath ?? "", "native", "canvas", "skia.win32-x64-msvc.node")
-  if (process.platform === "win32" && existsSync(nativeCanvas)) process.env.NAPI_RS_NATIVE_LIBRARY_PATH = nativeCanvas
-  const canvas = await import("@napi-rs/canvas")
-  Object.assign(globalThis, {
-    DOMMatrix: canvas.DOMMatrix,
-    ImageData: canvas.ImageData,
-    Path2D: canvas.Path2D,
-    // @ts-expect-error PDF.js does not declare its worker entry point.
-    pdfjsWorker: await import("pdfjs-dist/legacy/build/pdf.worker.mjs"),
-  })
-  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs")
+  const canvas = await preparePdfJs()
+  const { getDocument } = await loadPdfJs()
   class PdfCanvasFactory {
     constructor(_options: { enableHWA?: boolean }) {}
 
