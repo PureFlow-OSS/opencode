@@ -933,14 +933,48 @@ const layer = Layer.effect(
         )
         return { cacheID, ...extracted }
       })
+      const cacheDocumentImage = Effect.fn("SessionPrompt.cacheDocumentImage")(function* (
+        data: Uint8Array,
+        filename: string,
+        mime: string,
+      ) {
+        const cacheID = ulid()
+        const directory = visionCacheDirectory(input.sessionID, cacheID)
+        yield* fsys.writeWithDirs(path.join(directory, "source"), data)
+        yield* fsys.writeWithDirs(
+          path.join(directory, "manifest.json"),
+          JSON.stringify({ kind: "document", filename, source: "source", mime, pages: [] }),
+        )
+        return cacheID
+      })
+      const cacheVisionImage = Effect.fn("SessionPrompt.cacheVisionImage")(function* (
+        data: Uint8Array,
+        filename: string,
+        mime: string,
+      ) {
+        if (Option.isNone(modelInfo) || modelInfo.value.capabilities.input.image || !modelInfo.value.document?.vision)
+          return
+        const cacheID = yield* cacheDocumentImage(data, filename, mime).pipe(Effect.option)
+        if (Option.isNone(cacheID)) return
+        return [
+          {
+            messageID: info.id,
+            sessionID: input.sessionID,
+            type: "text" as const,
+            synthetic: true,
+            text: `[Vision Cache: ${cacheID.value}] ${filename}; image attachment. Use vision_recall with page 1 for visual questions.`,
+          },
+        ] satisfies Draft<SessionV1.Part>[]
+      })
       const renderVisionPdf = Effect.fn("SessionPrompt.renderVisionPdf")(function* (
         data: Uint8Array,
         filename: string,
       ) {
+        if (Option.isNone(modelInfo) || modelInfo.value.capabilities.input.pdf) return
         if (
-          Option.isNone(modelInfo) ||
-          modelInfo.value.capabilities.input.pdf ||
-          !modelInfo.value.capabilities.input.image
+          !modelInfo.value.capabilities.input.image &&
+          !modelInfo.value.document?.vision &&
+          !modelInfo.value.document?.ocr
         )
           return
         const cached = yield* cacheDocumentPdf(data, filename).pipe(Effect.option)
@@ -1174,7 +1208,15 @@ const layer = Layer.effect(
               }
               if (part.mime === "application/pdf") {
                 const rendered = yield* renderVisionPdf(decodeDataUrlBytes(part.url), part.filename ?? "document.pdf")
-                if (rendered) return [...rendered, { ...part, messageID: info.id, sessionID: input.sessionID }]
+                if (rendered) return rendered
+              }
+              if (part.mime.startsWith("image/")) {
+                const cached = yield* cacheVisionImage(
+                  decodeDataUrlBytes(part.url),
+                  part.filename ?? "image",
+                  part.mime,
+                )
+                if (cached) return cached
               }
               break
             case "file:": {
@@ -1186,7 +1228,14 @@ const layer = Layer.effect(
                 const content = yield* fsys.readFile(filepath).pipe(Effect.option)
                 if (Option.isSome(content)) {
                   const rendered = yield* renderVisionPdf(content.value, part.filename ?? path.basename(filepath))
-                  if (rendered) return [...rendered, { ...part, messageID: info.id, sessionID: input.sessionID }]
+                  if (rendered) return rendered
+                }
+              }
+              if (mime.startsWith("image/")) {
+                const content = yield* fsys.readFile(filepath).pipe(Effect.option)
+                if (Option.isSome(content)) {
+                  const cached = yield* cacheVisionImage(content.value, part.filename ?? path.basename(filepath), mime)
+                  if (cached) return cached
                 }
               }
 
@@ -2148,7 +2197,11 @@ const layer = Layer.effect(
                 const parsed = await Effect.runPromise(
                   Effect.try({
                     try: () =>
-                      JSON.parse(Buffer.from(manifest.value).toString()) as { filename?: unknown; source?: unknown },
+                      JSON.parse(Buffer.from(manifest.value).toString()) as {
+                        filename?: unknown
+                        mime?: unknown
+                        source?: unknown
+                      },
                     catch: (error) => (error instanceof Error ? error : new Error(String(error))),
                   }).pipe(Effect.option),
                 )
@@ -2164,15 +2217,19 @@ const layer = Layer.effect(
                     output: "The original PDF is no longer available for visual recall.",
                   }
                 const rendered = await Effect.runPromise(
-                  Effect.tryPromise({
-                    try: () => renderPdfPages(source.value, pages.slice(0, PDF_VISION_PAGE_LIMIT)),
-                    catch: (error) => (error instanceof Error ? error : new Error(String(error))),
-                  }).pipe(
-                    Effect.tapError((error) =>
-                      Effect.logWarning("PDF vision rendering failed", { sessionID, cacheID, error }),
-                    ),
-                    Effect.option,
-                  ),
+                  typeof parsed.value.mime === "string" && parsed.value.mime.startsWith("image/")
+                    ? Effect.succeed(
+                        Option.some({ pages: pages.includes(1) ? [{ number: 1, image: source.value }] : [] }),
+                      )
+                    : Effect.tryPromise({
+                        try: () => renderPdfPages(source.value, pages.slice(0, PDF_VISION_PAGE_LIMIT)),
+                        catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+                      }).pipe(
+                        Effect.tapError((error) =>
+                          Effect.logWarning("PDF vision rendering failed", { sessionID, cacheID, error }),
+                        ),
+                        Effect.option,
+                      ),
                 )
                 if (Option.isNone(rendered) || !rendered.value.pages.length)
                   return {
@@ -2227,7 +2284,10 @@ const layer = Layer.effect(
                             },
                             ...rendered.value.pages.map((page) => ({
                               type: "file" as const,
-                              mediaType: "image/jpeg",
+                              mediaType:
+                                typeof parsed.value.mime === "string" && parsed.value.mime.startsWith("image/")
+                                  ? parsed.value.mime
+                                  : "image/jpeg",
                               data: page.image,
                             })),
                           ],
@@ -2273,7 +2333,15 @@ const layer = Layer.effect(
                 message.info.role === "user" &&
                 message.parts.some((part) => part.type === "file" && part.mime === "application/pdf"),
             )
-            if (hasDocumentPdf) {
+            const hasDelegatedImage =
+              !!model.document?.vision &&
+              !model.capabilities.input.image &&
+              msgs.some(
+                (message) =>
+                  message.info.role === "user" &&
+                  message.parts.some((part) => part.type === "file" && part.mime.startsWith("image/")),
+              )
+            if (hasDocumentPdf || hasDelegatedImage) {
               for (const key of Object.keys(tools)) {
                 if (
                   ![
@@ -2307,9 +2375,9 @@ const layer = Layer.effect(
               ...(mcpInstructions ? [mcpInstructions] : []),
               ...(skills ? [skills] : []),
             ]
-            if (hasDocumentPdf)
+            if (hasDocumentPdf || hasDelegatedImage)
               system.push(
-                "A PDF is attached. Before answering questions about document text, data, rankings, totals, comparisons, summaries, or facts that may span pages, use the document tools. For any fact lookup or question about one PDF, call document_search and use its result. Call document_summary only when the user explicitly asks to summarize, synthesize, or compare multiple PDFs; it processes every indexed document before combining the result. Never infer a document-wide answer from an attachment preview or a single page. Use vision_recall for visual questions.",
+                "A document attachment is present. Before answering questions about document text, data, rankings, totals, comparisons, summaries, or facts that may span pages, use the document tools. For any fact lookup or question about one PDF, call document_search and use its result. Call document_summary only when the user explicitly asks to summarize, synthesize, or compare multiple PDFs; it processes every indexed document before combining the result. Never infer a document-wide answer from an attachment preview or a single page. Use vision_recall for visual questions.",
               )
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)

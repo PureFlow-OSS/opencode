@@ -214,7 +214,8 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
         if (part.type === "file" && part.mime !== "text/plain" && part.mime !== "application/x-directory") {
           if (
             (options?.stripMedia && isMedia(part.mime)) ||
-            (part.mime === "application/pdf" && !model.capabilities.input.pdf)
+            (part.mime === "application/pdf" && !model.capabilities.input.pdf) ||
+            (part.mime.startsWith("image/") && !model.capabilities.input.image)
           ) {
             userMessage.parts.push({
               type: "text",

@@ -56,7 +56,13 @@ function aiFactoryBaseURL(config: Pick<ConfigV1.Info, "aifactory_host">) {
 
 function mergeNoProxyEntry(value: string | undefined, entry: string) {
   if (!value) return entry
-  if (value.split(",").map((item) => item.trim()).includes(entry)) return value
+  if (
+    value
+      .split(",")
+      .map((item) => item.trim())
+      .includes(entry)
+  )
+    return value
   return `${value},${entry}`
 }
 
@@ -224,7 +230,8 @@ function aiFactoryRuleScore(pattern: string, modelID: string) {
   if (pattern === "*") return 0
   if (pattern.toLowerCase() === modelID.toLowerCase()) return 1000 + pattern.length
   const expression = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
-  if (new RegExp(`^${expression}$`, "i").test(modelID)) return 100 - (pattern.split("*").length - 1) * 10 + pattern.length
+  if (new RegExp(`^${expression}$`, "i").test(modelID))
+    return 100 - (pattern.split("*").length - 1) * 10 + pattern.length
   return -1
 }
 
@@ -242,7 +249,7 @@ function aiFactoryRule(modelID: string, rules: AiFactoryRule[] | undefined) {
     reasoning: rule?.reasoning ?? /(^o[134]\b)|(^gpt-5\b)|claude|reason|r1|deepseek|gemini/i.test(modelID),
     input: rule?.document_vision_native
       ? [...new Set([...input, "pdf"])]
-      : rule?.document_vision
+      : rule?.document_vision && !rule.document_vision_model
         ? [...new Set([...input.filter((value) => value !== "pdf"), "image"])]
         : input,
     document: {
@@ -257,10 +264,12 @@ function aiFactoryRule(modelID: string, rules: AiFactoryRule[] | undefined) {
 
 function aiFactoryVisible(modelID: string, rules: AiFactoryVisibilityRule[], defaults: string[]) {
   if (defaults.includes(modelID)) return true
-  const rule = rules.filter((item) => {
-    const pattern = item.pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
-    return new RegExp(`^${pattern}$`, "i").test(modelID)
-  }).at(-1)
+  const rule = rules
+    .filter((item) => {
+      const pattern = item.pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
+      return new RegExp(`^${pattern}$`, "i").test(modelID)
+    })
+    .at(-1)
   if (rule) return rule.visible
   return !["*embedding*", "all-proxy-models", "all-team-models"].some((pattern) => {
     const expression = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
@@ -286,7 +295,11 @@ async function discoverAiFactoryModels(
     signal: AbortSignal.timeout(5000),
   })
   if (!response.ok) {
-    console.warn("[aifactory] model discovery failed", { url, status: response.status, statusText: response.statusText })
+    console.warn("[aifactory] model discovery failed", {
+      url,
+      status: response.status,
+      statusText: response.statusText,
+    })
     return {}
   }
   const payload = (await response.json()) as { data?: Array<{ id?: string; created?: number | string }> }
@@ -316,7 +329,11 @@ async function discoverAiFactoryModelcards(
     signal: AbortSignal.timeout(5000),
   })
   if (!response.ok) {
-    console.warn("[aifactory] model card fallback failed", { url, status: response.status, statusText: response.statusText })
+    console.warn("[aifactory] model card fallback failed", {
+      url,
+      status: response.status,
+      statusText: response.statusText,
+    })
     return {}
   }
   const payload = (await response.json()) as { aifactory?: { models?: Array<{ model?: string }> } }
@@ -348,44 +365,47 @@ function aiFactoryModels(
     [...new Set([...modelIDs, ...defaults, ...hiddenWorkers])]
       .filter((id) => hiddenWorkers.has(id) || aiFactoryVisible(id, visibility, defaults))
       .map((id) => {
-      const override = aiFactoryRule(id, rules)
-      const input = hiddenWorkers.has(id) ? [...new Set([...override.input, "image"])] : override.input
-      return [id, {
-        id: ModelV2.ID.make(id),
-        providerID: ProviderV2.ID.make("aifactory"),
-        api: { id, url: baseURL, npm: "@ai-sdk/openai-compatible" },
-        name: id,
-        family: id.split(/[-/]/)[0],
-        capabilities: {
-          temperature: override.temperature,
-          reasoning: override.reasoning,
-          attachment: input.some((value) => value !== "text"),
-          toolcall: true,
-          input: {
-            text: input.includes("text"),
-            audio: input.includes("audio"),
-            image: input.includes("image"),
-            video: input.includes("video"),
-            pdf: input.includes("pdf"),
-          },
-          output: {
-            text: override.outputModalities.includes("text"),
-            audio: override.outputModalities.includes("audio"),
-            image: override.outputModalities.includes("image"),
-            video: override.outputModalities.includes("video"),
-            pdf: override.outputModalities.includes("pdf"),
-          },
-          interleaved: false,
-        },
-        cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
-        limit: { context: override.context, output: override.output },
-        status: "active",
-        options: override.options,
-        headers: {},
-        release_date: "",
-        variants: override.variants,
-        document: override.document,
-      } satisfies Model] as const
+        const override = aiFactoryRule(id, rules)
+        const input = hiddenWorkers.has(id) ? [...new Set([...override.input, "image"])] : override.input
+        return [
+          id,
+          {
+            id: ModelV2.ID.make(id),
+            providerID: ProviderV2.ID.make("aifactory"),
+            api: { id, url: baseURL, npm: "@ai-sdk/openai-compatible" },
+            name: id,
+            family: id.split(/[-/]/)[0],
+            capabilities: {
+              temperature: override.temperature,
+              reasoning: override.reasoning,
+              attachment: input.some((value) => value !== "text"),
+              toolcall: true,
+              input: {
+                text: input.includes("text"),
+                audio: input.includes("audio"),
+                image: input.includes("image"),
+                video: input.includes("video"),
+                pdf: input.includes("pdf"),
+              },
+              output: {
+                text: override.outputModalities.includes("text"),
+                audio: override.outputModalities.includes("audio"),
+                image: override.outputModalities.includes("image"),
+                video: override.outputModalities.includes("video"),
+                pdf: override.outputModalities.includes("pdf"),
+              },
+              interleaved: false,
+            },
+            cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+            limit: { context: override.context, output: override.output },
+            status: "active",
+            options: override.options,
+            headers: {},
+            release_date: "",
+            variants: override.variants,
+            document: override.document,
+          } satisfies Model,
+        ] as const
       }),
   )
   for (const id of hiddenWorkers) {
@@ -1206,27 +1226,37 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       const auth = yield* dep.auth(input.id)
       const configured = yield* dep.config()
       const configuredKey = configured.provider?.[input.id]?.options?.apiKey
-      const token = auth?.type === "api" ? auth.key : input.key ?? configuredKey
+      const token = auth?.type === "api" ? auth.key : (input.key ?? configuredKey)
       if (!token) return { autoload: false }
       const baseURL =
         (typeof input.options.baseURL === "string" && input.options.baseURL.trim()) ||
         aiFactoryBaseURL({ aifactory_host: configured.aifactory_host ?? process.env.OPENCODE_AIFACTORY_HOST })
       const config = yield* Effect.promise(() =>
-        readProviderConfig(fetch, {
-          headers: { "X-OpenCode-AiFactory-Api-Key": token },
-        }, configured),
+        readProviderConfig(
+          fetch,
+          {
+            headers: { "X-OpenCode-AiFactory-Api-Key": token },
+          },
+          configured,
+        ),
       )
-      const rawRules = isRecord(config.aifactory) && Array.isArray(config.aifactory.model_limits) ? config.aifactory.model_limits : []
+      const rawRules =
+        isRecord(config.aifactory) && Array.isArray(config.aifactory.model_limits) ? config.aifactory.model_limits : []
       const rules = rawRules.flatMap((value) => {
         if (!isRecord(value) || typeof value.pattern !== "string") return []
         return [value as unknown as AiFactoryRule]
       })
-      const rawVisibility = isRecord(config.aifactory) && Array.isArray(config.aifactory.model_visibility) ? config.aifactory.model_visibility : []
+      const rawVisibility =
+        isRecord(config.aifactory) && Array.isArray(config.aifactory.model_visibility)
+          ? config.aifactory.model_visibility
+          : []
       const visibility = rawVisibility.flatMap((value) => {
         if (!isRecord(value) || typeof value.pattern !== "string" || typeof value.visible !== "boolean") return []
         return [value as AiFactoryVisibilityRule]
       })
-      const defaults = [config.model, config.small_model].flatMap((value) => typeof value === "string" && value.trim() ? [value.trim()] : [])
+      const defaults = [config.model, config.small_model].flatMap((value) =>
+        typeof value === "string" && value.trim() ? [value.trim()] : [],
+      )
       return {
         autoload: true,
         async getModel(sdk: any, modelID: string) {
@@ -1234,7 +1264,14 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         },
         async discoverModels() {
           try {
-            const models = await discoverAiFactoryModels(token, baseURL, rules, visibility, defaults, providerFetch(AIFACTORY_ID, configured.http_proxy))
+            const models = await discoverAiFactoryModels(
+              token,
+              baseURL,
+              rules,
+              visibility,
+              defaults,
+              providerFetch(AIFACTORY_ID, configured.http_proxy),
+            )
             if (Object.keys(models).length > 0) return models
           } catch (error) {
             console.error("[aifactory] model discovery failed", {
@@ -2080,7 +2117,8 @@ const layer = Layer.effect(
         options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
           const fetchFn = customFetch ?? fetch
           const opts = init ?? {}
-          const titleRequest = typeof opts.body === "string" && opts.body.includes("Generate a title for this conversation:")
+          const titleRequest =
+            typeof opts.body === "string" && opts.body.includes("Generate a title for this conversation:")
           if (titleRequest && typeof opts.body === "string") {
             const body = JSON.parse(opts.body)
             body.user = "opencode-title-generator"
