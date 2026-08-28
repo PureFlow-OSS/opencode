@@ -249,7 +249,10 @@ function aiFactoryRule(modelID: string, rules: AiFactoryRule[] | undefined) {
     output: rule?.output ?? 32_000,
     temperature: rule?.temperature ?? true,
     reasoning: rule?.reasoning ?? /(^o[134]\b)|(^gpt-5\b)|claude|reason|r1|deepseek|gemini/i.test(modelID),
-    input: rule?.native_image_vision === true ? documentInput : documentInput.filter((value) => value !== "image"),
+    input:
+      rule?.native_image_vision === true
+        ? [...new Set([...documentInput, "image"])]
+        : documentInput.filter((value) => value !== "image"),
     document: {
       ocr: rule?.document_ocr_model,
       vision: rule?.document_vision_model,
