@@ -209,6 +209,7 @@ type AiFactoryRule = {
   reasoning?: boolean
   document_vision?: boolean
   document_vision_native?: boolean
+  native_image_vision?: boolean
   document_ocr_model?: string
   document_vision_model?: string
   input?: string[]
@@ -241,17 +242,14 @@ function aiFactoryRule(modelID: string, rules: AiFactoryRule[] | undefined) {
     .filter((item) => item.score >= 0)
     .sort((a, b) => b.score - a.score)
     .at(0)?.item
-  const input = rule?.input ?? rule?.modalities?.input ?? ["text"]
+  const configuredInput = rule?.input ?? rule?.modalities?.input ?? ["text"]
+  const documentInput = rule?.document_vision_native ? [...new Set([...configuredInput, "pdf"])] : configuredInput
   return {
     context: rule?.context ?? 200_000,
     output: rule?.output ?? 32_000,
     temperature: rule?.temperature ?? true,
     reasoning: rule?.reasoning ?? /(^o[134]\b)|(^gpt-5\b)|claude|reason|r1|deepseek|gemini/i.test(modelID),
-    input: rule?.document_vision_native
-      ? [...new Set([...input, "pdf"])]
-      : rule?.document_vision && !rule.document_vision_model
-        ? [...new Set([...input.filter((value) => value !== "pdf"), "image"])]
-        : input,
+    input: rule?.native_image_vision === true ? documentInput : documentInput.filter((value) => value !== "image"),
     document: {
       ocr: rule?.document_ocr_model,
       vision: rule?.document_vision_model,

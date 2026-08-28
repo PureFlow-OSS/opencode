@@ -89,6 +89,7 @@ import { ApiService, ModelSettings, ProviderSettings } from "./api.service"
                   }
                   <label><input type="checkbox" [ngModel]="draft().document_vision" (ngModelChange)="setBoolean('document_vision', $event)" name="documentVision" /> Document Vision</label>
                   <label><input type="checkbox" [ngModel]="draft().document_vision_native" (ngModelChange)="setBoolean('document_vision_native', $event)" name="documentVisionNative" /> Document Vision Native</label>
+                  <label><input type="checkbox" [ngModel]="draft().native_image_vision" (ngModelChange)="setBoolean('native_image_vision', $event)" name="nativeImageVision" /> Native Image Vision</label>
                   <label>Document OCR model
                     <select [ngModel]="draft().document_ocr_model" (ngModelChange)="setText('document_ocr_model', $event)" name="documentOcrModel">
                       <option [ngValue]="null">No OCR model</option>
@@ -127,6 +128,7 @@ import { ApiService, ModelSettings, ProviderSettings } from "./api.service"
                   }
                   <div class="meta-item"><small>Document Vision</small><strong>{{ formatBoolean(model.config?.documentVision ?? model.documentVision) }}</strong></div>
                   <div class="meta-item"><small>Document Vision Native</small><strong>{{ formatBoolean(model.config?.documentVisionNative ?? model.documentVisionNative) }}</strong></div>
+                  <div class="meta-item"><small>Native Image Vision</small><strong>{{ formatBoolean(model.config?.nativeImageVision ?? model.nativeImageVision) }}</strong></div>
                   <div class="meta-item"><small>Document OCR model</small><strong>{{ model.config?.documentOcrModel ?? model.documentOcrModel ?? 'n/a' }}</strong></div>
                   <div class="meta-item"><small>Document Vision model</small><strong>{{ model.config?.documentVisionModel ?? model.documentVisionModel ?? 'n/a' }}</strong></div>
                   <div class="meta-item"><small>Visible in OpenCode</small><strong>{{ formatBoolean(model.visible) }}</strong></div>
@@ -201,7 +203,7 @@ export class ModelStatusPanelComponent {
     }
   }
 
-  edit(model: { model: string; context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; reasoningVariants?: string[] | null; defaultReasoningVariant?: string | null; documentVision?: boolean; documentVisionNative?: boolean; documentOcrModel?: string | null; documentVisionModel?: string | null; visible?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null; liteLLM?: { maxInputTokens?: number | null } | null; config?: { context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; reasoningVariants?: string[] | null; defaultReasoningVariant?: string | null; documentVision?: boolean | null; documentVisionNative?: boolean | null; documentOcrModel?: string | null; documentVisionModel?: string | null; modalities?: { input?: string[]; output?: string[] } | null } | null }) {
+  edit(model: { model: string; context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; reasoningVariants?: string[] | null; defaultReasoningVariant?: string | null; documentVision?: boolean; documentVisionNative?: boolean; nativeImageVision?: boolean; documentOcrModel?: string | null; documentVisionModel?: string | null; visible?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null; liteLLM?: { maxInputTokens?: number | null } | null; config?: { context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; reasoningVariants?: string[] | null; defaultReasoningVariant?: string | null; documentVision?: boolean | null; documentVisionNative?: boolean | null; nativeImageVision?: boolean | null; documentOcrModel?: string | null; documentVisionModel?: string | null; modalities?: { input?: string[]; output?: string[] } | null } | null }) {
     this.editing.set(model.model)
     this.draft.set({
       context: model.config?.context ?? model.context ?? null,
@@ -212,6 +214,7 @@ export class ModelStatusPanelComponent {
       default_reasoning_variant: model.config?.defaultReasoningVariant ?? model.defaultReasoningVariant ?? null,
       document_vision: model.config?.documentVision ?? model.documentVision ?? false,
       document_vision_native: model.config?.documentVisionNative ?? model.documentVisionNative ?? false,
+      native_image_vision: model.config?.nativeImageVision ?? model.nativeImageVision ?? false,
       document_ocr_model: model.config?.documentOcrModel ?? model.documentOcrModel ?? null,
       document_vision_model: model.config?.documentVisionModel ?? model.documentVisionModel ?? null,
       visible: model.visible ?? true,
@@ -243,7 +246,7 @@ export class ModelStatusPanelComponent {
     this.draft.update((draft) => ({ ...draft, [key]: value.trim() || null }))
   }
 
-  setBoolean(key: "temperature" | "reasoning" | "document_vision" | "document_vision_native" | "visible", value: boolean) {
+  setBoolean(key: "temperature" | "reasoning" | "document_vision" | "document_vision_native" | "native_image_vision" | "visible", value: boolean) {
     this.draft.update((draft) => key === "reasoning" && !value ? { ...draft, reasoning: value, reasoning_variants: [], default_reasoning_variant: null } : { ...draft, [key]: value })
   }
 

@@ -889,6 +889,7 @@ sealed record ModelCardEntry(
   string? DefaultReasoningVariant,
   bool DocumentVision,
   bool DocumentVisionNative,
+  bool NativeImageVision,
   string? DocumentOcrModel,
   string? DocumentVisionModel,
   bool? Visible,
@@ -909,6 +910,7 @@ sealed record ModelCardConfig(
   string? DefaultReasoningVariant,
   bool? DocumentVision,
   bool? DocumentVisionNative,
+  bool? NativeImageVision,
   string? DocumentOcrModel,
   string? DocumentVisionModel,
   ModelCardModalities? Modalities
@@ -985,6 +987,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
         match?.DefaultReasoningVariant,
         match?.DocumentVision ?? false,
         match?.DocumentVisionNative ?? false,
+        match?.NativeImageVision ?? false,
         match?.DocumentOcrModel,
         match?.DocumentVisionModel,
         visibility,
@@ -1003,6 +1006,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
             match.DefaultReasoningVariant,
             match.DocumentVision,
             match.DocumentVisionNative,
+            match.NativeImageVision,
             match.DocumentOcrModel,
             match.DocumentVisionModel,
             match.Modalities is null ? null : new ModelCardModalities(match.Modalities.Input ?? [], match.Modalities.Output ?? [])
@@ -1335,6 +1339,10 @@ sealed class ModelLimitRuleOptions
   [JsonPropertyName("document_vision_native")]
   public bool? DocumentVisionNative { get; set; }
 
+  [ConfigurationKeyName("native_image_vision")]
+  [JsonPropertyName("native_image_vision")]
+  public bool? NativeImageVision { get; set; }
+
   [ConfigurationKeyName("document_ocr_model")]
   [JsonPropertyName("document_ocr_model")]
   public string? DocumentOcrModel { get; set; }
@@ -1369,6 +1377,9 @@ sealed class ModelSettingsRequest
 
   [JsonPropertyName("document_vision_native")]
   public bool? DocumentVisionNative { get; set; }
+
+  [JsonPropertyName("native_image_vision")]
+  public bool? NativeImageVision { get; set; }
 
   [JsonPropertyName("document_ocr_model")]
   public string? DocumentOcrModel { get; set; }
@@ -1421,6 +1432,7 @@ sealed class UpdaterConfigStore(IWebHostEnvironment environment)
       rule["default_reasoning_variant"] = settings.DefaultReasoningVariant;
       rule["document_vision"] = settings.DocumentVision;
       rule["document_vision_native"] = settings.DocumentVisionNative;
+      rule["native_image_vision"] = settings.NativeImageVision;
       rule["document_ocr_model"] = settings.DocumentOcrModel;
       rule["document_vision_model"] = settings.DocumentVisionModel;
       rule["modalities"] = new JsonObject

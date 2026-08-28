@@ -43,6 +43,7 @@ type ModelCard = {
   defaultReasoningVariant?: string | null
   documentVision?: boolean
   documentVisionNative?: boolean
+  nativeImageVision?: boolean
   documentOcrModel?: string | null
   documentVisionModel?: string | null
   visible?: boolean | null
@@ -59,6 +60,7 @@ type ModelCard = {
     defaultReasoningVariant?: string | null
     documentVision?: boolean | null
     documentVisionNative?: boolean | null
+    nativeImageVision?: boolean | null
     documentOcrModel?: string | null
     documentVisionModel?: string | null
     modalities?: { input?: string[]; output?: string[] } | null
@@ -99,6 +101,7 @@ export type ModelSettings = {
   default_reasoning_variant?: string | null
   document_vision?: boolean | null
   document_vision_native?: boolean | null
+  native_image_vision?: boolean | null
   document_ocr_model?: string | null
   document_vision_model?: string | null
   visible?: boolean | null
