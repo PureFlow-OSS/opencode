@@ -106,6 +106,17 @@ function visionCacheDirectory(sessionID: SessionID, cacheID: string) {
   return path.join(VISION_CACHE_DIR, sessionID, cacheID)
 }
 
+function documentWorkerModel(model: Provider.Model) {
+  return {
+    ...model,
+    capabilities: {
+      ...model.capabilities,
+      attachment: true,
+      input: { ...model.capabilities.input, image: true },
+    },
+  }
+}
+
 function findDocumentPages(pages: Array<{ number: number; text: string; table?: boolean }>, query: string) {
   const terms = query.toLocaleLowerCase().match(/[\p{L}\p{N}_-]{3,}/gu) ?? []
   const ranked = pages
@@ -909,7 +920,7 @@ const layer = Layer.effect(
                     .stream({
                       user: info,
                       sessionID: input.sessionID,
-                      model: ocrWorker.value,
+                      model: documentWorkerModel(ocrWorker.value),
                       agent: ag,
                       system: [],
                       tools: {},
@@ -1655,7 +1666,7 @@ const layer = Layer.effect(
                     Effect.option,
                   ),
                 )
-                if (Option.isNone(worker) || !worker.value.capabilities.input.image)
+                if (Option.isNone(worker))
                   return { title: "Document OCR", metadata: {}, output: "The configured document OCR worker is unavailable or does not support images." }
                 const directory = visionCacheDirectory(sessionID, cacheID)
                 const manifest = await Effect.runPromise(fsys.readFile(path.join(directory, "manifest.json")).pipe(Effect.option))
@@ -1678,7 +1689,7 @@ const layer = Layer.effect(
                     .stream({
                       user: lastUser,
                       sessionID,
-                      model: worker.value,
+                      model: documentWorkerModel(worker.value),
                       agent,
                       system: [],
                       tools: {},
@@ -1709,6 +1720,7 @@ const layer = Layer.effect(
                       Effect.map((parts) => Array.from(parts).join("").trim()),
                       Effect.timeoutOrElse({ duration: "2 minutes", orElse: () => Effect.succeed("") }),
                       Effect.catch(() => Effect.succeed("")),
+                      Effect.provideService(InstanceRef, ctx),
                     ),
                 )
                 if (!output)
@@ -1802,7 +1814,7 @@ const layer = Layer.effect(
                     Effect.option,
                   ),
                 )
-                if (Option.isNone(worker) || !worker.value.capabilities.input.image)
+                if (Option.isNone(worker))
                   return {
                     title: "Vision recall",
                     metadata: { cacheID, pages: rendered.value.pages.map((page) => page.number) },
@@ -1813,7 +1825,7 @@ const layer = Layer.effect(
                     .stream({
                       user: lastUser,
                       sessionID,
-                      model: worker.value,
+                      model: documentWorkerModel(worker.value),
                       agent,
                       system: [],
                       tools: {},
@@ -1848,6 +1860,7 @@ const layer = Layer.effect(
                       Effect.map((parts) => Array.from(parts).join("").trim()),
                       Effect.timeoutOrElse({ duration: "2 minutes", orElse: () => Effect.succeed("") }),
                       Effect.catch(() => Effect.succeed("")),
+                      Effect.provideService(InstanceRef, ctx),
                     ),
                 )
                 if (!analysis)
