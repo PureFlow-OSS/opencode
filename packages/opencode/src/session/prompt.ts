@@ -1580,13 +1580,11 @@ const layer = Layer.effect(
               })
             }
 
-            const resolveDocumentCacheID = async (value: unknown) => {
-              const requested = typeof value === "string" && /^[A-Za-z0-9_-]+$/.test(value) ? value : ""
+            const availableDocumentCacheIDs = async () => {
               const entries = await Effect.runPromise(
                 fsys.readDirectoryEntries(path.join(VISION_CACHE_DIR, sessionID)).pipe(Effect.catch(() => Effect.succeed([]))),
               )
               const cacheIDs = entries.filter((entry) => entry.type === "directory").map((entry) => entry.name)
-              if (requested && cacheIDs.includes(requested)) return requested
               const documents = await Promise.all(
                 cacheIDs.map(async (cacheID) => {
                   const manifest = await Effect.runPromise(
@@ -1602,17 +1600,22 @@ const layer = Layer.effect(
                   return Option.isSome(parsed) && parsed.value.kind === "document" ? cacheID : undefined
                 }),
               )
-              const available = documents.filter((cacheID): cacheID is string => !!cacheID)
+              return documents.filter((cacheID): cacheID is string => !!cacheID)
+            }
+
+            const resolveDocumentCacheID = async (value: unknown) => {
+              const requested = typeof value === "string" && /^[A-Za-z0-9_-]+$/.test(value) ? value : ""
+              const available = await availableDocumentCacheIDs()
               return available.length === 1 ? available[0] : requested
             }
 
             tools["document_search"] = tool({
               description:
-                "Searches the extracted text of an earlier PDF. Use only for textual questions. Do not use it for logos, images, diagrams, screenshots, or other visual details; use vision_recall for those. The PDF cache is resolved automatically when this session has one document.",
+                "Searches extracted text in earlier PDFs. Omit cache_id to search all PDFs attached in this session, especially for summaries or comparisons. Use only for textual questions. Do not use it for logos, images, diagrams, screenshots, or other visual details; use vision_recall for those.",
               inputSchema: jsonSchema({
                 type: "object",
                 properties: {
-                  cache_id: { type: "string", description: "Optional Vision Cache ID. Omit it when this session has one PDF." },
+                  cache_id: { type: "string", description: "Optional Vision Cache ID. Omit it to search every attached PDF." },
                   query: { type: "string", description: "The words, name, number, or topic to find" },
                 },
                 required: ["query"],
@@ -1620,41 +1623,61 @@ const layer = Layer.effect(
               }),
               async execute(args) {
                 const input = args as { cache_id?: unknown; query?: unknown }
-                const cacheID = await resolveDocumentCacheID(input.cache_id)
+                const requested = typeof input.cache_id === "string" && /^[A-Za-z0-9_-]+$/.test(input.cache_id) ? input.cache_id : ""
+                const cacheIDs = requested ? [await resolveDocumentCacheID(requested)] : await availableDocumentCacheIDs()
                 const query = typeof input.query === "string" ? input.query.trim() : ""
-                if (!/^[A-Za-z0-9_-]+$/.test(cacheID) || !query)
-                  return { title: "Document search", metadata: {}, output: "A document cache and search query are required." }
-                const manifest = await Effect.runPromise(
-                  fsys.readFile(path.join(visionCacheDirectory(sessionID, cacheID), "manifest.json")).pipe(Effect.option),
+                if (!cacheIDs.length || cacheIDs.some((cacheID) => !/^[A-Za-z0-9_-]+$/.test(cacheID)) || !query)
+                  return { title: "Document search", metadata: {}, output: "A searchable PDF and search query are required." }
+                const documents = await Promise.all(
+                  cacheIDs.map(async (cacheID) => {
+                    const manifest = await Effect.runPromise(
+                      fsys.readFile(path.join(visionCacheDirectory(sessionID, cacheID), "manifest.json")).pipe(Effect.option),
+                    )
+                    if (Option.isNone(manifest)) return
+                    const parsed = await Effect.runPromise(
+                      Effect.try({
+                        try: () => JSON.parse(Buffer.from(manifest.value).toString()) as { filename?: unknown; pages?: unknown },
+                        catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+                      }).pipe(Effect.option),
+                    )
+                    if (Option.isNone(parsed) || !Array.isArray(parsed.value.pages)) return
+                    const pages = parsed.value.pages.flatMap((page) => {
+                      if (typeof page !== "object" || page === null) return []
+                      const value = page as { number?: unknown; text?: unknown }
+                      if (typeof value.number !== "number" || typeof value.text !== "string") return []
+                      return [{ number: value.number, text: value.text }]
+                    })
+                    return { cacheID, filename: typeof parsed.value.filename === "string" ? parsed.value.filename : "document.pdf", pages }
+                  }),
                 )
-                if (Option.isNone(manifest))
+                const available = documents.filter(
+                  (document): document is { cacheID: string; filename: string; pages: Array<{ number: number; text: string }> } => !!document,
+                )
+                if (!available.length)
                   return { title: "Document search", metadata: {}, output: "The requested document cache is no longer available." }
-                const parsed = await Effect.runPromise(
-                  Effect.try({
-                    try: () => JSON.parse(Buffer.from(manifest.value).toString()) as { pages?: unknown },
-                    catch: (error) => (error instanceof Error ? error : new Error(String(error))),
-                  }).pipe(Effect.option),
-                )
-                if (Option.isNone(parsed) || !Array.isArray(parsed.value.pages))
-                  return { title: "Document search", metadata: {}, output: "The requested document has no searchable text index." }
-                const pages = parsed.value.pages.flatMap((page) => {
-                  if (typeof page !== "object" || page === null) return []
-                  const value = page as { number?: unknown; text?: unknown }
-                  if (typeof value.number !== "number" || typeof value.text !== "string") return []
-                  return [{ number: value.number, text: value.text }]
+                const indexed = available
+                  .flatMap((document) =>
+                    document.pages.flatMap((page) => (page.text ? [`# ${document.filename}\n\n## Page ${page.number}\n${page.text}`] : [])),
+                  )
+                  .join("\n\n")
+                const fullIndex = indexed.length <= DOCUMENT_SEARCH_TEXT_LIMIT
+                const limit = Math.floor(DOCUMENT_SEARCH_TEXT_LIMIT / available.length)
+                const results = available.map((document) => {
+                  const pages = fullIndex ? document.pages : findDocumentPages(document.pages, query)
+                  const output = pages
+                    .flatMap((page) => (page.text ? [`## Page ${page.number}\n${page.text}`] : []))
+                    .join("\n\n")
+                    .slice(0, fullIndex ? DOCUMENT_SEARCH_TEXT_LIMIT : limit)
+                  return { ...document, pages, output }
                 })
-                const indexed = pages
-                  .flatMap((page) => (page.text ? [`## Page ${page.number}\n${page.text}`] : []))
+                const output = results
+                  .flatMap((document) => (document.output ? [`# ${document.filename}\n${document.output}`] : []))
                   .join("\n\n")
-                const matches = findDocumentPages(pages, query)
-                const selected = indexed.length <= DOCUMENT_SEARCH_TEXT_LIMIT ? pages : matches
-                const output = selected
-                  .flatMap((page) => (page.text ? [`## Page ${page.number}\n${page.text}`] : []))
-                  .join("\n\n")
-                  .slice(0, DOCUMENT_SEARCH_TEXT_LIMIT)
                 return {
                   title: "Document search",
-                  metadata: { cacheID, pages: selected.map((page) => page.number) },
+                  metadata: {
+                    documents: results.map((document) => ({ cacheID: document.cacheID, filename: document.filename, pages: document.pages.map((page) => page.number) })),
+                  },
                   output: output || "No digital text was extracted from the matching pages. Use vision_recall for visual inspection.",
                 }
               },
@@ -1935,7 +1958,7 @@ const layer = Layer.effect(
             ]
             if (hasDocumentPdf)
               system.push(
-                "A PDF is attached. Before answering questions about document text, data, rankings, totals, comparisons, or facts that may span pages, call document_search. Never infer a document-wide answer from an attachment preview or a single page. Use vision_recall for visual questions.",
+                "A PDF is attached. Before answering questions about document text, data, rankings, totals, comparisons, summaries, or facts that may span pages, call document_search. When several PDFs are attached, omit cache_id first to search them all and do not summarize or compare only one document. Never infer a document-wide answer from an attachment preview or a single page. Use vision_recall for visual questions.",
               )
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
