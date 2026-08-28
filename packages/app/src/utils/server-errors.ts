@@ -78,6 +78,7 @@ function isProviderModelNotFoundErrorLike(error: unknown): error is ProviderMode
 export function parseReadableConfigInvalidError(errorInput: ConfigInvalidError, translator?: Translator) {
   const file = errorInput.data.path && errorInput.data.path !== "config" ? errorInput.data.path : "config"
   const detail = errorInput.data.message?.trim() ?? ""
+  const jsoncErrors = detail.match(/--- Errors ---\s*([\s\S]*?)\s*--- End ---/)?.[1]?.trim()
   const issues = (errorInput.data.issues ?? [])
     .map((issue) => {
       const msg = issue.message.trim()
@@ -85,7 +86,7 @@ export function parseReadableConfigInvalidError(errorInput: ConfigInvalidError, 
       return `${issue.path.join(".")}: ${msg}`
     })
     .filter(Boolean)
-  const msg = issues.length ? issues.join("\n") : detail
+  const msg = issues.length ? issues.join("\n") : jsoncErrors || detail
   if (!msg) return tr(translator, "error.chain.configInvalid", `Config file at ${file} is invalid`, { path: file })
   return tr(translator, "error.chain.configInvalidWithMessage", `Config file at ${file} is invalid: ${msg}`, {
     path: file,
