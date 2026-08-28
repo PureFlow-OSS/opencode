@@ -207,6 +207,10 @@ type AiFactoryRule = {
   document_vision_model?: string
   input?: string[]
   output_modalities?: string[]
+  modalities?: {
+    input?: string[]
+    output?: string[]
+  }
   options?: Record<string, unknown>
   variants?: Record<string, Record<string, unknown>>
 }
@@ -230,21 +234,22 @@ function aiFactoryRule(modelID: string, rules: AiFactoryRule[] | undefined) {
     .filter((item) => item.score >= 0)
     .sort((a, b) => b.score - a.score)
     .at(0)?.item
+  const input = rule?.input ?? rule?.modalities?.input ?? ["text"]
   return {
     context: rule?.context ?? 200_000,
     output: rule?.output ?? 32_000,
     temperature: rule?.temperature ?? true,
     reasoning: rule?.reasoning ?? /(^o[134]\b)|(^gpt-5\b)|claude|reason|r1|deepseek|gemini/i.test(modelID),
     input: rule?.document_vision_native
-      ? [...new Set([...(rule.input ?? ["text"]), "pdf"])]
+      ? [...new Set([...input, "pdf"])]
       : rule?.document_vision
-        ? [...new Set([...(rule.input ?? ["text"]).filter((value) => value !== "pdf"), "image"])]
-        : rule?.input ?? ["text"],
+        ? [...new Set([...input.filter((value) => value !== "pdf"), "image"])]
+        : input,
     document: {
       ocr: rule?.document_ocr_model,
       vision: rule?.document_vision_model,
     },
-    outputModalities: rule?.output_modalities ?? ["text"],
+    outputModalities: rule?.output_modalities ?? rule?.modalities?.output ?? ["text"],
     options: rule?.options ?? {},
     variants: rule?.variants ?? {},
   }
