@@ -42,7 +42,7 @@ import { ShellID } from "@/tool/shell/id"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Truncate } from "@/tool/truncate"
 import { Image } from "@/image/image"
-import { decodeDataUrl } from "@/util/data-url"
+import { decodeDataUrl, decodeDataUrlBytes } from "@/util/data-url"
 import { Process } from "@/util/process"
 import { Cause, Effect, Exit, Latch, Layer, Option, Scope, Context, Schema, Types } from "effect"
 import { InstanceState } from "@/effect/instance-state"
@@ -1100,7 +1100,7 @@ const layer = Layer.effect(
               }
               if (part.mime === "application/pdf") {
                 const rendered = yield* renderVisionPdf(
-                  Buffer.from(decodeDataUrl(part.url)),
+                  decodeDataUrlBytes(part.url),
                   part.filename ?? "document.pdf",
                 )
                 if (rendered) return [...rendered, { ...part, messageID: info.id, sessionID: input.sessionID }]
