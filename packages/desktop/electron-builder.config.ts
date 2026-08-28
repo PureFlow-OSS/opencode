@@ -97,6 +97,10 @@ const getBase = (appId: string): Configuration => ({
             from: "../opencode/node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
             to: "pdfjs/pdf.worker.mjs",
           },
+          {
+            from: "../opencode/node_modules/pdfjs-dist/legacy/build/pdf.mjs",
+            to: "pdfjs/pdf.mjs",
+          },
         ]
       : []),
     {

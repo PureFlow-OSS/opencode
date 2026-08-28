@@ -79,6 +79,7 @@ const SUPPORTED_MCP_RESOURCE_ATTACHMENT_MIMES = new Set([
   "image/png",
   "image/webp",
 ])
+type PdfJs = typeof import("pdfjs-dist/legacy/build/pdf.mjs")
 
 const STRUCTURED_OUTPUT_DESCRIPTION = `Use this tool to return your final response in the requested structured format.
 
@@ -104,6 +105,12 @@ function formatMcpResourceBytes(value: number) {
 
 function visionCacheDirectory(sessionID: SessionID, cacheID: string) {
   return path.join(VISION_CACHE_DIR, sessionID, cacheID)
+}
+
+async function loadPdfJs(): Promise<PdfJs> {
+  const bundled = path.join(process.resourcesPath ?? "", "pdfjs", "pdf.mjs")
+  if (existsSync(bundled)) return (await import(/* @vite-ignore */ pathToFileURL(bundled).href)) as PdfJs
+  return import("pdfjs-dist/legacy/build/pdf.mjs")
 }
 
 function findDocumentPages(pages: Array<{ number: number; text: string; table?: boolean }>, query: string) {
@@ -148,7 +155,7 @@ function hasPdfTableLayout(items: unknown[]) {
 }
 
 async function extractPdfText(data: Uint8Array) {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
+  const pdfjs = await loadPdfJs()
   const pdf = await pdfjs.getDocument({ data: new Uint8Array(data), useSystemFonts: true }).promise
   const pages = [] as Array<{ number: number; text: string; table: boolean }>
   for (const number of Array.from({ length: pdf.numPages }, (_, index) => index + 1)) {
@@ -174,7 +181,7 @@ async function renderPdfPages(data: Uint8Array, requestedPages?: number[]) {
     // @ts-expect-error PDF.js does not declare its worker entry point.
     pdfjsWorker: await import("pdfjs-dist/legacy/build/pdf.worker.mjs"),
   })
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
+  const pdfjs = await loadPdfJs()
   const worker = process.resourcesPath ? path.join(process.resourcesPath, "pdfjs", "pdf.worker.mjs") : ""
   pdfjs.GlobalWorkerOptions.workerSrc = existsSync(worker)
     ? pathToFileURL(worker).href
