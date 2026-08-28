@@ -338,16 +338,18 @@ function aiFactoryModels(
   visibility: AiFactoryVisibilityRule[],
   defaults: string[],
 ) {
+  const hiddenWorkers = new Set(
+    (rules ?? [])
+      .flatMap((rule) => [rule.document_ocr_model, rule.document_vision_model])
+      .filter((id): id is string => typeof id === "string" && id.trim() !== "")
+      .filter((id) => !modelIDs.includes(id) && !defaults.includes(id)),
+  )
   const models = Object.fromEntries(
-    [...new Set([...modelIDs, ...defaults])].filter((id) => aiFactoryVisible(id, visibility, defaults)).map((id) => {
+    [...new Set([...modelIDs, ...defaults, ...hiddenWorkers])]
+      .filter((id) => hiddenWorkers.has(id) || aiFactoryVisible(id, visibility, defaults))
+      .map((id) => {
       const override = aiFactoryRule(id, rules)
-      const modality = (value: string) => ({
-        text: value === "text",
-        audio: value === "audio",
-        image: value === "image",
-        video: value === "video",
-        pdf: value === "pdf",
-      })
+      const input = hiddenWorkers.has(id) ? [...new Set([...override.input, "image"])] : override.input
       return [id, {
         id: ModelV2.ID.make(id),
         providerID: ProviderV2.ID.make("aifactory"),
@@ -357,14 +359,14 @@ function aiFactoryModels(
         capabilities: {
           temperature: override.temperature,
           reasoning: override.reasoning,
-          attachment: override.input.some((value) => value !== "text"),
+          attachment: input.some((value) => value !== "text"),
           toolcall: true,
           input: {
-            text: override.input.includes("text"),
-            audio: override.input.includes("audio"),
-            image: override.input.includes("image"),
-            video: override.input.includes("video"),
-            pdf: override.input.includes("pdf"),
+            text: input.includes("text"),
+            audio: input.includes("audio"),
+            image: input.includes("image"),
+            video: input.includes("video"),
+            pdf: input.includes("pdf"),
           },
           output: {
             text: override.outputModalities.includes("text"),
@@ -384,8 +386,13 @@ function aiFactoryModels(
         variants: override.variants,
         document: override.document,
       } satisfies Model] as const
-    }),
+      }),
   )
+  for (const id of hiddenWorkers) {
+    const worker = models[id]
+    if (!worker) continue
+    Object.defineProperty(models, id, { value: worker, enumerable: false })
+  }
   return models
 }
 
