@@ -243,7 +243,9 @@ function aiFactoryRule(modelID: string, rules: AiFactoryRule[] | undefined) {
     .sort((a, b) => b.score - a.score)
     .at(0)?.item
   const configuredInput = rule?.input ?? rule?.modalities?.input ?? ["text"]
-  const documentInput = rule?.document_vision_native ? [...new Set([...configuredInput, "pdf"])] : configuredInput
+  const documentInput = rule?.document_vision_native
+    ? [...new Set([...configuredInput, "pdf"])]
+    : configuredInput.filter((value) => value !== "pdf")
   return {
     context: rule?.context ?? 200_000,
     output: rule?.output ?? 32_000,
