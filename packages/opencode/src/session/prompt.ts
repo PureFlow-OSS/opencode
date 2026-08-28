@@ -216,11 +216,10 @@ async function preparePdfJs() {
 
 async function loadPdfJs() {
   await preparePdfJs()
+  // @ts-expect-error PDF.js does not declare its worker entry point.
+  const worker = await import("pdfjs-dist/legacy/build/pdf.worker.mjs")
+  Object.assign(globalThis, { pdfjsWorker: worker })
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
-  const worker = process.resourcesPath ? path.join(process.resourcesPath, "pdfjs", "pdf.worker.mjs") : ""
-  pdfjs.GlobalWorkerOptions.workerSrc = existsSync(worker)
-    ? pathToFileURL(worker).href
-    : import.meta.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs")
   return pdfjs
 }
 
