@@ -25,6 +25,7 @@ type PrepareInput = {
   readonly agent: Agent.Info
   readonly permission?: PermissionV1.Ruleset
   readonly system: string[]
+  readonly headers?: Record<string, string>
   readonly messages: ModelMessage[]
   readonly small?: boolean
   readonly tools: Record<string, Tool>
@@ -215,6 +216,7 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
             "X-OpenCode-Request-Type": "title-generator",
           }
         : {}),
+      ...input.headers,
     },
   }
 })

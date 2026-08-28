@@ -126,6 +126,14 @@ function documentWorkerAgent(agent: Agent.Info) {
   }
 }
 
+function documentWorkerHeaders(model: Provider.Model, type: "ocr" | "vision") {
+  return {
+    "User-Agent": `opencode/document-${type} source-model=${model.id}`,
+    "X-OpenCode-Source-Model": model.id,
+    "X-OpenCode-Request-Type": `document-${type}`,
+  }
+}
+
 function findDocumentPages(pages: Array<{ number: number; text: string; table?: boolean }>, query: string) {
   const terms = query.toLocaleLowerCase().match(/[\p{L}\p{N}_-]{3,}/gu) ?? []
   const ranked = pages
@@ -932,6 +940,7 @@ const layer = Layer.effect(
                       model: documentWorkerModel(ocrWorker.value),
                       agent: documentWorkerAgent(ag),
                       system: [],
+                      headers: documentWorkerHeaders(modelInfo.value, "ocr"),
                       tools: {},
                       retries: 0,
                       messages: [
@@ -1701,6 +1710,7 @@ const layer = Layer.effect(
                       model: documentWorkerModel(worker.value),
                       agent: documentWorkerAgent(agent),
                       system: [],
+                      headers: documentWorkerHeaders(model, "ocr"),
                       tools: {},
                       retries: 0,
                       messages: [
@@ -1841,6 +1851,7 @@ const layer = Layer.effect(
                       model: documentWorkerModel(worker.value),
                       agent: documentWorkerAgent(agent),
                       system: [],
+                      headers: documentWorkerHeaders(model, "vision"),
                       tools: {},
                       retries: 0,
                       messages: [

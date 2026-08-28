@@ -40,6 +40,7 @@ export type StreamInput = {
   agent: Agent.Info
   permission?: PermissionV1.Ruleset
   system: string[]
+  headers?: Record<string, string>
   messages: ModelMessage[]
   small?: boolean
   tools: Record<string, Tool>
