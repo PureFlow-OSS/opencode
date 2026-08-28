@@ -1643,14 +1643,18 @@ const layer = Layer.effect(
                   if (typeof value.number !== "number" || typeof value.text !== "string") return []
                   return [{ number: value.number, text: value.text }]
                 })
+                const indexed = pages
+                  .flatMap((page) => (page.text ? [`## Page ${page.number}\n${page.text}`] : []))
+                  .join("\n\n")
                 const matches = findDocumentPages(pages, query)
-                const output = matches
+                const selected = indexed.length <= DOCUMENT_SEARCH_TEXT_LIMIT ? pages : matches
+                const output = selected
                   .flatMap((page) => (page.text ? [`## Page ${page.number}\n${page.text}`] : []))
                   .join("\n\n")
                   .slice(0, DOCUMENT_SEARCH_TEXT_LIMIT)
                 return {
                   title: "Document search",
-                  metadata: { cacheID, pages: matches.map((page) => page.number) },
+                  metadata: { cacheID, pages: selected.map((page) => page.number) },
                   output: output || "No digital text was extracted from the matching pages. Use vision_recall for visual inspection.",
                 }
               },
@@ -1929,6 +1933,10 @@ const layer = Layer.effect(
               ...(mcpInstructions ? [mcpInstructions] : []),
               ...(skills ? [skills] : []),
             ]
+            if (hasDocumentPdf)
+              system.push(
+                "A PDF is attached. Before answering questions about document text, data, rankings, totals, comparisons, or facts that may span pages, call document_search. Never infer a document-wide answer from an attachment preview or a single page. Use vision_recall for visual questions.",
+              )
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
             const result = yield* handle.process({
