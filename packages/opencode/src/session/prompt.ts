@@ -46,6 +46,7 @@ import { decodeDataUrl } from "@/util/data-url"
 import { Process } from "@/util/process"
 import { Cause, Effect, Exit, Latch, Layer, Option, Scope, Context, Schema, Types } from "effect"
 import { InstanceState } from "@/effect/instance-state"
+import { InstanceRef } from "@/effect/instance-ref"
 import { TaskTool, type TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { RuntimeFlags } from "@/effect/runtime-flags"
@@ -1639,7 +1640,12 @@ const layer = Layer.effect(
                   return { title: "Document OCR", metadata: {}, output: "A document cache and page number are required." }
                 if (!model.document?.ocr)
                   return { title: "Document OCR", metadata: {}, output: "No document OCR worker is configured for this model." }
-                const worker = await Effect.runPromise(provider.getModel(model.providerID, ModelV2.ID.make(model.document.ocr)).pipe(Effect.option))
+                const worker = await Effect.runPromise(
+                  provider.getModel(model.providerID, ModelV2.ID.make(model.document.ocr)).pipe(
+                    Effect.provideService(InstanceRef, ctx),
+                    Effect.option,
+                  ),
+                )
                 if (Option.isNone(worker) || !worker.value.capabilities.input.image)
                   return { title: "Document OCR", metadata: {}, output: "The configured document OCR worker is unavailable or does not support images." }
                 const directory = visionCacheDirectory(sessionID, cacheID)
@@ -1782,7 +1788,10 @@ const layer = Layer.effect(
                     output: "No document vision worker is configured for this model.",
                   }
                 const worker = await Effect.runPromise(
-                  provider.getModel(model.providerID, ModelV2.ID.make(model.document.vision)).pipe(Effect.option),
+                  provider.getModel(model.providerID, ModelV2.ID.make(model.document.vision)).pipe(
+                    Effect.provideService(InstanceRef, ctx),
+                    Effect.option,
+                  ),
                 )
                 if (Option.isNone(worker) || !worker.value.capabilities.input.image)
                   return {
