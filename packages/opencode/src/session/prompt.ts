@@ -79,7 +79,6 @@ const SUPPORTED_MCP_RESOURCE_ATTACHMENT_MIMES = new Set([
   "image/png",
   "image/webp",
 ])
-type PdfJs = typeof import("pdfjs-dist/legacy/build/pdf.mjs")
 
 const STRUCTURED_OUTPUT_DESCRIPTION = `Use this tool to return your final response in the requested structured format.
 
@@ -105,20 +104,6 @@ function formatMcpResourceBytes(value: number) {
 
 function visionCacheDirectory(sessionID: SessionID, cacheID: string) {
   return path.join(VISION_CACHE_DIR, sessionID, cacheID)
-}
-
-async function loadPdfJs(): Promise<PdfJs> {
-  const nativeCanvas = path.join(process.resourcesPath ?? "", "native", "canvas", "skia.win32-x64-msvc.node")
-  if (process.platform === "win32" && existsSync(nativeCanvas)) process.env.NAPI_RS_NATIVE_LIBRARY_PATH = nativeCanvas
-  const canvas = await import("@napi-rs/canvas")
-  Object.assign(globalThis, {
-    DOMMatrix: canvas.DOMMatrix,
-    ImageData: canvas.ImageData,
-    Path2D: canvas.Path2D,
-  })
-  const bundled = path.join(process.resourcesPath ?? "", "pdfjs", "pdf.mjs")
-  if (existsSync(bundled)) return (await import(/* @vite-ignore */ pathToFileURL(bundled).href)) as PdfJs
-  return import("pdfjs-dist/legacy/build/pdf.mjs")
 }
 
 function findDocumentPages(pages: Array<{ number: number; text: string; table?: boolean }>, query: string) {
@@ -163,8 +148,8 @@ function hasPdfTableLayout(items: unknown[]) {
 }
 
 async function extractPdfText(data: Uint8Array) {
-  const pdfjs = await loadPdfJs()
-  const pdf = await pdfjs.getDocument({ data: new Uint8Array(data), useSystemFonts: true }).promise
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs")
+  const pdf = await getDocument({ data: new Uint8Array(data), useSystemFonts: true }).promise
   const pages = [] as Array<{ number: number; text: string; table: boolean }>
   for (const number of Array.from({ length: pdf.numPages }, (_, index) => index + 1)) {
     const page = await pdf.getPage(number)
@@ -179,12 +164,17 @@ async function extractPdfText(data: Uint8Array) {
 }
 
 async function renderPdfPages(data: Uint8Array, requestedPages?: number[]) {
+  const nativeCanvas = path.join(process.resourcesPath ?? "", "native", "canvas", "skia.win32-x64-msvc.node")
+  if (process.platform === "win32" && existsSync(nativeCanvas)) process.env.NAPI_RS_NATIVE_LIBRARY_PATH = nativeCanvas
   const canvas = await import("@napi-rs/canvas")
-  const pdfjs = await loadPdfJs()
-  const worker = process.resourcesPath ? path.join(process.resourcesPath, "pdfjs", "pdf.worker.mjs") : ""
-  pdfjs.GlobalWorkerOptions.workerSrc = existsSync(worker)
-    ? pathToFileURL(worker).href
-    : import.meta.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs")
+  Object.assign(globalThis, {
+    DOMMatrix: canvas.DOMMatrix,
+    ImageData: canvas.ImageData,
+    Path2D: canvas.Path2D,
+    // @ts-expect-error PDF.js does not declare its worker entry point.
+    pdfjsWorker: await import("pdfjs-dist/legacy/build/pdf.worker.mjs"),
+  })
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs")
   class PdfCanvasFactory {
     constructor(_options: { enableHWA?: boolean }) {}
 
@@ -203,7 +193,7 @@ async function renderPdfPages(data: Uint8Array, requestedPages?: number[]) {
       target.canvas.height = 0
     }
   }
-  const pdf = await pdfjs.getDocument({
+  const pdf = await getDocument({
     data: new Uint8Array(data),
     useSystemFonts: true,
     CanvasFactory: PdfCanvasFactory,
