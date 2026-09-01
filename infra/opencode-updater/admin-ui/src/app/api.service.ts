@@ -92,6 +92,22 @@ type ModelCardsResponse = {
   } | null
 }
 
+export type ModelLimitsReportEntry = {
+  pattern: string
+  matched_models: string[]
+  stale: boolean
+  fallback: boolean
+}
+
+export type ModelLimitsReport = {
+  isBeta: boolean
+  model_count: number
+  source?: string | null
+  synced_at?: string | null
+  limits: ModelLimitsReportEntry[]
+  visibility: Array<{ pattern: string; visible?: boolean | null; stale: boolean; fallback: boolean }>
+}
+
 export type ModelSettings = {
   context?: number | null
   output?: number | null
@@ -211,6 +227,26 @@ export class ApiService {
 
   async listModelCards(channel: "stable" | "beta" = "stable") {
     return this.readJson<ModelCardsResponse>(await fetch(`/opencode/admin/modelcards?channel=${channel}`, { cache: "no-store" }))
+  }
+
+  async getModelLimitsReport(channel: "stable" | "beta") {
+    return this.readJson<ModelLimitsReport>(await fetch(`/opencode/admin/model-limits/report?channel=${channel}`, { cache: "no-store" }))
+  }
+
+  async cleanupModelLimits(channel: "stable" | "beta", patterns: string[]) {
+    return this.readJson<{ channel: string; removed: number; patterns: string[] }>(
+      await fetch(`/opencode/admin/model-limits/cleanup?channel=${channel}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ patterns }),
+      }),
+    )
+  }
+
+  async syncModelCards() {
+    return this.readJson<{ synced: boolean; source?: string | null; synced_at?: string | null; count: number }>(
+      await fetch("/opencode/admin/modelcards/sync", { method: "POST" }),
+    )
   }
 
   async saveModelSettings(model: string, channel: "stable" | "beta", settings: ModelSettings) {

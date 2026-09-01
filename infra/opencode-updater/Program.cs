@@ -348,17 +348,70 @@ app.MapGet("/opencode/admin/modelcards", async (
   var isBeta = string.Equals(channel, "beta", StringComparison.OrdinalIgnoreCase);
   var config = await configStore.LoadUpdaterOptionsAsync(isBeta, context.RequestAborted);
   var cards = modelCards.BuildSnapshot(isBeta, config.ProviderConfig);
-  return Results.Json(new
-  {
-    version = config.Version,
-    isBeta,
-    generatedAt = cards.GeneratedAt,
-    aifactory = new
+    return Results.Json(new
     {
-      models = cards.Models,
-      model_visibility = config.ProviderConfig.AiFactory.ModelVisibility,
-    },
-  });
+      version = config.Version,
+      isBeta,
+      generatedAt = cards.GeneratedAt,
+      aifactory = new
+      {
+        models = cards.Models,
+        model_visibility = config.ProviderConfig.AiFactory.ModelVisibility,
+      },
+    });
+});
+
+app.MapPost("/opencode/admin/modelcards/sync", async (ModelCardStore modelCards, HttpContext context) =>
+{
+  var synced = await modelCards.SyncAsync(context.RequestAborted, force: true);
+  var (source, syncedAt, count) = modelCards.GetSyncInfo();
+  return Results.Json(new { synced, source, synced_at = syncedAt, count });
+});
+
+app.MapGet("/opencode/admin/model-limits/report", async (
+  string? channel,
+  UpdaterConfigStore configStore,
+  ModelCardStore modelCards,
+  HttpContext context
+) =>
+{
+  var isBeta = string.Equals(channel, "beta", StringComparison.OrdinalIgnoreCase);
+  var config = await configStore.LoadUpdaterOptionsAsync(isBeta, context.RequestAborted);
+  var limits = config.ProviderConfig.AiFactory.ModelLimits
+    .Select((rule) =>
+    {
+      var matched = modelCards.MatchModels(rule.Pattern);
+      return new ModelLimitReportEntry(rule.Pattern, matched, matched.Length == 0 && rule.Pattern != "*", rule.Pattern == "*");
+    })
+    .ToArray();
+  var visibility = config.ProviderConfig.AiFactory.ModelVisibility
+    .Select((rule) =>
+    {
+      var matched = modelCards.MatchModels(rule.Pattern);
+      return new ModelVisibilityReportEntry(rule.Pattern, rule.Visible, matched.Length == 0 && rule.Pattern != "*", rule.Pattern == "*");
+    })
+    .ToArray();
+  var (source, syncedAt, count) = modelCards.GetSyncInfo();
+  return Results.Json(new ModelLimitsReport(isBeta, count, source, syncedAt == DateTimeOffset.MinValue ? null : syncedAt, limits, visibility));
+});
+
+app.MapPost("/opencode/admin/model-limits/cleanup", async (
+  ModelLimitsCleanupRequest body,
+  string? channel,
+  UpdaterConfigStore configStore,
+  HttpContext context
+) =>
+{
+  var patterns = (body.Patterns ?? [])
+    .Where((item) => !string.IsNullOrWhiteSpace(item))
+    .Select((item) => item.Trim())
+    .Where((item) => item != "*")
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+  if (patterns.Length == 0) return Results.BadRequest(new { error = "No removable patterns provided" });
+  var isBeta = string.Equals(channel, "beta", StringComparison.OrdinalIgnoreCase);
+  var removed = await configStore.RemoveModelPatternsAsync(isBeta, patterns, context.RequestAborted);
+  return Results.Json(new { channel = isBeta ? "beta" : "stable", removed, patterns });
 });
 
 app.MapGet("/opencode/admin/provider-settings", async (
@@ -1034,11 +1087,14 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
     return new ModelCardSnapshot(DateTimeOffset.UtcNow, models.Length, models, new ModelCardSyncInfo(source, syncedAt, isBeta));
   }
 
-  public async Task SyncAsync(CancellationToken cancellationToken)
+  public async Task<bool> SyncAsync(CancellationToken cancellationToken, bool force = false)
   {
     var beta = betaOptions.Value;
-    if (string.IsNullOrWhiteSpace(beta.LiteLLM.BaseUrl)) return;
-    if (!await syncGate.WaitAsync(0, cancellationToken)) return;
+    if (string.IsNullOrWhiteSpace(beta.LiteLLM.BaseUrl)) return false;
+    var acquired = force
+      ? await syncGate.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken)
+      : await syncGate.WaitAsync(0, cancellationToken);
+    if (!acquired) return false;
 
     try
     {
@@ -1047,6 +1103,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
       syncedAt = DateTimeOffset.UtcNow;
       source = modelInfo.Length > 0 ? "litellm:/model/info" : "litellm:/v1/models";
       logger.LogInformation("synced model cards from {Source} count={Count}", source, cached.Length);
+      return true;
     }
     finally
     {
@@ -1057,6 +1114,14 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
   public int? GetMaxInputTokens(string model) => cached
     .FirstOrDefault((item) => string.Equals(item.Name, model, StringComparison.OrdinalIgnoreCase))
     ?.Context;
+
+  public string[] GetModelNames() => cached.Select((item) => item.Name).ToArray();
+
+  public (string? Source, DateTimeOffset SyncedAt, int Count) GetSyncInfo() => (source, syncedAt, cached.Length);
+
+  public string[] MatchModels(string pattern) => string.IsNullOrWhiteSpace(pattern)
+    ? []
+    : cached.Select((item) => item.Name).Where((name) => ScoreRule(pattern, name) >= 0).ToArray();
 
   async Task<ModelCardData[]> TryLoadModelInfoAsync(UpdaterBetaOptions beta, CancellationToken cancellationToken)
   {
@@ -1408,6 +1473,14 @@ sealed class ProviderSettingsRequest
   public string? SmallModel { get; set; }
 }
 
+sealed record ModelLimitReportEntry(string Pattern, string[] MatchedModels, bool Stale, bool Fallback);
+
+sealed record ModelVisibilityReportEntry(string Pattern, bool? Visible, bool Stale, bool Fallback);
+
+sealed record ModelLimitsReport(bool IsBeta, int ModelCount, string? Source, DateTimeOffset? SyncedAt, ModelLimitReportEntry[] Limits, ModelVisibilityReportEntry[] Visibility);
+
+sealed record ModelLimitsCleanupRequest(string[] Patterns);
+
 sealed class UpdaterConfigStore(IWebHostEnvironment environment)
 {
   readonly SemaphoreSlim gate = new(1, 1);
@@ -1523,6 +1596,42 @@ sealed class UpdaterConfigStore(IWebHostEnvironment environment)
       if (existing is null && existingVisibility is null) return false;
       await SaveAsync(root, beta, cancellationToken);
       return true;
+    }
+    finally
+    {
+      gate.Release();
+    }
+  }
+
+  public async Task<int> RemoveModelPatternsAsync(bool beta, IEnumerable<string> patterns, CancellationToken cancellationToken)
+  {
+    await gate.WaitAsync(cancellationToken);
+    try
+    {
+      var root = await LoadAsync(beta, cancellationToken);
+      var limits = GetModelLimits(root);
+      var visibility = GetModelVisibility(root);
+      var removed = 0;
+      foreach (var pattern in patterns)
+      {
+        var normalized = pattern?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized) || normalized == "*") continue;
+        foreach (var rule in limits.OfType<JsonObject>()
+                   .Where((rule) => string.Equals(rule["pattern"]?.GetValue<string>(), normalized, StringComparison.OrdinalIgnoreCase))
+                   .ToArray())
+        {
+          limits.Remove(rule);
+          removed++;
+        }
+        foreach (var rule in visibility.OfType<JsonObject>()
+                   .Where((rule) => string.Equals(rule["pattern"]?.GetValue<string>(), normalized, StringComparison.OrdinalIgnoreCase))
+                   .ToArray())
+        {
+          visibility.Remove(rule);
+        }
+      }
+      if (removed > 0) await SaveAsync(root, beta, cancellationToken);
+      return removed;
     }
     finally
     {

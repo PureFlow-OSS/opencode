@@ -1,7 +1,7 @@
 import { FormsModule } from "@angular/forms"
 import { Component, effect, inject, signal } from "@angular/core"
 import { injectQuery } from "@tanstack/angular-query-experimental"
-import { ApiService, ModelSettings, ProviderSettings } from "./api.service"
+import { ApiService, ModelLimitsReport, ModelSettings, ProviderSettings } from "./api.service"
 
 @Component({
   selector: "app-model-status-panel",
@@ -15,10 +15,11 @@ import { ApiService, ModelSettings, ProviderSettings } from "./api.service"
           <p>Änderungen werden direkt in die gewählte Konfigurationsdatei gespeichert.</p>
         </div>
         <div class="header-actions">
-          <select [ngModel]="channel()" (ngModelChange)="setChannel($event)">
-            <option value="stable">Stable</option>
-            <option value="beta">Beta</option>
-          </select>
+          <div class="channel-switch" role="tablist" aria-label="Updater channel">
+            <button type="button" [class.active]="channel() === 'beta'" (click)="setChannel('beta')">Beta channel</button>
+            <button type="button" [class.active]="channel() === 'stable'" (click)="setChannel('stable')">Normal channel</button>
+          </div>
+          <button type="button" class="secondary" (click)="syncModels()" [disabled]="syncingModels()">{{ syncingModels() ? 'Refreshing…' : 'Fetch models from LiteLLM' }}</button>
           <div class="count-pill">Models: {{ models().length }}</div>
         </div>
       </div>
@@ -49,6 +50,35 @@ import { ApiService, ModelSettings, ProviderSettings } from "./api.service"
         </label>
         <button type="submit" [disabled]="savingProvider() || models().length === 0">{{ savingProvider() ? 'Saving…' : 'Save global models' }}</button>
       </form>
+      <section class="cleanup-block">
+        <div class="header-row">
+          <div>
+            <h3>Veraltete Modellregeln</h3>
+            <p>Regeln ohne Treffer in der LiteLLM-Modelliste. Entfernen löscht die Regel samt zugehörigem Sichtbarkeits-Eintrag aus der gewählten Konfigurationsdatei. Die Fallback-Regel <code>*</code> wird nie entfernt.</p>
+          </div>
+          <button type="button" class="secondary" (click)="loadCleanupReport()" [disabled]="cleanupLoading()">{{ cleanupLoading() ? 'Checking…' : 'Check for stale rules' }}</button>
+        </div>
+        @if (cleanupReport(); as report) {
+          @if (staleEntries().length === 0) {
+            <div class="empty-state">Keine veralteten Regeln — alle {{ report.limits.length }} Regeln matchen {{ report.model_count }} LiteLLM-Modelle.</div>
+          } @else {
+            <ul class="cleanup-list">
+              @for (entry of staleEntries(); track entry.pattern) {
+                <li>
+                  <label>
+                    <input type="checkbox" [checked]="cleanupSelection().has(entry.pattern)" (change)="toggleCleanup(entry.pattern, $any($event.target).checked)" />
+                    <strong>{{ entry.pattern }}</strong>
+                    <span>— {{ entry.kinds.join(' + ') }}</span>
+                  </label>
+                </li>
+              }
+            </ul>
+            <div class="form-actions">
+              <button type="button" [disabled]="cleanupRunning() || cleanupSelection().size === 0" (click)="runCleanup()">{{ cleanupRunning() ? 'Removing…' : 'Remove selected (' + cleanupSelection().size + ')' }}</button>
+            </div>
+          }
+        }
+      </section>
       @if (models().length === 0) {
         <div class="empty-state">No model cards available yet.</div>
       } @else {
@@ -156,8 +186,13 @@ export class ModelStatusPanelComponent {
   readonly saving = signal(false)
   readonly savingProvider = signal(false)
   readonly syncingContext = signal<string | null>(null)
+  readonly syncingModels = signal(false)
   readonly error = signal<string | null>(null)
   readonly success = signal<string | null>(null)
+  readonly cleanupReport = signal<ModelLimitsReport | null>(null)
+  readonly cleanupLoading = signal(false)
+  readonly cleanupRunning = signal(false)
+  readonly cleanupSelection = signal<Set<string>>(new Set())
   readonly reasoningLevels = ["low", "medium", "high", "xhigh"] as const
   readonly modelCards = injectQuery(() => ({
     queryKey: ["model-cards", this.channel()],
@@ -182,6 +217,88 @@ export class ModelStatusPanelComponent {
     this.editing.set(null)
     this.error.set(null)
     this.success.set(null)
+    this.cleanupReport.set(null)
+    this.cleanupSelection.set(new Set())
+  }
+
+  readonly staleEntries = () => {
+    const report = this.cleanupReport()
+    if (!report) return []
+    const entries = new Map<string, { pattern: string; kinds: string[] }>()
+    for (const limit of report.limits) {
+      if (!limit.stale) continue
+      entries.set(limit.pattern, { pattern: limit.pattern, kinds: ["Modellregel"] })
+    }
+    for (const visibility of report.visibility) {
+      if (!visibility.stale) continue
+      const existing = entries.get(visibility.pattern)
+      if (existing) existing.kinds.push("Sichtbarkeit")
+      else entries.set(visibility.pattern, { pattern: visibility.pattern, kinds: ["Sichtbarkeit"] })
+    }
+    return [...entries.values()]
+  }
+
+  async syncModels() {
+    this.syncingModels.set(true)
+    this.error.set(null)
+    this.success.set(null)
+    try {
+      const result = await this.api.syncModelCards()
+      if (!result.synced) {
+        this.error.set("Sync konnte nicht ausgeführt werden — LiteLLM ist nicht konfiguriert oder ein laufender Sync blockiert")
+        return
+      }
+      await this.modelCards.refetch()
+      this.success.set(`${result.count} Modelle von LiteLLM geladen (${result.source})`)
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : "Could not sync models from LiteLLM")
+    } finally {
+      this.syncingModels.set(false)
+    }
+  }
+
+  async loadCleanupReport() {
+    this.cleanupLoading.set(true)
+    this.error.set(null)
+    this.success.set(null)
+    try {
+      const report = await this.api.getModelLimitsReport(this.channel())
+      this.cleanupReport.set(report)
+      this.cleanupSelection.set(new Set(this.staleEntries().map((entry) => entry.pattern)))
+    } catch (error) {
+      this.cleanupReport.set(null)
+      this.error.set(error instanceof Error ? error.message : "Could not load model limits report")
+    } finally {
+      this.cleanupLoading.set(false)
+    }
+  }
+
+  toggleCleanup(pattern: string, checked: boolean) {
+    this.cleanupSelection.update((selection) => {
+      const next = new Set(selection)
+      if (checked) next.add(pattern)
+      else next.delete(pattern)
+      return next
+    })
+  }
+
+  async runCleanup() {
+    const patterns = [...this.cleanupSelection()]
+    if (patterns.length === 0) return
+    this.cleanupRunning.set(true)
+    this.error.set(null)
+    this.success.set(null)
+    try {
+      const result = await this.api.cleanupModelLimits(this.channel(), patterns)
+      this.cleanupReport.set(null)
+      this.cleanupSelection.set(new Set())
+      await this.modelCards.refetch()
+      this.success.set(`${result.removed} Modellregel(n) aus appsettings${this.channel() === "beta" ? ".beta" : ""}.json entfernt`)
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : "Could not remove stale model rules")
+    } finally {
+      this.cleanupRunning.set(false)
+    }
   }
 
   setProviderModel(key: "model" | "small_model", value: string) {
