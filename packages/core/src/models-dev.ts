@@ -215,14 +215,26 @@ const layer = Layer.effect(
       if (snapshot) return snapshot
       if (Flag.OPENCODE_DISABLE_MODELS_FETCH) return {}
       // Flock is cross-process: concurrent opencode CLIs can race on this cache file.
-      const text = yield* Effect.scoped(
+      const result = yield* Effect.scoped(
         Effect.gen(function* () {
           yield* Flock.effect(lockKey)
           return yield* fetchAndWrite()
         }),
+      ).pipe(
+        Effect.catch((error) =>
+          Effect.gen(function* () {
+            // Corporate proxies (e.g. 407) or outages must not break the boot:
+            // fall back to any stale cache another process may have written.
+            const stale = yield* loadFromDisk
+            if (stale) return stale
+            yield* Effect.logWarning("models.dev catalog unavailable, continuing without it", { cause: error })
+            return undefined
+          }),
+        ),
       )
-      return JSON.parse(text) as Record<string, Provider>
-    }).pipe(Effect.withSpan("ModelsDev.populate"), Effect.orDie)
+      if (typeof result === "string") return JSON.parse(result) as Record<string, Provider>
+      return result ?? {}
+    }).pipe(Effect.withSpan("ModelsDev.populate"))
 
     const [cachedGet, invalidate] = yield* Effect.cachedInvalidateWithTTL(populate, Duration.infinity)
 
@@ -241,7 +253,14 @@ const layer = Layer.effect(
           yield* events.publish(Event.Refreshed, {})
         }),
       ).pipe(
-        Effect.tapCause((cause) => Effect.logError("Failed to fetch models.dev", { cause: cause })),
+        Effect.tapCause((cause) =>
+          Effect.gen(function* () {
+            const cached = yield* loadFromDisk
+            if (cached)
+              yield* Effect.logWarning("Failed to refresh models.dev, using cached catalog", { cause: cause })
+            else yield* Effect.logError("Failed to fetch models.dev", { cause: cause })
+          }),
+        ),
         Effect.ignore,
       )
     })
