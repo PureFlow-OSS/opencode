@@ -280,6 +280,14 @@ function aiFactoryVisible(modelID: string, rules: AiFactoryVisibilityRule[], def
   })
 }
 
+// Provider state is built per directory; cache discovery per server boot so
+// every project bootstrap does not refetch the same model list.
+const aiFactoryDiscoveryCache = new Map<
+  string,
+  { until: number; models: ReturnType<typeof aiFactoryModels> }
+>()
+const AIFACTORY_DISCOVERY_TTL = 5 * 60 * 1000
+
 async function discoverAiFactoryModels(
   token: string,
   baseURL: string,
@@ -289,6 +297,9 @@ async function discoverAiFactoryModels(
   fetchFn: FetchLike = fetch,
 ) {
   const url = `${baseURL.replace(/\/$/, "")}/models`
+  const cacheKey = `${url}|${token}`
+  const cached = aiFactoryDiscoveryCache.get(cacheKey)
+  if (cached && cached.until > Date.now()) return cached.models
   console.info("[aifactory] discovering models", { url })
   const response = await fetchFn(url, {
     headers: {
@@ -313,6 +324,8 @@ async function discoverAiFactoryModels(
     visibility,
     defaults,
   )
+  if (Object.keys(models).length > 0)
+    aiFactoryDiscoveryCache.set(cacheKey, { until: Date.now() + AIFACTORY_DISCOVERY_TTL, models })
   console.info("[aifactory] discovered models", { url, count: Object.keys(models).length })
   return models
 }

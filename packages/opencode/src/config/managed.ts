@@ -128,12 +128,25 @@ export function providerConfigRequestInit(input: { config?: unknown; auth?: Reco
   } satisfies RequestInit
 }
 
+// Provider state is built per directory; cache the managed config per server
+// boot so every project bootstrap does not refetch the same payload.
+const providerConfigCache = new Map<string, { until: number; payload: Record<string, unknown> }>()
+const PROVIDER_CONFIG_TTL = 5 * 60 * 1000
+
 export async function readProviderConfig(
   fetchFn: typeof fetch = fetch,
   init: RequestInit = {},
   config?: unknown,
 ): Promise<Record<string, unknown>> {
-  return fetchFn(providerConfigUrl(config), {
+  const url = providerConfigUrl(config)
+  const apiKey =
+    isRecord(init.headers) && typeof init.headers[PROVIDER_CONFIG_AIFACTORY_API_KEY_HEADER] === "string"
+      ? init.headers[PROVIDER_CONFIG_AIFACTORY_API_KEY_HEADER]
+      : ""
+  const cacheKey = `${url}|${apiKey}`
+  const cached = providerConfigCache.get(cacheKey)
+  if (cached && cached.until > Date.now()) return cached.payload
+  const payload = await fetchFn(url, {
     ...init,
     signal: AbortSignal.timeout(3000),
   })
@@ -143,6 +156,9 @@ export async function readProviderConfig(
       return isRecord(payload) ? payload : {}
     })
     .catch(() => ({}))
+  if (Object.keys(payload).length > 0)
+    providerConfigCache.set(cacheKey, { until: Date.now() + PROVIDER_CONFIG_TTL, payload })
+  return payload
 }
 
 export async function readManagedPreferences() {
