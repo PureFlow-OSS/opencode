@@ -135,6 +135,7 @@
     "open": "10.1.2",
     "opencode-gitlab-auth": "2.1.0",
     "opencode-poe-auth": "0.0.1",
+    "playwright-core": "1.59.1",
     "opentui-spinner": "catalog:",
     "partial-json": "0.1.7",
     "pdfjs-dist": "6.2.108",
