@@ -35,6 +35,19 @@ export default defineConfig({
         },
       },
       {
+        name: "opencode:skip-esbuild-transpile",
+        enforce: "pre",
+        renderChunk(code, chunk, opts) {
+          ;(opts as { __vite_skip_esbuild__?: boolean }).__vite_skip_esbuild__ = true
+          if (code.length < 5_000_000) return null
+          const cjsShims = [
+            "\n// -- CommonJS Shims --\nimport __cjs_mod__ from 'node:module';\nconst __filename = import.meta.filename;\nconst __dirname = import.meta.dirname;\nconst require = __cjs_mod__.createRequire(import.meta.url);\n",
+            "\n// -- CommonJS Shims --\nimport __cjs_url__ from 'node:url';\nimport __cjs_path__ from 'node:path';\nimport __cjs_mod__ from 'node:module';\nconst __filename = __cjs_url__.fileURLToPath(import.meta.url);\nconst __dirname = __cjs_path__.dirname(__filename);\nconst require = __cjs_mod__.createRequire(import.meta.url);\n",
+          ]
+          return "/*" + cjsShims.join("") + "*/\n" + code
+        },
+      },
+      {
         name: "opencode:virtual-server-module",
         enforce: "pre",
         resolveId(id) {
