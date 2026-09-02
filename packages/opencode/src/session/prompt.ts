@@ -203,7 +203,8 @@ function hasPdfTableLayout(items: unknown[]) {
 }
 
 async function preparePdfJs() {
-  const nativeCanvas = path.join(process.resourcesPath ?? "", "native", "canvas", "skia.win32-x64-msvc.node")
+  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath
+  const nativeCanvas = path.join(resourcesPath ?? "", "native", "canvas", "skia.win32-x64-msvc.node")
   if (process.platform === "win32" && existsSync(nativeCanvas)) process.env.NAPI_RS_NATIVE_LIBRARY_PATH = nativeCanvas
   const canvas = await import("@napi-rs/canvas")
   Object.assign(globalThis, {
