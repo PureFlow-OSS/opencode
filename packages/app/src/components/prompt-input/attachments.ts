@@ -68,6 +68,11 @@ export function createPromptAttachmentsCore(input: PromptAttachmentsCoreInput) {
     const url = await dataUrl(file, mime)
     if (!url) return false
 
+    const duplicate = target.prompt
+      .current()
+      .some((part) => part.type === "image" && part.filename === file.name && part.mime === mime && part.dataUrl === url)
+    if (duplicate) return true
+
     const attachment: ImageAttachmentPart = {
       type: "image",
       id: uuid(),

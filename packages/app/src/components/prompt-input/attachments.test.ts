@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { createPromptAttachmentsCore } from "./attachments"
 import { attachmentMime, pickAttachmentFiles } from "./files"
 import { pasteMode } from "./paste"
 
@@ -23,6 +24,26 @@ describe("attachmentMime", () => {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     })
     expect(await attachmentMime(file)).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+  })
+})
+
+describe("createPromptAttachmentsCore", () => {
+  test("adds a dropped PDF only once when the drop handler runs twice", async () => {
+    const prompt = [] as import("@/context/prompt").Prompt
+    const target = {
+      current: () => prompt,
+      cursor: () => 0,
+      set: (next: import("@/context/prompt").Prompt) => prompt.splice(0, prompt.length, ...next),
+    }
+    const attachments = createPromptAttachmentsCore({
+      capture: () => target,
+      editor: () => document.createElement("div"),
+    })
+    const file = new File(["%PDF-1.7"], "guide.pdf", { type: "application/pdf" })
+
+    await Promise.all([attachments.addAttachment(file), attachments.addAttachment(file)])
+
+    expect(prompt).toHaveLength(1)
   })
 })
 
