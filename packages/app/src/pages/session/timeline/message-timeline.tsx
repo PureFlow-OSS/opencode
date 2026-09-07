@@ -498,6 +498,7 @@ export function MessageTimeline(props: {
     () => new Map(virtualizer.getVirtualItems().map((item) => [item.key, item] as const)),
   )
   const virtualRowKeys = createMemo(() => virtualizer.getVirtualItems().map((item) => item.key as string))
+  const [overviewScrollTop, setOverviewScrollTop] = createSignal(0)
   const overview = createMemo(() => {
     const seen = new Set<string>()
     return props.userMessages.flatMap((message) => {
@@ -508,15 +509,19 @@ export function MessageTimeline(props: {
         .join(" ")
         .replace(/\s+/g, " ")
         .trim()
-      return [{ id: message.id, prompt: prompt.length > 96 ? `${prompt.slice(0, 96)}…` : prompt }]
+      return [{ id: message.id, prompt: prompt.length > 80 ? `${prompt.slice(0, 80)}…` : prompt }]
     })
   })
   const overviewActive = createMemo(() => {
-    const first = virtualizer.getVirtualItems().at(0)?.index
-    if (first === undefined) return
-    return overview().findLast((message) => (messageRowIndex().get(message.id) ?? Infinity) <= first)?.id
+    const root = listRoot()
+    const position = overviewScrollTop() + (root?.clientHeight ?? 0) * 0.35
+    return overview().findLast((message) => {
+      const index = messageRowIndex().get(message.id)
+      return index !== undefined && (virtualizer.measurementsCache[index]?.start ?? Infinity) <= position
+    })?.id
   })
   const [overviewPreview, setOverviewPreview] = createSignal<{ id: string; top: number }>()
+  const [hoveredOverviewID, setHoveredOverviewID] = createSignal<string>()
   const overviewPreviewText = createMemo(() => {
     const preview = overviewPreview()
     if (!preview) return
@@ -528,6 +533,20 @@ export function MessageTimeline(props: {
     props.onMarkScrollGesture()
     props.onUserScroll()
     virtualizer.scrollToIndex(index, { align: "center" })
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const root = listRoot()
+        const target = root?.querySelector<HTMLElement>(`#${CSS.escape(props.anchor(id))}`)
+        if (!root || !target) return
+        root.scrollTo({
+          top: Math.max(
+            0,
+            root.scrollTop + target.getBoundingClientRect().top - root.getBoundingClientRect().top - root.clientHeight / 2,
+          ),
+          behavior: "smooth",
+        })
+      })
+    })
   }
   createEffect(() => {
     props.setRevealMessage?.((id) => {
@@ -601,6 +620,7 @@ export function MessageTimeline(props: {
   const bindListRoot = (root: HTMLDivElement) => {
     if (root === listRoot()) return
     setListRoot(root)
+    setOverviewScrollTop(root.scrollTop)
     props.setScrollRef(root)
   }
 
@@ -662,6 +682,7 @@ export function MessageTimeline(props: {
   }
 
   const handleListScroll = (event: Event & { currentTarget: HTMLDivElement }) => {
+    setOverviewScrollTop(event.currentTarget.scrollTop)
     if (prependLoading) updatePrependAnchor()
     props.onScheduleScrollState(event.currentTarget)
     props.onHistoryScroll()
@@ -1338,44 +1359,62 @@ export function MessageTimeline(props: {
       <Show when={settings.general.newLayoutDesigns() && overview().length >= 3}>
         <nav
           aria-label="Conversation navigation"
-          class="absolute left-1 top-24 z-[60] hidden max-h-40 w-4 overflow-y-auto py-1 no-scrollbar md:flex md:flex-col"
+          class="group/nav absolute right-2 top-1/2 z-[60] hidden max-h-48 w-10 -translate-y-1/2 overflow-y-auto py-1 no-scrollbar md:block"
         >
-          <div class="flex flex-col items-center gap-1">
+          <div class="flex flex-col">
             <For each={overview()}>
-              {(item) => (
-                <button
-                  type="button"
-                  aria-label={item.prompt || "Message"}
-                  class="flex size-3 shrink-0 items-center justify-center border-0 bg-transparent p-0"
-                  onClick={() => revealOverviewMessage(item.id)}
-                  onPointerEnter={(event) => {
-                    const root = timelineRoot
-                    if (!root) return
-                    setOverviewPreview({
-                      id: item.id,
-                      top: event.currentTarget.getBoundingClientRect().top - root.getBoundingClientRect().top,
-                    })
-                  }}
-                  onPointerLeave={() => setOverviewPreview(undefined)}
-                  onFocus={(event) => {
-                    const root = timelineRoot
-                    if (!root) return
-                    setOverviewPreview({
-                      id: item.id,
-                      top: event.currentTarget.getBoundingClientRect().top - root.getBoundingClientRect().top,
-                    })
-                  }}
-                  onBlur={() => setOverviewPreview(undefined)}
-                >
-                  <span
+              {(item) => {
+                const hovered = () => hoveredOverviewID() === item.id
+                const current = () => overviewActive() === item.id
+                const preview = (event: PointerEvent | FocusEvent) => {
+                  const root = timelineRoot
+                  if (!root) return
+                  setHoveredOverviewID(item.id)
+                  setOverviewPreview({
+                    id: item.id,
+                    top: event.currentTarget.getBoundingClientRect().top - root.getBoundingClientRect().top,
+                  })
+                }
+
+                return (
+                  <button
+                    type="button"
+                    aria-label={item.prompt || "Message"}
+                    aria-current={current() ? "true" : undefined}
+                    class="flex h-1.5 w-full shrink-0 cursor-pointer items-center justify-end rounded-sm border-0 bg-transparent p-0 transition-opacity duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-xheavy"
                     classList={{
-                      "block bg-border-weak-base transition-all": true,
-                      "size-1 rounded-full": overviewActive() !== item.id,
-                      "h-px w-3 bg-text-strong": overviewActive() === item.id,
+                      "opacity-100": current() || hovered(),
+                      "opacity-40 group-hover/nav:opacity-100 group-focus-within/nav:opacity-100": !current() && !hovered(),
                     }}
-                  />
-                </button>
-              )}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      revealOverviewMessage(item.id)
+                    }}
+                    onPointerEnter={preview}
+                    onPointerLeave={() => {
+                      setHoveredOverviewID(undefined)
+                      setOverviewPreview(undefined)
+                    }}
+                    onFocus={preview}
+                    onBlur={() => {
+                      setHoveredOverviewID(undefined)
+                      setOverviewPreview(undefined)
+                    }}
+                  >
+                    <span
+                      classList={{
+                        "block rounded-full transition-[width,height,background-color] duration-150 ease-out": true,
+                        "bg-text-strong": current() || hovered(),
+                        "bg-border-weak-base": !current() && !hovered(),
+                      }}
+                      style={{
+                        width: `${hovered() ? 39 : current() ? 21 : 12}px`,
+                        height: `${hovered() ? 6 : 3}px`,
+                      }}
+                    />
+                  </button>
+                )
+              }}
             </For>
           </div>
         </nav>
@@ -1383,7 +1422,7 @@ export function MessageTimeline(props: {
           {(text) => (
             <div
               role="tooltip"
-              class="pointer-events-none absolute left-7 z-[70] hidden max-w-64 rounded-[6px] bg-surface-raised-stronger px-3 py-2 text-12-medium text-text-strong shadow-md md:block"
+              class="pointer-events-none absolute right-14 z-[70] hidden max-w-56 rounded-md bg-surface-raised-stronger px-2.5 py-1.5 text-11-medium text-text-strong shadow-md md:block"
               style={{ top: `${overviewPreview()!.top}px`, transform: "translateY(-50%)" }}
             >
               {text()}
