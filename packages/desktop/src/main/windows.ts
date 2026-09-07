@@ -156,7 +156,7 @@ export function getLastFocusedWindow() {
 
 export function restoreMainWindows() {
   const ids = registry.persisted()
-  return (ids.length ? ids : [randomUUID()]).map((id) => createMainWindow(id))
+  return [createMainWindow(ids.at(-1) ?? randomUUID())]
 }
 
 export function setDockIcon() {
