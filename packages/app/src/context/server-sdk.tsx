@@ -3,7 +3,8 @@ import { createSimpleContext } from "@opencode-ai/ui/context"
 import { createGlobalEmitter } from "@solid-primitives/event-bus"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { type Accessor, batch, createMemo, onCleanup, onMount } from "solid-js"
-import { createSdkForServer } from "@/utils/server"
+import { createApiForServer, createSdkForServer } from "@/utils/server"
+import { createCompatibleApi } from "@/utils/server-compat"
 import { useLanguage } from "./language"
 import { usePlatform } from "./platform"
 import { ServerConnection, useServer } from "./server"
@@ -96,6 +97,9 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
     fetch: eventFetch,
     server: server.http,
   })
+  const eventApi = createApiForServer({ server: server.http, fetch: eventFetch })
+  const protocol = Promise.resolve("v1" as const)
+  const protocolKind = createMemo(() => "v1" as const)
   const emitter = createGlobalEmitter<{
     [key: string]: Event
   }>()
@@ -264,6 +268,20 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
     scope,
     url: server.http.url,
     client: sdk,
+    protocol,
+    protocolKind,
+    currentApi: eventApi,
+    api: createCompatibleApi({
+      protocol,
+      current: eventApi,
+      legacy: (directory) =>
+        createSdkForServer({
+          server: server.http,
+          fetch: platform.fetch,
+          directory,
+          throwOnError: true,
+        }),
+    }),
     request(path: string, init?: RequestInit) {
       const headers = new Headers(init?.headers)
       if (server.http.password) {
@@ -322,7 +340,7 @@ export const { use: useServerSDK, provider: ServerSDKProvider } = createSimpleCo
 })
 
 export function useServerProtocol() {
-  return createMemo(() => "v1" as const)
+  return useServerSDK().protocolKind
 }
 
 type SDKEventMap = {
@@ -344,8 +362,15 @@ function createDirSdkContext(directory: string, serverSDK: ServerSDKBase) {
 
   return {
     scope: serverSDK.scope,
+    protocol: serverSDK.protocol,
     directory,
     client,
+    api: createCompatibleApi({
+      protocol: serverSDK.protocol,
+      current: serverSDK.currentApi,
+      legacy: (next) => serverSDK.createClient({ directory: next ?? directory, throwOnError: true }),
+      directory,
+    }),
     event: emitter,
     get url() {
       return serverSDK.url
