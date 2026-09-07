@@ -285,10 +285,7 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
     request(path: string, init?: RequestInit) {
       const headers = new Headers(init?.headers)
       if (server.http.password) {
-        headers.set(
-          "Authorization",
-          `Basic ${btoa(`${server.http.username ?? "opencode"}:${server.http.password}`)}`,
-        )
+        headers.set("Authorization", `Basic ${btoa(`${server.http.username ?? "opencode"}:${server.http.password}`)}`)
       }
       return (platform.fetch ?? fetch)(`${server.http.url}${path}`, {
         ...init,
@@ -340,7 +337,7 @@ export const { use: useServerSDK, provider: ServerSDKProvider } = createSimpleCo
 })
 
 export function useServerProtocol() {
-  return useServerSDK().protocolKind
+  return useServerSDK()().protocolKind
 }
 
 type SDKEventMap = {
