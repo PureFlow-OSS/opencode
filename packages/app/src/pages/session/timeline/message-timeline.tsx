@@ -257,6 +257,7 @@ export function MessageTimeline(props: {
   setHistoryAnchor?: (handlers: { capture: () => void; restore: (done: boolean) => void }) => void
 }) {
   let touchGesture: number | undefined
+  let timelineRoot: HTMLDivElement | undefined
 
   const navigate = useNavigate()
   const serverSDK = useServerSDK()
@@ -515,10 +516,18 @@ export function MessageTimeline(props: {
     if (first === undefined) return
     return overview().findLast((message) => (messageRowIndex().get(message.id) ?? Infinity) <= first)?.id
   })
+  const [overviewPreview, setOverviewPreview] = createSignal<{ id: string; top: number }>()
+  const overviewPreviewText = createMemo(() => {
+    const preview = overviewPreview()
+    if (!preview) return
+    return overview().find((item) => item.id === preview.id)?.prompt
+  })
   const revealOverviewMessage = (id: string) => {
     const index = messageRowIndex().get(id)
     if (index === undefined) return
-    virtualizer.scrollToIndex(index, { align: "start" })
+    props.onMarkScrollGesture()
+    props.onUserScroll()
+    virtualizer.scrollToIndex(index, { align: "center" })
   }
   createEffect(() => {
     props.setRevealMessage?.((id) => {
@@ -1320,8 +1329,13 @@ export function MessageTimeline(props: {
   }
 
   return (
-    <div class="relative w-full h-full min-w-0">
-      <Show when={settings.general.newLayoutDesigns() && overview().length > 0}>
+    <div
+      ref={(element) => {
+        timelineRoot = element
+      }}
+      class="relative w-full h-full min-w-0"
+    >
+      <Show when={settings.general.newLayoutDesigns() && overview().length >= 3}>
         <nav
           aria-label="Conversation navigation"
           class="absolute left-1 top-24 z-[60] hidden max-h-40 w-4 overflow-y-auto py-1 no-scrollbar md:flex md:flex-col"
@@ -1331,10 +1345,27 @@ export function MessageTimeline(props: {
               {(item) => (
                 <button
                   type="button"
-                  title={item.prompt}
                   aria-label={item.prompt || "Message"}
                   class="flex size-3 shrink-0 items-center justify-center border-0 bg-transparent p-0"
                   onClick={() => revealOverviewMessage(item.id)}
+                  onPointerEnter={(event) => {
+                    const root = timelineRoot
+                    if (!root) return
+                    setOverviewPreview({
+                      id: item.id,
+                      top: event.currentTarget.getBoundingClientRect().top - root.getBoundingClientRect().top,
+                    })
+                  }}
+                  onPointerLeave={() => setOverviewPreview(undefined)}
+                  onFocus={(event) => {
+                    const root = timelineRoot
+                    if (!root) return
+                    setOverviewPreview({
+                      id: item.id,
+                      top: event.currentTarget.getBoundingClientRect().top - root.getBoundingClientRect().top,
+                    })
+                  }}
+                  onBlur={() => setOverviewPreview(undefined)}
                 >
                   <span
                     classList={{
@@ -1348,6 +1379,17 @@ export function MessageTimeline(props: {
             </For>
           </div>
         </nav>
+        <Show when={overviewPreviewText()}>
+          {(text) => (
+            <div
+              role="tooltip"
+              class="pointer-events-none absolute left-7 z-[70] hidden max-w-64 rounded-[6px] bg-surface-raised-stronger px-3 py-2 text-12-medium text-text-strong shadow-md md:block"
+              style={{ top: `${overviewPreview()!.top}px`, transform: "translateY(-50%)" }}
+            >
+              {text()}
+            </div>
+          )}
+        </Show>
       </Show>
       <div
         class="absolute left-1/2 -translate-x-1/2 z-[60] pointer-events-none transition-all duration-200 ease-out"
