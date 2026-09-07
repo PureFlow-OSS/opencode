@@ -321,6 +321,10 @@ export const { use: useServerSDK, provider: ServerSDKProvider } = createSimpleCo
   },
 })
 
+export function useServerProtocol() {
+  return createMemo(() => "v1" as const)
+}
+
 type SDKEventMap = {
   [key in Event["type"]]: Extract<Event, { type: key }>
 }
