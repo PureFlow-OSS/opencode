@@ -45,6 +45,7 @@ import { StickyAccordionHeader } from "@opencode-ai/ui/sticky-accordion-header"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { TextReveal } from "@opencode-ai/ui/text-reveal"
 import { TextShimmer } from "@opencode-ai/ui/text-shimmer"
+import { Tooltip } from "@opencode-ai/ui/tooltip"
 import type {
   AssistantMessage,
   Message as MessageType,
@@ -497,6 +498,26 @@ export function MessageTimeline(props: {
     () => new Map(virtualizer.getVirtualItems().map((item) => [item.key, item] as const)),
   )
   const virtualRowKeys = createMemo(() => virtualizer.getVirtualItems().map((item) => item.key as string))
+  const overview = createMemo(() =>
+    props.userMessages.map((message) => ({
+      id: message.id,
+      prompt: getMsgParts(message.id)
+        .flatMap((part) => (part.type === "text" ? [part.text] : []))
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim(),
+    })),
+  )
+  const overviewActive = createMemo(() => {
+    const first = virtualizer.getVirtualItems().at(0)?.index
+    if (first === undefined) return
+    return props.userMessages.findLast((message) => (messageRowIndex().get(message.id) ?? Infinity) <= first)?.id
+  })
+  const revealOverviewMessage = (id: string) => {
+    const index = messageRowIndex().get(id)
+    if (index === undefined) return
+    virtualizer.scrollToIndex(index, { align: "start" })
+  }
   createEffect(() => {
     props.setRevealMessage?.((id) => {
       const index = messageRowIndex().get(id)
@@ -1168,20 +1189,11 @@ export function MessageTimeline(props: {
         return (
           <TimelineRowFrame row={assistantPartRow}>
             <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
-              <div class="flex min-w-0 gap-3">
-                <Show when={settings.general.newLayoutDesigns()}>
-                  <div aria-hidden="true" class="relative flex w-3 shrink-0 justify-center">
-                    <div class="absolute inset-y-0 border-l border-dashed border-border-weak-base" />
-                    <span class="relative mt-3 size-1.5 rounded-full bg-icon-weak-base" />
-                  </div>
-                </Show>
-                <div
-                  data-slot="session-turn-assistant-content"
-                  class="min-w-0 flex-1"
-                  aria-hidden={workingTurn(assistantPartRow().userMessageID)}
-                >
-                  {renderAssistantPartGroup(assistantPartRow, onSizeChange)}
-                </div>
+              <div
+                data-slot="session-turn-assistant-content"
+                aria-hidden={workingTurn(assistantPartRow().userMessageID)}
+              >
+                {renderAssistantPartGroup(assistantPartRow, onSizeChange)}
               </div>
             </div>
           </TimelineRowFrame>
@@ -1307,6 +1319,35 @@ export function MessageTimeline(props: {
 
   return (
     <div class="relative w-full h-full min-w-0">
+      <Show when={settings.general.newLayoutDesigns() && overview().length > 0}>
+        <nav
+          aria-label="Conversation navigation"
+          class="absolute inset-y-20 left-1 z-[60] hidden w-4 py-2 md:flex md:flex-col"
+        >
+          <div class="flex h-full flex-col items-center justify-between">
+            <For each={overview()}>
+              {(item) => (
+                <Tooltip placement="right" gutter={8} value={item.prompt} class="flex">
+                  <button
+                    type="button"
+                    aria-label={item.prompt || "Message"}
+                    class="flex size-4 items-center justify-center border-0 bg-transparent p-0"
+                    onClick={() => revealOverviewMessage(item.id)}
+                  >
+                    <span
+                      classList={{
+                        "block bg-border-weak-base transition-all": true,
+                        "size-1 rounded-full": overviewActive() !== item.id,
+                        "h-px w-4 bg-text-strong": overviewActive() === item.id,
+                      }}
+                    />
+                  </button>
+                </Tooltip>
+              )}
+            </For>
+          </div>
+        </nav>
+      </Show>
       <div
         class="absolute left-1/2 -translate-x-1/2 z-[60] pointer-events-none transition-all duration-200 ease-out"
         classList={{
