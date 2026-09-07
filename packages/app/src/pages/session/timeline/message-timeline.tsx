@@ -45,7 +45,6 @@ import { StickyAccordionHeader } from "@opencode-ai/ui/sticky-accordion-header"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { TextReveal } from "@opencode-ai/ui/text-reveal"
 import { TextShimmer } from "@opencode-ai/ui/text-shimmer"
-import { Tooltip } from "@opencode-ai/ui/tooltip"
 import type {
   AssistantMessage,
   Message as MessageType,
@@ -498,20 +497,23 @@ export function MessageTimeline(props: {
     () => new Map(virtualizer.getVirtualItems().map((item) => [item.key, item] as const)),
   )
   const virtualRowKeys = createMemo(() => virtualizer.getVirtualItems().map((item) => item.key as string))
-  const overview = createMemo(() =>
-    props.userMessages.map((message) => ({
-      id: message.id,
-      prompt: getMsgParts(message.id)
+  const overview = createMemo(() => {
+    const seen = new Set<string>()
+    return props.userMessages.flatMap((message) => {
+      if (seen.has(message.id)) return []
+      seen.add(message.id)
+      const prompt = getMsgParts(message.id)
         .flatMap((part) => (part.type === "text" ? [part.text] : []))
         .join(" ")
         .replace(/\s+/g, " ")
-        .trim(),
-    })),
-  )
+        .trim()
+      return [{ id: message.id, prompt: prompt.length > 96 ? `${prompt.slice(0, 96)}…` : prompt }]
+    })
+  })
   const overviewActive = createMemo(() => {
     const first = virtualizer.getVirtualItems().at(0)?.index
     if (first === undefined) return
-    return props.userMessages.findLast((message) => (messageRowIndex().get(message.id) ?? Infinity) <= first)?.id
+    return overview().findLast((message) => (messageRowIndex().get(message.id) ?? Infinity) <= first)?.id
   })
   const revealOverviewMessage = (id: string) => {
     const index = messageRowIndex().get(id)
@@ -1322,27 +1324,26 @@ export function MessageTimeline(props: {
       <Show when={settings.general.newLayoutDesigns() && overview().length > 0}>
         <nav
           aria-label="Conversation navigation"
-          class="absolute inset-y-20 left-1 z-[60] hidden w-4 py-2 md:flex md:flex-col"
+          class="absolute left-1 top-24 z-[60] hidden max-h-40 w-4 overflow-y-auto py-1 no-scrollbar md:flex md:flex-col"
         >
-          <div class="flex h-full flex-col items-center justify-between">
+          <div class="flex flex-col items-center gap-1">
             <For each={overview()}>
               {(item) => (
-                <Tooltip placement="right" gutter={8} value={item.prompt} class="flex">
-                  <button
-                    type="button"
-                    aria-label={item.prompt || "Message"}
-                    class="flex size-4 items-center justify-center border-0 bg-transparent p-0"
-                    onClick={() => revealOverviewMessage(item.id)}
-                  >
-                    <span
-                      classList={{
-                        "block bg-border-weak-base transition-all": true,
-                        "size-1 rounded-full": overviewActive() !== item.id,
-                        "h-px w-4 bg-text-strong": overviewActive() === item.id,
-                      }}
-                    />
-                  </button>
-                </Tooltip>
+                <button
+                  type="button"
+                  title={item.prompt}
+                  aria-label={item.prompt || "Message"}
+                  class="flex size-3 shrink-0 items-center justify-center border-0 bg-transparent p-0"
+                  onClick={() => revealOverviewMessage(item.id)}
+                >
+                  <span
+                    classList={{
+                      "block bg-border-weak-base transition-all": true,
+                      "size-1 rounded-full": overviewActive() !== item.id,
+                      "h-px w-3 bg-text-strong": overviewActive() === item.id,
+                    }}
+                  />
+                </button>
               )}
             </For>
           </div>
