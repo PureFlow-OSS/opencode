@@ -319,6 +319,31 @@ describe("session.message-v2.toModelMessage", () => {
     ])
   })
 
+  test("replaces PDFs when the model does not support document input", async () => {
+    const messageID = "m-user"
+    const input: SessionV1.WithParts[] = [
+      {
+        info: userInfo(messageID),
+        parts: [
+          {
+            ...basePart(messageID, "p1"),
+            type: "file",
+            mime: "application/pdf",
+            filename: "document.pdf",
+            url: "data:application/pdf;base64,cGRm",
+          },
+        ] as SessionV1.Part[],
+      },
+    ]
+
+    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([
+      {
+        role: "user",
+        content: [{ type: "text", text: "[Attached application/pdf: document.pdf]" }],
+      },
+    ])
+  })
+
   test("converts assistant tool completion into tool-call + tool-result messages with attachments", async () => {
     const userID = "m-user"
     const assistantID = "m-assistant"

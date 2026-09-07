@@ -3,12 +3,27 @@ import { makeEventListener } from "@solid-primitives/event-listener"
 import { showToast } from "@/utils/toast"
 import { type ContentPart, type ImageAttachmentPart, type usePrompt } from "@/context/prompt"
 import { useLanguage } from "@/context/language"
-import { usePlatform } from "@/context/platform"
 import { uuid } from "@/utils/uuid"
 import { getCursorPosition } from "./editor-dom"
-import { createBlobReference, type DraftStore } from "@/utils/draft-store"
 import { attachmentMime } from "./files"
 import { normalizePaste, pasteMode } from "./paste"
+
+function dataUrl(file: File, mime: string) {
+  return new Promise<string>((resolve) => {
+    const reader = new FileReader()
+    reader.addEventListener("error", () => resolve(""))
+    reader.addEventListener("load", () => {
+      const value = typeof reader.result === "string" ? reader.result : ""
+      const idx = value.indexOf(",")
+      if (idx === -1) {
+        resolve(value)
+        return
+      }
+      resolve(`data:${mime};base64,${value.slice(idx + 1)}`)
+    })
+    reader.readAsDataURL(file)
+  })
+}
 
 type PromptTarget = Pick<ReturnType<ReturnType<typeof usePrompt>["capture"]>, "current" | "cursor" | "set">
 type AttachmentTarget = { prompt: PromptTarget; cursor: number | undefined }
@@ -21,10 +36,9 @@ type PromptAttachmentsCoreInput = {
   warn?: () => void
   readClipboardImage?: () => Promise<File | null>
   getPathForFile?: (file: File) => string
-  draftStore?: DraftStore
 }
 
-export type PromptAttachmentsInput = {
+type PromptAttachmentsInput = {
   prompt: ReturnType<typeof usePrompt>
   editor: () => HTMLDivElement | undefined
   isDialogActive: () => boolean
@@ -51,13 +65,21 @@ export function createPromptAttachmentsCore(input: PromptAttachmentsCoreInput) {
       return false
     }
 
+    const url = await dataUrl(file, mime)
+    if (!url) return false
+
+    const duplicate = target.prompt
+      .current()
+      .some((part) => part.type === "image" && part.filename === file.name && part.mime === mime && part.dataUrl === url)
+    if (duplicate) return true
+
     const attachment: ImageAttachmentPart = {
       type: "image",
       id: uuid(),
       filename: file.name,
       sourcePath: input.getPathForFile?.(file) || undefined,
       mime,
-      blob: input.draftStore ? await input.draftStore.putBlob(file) : await createBlobReference(file),
+      dataUrl: url,
     }
     target.prompt.set([...target.prompt.current(), attachment], target.cursor)
     return true
@@ -149,10 +171,8 @@ export function createPromptAttachmentsCore(input: PromptAttachmentsCoreInput) {
 
 export function createPromptAttachments(input: PromptAttachmentsInput) {
   const language = useLanguage()
-  const platform = usePlatform()
   const attachments = createPromptAttachmentsCore({
     ...input,
-    draftStore: platform.draftStore,
     capture: input.prompt.capture,
     warn: () => {
       showToast({

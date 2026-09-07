@@ -95,7 +95,7 @@ export const SettingsMcp: Component = () => {
   const params = useParams()
   const dir = createMemo(() => decode64(params.dir) ?? globalSync().data.path.directory ?? "")
   const [managedData] = createResource<Record<string, ManagedServer>>(() =>
-    fetch(new URL("/mcp/managed", globalSDK().url)).then((res) =>
+    globalSDK().request("/mcp/managed").then((res) =>
       res.ok ? (res.json() as Promise<Record<string, ManagedServer>>) : {},
     ),
   )

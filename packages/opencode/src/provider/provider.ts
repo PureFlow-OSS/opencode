@@ -34,7 +34,7 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderError } from "./error"
 import { PROVIDER_CONFIG_AIFACTORY_API_KEY_HEADER, readProviderConfig, updateBaseUrl } from "@/config/managed"
 
-const OPENAI_HEADER_TIMEOUT_DEFAULT = 300_000
+const OPENAI_HEADER_TIMEOUT_DEFAULT = 10_000
 const AIFACTORY_ID = ProviderV2.ID.make("aifactory")
 const AIFACTORY_BASE_URL = "http://10.53.7.23/v1"
 const AIFACTORY_CATALOG: ModelsDev.Provider = {
@@ -56,7 +56,13 @@ function aiFactoryBaseURL(config: Pick<ConfigV1.Info, "aifactory_host">) {
 
 function mergeNoProxyEntry(value: string | undefined, entry: string) {
   if (!value) return entry
-  if (value.split(",").map((item) => item.trim()).includes(entry)) return value
+  if (
+    value
+      .split(",")
+      .map((item) => item.trim())
+      .includes(entry)
+  )
+    return value
   return `${value},${entry}`
 }
 
@@ -90,7 +96,7 @@ function wrapSSE(res: Response, ms: number, ctl: AbortController) {
         const id = setTimeout(() => {
           const err = new ProviderError.ResponseStreamError("SSE read timed out")
           ctl.abort(err)
-          reader.cancel(err).catch(() => {})
+          void reader.cancel(err)
           reject(err)
         }, ms)
 
@@ -140,12 +146,6 @@ function googleVertexAnthropicBaseURL(project: string | undefined, location: str
   if (location !== "eu" && location !== "us") return
   // Continental multi-regions require Regional Endpoint Platform domains.
   return `https://aiplatform.${location}.rep.googleapis.com/v1/projects/${project}/locations/${location}/publishers/anthropic/models`
-}
-
-function googleVertexEndpoint(location: string) {
-  if (location === "global") return "aiplatform.googleapis.com"
-  if (location === "eu" || location === "us") return `aiplatform.${location}.rep.googleapis.com`
-  return `${location}-aiplatform.googleapis.com`
 }
 
 type BundledSDK = {
@@ -207,8 +207,20 @@ type AiFactoryRule = {
   output?: number
   temperature?: boolean
   reasoning?: boolean
+  document_vision?: boolean
+  document_vision_native?: boolean
+  document_ocr_native_pdf?: boolean
+  native_image_vision?: boolean
+  document_ocr_model?: string
+  document_vision_model?: string
   input?: string[]
   output_modalities?: string[]
+  modalities?: {
+    input?: string[]
+    output?: string[]
+  }
+  options?: Record<string, unknown>
+  variants?: Record<string, Record<string, unknown>>
 }
 
 type AiFactoryVisibilityRule = {
@@ -216,33 +228,67 @@ type AiFactoryVisibilityRule = {
   visible: boolean
 }
 
+function aiFactoryRuleScore(pattern: string, modelID: string) {
+  if (pattern === "*") return 0
+  if (pattern.toLowerCase() === modelID.toLowerCase()) return 1000 + pattern.length
+  const expression = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
+  if (new RegExp(`^${expression}$`, "i").test(modelID))
+    return 100 - (pattern.split("*").length - 1) * 10 + pattern.length
+  return -1
+}
+
 function aiFactoryRule(modelID: string, rules: AiFactoryRule[] | undefined) {
-  const rule = rules?.find((item) => {
-    const pattern = item.pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
-    return new RegExp(`^${pattern}$`, "i").test(modelID)
-  })
+  const rule = rules
+    ?.map((item) => ({ item, score: aiFactoryRuleScore(item.pattern, modelID) }))
+    .filter((item) => item.score >= 0)
+    .sort((a, b) => b.score - a.score)
+    .at(0)?.item
+  const configuredInput = rule?.input ?? rule?.modalities?.input ?? ["text"]
+  const documentInput = rule?.document_vision_native
+    ? [...new Set([...configuredInput, "pdf"])]
+    : configuredInput.filter((value) => value !== "pdf")
   return {
     context: rule?.context ?? 200_000,
     output: rule?.output ?? 32_000,
     temperature: rule?.temperature ?? true,
     reasoning: rule?.reasoning ?? /(^o[134]\b)|(^gpt-5\b)|claude|reason|r1|deepseek|gemini/i.test(modelID),
-    input: rule?.input ?? ["text"],
-    outputModalities: rule?.output_modalities ?? ["text"],
+    input:
+      rule?.native_image_vision === true
+        ? [...new Set([...documentInput, "image"])]
+        : documentInput.filter((value) => value !== "image"),
+    document: {
+      ocr: rule?.document_ocr_model,
+      ocr_pdf: rule?.document_ocr_native_pdf,
+      vision: rule?.document_vision_model,
+    },
+    outputModalities: rule?.output_modalities ?? rule?.modalities?.output ?? ["text"],
+    options: rule?.options ?? {},
+    variants: rule?.variants ?? {},
   }
 }
 
 function aiFactoryVisible(modelID: string, rules: AiFactoryVisibilityRule[], defaults: string[]) {
   if (defaults.includes(modelID)) return true
-  const rule = rules.filter((item) => {
-    const pattern = item.pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
-    return new RegExp(`^${pattern}$`, "i").test(modelID)
-  }).at(-1)
+  const rule = rules
+    .filter((item) => {
+      const pattern = item.pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
+      return new RegExp(`^${pattern}$`, "i").test(modelID)
+    })
+    .at(-1)
   if (rule) return rule.visible
   return !["*embedding*", "all-proxy-models", "all-team-models"].some((pattern) => {
     const expression = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
     return new RegExp(`^${expression}$`, "i").test(modelID)
   })
 }
+
+// Provider state is built per directory; cache discovery per server boot so
+// every project bootstrap does not refetch the same model list.
+const aiFactoryDiscoveryCache = new Map<
+  string,
+  { until: number; models: ReturnType<typeof aiFactoryModels> }
+>()
+const AIFACTORY_DISCOVERY_TTL = 5 * 60 * 1000
 
 async function discoverAiFactoryModels(
   token: string,
@@ -253,6 +299,9 @@ async function discoverAiFactoryModels(
   fetchFn: FetchLike = fetch,
 ) {
   const url = `${baseURL.replace(/\/$/, "")}/models`
+  const cacheKey = `${url}|${token}`
+  const cached = aiFactoryDiscoveryCache.get(cacheKey)
+  if (cached && cached.until > Date.now()) return cached.models
   console.info("[aifactory] discovering models", { url })
   const response = await fetchFn(url, {
     headers: {
@@ -262,7 +311,11 @@ async function discoverAiFactoryModels(
     signal: AbortSignal.timeout(5000),
   })
   if (!response.ok) {
-    console.warn("[aifactory] model discovery failed", { url, status: response.status, statusText: response.statusText })
+    console.warn("[aifactory] model discovery failed", {
+      url,
+      status: response.status,
+      statusText: response.statusText,
+    })
     return {}
   }
   const payload = (await response.json()) as { data?: Array<{ id?: string; created?: number | string }> }
@@ -273,6 +326,8 @@ async function discoverAiFactoryModels(
     visibility,
     defaults,
   )
+  if (Object.keys(models).length > 0)
+    aiFactoryDiscoveryCache.set(cacheKey, { until: Date.now() + AIFACTORY_DISCOVERY_TTL, models })
   console.info("[aifactory] discovered models", { url, count: Object.keys(models).length })
   return models
 }
@@ -283,15 +338,20 @@ async function discoverAiFactoryModelcards(
   rules: AiFactoryRule[] | undefined,
   visibility: AiFactoryVisibilityRule[],
   defaults: string[],
+  config?: ConfigV1.Info,
 ) {
-  const url = `${updateBaseUrl()}/modelcards.json`
+  const url = `${updateBaseUrl(config)}/modelcards.json`
   console.info("[aifactory] using model cards as fallback", { url })
   const response = await fetch(url, {
     headers: { [PROVIDER_CONFIG_AIFACTORY_API_KEY_HEADER]: token },
     signal: AbortSignal.timeout(5000),
   })
   if (!response.ok) {
-    console.warn("[aifactory] model card fallback failed", { url, status: response.status, statusText: response.statusText })
+    console.warn("[aifactory] model card fallback failed", {
+      url,
+      status: response.status,
+      statusText: response.statusText,
+    })
     return {}
   }
   const payload = (await response.json()) as { aifactory?: { models?: Array<{ model?: string }> } }
@@ -313,53 +373,64 @@ function aiFactoryModels(
   visibility: AiFactoryVisibilityRule[],
   defaults: string[],
 ) {
-  const models = Object.fromEntries(
-    [...new Set([...modelIDs, ...defaults])].filter((id) => aiFactoryVisible(id, visibility, defaults)).map((id) => {
-      const override = aiFactoryRule(id, rules)
-      const modality = (value: string) => ({
-        text: value === "text",
-        audio: value === "audio",
-        image: value === "image",
-        video: value === "video",
-        pdf: value === "pdf",
-      })
-      return [id, {
-        id: ModelV2.ID.make(id),
-        providerID: ProviderV2.ID.make("aifactory"),
-        api: { id, url: baseURL, npm: "@ai-sdk/openai-compatible" },
-        name: id,
-        family: id.split(/[-/]/)[0],
-        capabilities: {
-          temperature: override.temperature,
-          reasoning: override.reasoning,
-          attachment: override.input.some((value) => value !== "text"),
-          toolcall: true,
-          input: {
-            text: override.input.includes("text"),
-            audio: override.input.includes("audio"),
-            image: override.input.includes("image"),
-            video: override.input.includes("video"),
-            pdf: override.input.includes("pdf"),
-          },
-          output: {
-            text: override.outputModalities.includes("text"),
-            audio: override.outputModalities.includes("audio"),
-            image: override.outputModalities.includes("image"),
-            video: override.outputModalities.includes("video"),
-            pdf: override.outputModalities.includes("pdf"),
-          },
-          interleaved: false,
-        },
-        cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
-        limit: { context: override.context, output: override.output },
-        status: "active",
-        options: {},
-        headers: {},
-        release_date: "",
-        variants: {},
-      } satisfies Model] as const
-    }),
+  const hiddenWorkers = new Set(
+    (rules ?? [])
+      .flatMap((rule) => [rule.document_ocr_model, rule.document_vision_model])
+      .filter((id): id is string => typeof id === "string" && id.trim() !== "")
+      .filter((id) => !modelIDs.includes(id) && !defaults.includes(id)),
   )
+  const models = Object.fromEntries(
+    [...new Set([...modelIDs, ...defaults, ...hiddenWorkers])]
+      .filter((id) => hiddenWorkers.has(id) || aiFactoryVisible(id, visibility, defaults))
+      .map((id) => {
+        const override = aiFactoryRule(id, rules)
+        const input = hiddenWorkers.has(id) ? [...new Set([...override.input, "image"])] : override.input
+        return [
+          id,
+          {
+            id: ModelV2.ID.make(id),
+            providerID: ProviderV2.ID.make("aifactory"),
+            api: { id, url: baseURL, npm: "@ai-sdk/openai-compatible" },
+            name: id,
+            family: id.split(/[-/]/)[0],
+            capabilities: {
+              temperature: override.temperature,
+              reasoning: override.reasoning,
+              attachment: input.some((value) => value !== "text"),
+              toolcall: true,
+              input: {
+                text: input.includes("text"),
+                audio: input.includes("audio"),
+                image: input.includes("image"),
+                video: input.includes("video"),
+                pdf: input.includes("pdf"),
+              },
+              output: {
+                text: override.outputModalities.includes("text"),
+                audio: override.outputModalities.includes("audio"),
+                image: override.outputModalities.includes("image"),
+                video: override.outputModalities.includes("video"),
+                pdf: override.outputModalities.includes("pdf"),
+              },
+              interleaved: false,
+            },
+            cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+            limit: { context: override.context, output: override.output },
+            status: "active",
+            options: override.options,
+            headers: {},
+            release_date: "",
+            variants: override.variants,
+            document: override.document,
+          } satisfies Model,
+        ] as const
+      }),
+  )
+  for (const id of hiddenWorkers) {
+    const worker = models[id]
+    if (!worker) continue
+    Object.defineProperty(models, id, { value: worker, enumerable: false })
+  }
   return models
 }
 
@@ -456,7 +527,6 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         return [
           provider.options?.resourceName,
           auth?.type === "api" ? auth.metadata?.resourceName : undefined,
-          auth?.type === "oauth" ? auth.accountId : undefined,
           env["AZURE_RESOURCE_NAME"],
         ].find((name) => typeof name === "string" && name.trim() !== "")
       })
@@ -490,7 +560,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         },
       }
     }),
-    "azure-cognitive-services": Effect.fnUntraced(function* (provider: Info) {
+    "azure-cognitive-services": Effect.fnUntraced(function* () {
       const resourceName = yield* dep.get("AZURE_COGNITIVE_SERVICES_RESOURCE_NAME")
       return {
         autoload: false,
@@ -498,9 +568,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
           return selectAzureLanguageModel(sdk, modelID, Boolean(options?.["useCompletionUrls"]))
         },
         options: {
-          baseURL: resourceName
-            ? `https://${resourceName}.cognitiveservices.azure.com/openai${provider.options?.useDeploymentBasedUrls ? "" : "/v1"}`
-            : undefined,
+          baseURL: resourceName ? `https://${resourceName}.cognitiveservices.azure.com/openai` : undefined,
         },
       }
     }),
@@ -732,10 +800,11 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       return {
         autoload: true,
         vars(_options: Record<string, any>) {
+          const endpoint = location === "global" ? "aiplatform.googleapis.com" : `${location}-aiplatform.googleapis.com`
           return {
             ...(project && { GOOGLE_VERTEX_PROJECT: project }),
             GOOGLE_VERTEX_LOCATION: location,
-            GOOGLE_VERTEX_ENDPOINT: googleVertexEndpoint(location),
+            GOOGLE_VERTEX_ENDPOINT: endpoint,
           }
         },
         options: {
@@ -1012,11 +1081,9 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         )
       }
 
+      // Use official ai-gateway-provider package (v2.x for AI SDK v5 compatibility)
       const { createAiGateway } = yield* Effect.promise(() => import("ai-gateway-provider"))
       const { createUnified } = yield* Effect.promise(() => import("ai-gateway-provider/providers/unified"))
-      const { createOpenAI } = yield* Effect.promise(() => import("ai-gateway-provider/providers/openai"))
-      const { createAnthropic } = yield* Effect.promise(() => import("ai-gateway-provider/providers/anthropic"))
-      const { createOpenAICompatible } = yield* Effect.promise(() => import("@ai-sdk/openai-compatible"))
 
       const metadata = iife(() => {
         if (input.options?.metadata) return input.options.metadata
@@ -1043,43 +1110,13 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         apiKey: apiToken,
         ...(Object.values(opts).some((v) => v !== undefined) ? { options: opts } : {}),
       })
+      const unified = createUnified({ apiKey: apiToken })
+
       return {
         autoload: true,
         async getModel(_sdk: any, modelID: string, _options?: Record<string, any>) {
-          // Model IDs use Unified API format: provider/model (e.g., "anthropic/claude-sonnet-4-5").
-          // OpenAI and Anthropic ride their native passthrough routes so agents get the Responses
-          // and Messages APIs; new OpenAI models reject tools+reasoning_effort on chat completions.
-          // The passthrough wrappers inject a CF_TEMP_TOKEN sentinel that the gateway strips before
-          // dispatch, so upstream billing stays on the gateway (Unified Billing / stored BYOK).
-          if (modelID.startsWith("openai/")) return aigateway(createOpenAI()(modelID.slice("openai/".length)))
-          // models.dev lists Anthropic ids with dotted versions (claude-haiku-4.5); Anthropic's
-          // Messages API expects dashed native slugs (claude-haiku-4-5), so translate before passing.
-          // No native Anthropic slug contains a dot, so the blanket replacement is lossless here -
-          // unlike OpenAI above, whose native ids (e.g. gpt-4.1) keep their dots and must not be touched.
-          if (modelID.startsWith("anthropic/"))
-            return aigateway(createAnthropic()(modelID.slice("anthropic/".length).replaceAll(".", "-")))
-          // Workers AI is the only first-party provider whose upstream is Cloudflare itself, so it is
-          // the only one that should receive the Cloudflare token as its upstream Authorization header.
-          // The Unified API addresses Workers AI both with the explicit "workers-ai/" prefix and as
-          // bare "@cf/..." ids. Third-party providers must not receive the token; they rely on the
-          // gateway's stored/BYOK keys instead.
-          // Workers AI is Cloudflare's own upstream, so it rides the unified compat route with the
-          // Cloudflare token as its upstream Authorization header.
-          const isWorkersAi = modelID.startsWith("workers-ai/") || modelID.startsWith("@cf/")
-          if (isWorkersAi) return aigateway(createUnified({ apiKey: apiToken })(modelID))
-
-          // Every other third-party provider (google, xai, alibaba, deepseek, moonshotai, …) is only
-          // served by Cloudflare's catalog-aware REST API. The universal/compat gateway route rejects
-          // them with "Invalid provider" (the gateway's compat endpoint doesn't front those upstreams),
-          // so point an OpenAI-compatible client at the REST endpoint and bind it to the gateway with
-          // cf-aig-gateway-id — that keeps requests gateway-routed (analytics/caching/BYOK), not a
-          // bypass. models.dev ids (provider/model, dotted) pass through unchanged.
-          return createOpenAICompatible({
-            name: "cloudflare-ai-gateway",
-            baseURL: `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1`,
-            apiKey: apiToken,
-            headers: { "cf-aig-gateway-id": gateway },
-          })(modelID)
+          // Model IDs use Unified API format: provider/model (e.g., "anthropic/claude-sonnet-4-5")
+          return aigateway(unified(modelID))
         },
         options: {},
       }
@@ -1207,27 +1244,37 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       const auth = yield* dep.auth(input.id)
       const configured = yield* dep.config()
       const configuredKey = configured.provider?.[input.id]?.options?.apiKey
-      const token = auth?.type === "api" ? auth.key : input.key ?? configuredKey
+      const token = auth?.type === "api" ? auth.key : (input.key ?? configuredKey)
       if (!token) return { autoload: false }
       const baseURL =
         (typeof input.options.baseURL === "string" && input.options.baseURL.trim()) ||
         aiFactoryBaseURL({ aifactory_host: configured.aifactory_host ?? process.env.OPENCODE_AIFACTORY_HOST })
       const config = yield* Effect.promise(() =>
-        readProviderConfig(fetch, {
-          headers: { "X-OpenCode-AiFactory-Api-Key": token },
-        }),
+        readProviderConfig(
+          fetch,
+          {
+            headers: { "X-OpenCode-AiFactory-Api-Key": token },
+          },
+          configured,
+        ),
       )
-      const rawRules = isRecord(config.aifactory) && Array.isArray(config.aifactory.model_limits) ? config.aifactory.model_limits : []
+      const rawRules =
+        isRecord(config.aifactory) && Array.isArray(config.aifactory.model_limits) ? config.aifactory.model_limits : []
       const rules = rawRules.flatMap((value) => {
         if (!isRecord(value) || typeof value.pattern !== "string") return []
         return [value as unknown as AiFactoryRule]
       })
-      const rawVisibility = isRecord(config.aifactory) && Array.isArray(config.aifactory.model_visibility) ? config.aifactory.model_visibility : []
+      const rawVisibility =
+        isRecord(config.aifactory) && Array.isArray(config.aifactory.model_visibility)
+          ? config.aifactory.model_visibility
+          : []
       const visibility = rawVisibility.flatMap((value) => {
         if (!isRecord(value) || typeof value.pattern !== "string" || typeof value.visible !== "boolean") return []
         return [value as AiFactoryVisibilityRule]
       })
-      const defaults = [config.model, config.small_model].flatMap((value) => typeof value === "string" && value.trim() ? [value.trim()] : [])
+      const defaults = [config.model, config.small_model].flatMap((value) =>
+        typeof value === "string" && value.trim() ? [value.trim()] : [],
+      )
       return {
         autoload: true,
         async getModel(sdk: any, modelID: string) {
@@ -1235,7 +1282,14 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         },
         async discoverModels() {
           try {
-            const models = await discoverAiFactoryModels(token, baseURL, rules, visibility, defaults, providerFetch(AIFACTORY_ID, configured.http_proxy))
+            const models = await discoverAiFactoryModels(
+              token,
+              baseURL,
+              rules,
+              visibility,
+              defaults,
+              providerFetch(AIFACTORY_ID, configured.http_proxy),
+            )
             if (Object.keys(models).length > 0) return models
           } catch (error) {
             console.error("[aifactory] model discovery failed", {
@@ -1244,10 +1298,10 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
             })
           }
           try {
-            return await discoverAiFactoryModelcards(token, baseURL, rules, visibility, defaults)
+            return await discoverAiFactoryModelcards(token, baseURL, rules, visibility, defaults, configured)
           } catch (error) {
             console.error("[aifactory] model card fallback failed", {
-              url: `${updateBaseUrl()}/modelcards.json`,
+              url: `${updateBaseUrl(configured)}/modelcards.json`,
               error: error instanceof Error ? error.message : String(error),
             })
             return {}
@@ -1273,15 +1327,13 @@ const ProviderModalities = Schema.Struct({
   pdf: Schema.Boolean,
 })
 
-const ProviderInterleavedField = Schema.Union([
-  Schema.Literals(["reasoning", "reasoning_content", "reasoning_text"]),
-  Schema.String,
-])
-
 const ProviderInterleaved = Schema.Union([
   Schema.Boolean,
   Schema.Struct({
-    field: ProviderInterleavedField,
+    field: Schema.Union([
+      Schema.Literals(["reasoning", "reasoning_content", "reasoning_text"]),
+      Schema.String,
+    ]),
   }),
 ])
 
@@ -1344,6 +1396,13 @@ export const Model = Schema.Struct({
   headers: Schema.Record(Schema.String, Schema.String),
   release_date: Schema.String,
   variants: optional(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Any))),
+  document: optional(
+    Schema.Struct({
+      ocr: optional(Schema.String),
+      ocr_pdf: optional(Schema.Boolean),
+      vision: optional(Schema.String),
+    }),
+  ),
 }).annotate({ identifier: "Model" })
 export type Model = Types.DeepMutable<Schema.Schema.Type<typeof Model>>
 
@@ -1511,17 +1570,6 @@ function cost(c: ModelsDev.Model["cost"]): Model["cost"] {
   return result
 }
 
-// Cloudflare AI Gateway routes OpenAI and Anthropic models through their native
-// passthrough SDKs (Responses / Messages APIs). Resolving the native npm before
-// variants are computed makes reasoning variants produce payloads the native
-// SDKs understand (e.g. anthropic `effort` instead of compat `reasoningEffort`).
-function cloudflareGatewayNpm(providerID: string, modelID: string) {
-  if (providerID !== "cloudflare-ai-gateway") return undefined
-  if (modelID.startsWith("openai/")) return "@ai-sdk/openai"
-  if (modelID.startsWith("anthropic/")) return "@ai-sdk/anthropic"
-  return undefined
-}
-
 function fromModelsDevModel(provider: ModelsDev.Provider, model: ModelsDev.Model): Model {
   const base: Model = {
     id: ModelV2.ID.make(model.id),
@@ -1531,11 +1579,7 @@ function fromModelsDevModel(provider: ModelsDev.Provider, model: ModelsDev.Model
     api: {
       id: model.id,
       url: model.provider?.api ?? provider.api ?? "",
-      npm:
-        cloudflareGatewayNpm(provider.id, model.id) ??
-        model.provider?.npm ??
-        provider.npm ??
-        "@ai-sdk/openai-compatible",
+      npm: model.provider?.npm ?? provider.npm ?? "@ai-sdk/openai-compatible",
     },
     status: model.status ?? "active",
     headers: {},
@@ -1591,7 +1635,14 @@ export function fromModelsDevProvider(provider: ModelsDev.Provider): Info {
         id: ModelV2.ID.make(id),
         name: `${model.name} ${mode[0].toUpperCase()}${mode.slice(1)}`,
         cost: opts.cost ? mergeDeep(base.cost, cost(opts.cost)) : base.cost,
-        options: modeOptions(base, opts.provider?.body),
+        options: opts.provider?.body
+          ? Object.fromEntries(
+              Object.entries(opts.provider.body).map(([k, v]) => [
+                k.replace(/_([a-z])/g, (_, c) => c.toUpperCase()),
+                v,
+              ]),
+            )
+          : base.options,
         headers: opts.provider?.headers ?? base.headers,
       }
     }
@@ -1604,17 +1655,6 @@ export function fromModelsDevProvider(provider: ModelsDev.Provider): Info {
     options: {},
     models,
   }
-}
-
-function modeOptions(model: Model, body: Record<string, unknown> | undefined) {
-  if (!body) return model.options
-  const options = Object.fromEntries(
-    Object.entries(body).map(([key, value]) => [key.replace(/_([a-z])/g, (_, char) => char.toUpperCase()), value]),
-  )
-  const reasoning = body.reasoning
-  if (model.api.npm !== "@ai-sdk/openai" || !isRecord(reasoning) || typeof reasoning.mode !== "string") return options
-  const { reasoning: _, ...rest } = options
-  return { ...rest, reasoningMode: reasoning.mode }
 }
 
 function modelSuggestions(provider: Info | undefined, modelID: ModelV2.ID, enableExperimentalModels: boolean) {
@@ -1771,9 +1811,6 @@ const layer = Layer.effect(
               model.provider?.npm ??
               provider.npm ??
               existingModel?.api.npm ??
-              // Config-defined gateway models bypass fromModelsDevModel, so resolve the
-              // native passthrough npm here before falling back to the catalog default.
-              cloudflareGatewayNpm(providerID, apiID) ??
               modelsDev[providerID]?.npm ??
               "@ai-sdk/openai-compatible"
             const name = iife(() => {
@@ -1963,7 +2000,6 @@ const layer = Layer.effect(
 
           for (const [modelID, model] of Object.entries(provider.models)) {
             model.api.id = model.api.id ?? model.id ?? modelID
-
             if (
               // These chat aliases are invalid for the special handling in the
               // built-in providers below, but custom providers may support them.
@@ -2095,15 +2131,16 @@ const layer = Layer.effect(
         if (existing) return existing
 
         const customFetch = options["fetch"]
-        const chunkTimeout = options["chunkTimeout"] ?? 300_000
-        const headerTimeout = options["headerTimeout"] ?? 300_000
+        const chunkTimeout = options["chunkTimeout"]
+        const headerTimeout = options["headerTimeout"]
         delete options["chunkTimeout"]
         delete options["headerTimeout"]
 
         options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
           const fetchFn = customFetch ?? fetch
           const opts = init ?? {}
-          const titleRequest = typeof opts.body === "string" && opts.body.includes("Generate a title for this conversation:")
+          const titleRequest =
+            typeof opts.body === "string" && opts.body.includes("Generate a title for this conversation:")
           if (titleRequest && typeof opts.body === "string") {
             const body = JSON.parse(opts.body)
             body.user = "opencode-title-generator"
@@ -2258,19 +2295,6 @@ const layer = Layer.effect(
       const s = yield* InstanceState.get(state)
       const provider = s.providers[providerID]
       if (!provider) return undefined
-
-      const experimental = yield* plugin.trigger<"experimental.provider.small_model">(
-        "experimental.provider.small_model",
-        { provider: toPublicInfo(provider) },
-        { model: undefined },
-      )
-      if (experimental.model) {
-        return {
-          ...experimental.model,
-          id: ModelV2.ID.make(experimental.model.id),
-          providerID: ProviderV2.ID.make(experimental.model.providerID),
-        }
-      }
 
       // TODO: Remove these provider-specific assumptions once model syncing reliably reports available deployments.
       if (providerID === ProviderV2.ID.azure || providerID === ProviderV2.ID.make("azure-cognitive-services")) {

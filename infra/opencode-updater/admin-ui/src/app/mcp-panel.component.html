@@ -1,0 +1,108 @@
+<article class="card mcp-card">
+  <header class="panel-header">
+    <div>
+      <p class="panel-kicker">Managed configuration</p>
+      <h2>MCP</h2>
+      <p>Servers configured here are delivered by the updater and cannot be deleted in the desktop app.</p>
+    </div>
+    <button type="button" class="secondary" (click)="add()">+ Add MCP</button>
+  </header>
+
+  <div class="channel-switch" role="tablist" aria-label="Updater channel">
+    <button type="button" [class.active]="channel === 'beta'" (click)="selectChannel('beta')">Beta channel</button>
+    <button type="button" [class.active]="channel === 'normal'" (click)="selectChannel('normal')">Normal channel</button>
+  </div>
+
+  @if (editing) {
+    <form class="mcp-form" (submit)="submit($event)">
+      <div class="form-title">
+        <strong>{{ editing === 'new' ? 'Add managed MCP' : 'Edit ' + editing }}</strong>
+        <span>Changes are published immediately to the {{ channel }} channel.</span>
+      </div>
+      <div class="form-grid">
+        <label>
+          Server name
+          <input name="name" [(ngModel)]="draft.name" [readonly]="editing !== 'new'" placeholder="for example, devops" required />
+        </label>
+        <label>
+          Transport
+          <select name="type" [(ngModel)]="draft.type">
+            <option value="remote">Remote HTTP</option>
+            <option value="local">Local command</option>
+          </select>
+        </label>
+        @if (draft.type === 'remote') {
+          <label class="full-width">
+            MCP URL
+            <input name="url" [(ngModel)]="draft.url" type="url" placeholder="https://mcp.example.com/mcp" required />
+          </label>
+        } @else {
+          <label class="full-width">
+            Command
+            <input name="command" [(ngModel)]="draft.command" placeholder="npx -y @modelcontextprotocol/server-filesystem /workspace" required />
+          </label>
+        }
+        <label>
+          Timeout (ms)
+          <input name="timeout" [(ngModel)]="draft.timeout" type="number" min="1" placeholder="Default" />
+        </label>
+        <label class="toggle">
+          <input name="enabled" [(ngModel)]="draft.enabled" type="checkbox" />
+          <span><strong>Enabled</strong><small>Expose this server to managed clients.</small></span>
+        </label>
+        <label>
+          Headers
+          <textarea name="headers" [(ngModel)]="draft.headers" rows="4" placeholder="X-Example=value"></textarea>
+        </label>
+        <label>
+          Environment
+          <textarea name="environment" [(ngModel)]="draft.environment" rows="4" placeholder="API_URL=https://..."></textarea>
+        </label>
+      </div>
+      <label class="pat-toggle">
+        <input name="usePat" [(ngModel)]="draft.usePat" type="checkbox" />
+        <span>Ask users for a personal access token</span>
+      </label>
+      @if (draft.usePat) {
+        <div class="form-grid pat-fields">
+          <label>Label<input name="patLabel" [(ngModel)]="draft.patLabel" placeholder="DevOps PAT" /></label>
+          <label>Header<input name="patHeader" [(ngModel)]="draft.patHeader" placeholder="Authorization" /></label>
+          <label>Placeholder<input name="patPlaceholder" [(ngModel)]="draft.patPlaceholder" placeholder="Personal access token" /></label>
+          <label>Prefix<input name="patPrefix" [(ngModel)]="draft.patPrefix" placeholder="Bearer " /></label>
+          <label class="full-width">Description<textarea name="patDescription" [(ngModel)]="draft.patDescription" rows="2" placeholder="Explain how users get this token."></textarea></label>
+        </div>
+      }
+      <div class="form-actions">
+        <button type="submit" [disabled]="saveMutation.isPending()">{{ saveMutation.isPending() ? 'Saving…' : 'Save MCP' }}</button>
+        <button type="button" class="secondary" (click)="cancel()">Cancel</button>
+      </div>
+    </form>
+  }
+
+  @if (error) { <p class="message error">{{ error }}</p> }
+  @if (status) { <p class="message">{{ status }}</p> }
+
+  <div class="mcp-list">
+    @if (mcps.isPending()) {
+      <div class="empty">Loading managed MCPs…</div>
+    } @else if (entries().length === 0) {
+      <div class="empty">No managed MCPs in the {{ channel }} channel yet.</div>
+    } @else {
+      @for (entry of entries(); track entry[0]) {
+        <section class="mcp-row">
+          <div class="mcp-icon">{{ entry[1].type === 'remote' ? '↗' : '⌘' }}</div>
+          <div class="mcp-copy">
+            <div><strong>{{ entry[0] }}</strong><span class="badge">Managed</span><span class="badge muted">{{ entry[1].type }}</span></div>
+            <code>{{ entry[1].type === 'remote' ? entry[1].url : entry[1].command?.join(' ') }}</code>
+            @if (entry[1].auth?.type === 'pat') { <small>Personal access token required</small> }
+          </div>
+          <div class="row-actions">
+            <span [class.off]="entry[1].enabled === false">{{ entry[1].enabled === false ? 'Disabled' : 'Enabled' }}</span>
+            <button type="button" class="secondary" (click)="edit(entry[0], entry[1])">Edit</button>
+            <button type="button" class="danger" [disabled]="deleteMutation.isPending()" (click)="remove(entry[0])">Remove</button>
+          </div>
+        </section>
+      }
+    }
+  </div>
+</article>

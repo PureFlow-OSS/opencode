@@ -1,7 +1,7 @@
 import { FormsModule } from "@angular/forms"
-import { Component, inject, signal } from "@angular/core"
+import { Component, effect, inject, signal } from "@angular/core"
 import { injectQuery } from "@tanstack/angular-query-experimental"
-import { ApiService, ModelSettings } from "./api.service"
+import { ApiService, ModelLimitsReport, ModelSettings, ProviderSettings } from "./api.service"
 
 @Component({
   selector: "app-model-status-panel",
@@ -15,10 +15,11 @@ import { ApiService, ModelSettings } from "./api.service"
           <p>Änderungen werden direkt in die gewählte Konfigurationsdatei gespeichert.</p>
         </div>
         <div class="header-actions">
-          <select [ngModel]="channel()" (ngModelChange)="setChannel($event)">
-            <option value="stable">Stable</option>
-            <option value="beta">Beta</option>
-          </select>
+          <div class="channel-switch" role="tablist" aria-label="Updater channel">
+            <button type="button" [class.active]="channel() === 'beta'" (click)="setChannel('beta')">Beta channel</button>
+            <button type="button" [class.active]="channel() === 'stable'" (click)="setChannel('stable')">Normal channel</button>
+          </div>
+          <button type="button" class="secondary" (click)="syncModels()" [disabled]="syncingModels()">{{ syncingModels() ? 'Refreshing…' : 'Fetch models from LiteLLM' }}</button>
           <div class="count-pill">Models: {{ models().length }}</div>
         </div>
       </div>
@@ -28,6 +29,56 @@ import { ApiService, ModelSettings } from "./api.service"
       @if (success()) {
         <div class="success-state">{{ success() }}</div>
       }
+      <form class="global-settings" (ngSubmit)="saveProviderSettings()">
+        <div>
+          <h3>Globale Modellvorgaben</h3>
+          <p>Diese Modelle gelten für alle OpenCode-Clients des gewählten Kanals, sofern keine lokale Konfiguration sie überschreibt.</p>
+        </div>
+        <label>Model
+          <select [ngModel]="providerDraft().model" (ngModelChange)="setProviderModel('model', $event)" name="providerModel" required>
+            @for (model of models(); track model.model) {
+              <option [value]="model.model">{{ model.model }}</option>
+            }
+          </select>
+        </label>
+        <label>Small model
+          <select [ngModel]="providerDraft().small_model" (ngModelChange)="setProviderModel('small_model', $event)" name="providerSmallModel" required>
+            @for (model of models(); track model.model) {
+              <option [value]="model.model">{{ model.model }}</option>
+            }
+          </select>
+        </label>
+        <button type="submit" [disabled]="savingProvider() || models().length === 0">{{ savingProvider() ? 'Saving…' : 'Save global models' }}</button>
+      </form>
+      <section class="cleanup-block">
+        <div class="header-row">
+          <div>
+            <h3>Veraltete Modellregeln</h3>
+            <p>Regeln ohne Treffer in der LiteLLM-Modelliste. Entfernen löscht die Regel samt zugehörigem Sichtbarkeits-Eintrag aus der gewählten Konfigurationsdatei. Die Fallback-Regel <code>*</code> wird nie entfernt.</p>
+          </div>
+          <button type="button" class="secondary" (click)="loadCleanupReport()" [disabled]="cleanupLoading()">{{ cleanupLoading() ? 'Checking…' : 'Check for stale rules' }}</button>
+        </div>
+        @if (cleanupReport(); as report) {
+          @if (staleEntries().length === 0) {
+            <div class="empty-state">Keine veralteten Regeln — alle {{ report.limits.length }} Regeln matchen {{ report.model_count }} LiteLLM-Modelle.</div>
+          } @else {
+            <ul class="cleanup-list">
+              @for (entry of staleEntries(); track entry.pattern) {
+                <li>
+                  <label>
+                    <input type="checkbox" [checked]="cleanupSelection().has(entry.pattern)" (change)="toggleCleanup(entry.pattern, $any($event.target).checked)" />
+                    <strong>{{ entry.pattern }}</strong>
+                    <span>— {{ entry.kinds.join(' + ') }}</span>
+                  </label>
+                </li>
+              }
+            </ul>
+            <div class="form-actions">
+              <button type="button" [disabled]="cleanupRunning() || cleanupSelection().size === 0" (click)="runCleanup()">{{ cleanupRunning() ? 'Removing…' : 'Remove selected (' + cleanupSelection().size + ')' }}</button>
+            </div>
+          }
+        }
+      </section>
       @if (models().length === 0) {
         <div class="empty-state">No model cards available yet.</div>
       } @else {
@@ -39,14 +90,53 @@ import { ApiService, ModelSettings } from "./api.service"
                   <strong>{{ model.model }}</strong>
                   <span>{{ model.config?.pattern || 'All models' }}</span>
                 </div>
-                <button type="button" class="secondary" (click)="edit(model)">Settings</button>
+                <div class="model-card-actions">
+                  <button type="button" class="secondary" (click)="syncContext(model.model)" [disabled]="syncingContext() === model.model">{{ syncingContext() === model.model ? 'Syncing…' : 'Sync context' }}</button>
+                  <button type="button" class="secondary" (click)="edit(model)">Settings</button>
+                </div>
               </div>
               @if (editing() === model.model) {
                 <form class="settings-form" (ngSubmit)="save(model.model)">
-                  <label>Context <input type="number" min="0" [ngModel]="draft().context" (ngModelChange)="setNumber('context', $event)" name="context" /></label>
+                  <label>Context <input type="number" min="0" [max]="model.liteLLM?.maxInputTokens ?? null" [ngModel]="draft().context" (ngModelChange)="setNumber('context', $event)" name="context" /></label>
                   <label>Output <input type="number" min="0" [ngModel]="draft().output" (ngModelChange)="setNumber('output', $event)" name="output" /></label>
                   <label><input type="checkbox" [ngModel]="draft().temperature" (ngModelChange)="setBoolean('temperature', $event)" name="temperature" /> Temperature</label>
                   <label><input type="checkbox" [ngModel]="draft().reasoning" (ngModelChange)="setBoolean('reasoning', $event)" name="reasoning" /> Thinking</label>
+                  @if (draft().reasoning) {
+                    <fieldset class="reasoning-settings">
+                      <legend>Reasoning levels for users</legend>
+                      @for (level of reasoningLevels; track level) {
+                        <label><input type="checkbox" [checked]="hasReasoningLevel(level)" (change)="setReasoningLevel(level, $any($event.target).checked)" /> {{ level }}</label>
+                      }
+                      <label>Default
+                        <select [ngModel]="draft().default_reasoning_variant" (ngModelChange)="setDefaultReasoningLevel($event)" name="defaultReasoning" [disabled]="!draft().reasoning_variants?.length">
+                          <option [ngValue]="null">Select a default</option>
+                          @for (level of draft().reasoning_variants || []; track level) {
+                            <option [value]="level">{{ level }}</option>
+                          }
+                        </select>
+                      </label>
+                    </fieldset>
+                  }
+                  <label><input type="checkbox" [ngModel]="draft().document_vision" (ngModelChange)="setBoolean('document_vision', $event)" name="documentVision" /> Document Vision</label>
+                  <label><input type="checkbox" [ngModel]="draft().document_vision_native" (ngModelChange)="setBoolean('document_vision_native', $event)" name="documentVisionNative" /> Document Vision Native</label>
+                  <label><input type="checkbox" [ngModel]="draft().document_ocr_native_pdf" (ngModelChange)="setBoolean('document_ocr_native_pdf', $event)" name="documentOcrNativePdf" /> Direct PDF OCR (send PDF to OCR model)</label>
+                  <label><input type="checkbox" [ngModel]="draft().native_image_vision" (ngModelChange)="setBoolean('native_image_vision', $event)" name="nativeImageVision" /> Native Image Vision</label>
+                  <label>Document OCR model
+                    <select [ngModel]="draft().document_ocr_model" (ngModelChange)="setText('document_ocr_model', $event)" name="documentOcrModel">
+                      <option [ngValue]="null">No OCR model</option>
+                      @for (availableModel of models(); track availableModel.model) {
+                        <option [value]="availableModel.model">{{ availableModel.model }}</option>
+                      }
+                    </select>
+                  </label>
+                  <label>Document Vision model
+                    <select [ngModel]="draft().document_vision_model" (ngModelChange)="setText('document_vision_model', $event)" name="documentVisionModel">
+                      <option [ngValue]="null">No Vision model</option>
+                      @for (availableModel of models(); track availableModel.model) {
+                        <option [value]="availableModel.model">{{ availableModel.model }}</option>
+                      }
+                    </select>
+                  </label>
                   <label><input type="checkbox" [ngModel]="draft().visible" (ngModelChange)="setBoolean('visible', $event)" name="visible" /> Visible in OpenCode</label>
                   <label>Input modalities <input [ngModel]="draft().input_modalities?.join(', ')" (ngModelChange)="setModalities('input_modalities', $event)" name="inputModalities" placeholder="text, image" /></label>
                   <label>Output modalities <input [ngModel]="draft().output_modalities?.join(', ')" (ngModelChange)="setModalities('output_modalities', $event)" name="outputModalities" placeholder="text" /></label>
@@ -58,8 +148,21 @@ import { ApiService, ModelSettings } from "./api.service"
               } @else {
                 <div class="meta-grid">
                   <div class="meta-item"><small>Context</small><strong>{{ formatNumber(model.config?.context ?? model.context) }}</strong></div>
+                  @if (model.liteLLM?.maxInputTokens) {
+                    <div class="meta-item"><small>LiteLLM max input</small><strong>{{ formatNumber(model.liteLLM?.maxInputTokens) }}</strong></div>
+                  }
                   <div class="meta-item"><small>Output</small><strong>{{ formatNumber(model.config?.output ?? model.output) }}</strong></div>
                   <div class="meta-item"><small>Thinking</small><strong>{{ formatBoolean(model.config?.reasoning ?? model.reasoning) }}</strong></div>
+                  @if ((model.config?.reasoning ?? model.reasoning) && (model.config?.reasoningVariants ?? model.reasoningVariants)?.length) {
+                    <div class="meta-item"><small>Reasoning levels</small><strong>{{ (model.config?.reasoningVariants ?? model.reasoningVariants ?? []).join(', ') }}</strong></div>
+                    <div class="meta-item"><small>Default reasoning</small><strong>{{ model.config?.defaultReasoningVariant ?? model.defaultReasoningVariant ?? 'n/a' }}</strong></div>
+                  }
+                  <div class="meta-item"><small>Document Vision</small><strong>{{ formatBoolean(model.config?.documentVision ?? model.documentVision) }}</strong></div>
+                  <div class="meta-item"><small>Document Vision Native</small><strong>{{ formatBoolean(model.config?.documentVisionNative ?? model.documentVisionNative) }}</strong></div>
+                  <div class="meta-item"><small>Direct PDF OCR</small><strong>{{ formatBoolean(model.config?.documentOcrNativePdf ?? model.documentOcrNativePdf) }}</strong></div>
+                  <div class="meta-item"><small>Native Image Vision</small><strong>{{ formatBoolean(model.config?.nativeImageVision ?? model.nativeImageVision) }}</strong></div>
+                  <div class="meta-item"><small>Document OCR model</small><strong>{{ model.config?.documentOcrModel ?? model.documentOcrModel ?? 'n/a' }}</strong></div>
+                  <div class="meta-item"><small>Document Vision model</small><strong>{{ model.config?.documentVisionModel ?? model.documentVisionModel ?? 'n/a' }}</strong></div>
                   <div class="meta-item"><small>Visible in OpenCode</small><strong>{{ formatBoolean(model.visible) }}</strong></div>
                   <div class="meta-item"><small>Input Cost /1M</small><strong>{{ formatPrice(model.price?.input ?? model.liteLLM?.inputCostPerMillionTokens) }}</strong></div>
                   <div class="meta-item"><small>Output Cost /1M</small><strong>{{ formatPrice(model.price?.output ?? model.liteLLM?.outputCostPerMillionTokens) }}</strong></div>
@@ -81,42 +184,205 @@ export class ModelStatusPanelComponent {
   readonly channel = signal<"stable" | "beta">("stable")
   readonly editing = signal<string | null>(null)
   readonly draft = signal<ModelSettings>({})
+  readonly providerDraft = signal<ProviderSettings>({})
   readonly saving = signal(false)
+  readonly savingProvider = signal(false)
+  readonly syncingContext = signal<string | null>(null)
+  readonly syncingModels = signal(false)
   readonly error = signal<string | null>(null)
   readonly success = signal<string | null>(null)
+  readonly cleanupReport = signal<ModelLimitsReport | null>(null)
+  readonly cleanupLoading = signal(false)
+  readonly cleanupRunning = signal(false)
+  readonly cleanupSelection = signal<Set<string>>(new Set())
+  readonly reasoningLevels = ["low", "medium", "high", "xhigh"] as const
   readonly modelCards = injectQuery(() => ({
     queryKey: ["model-cards", this.channel()],
     queryFn: () => this.api.listModelCards(this.channel()),
   }))
+  readonly providerSettings = injectQuery(() => ({
+    queryKey: ["provider-settings", this.channel()],
+    queryFn: () => this.api.getProviderSettings(this.channel()),
+  }))
 
   readonly models = () => this.modelCards.data()?.aifactory?.models ?? []
+
+  constructor() {
+    effect(() => {
+      const settings = this.providerSettings.data()
+      if (settings) this.providerDraft.set(settings)
+    })
+  }
 
   setChannel(channel: "stable" | "beta") {
     this.channel.set(channel)
     this.editing.set(null)
     this.error.set(null)
     this.success.set(null)
+    this.cleanupReport.set(null)
+    this.cleanupSelection.set(new Set())
   }
 
-  edit(model: { model: string; context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; visible?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null; config?: { context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null } | null }) {
+  readonly staleEntries = () => {
+    const report = this.cleanupReport()
+    if (!report) return []
+    const entries = new Map<string, { pattern: string; kinds: string[] }>()
+    for (const limit of report.limits) {
+      if (!limit.stale) continue
+      entries.set(limit.pattern, { pattern: limit.pattern, kinds: ["Modellregel"] })
+    }
+    for (const visibility of report.visibility) {
+      if (!visibility.stale) continue
+      const existing = entries.get(visibility.pattern)
+      if (existing) existing.kinds.push("Sichtbarkeit")
+      else entries.set(visibility.pattern, { pattern: visibility.pattern, kinds: ["Sichtbarkeit"] })
+    }
+    return [...entries.values()]
+  }
+
+  async syncModels() {
+    this.syncingModels.set(true)
+    this.error.set(null)
+    this.success.set(null)
+    try {
+      const result = await this.api.syncModelCards()
+      if (!result.synced) {
+        this.error.set("Sync konnte nicht ausgeführt werden — LiteLLM ist nicht konfiguriert oder ein laufender Sync blockiert")
+        return
+      }
+      await this.modelCards.refetch()
+      this.success.set(`${result.count} Modelle von LiteLLM geladen (${result.source})`)
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : "Could not sync models from LiteLLM")
+    } finally {
+      this.syncingModels.set(false)
+    }
+  }
+
+  async loadCleanupReport() {
+    this.cleanupLoading.set(true)
+    this.error.set(null)
+    this.success.set(null)
+    try {
+      const report = await this.api.getModelLimitsReport(this.channel())
+      this.cleanupReport.set(report)
+      this.cleanupSelection.set(new Set(this.staleEntries().map((entry) => entry.pattern)))
+    } catch (error) {
+      this.cleanupReport.set(null)
+      this.error.set(error instanceof Error ? error.message : "Could not load model limits report")
+    } finally {
+      this.cleanupLoading.set(false)
+    }
+  }
+
+  toggleCleanup(pattern: string, checked: boolean) {
+    this.cleanupSelection.update((selection) => {
+      const next = new Set(selection)
+      if (checked) next.add(pattern)
+      else next.delete(pattern)
+      return next
+    })
+  }
+
+  async runCleanup() {
+    const patterns = [...this.cleanupSelection()]
+    if (patterns.length === 0) return
+    this.cleanupRunning.set(true)
+    this.error.set(null)
+    this.success.set(null)
+    try {
+      const result = await this.api.cleanupModelLimits(this.channel(), patterns)
+      this.cleanupReport.set(null)
+      this.cleanupSelection.set(new Set())
+      await this.modelCards.refetch()
+      this.success.set(`${result.removed} Modellregel(n) aus appsettings${this.channel() === "beta" ? ".beta" : ""}.json entfernt`)
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : "Could not remove stale model rules")
+    } finally {
+      this.cleanupRunning.set(false)
+    }
+  }
+
+  setProviderModel(key: "model" | "small_model", value: string) {
+    this.providerDraft.update((settings) => ({ ...settings, [key]: value }))
+  }
+
+  async saveProviderSettings() {
+    this.savingProvider.set(true)
+    this.error.set(null)
+    this.success.set(null)
+    try {
+      await this.api.saveProviderSettings(this.channel(), this.providerDraft())
+      await this.providerSettings.refetch()
+      this.success.set(`Saved global models to appsettings${this.channel() === "beta" ? ".beta" : ""}.json`)
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : "Could not save global model settings")
+    } finally {
+      this.savingProvider.set(false)
+    }
+  }
+
+  edit(model: { model: string; context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; reasoningVariants?: string[] | null; defaultReasoningVariant?: string | null; documentVision?: boolean; documentVisionNative?: boolean; documentOcrNativePdf?: boolean; nativeImageVision?: boolean; documentOcrModel?: string | null; documentVisionModel?: string | null; visible?: boolean | null; modalities?: { input?: string[]; output?: string[] } | null; liteLLM?: { maxInputTokens?: number | null } | null; config?: { context?: number | null; output?: number | null; temperature?: boolean | null; reasoning?: boolean | null; reasoningVariants?: string[] | null; defaultReasoningVariant?: string | null; documentVision?: boolean | null; documentVisionNative?: boolean | null; documentOcrNativePdf?: boolean | null; nativeImageVision?: boolean | null; documentOcrModel?: string | null; documentVisionModel?: string | null; modalities?: { input?: string[]; output?: string[] } | null } | null }) {
     this.editing.set(model.model)
     this.draft.set({
       context: model.config?.context ?? model.context ?? null,
       output: model.config?.output ?? model.output ?? null,
       temperature: model.config?.temperature ?? model.temperature ?? null,
       reasoning: model.config?.reasoning ?? model.reasoning ?? null,
+      reasoning_variants: model.config?.reasoningVariants ?? model.reasoningVariants ?? [],
+      default_reasoning_variant: model.config?.defaultReasoningVariant ?? model.defaultReasoningVariant ?? null,
+      document_vision: model.config?.documentVision ?? model.documentVision ?? false,
+      document_vision_native: model.config?.documentVisionNative ?? model.documentVisionNative ?? false,
+      document_ocr_native_pdf: model.config?.documentOcrNativePdf ?? model.documentOcrNativePdf ?? false,
+      native_image_vision: model.config?.nativeImageVision ?? model.nativeImageVision ?? false,
+      document_ocr_model: model.config?.documentOcrModel ?? model.documentOcrModel ?? null,
+      document_vision_model: model.config?.documentVisionModel ?? model.documentVisionModel ?? null,
       visible: model.visible ?? true,
       input_modalities: model.modalities?.input ?? model.config?.modalities?.input ?? [],
       output_modalities: model.modalities?.output ?? model.config?.modalities?.output ?? [],
     })
   }
 
+  async syncContext(model: string) {
+    this.syncingContext.set(model)
+    this.error.set(null)
+    this.success.set(null)
+    try {
+      const result = await this.api.syncModelContext(model, this.channel())
+      await this.modelCards.refetch()
+      this.success.set(`Synced ${model} context to ${this.formatNumber(result.context)} from LiteLLM`)
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : "Could not sync context from LiteLLM")
+    } finally {
+      this.syncingContext.set(null)
+    }
+  }
+
   setNumber(key: "context" | "output", value: string) {
     this.draft.update((draft) => ({ ...draft, [key]: value === "" ? null : Number(value) }))
   }
 
-  setBoolean(key: "temperature" | "reasoning" | "visible", value: boolean) {
-    this.draft.update((draft) => ({ ...draft, [key]: value }))
+  setText(key: "document_ocr_model" | "document_vision_model", value: string) {
+    this.draft.update((draft) => ({ ...draft, [key]: value.trim() || null }))
+  }
+
+  setBoolean(key: "temperature" | "reasoning" | "document_vision" | "document_vision_native" | "document_ocr_native_pdf" | "native_image_vision" | "visible", value: boolean) {
+    this.draft.update((draft) => key === "reasoning" && !value ? { ...draft, reasoning: value, reasoning_variants: [], default_reasoning_variant: null } : { ...draft, [key]: value })
+  }
+
+  hasReasoningLevel(level: string) {
+    return this.draft().reasoning_variants?.includes(level) ?? false
+  }
+
+  setReasoningLevel(level: string, enabled: boolean) {
+    this.draft.update((draft) => {
+      const reasoning_variants = enabled ? [...new Set([...(draft.reasoning_variants ?? []), level])] : (draft.reasoning_variants ?? []).filter((item) => item !== level)
+      return { ...draft, reasoning_variants, default_reasoning_variant: reasoning_variants.includes(draft.default_reasoning_variant ?? "") ? draft.default_reasoning_variant : reasoning_variants[0] ?? null }
+    })
+  }
+
+  setDefaultReasoningLevel(value: string | null) {
+    this.draft.update((draft) => ({ ...draft, default_reasoning_variant: value || null }))
   }
 
   setModalities(key: "input_modalities" | "output_modalities", value: string) {

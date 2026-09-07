@@ -65,6 +65,21 @@ describe("parseReadableConfigInvalidError", () => {
 
     expect(result).toBe("Arquivo de config em config invalido: Bad value")
   })
+
+  test("omits JSONC input from parse diagnostics", () => {
+    const error = {
+      name: "ConfigInvalidError",
+      data: {
+        path: "opencode.json",
+        message: "\n--- JSONC Input ---\n{\n  \"token\": \"secret\"\n}\n--- Errors ---\nExpected comma at line 2\n--- End ---",
+      },
+    } satisfies ConfigInvalidError
+
+    const result = parseReadableConfigInvalidError(error, language.t)
+
+    expect(result).toBe("Arquivo de config em opencode.json invalido: Expected comma at line 2")
+    expect(result).not.toContain("secret")
+  })
 })
 
 describe("formatServerError", () => {

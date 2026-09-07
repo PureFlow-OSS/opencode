@@ -11,6 +11,12 @@ test("providerConfigPayload accepts bare provider config", () => {
   expect(ConfigManaged.providerConfigPayload(payload)).toBe(payload)
 })
 
+test("uses the updater URL from opencode.json before the embedded default", () => {
+  expect(ConfigManaged.providerConfigUrl({ updater: "http://localhost/opencode/" })).toBe(
+    "http://localhost/opencode/provider-config.json",
+  )
+})
+
 test("providerConfigPayload accepts nested updater provider config", () => {
   expect(
     ConfigManaged.providerConfigPayload({

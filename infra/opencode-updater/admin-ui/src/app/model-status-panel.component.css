@@ -44,6 +44,26 @@ button.secondary {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.channel-switch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.channel-switch button {
+  padding: 8px 12px;
+  background: transparent;
+  color: rgba(242, 244, 248, 0.72);
+}
+
+.channel-switch button.active {
+  background: rgba(123, 140, 255, 0.28);
+  color: #fff;
+}
+
 .error-state {
   margin-bottom: 16px;
   padding: 10px 12px;
@@ -71,6 +91,98 @@ button.secondary {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.global-settings {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid rgba(123, 140, 255, 0.3);
+  border-radius: 16px;
+  background: rgba(123, 140, 255, 0.08);
+}
+
+.global-settings h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.global-settings p {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(242, 244, 248, 0.68);
+}
+
+.global-settings label {
+  display: grid;
+  gap: 6px;
+  color: rgba(242, 244, 248, 0.82);
+  font-size: 13px;
+}
+
+.global-settings button {
+  align-self: end;
+  margin-bottom: 14px;
+}
+
+.cleanup-block {
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid rgba(255, 180, 120, 0.28);
+  border-radius: 16px;
+  background: rgba(255, 180, 120, 0.06);
+}
+
+.cleanup-block h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.cleanup-block p {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(242, 244, 248, 0.68);
+}
+
+.cleanup-block .header-row {
+  align-items: center;
+  margin-bottom: 0;
+}
+
+.cleanup-list {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cleanup-list label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+}
+
+.cleanup-list input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.cleanup-list span {
+  color: rgba(242, 244, 248, 0.62);
+}
+
+.cleanup-block .form-actions {
+  margin-top: 14px;
 }
 
 .empty-state {
@@ -102,6 +214,13 @@ button.secondary {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.model-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .model-name {
@@ -149,6 +268,29 @@ button.secondary {
   align-items: center;
 }
 
+.reasoning-settings {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, max-content);
+  gap: 10px 16px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+}
+
+.reasoning-settings legend {
+  padding: 0 4px;
+  color: rgba(242, 244, 248, 0.82);
+  font-size: 13px;
+}
+
+.reasoning-settings > label:last-child {
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
 .settings-form input[type="checkbox"] {
   width: 16px;
   height: 16px;
@@ -193,6 +335,10 @@ button.secondary {
   }
 
   .settings-form {
+    grid-template-columns: 1fr;
+  }
+
+  .global-settings {
     grid-template-columns: 1fr;
   }
 }

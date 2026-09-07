@@ -462,6 +462,34 @@ describe("OpenAI Chat route", () => {
     }),
   )
 
+  it.effect("prepares PDF media as an OpenAI-compatible file input", () =>
+    Effect.gen(function* () {
+      const prepared = yield* LLMClient.prepare<OpenAIChat.OpenAIChatBody>(
+        LLM.request({
+          model,
+          messages: [
+            Message.user([
+              { type: "text", text: "Extract this document." },
+              { type: "media", mediaType: "application/pdf", data: "JVBERi0x", filename: "document.pdf" },
+            ]),
+          ],
+        }),
+      )
+      expect(prepared.body.messages).toEqual([
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Extract this document." },
+            {
+              type: "file",
+              file: { filename: "document.pdf", file_data: "data:application/pdf;base64,JVBERi0x" },
+            },
+          ],
+        },
+      ])
+    }),
+  )
+
   it.effect("lowers reasoning-only assistant history", () =>
     Effect.gen(function* () {
       const prepared = yield* LLMClient.prepare<OpenAIChat.OpenAIChatBody>(

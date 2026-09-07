@@ -14,8 +14,6 @@ const signScript = path.join(rootDir, "script", "sign-windows.ps1")
 // pins still resolve after the canonical app id changes back to ai.opencode.desktop.
 const legacyDesktopEntry = path.join(packageDir, "resources", "linux", "opencode-desktop.desktop")
 const legacyDesktopEntryFpm = `${legacyDesktopEntry}=/usr/share/applications/opencode-desktop.desktop`
-const metainfoFpm = (appId: string) =>
-  `${path.join(packageDir, "resources", `${appId}.metainfo.xml`)}=/usr/share/metainfo/${appId}.metainfo.xml`
 
 async function signWindows(configuration: { path: string }) {
   if (process.platform !== "win32") return
@@ -80,17 +78,24 @@ const getBase = (appId: string): Configuration => ({
   extraMetadata: {
     desktopName: `${appId}.desktop`,
   },
-  files: ["out/**/*", "resources/**/*", "!resources/opencode-cli*"],
+  files: ["out/**/*", "resources/**/*"],
   afterSign: async (context: { appOutDir: string }) => {
     await signWindowsOutput(context)
   },
   extraResources: [
-    ...(channel === "dev"
+    ...(process.platform === "win32"
       ? [
           {
-            from: "resources/",
-            to: "",
-            filter: ["opencode-cli*"],
+            from: "../opencode/node_modules/@napi-rs/canvas-win32-x64-msvc/skia.win32-x64-msvc.node",
+            to: "native/canvas/skia.win32-x64-msvc.node",
+          },
+          {
+            from: "../opencode/node_modules/@napi-rs/canvas-win32-x64-msvc/icudtl.dat",
+            to: "native/canvas/icudtl.dat",
+          },
+          {
+            from: "../opencode/node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+            to: "pdfjs/pdf.worker.mjs",
           },
         ]
       : []),
@@ -167,8 +172,7 @@ function getConfig() {
         ...base,
         appId,
         productName: "OpenCode Dev",
-        deb: { fpm: [metainfoFpm(appId)] },
-        rpm: { packageName: "opencode-dev", fpm: [metainfoFpm(appId)] },
+        rpm: { packageName: "opencode-dev" },
       }
     }
     case "beta": {
@@ -178,8 +182,7 @@ function getConfig() {
         productName: "OpenCode Beta",
         protocols: { name: "OpenCode Beta", schemes: ["opencode"] },
         publish: { provider: "github", owner: "anomalyco", repo: "opencode-beta", channel: "latest" },
-        deb: { fpm: [metainfoFpm(appId)] },
-        rpm: { packageName: "opencode-beta", fpm: [metainfoFpm(appId)] },
+        rpm: { packageName: "opencode-beta" },
       }
     }
     case "prod": {
@@ -189,8 +192,8 @@ function getConfig() {
         productName: "OpenCode",
         protocols: { name: "OpenCode", schemes: ["opencode"] },
         publish: { provider: "github", owner: "anomalyco", repo: "opencode", channel: "latest" },
-        deb: { fpm: [metainfoFpm(appId), legacyDesktopEntryFpm] },
-        rpm: { packageName: "opencode", fpm: [metainfoFpm(appId), legacyDesktopEntryFpm] },
+        deb: { fpm: [legacyDesktopEntryFpm] },
+        rpm: { packageName: "opencode", fpm: [legacyDesktopEntryFpm] },
       }
     }
   }

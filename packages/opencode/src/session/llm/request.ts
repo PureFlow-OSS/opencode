@@ -25,6 +25,7 @@ type PrepareInput = {
   readonly agent: Agent.Info
   readonly permission?: PermissionV1.Ruleset
   readonly system: string[]
+  readonly headers?: Record<string, string>
   readonly messages: ModelMessage[]
   readonly small?: boolean
   readonly tools: Record<string, Tool>
@@ -204,9 +205,9 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
         : {
             "x-session-affinity": input.sessionID,
             "X-Session-Id": input.sessionID,
+            ...(input.parentSessionID ? { "x-parent-session-id": input.parentSessionID } : {}),
             "User-Agent": USER_AGENT,
           }),
-      ...(input.parentSessionID ? { "x-parent-session-id": input.parentSessionID } : {}),
       ...input.model.headers,
       ...headers,
       ...(input.agent.name === "title"
@@ -215,6 +216,7 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
             "X-OpenCode-Request-Type": "title-generator",
           }
         : {}),
+      ...input.headers,
     },
   }
 })
