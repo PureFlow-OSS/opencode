@@ -32,7 +32,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Package Windows EXE
-        working-directory: packages/desktop
+        working-directory: packages/desktop-electron
         run: bun run package:win -- --publish never
 
       - name: Upload EXE artifacts
@@ -40,6 +40,6 @@ jobs:
         with:
           name: opencode-windows-exe
           path: |
-            packages/desktop/dist/*.exe
-            packages/desktop/dist/latest*.yml
-            packages/desktop/dist/*.blockmap
+            packages/desktop-electron/dist/*.exe
+            packages/desktop-electron/dist/latest*.yml
+            packages/desktop-electron/dist/*.blockmap

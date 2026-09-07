@@ -106,6 +106,10 @@ const getBase = (): Configuration => ({
             to: "pdfjs/pdf.worker.mjs",
           },
           {
+            from: "resources/bin/rg.exe",
+            to: "bin/rg.exe",
+          },
+          {
             from: "build/updater-helper/win-x64/",
             to: "updater-helper/",
             filter: ["OpenCode.UpdaterHelper.exe"],
