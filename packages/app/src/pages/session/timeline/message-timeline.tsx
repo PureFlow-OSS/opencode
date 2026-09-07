@@ -1168,11 +1168,20 @@ export function MessageTimeline(props: {
         return (
           <TimelineRowFrame row={assistantPartRow}>
             <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
-              <div
-                data-slot="session-turn-assistant-content"
-                aria-hidden={workingTurn(assistantPartRow().userMessageID)}
-              >
-                {renderAssistantPartGroup(assistantPartRow, onSizeChange)}
+              <div class="flex min-w-0 gap-3">
+                <Show when={settings.general.newLayoutDesigns()}>
+                  <div aria-hidden="true" class="relative flex w-3 shrink-0 justify-center">
+                    <div class="absolute inset-y-0 border-l border-dashed border-border-weak-base" />
+                    <span class="relative mt-3 size-1.5 rounded-full bg-icon-weak-base" />
+                  </div>
+                </Show>
+                <div
+                  data-slot="session-turn-assistant-content"
+                  class="min-w-0 flex-1"
+                  aria-hidden={workingTurn(assistantPartRow().userMessageID)}
+                >
+                  {renderAssistantPartGroup(assistantPartRow, onSizeChange)}
+                </div>
               </div>
             </div>
           </TimelineRowFrame>
