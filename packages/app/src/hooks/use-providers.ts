@@ -23,7 +23,7 @@ export function useProviders(directory?: Accessor<string | undefined>) {
   const providers = () => {
     const value = dir()
     const projectStore = value ? serverSync().child(value)[0] : undefined
-    if (value)
+    if (directory)
       return selectProviderCatalog({
         explicit: true,
         directory: value,
