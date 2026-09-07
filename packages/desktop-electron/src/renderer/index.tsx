@@ -5,7 +5,6 @@ import {
   ACCEPTED_FILE_TYPES,
   AppBaseProviders,
   AppInterface,
-  handleNotificationClick,
   loadLocaleDict,
   normalizeLocale,
   type Locale,
@@ -247,7 +246,7 @@ const createPlatform = (): Platform => {
       notification.onclick = () => {
         void window.api.showWindow()
         void window.api.setWindowFocus()
-        handleNotificationClick(href)
+        if (href) window.location.assign(href)
         notification.close()
       }
     },
