@@ -942,6 +942,7 @@ sealed record ModelCardEntry(
   string? DefaultReasoningVariant,
   bool DocumentVision,
   bool DocumentVisionNative,
+  bool DocumentOcrNativePdf,
   bool NativeImageVision,
   string? DocumentOcrModel,
   string? DocumentVisionModel,
@@ -963,6 +964,7 @@ sealed record ModelCardConfig(
   string? DefaultReasoningVariant,
   bool? DocumentVision,
   bool? DocumentVisionNative,
+  bool? DocumentOcrNativePdf,
   bool? NativeImageVision,
   string? DocumentOcrModel,
   string? DocumentVisionModel,
@@ -1040,6 +1042,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
         match?.DefaultReasoningVariant,
         match?.DocumentVision ?? false,
         match?.DocumentVisionNative ?? false,
+        match?.DocumentOcrNativePdf ?? false,
         match?.NativeImageVision ?? false,
         match?.DocumentOcrModel,
         match?.DocumentVisionModel,
@@ -1059,6 +1062,7 @@ sealed class ModelCardStore(IOptions<UpdaterBetaOptions> betaOptions, IHttpClien
             match.DefaultReasoningVariant,
             match.DocumentVision,
             match.DocumentVisionNative,
+            match.DocumentOcrNativePdf,
             match.NativeImageVision,
             match.DocumentOcrModel,
             match.DocumentVisionModel,
@@ -1406,6 +1410,10 @@ sealed class ModelLimitRuleOptions
   [JsonPropertyName("document_vision_native")]
   public bool? DocumentVisionNative { get; set; }
 
+  [ConfigurationKeyName("document_ocr_native_pdf")]
+  [JsonPropertyName("document_ocr_native_pdf")]
+  public bool? DocumentOcrNativePdf { get; set; }
+
   [ConfigurationKeyName("native_image_vision")]
   [JsonPropertyName("native_image_vision")]
   public bool? NativeImageVision { get; set; }
@@ -1444,6 +1452,9 @@ sealed class ModelSettingsRequest
 
   [JsonPropertyName("document_vision_native")]
   public bool? DocumentVisionNative { get; set; }
+
+  [JsonPropertyName("document_ocr_native_pdf")]
+  public bool? DocumentOcrNativePdf { get; set; }
 
   [JsonPropertyName("native_image_vision")]
   public bool? NativeImageVision { get; set; }
@@ -1507,6 +1518,7 @@ sealed class UpdaterConfigStore(IWebHostEnvironment environment)
       rule["default_reasoning_variant"] = settings.DefaultReasoningVariant;
       rule["document_vision"] = settings.DocumentVision;
       rule["document_vision_native"] = settings.DocumentVisionNative;
+      rule["document_ocr_native_pdf"] = settings.DocumentOcrNativePdf;
       rule["native_image_vision"] = settings.NativeImageVision;
       rule["document_ocr_model"] = settings.DocumentOcrModel;
       rule["document_vision_model"] = settings.DocumentVisionModel;

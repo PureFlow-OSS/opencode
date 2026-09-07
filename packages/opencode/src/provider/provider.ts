@@ -209,6 +209,7 @@ type AiFactoryRule = {
   reasoning?: boolean
   document_vision?: boolean
   document_vision_native?: boolean
+  document_ocr_native_pdf?: boolean
   native_image_vision?: boolean
   document_ocr_model?: string
   document_vision_model?: string
@@ -257,6 +258,7 @@ function aiFactoryRule(modelID: string, rules: AiFactoryRule[] | undefined) {
         : documentInput.filter((value) => value !== "image"),
     document: {
       ocr: rule?.document_ocr_model,
+      ocr_pdf: rule?.document_ocr_native_pdf,
       vision: rule?.document_vision_model,
     },
     outputModalities: rule?.output_modalities ?? rule?.modalities?.output ?? ["text"],
@@ -1394,6 +1396,7 @@ export const Model = Schema.Struct({
   document: optional(
     Schema.Struct({
       ocr: optional(Schema.String),
+      ocr_pdf: optional(Schema.Boolean),
       vision: optional(Schema.String),
     }),
   ),
