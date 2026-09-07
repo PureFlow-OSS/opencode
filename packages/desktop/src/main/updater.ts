@@ -1,37 +1,24 @@
 import { app, dialog } from "electron"
-import { randomUUID } from "node:crypto"
 import { rmSync } from "node:fs"
-import { copyFile, mkdir, writeFile } from "node:fs/promises"
-import { spawn } from "node:child_process"
-import { dirname, join } from "node:path"
+import { join } from "node:path"
 import pkg from "electron-updater"
 import { UPDATER_ENABLED } from "./constants"
 import { createUpdaterController, type UpdaterReadyRecord } from "./updater-controller"
 import { getLogger } from "./logging"
 import { getStore } from "./store"
+import { setAppQuitting } from "./windows"
+import { nativeT } from "./native-translations"
 import { updateServer } from "./update-server"
 
 const { autoUpdater } = pkg
 const key = "ready"
-const updateCacheRoot = process.platform === "win32" ? "C:/Entwicklung" : undefined
-const updateCacheDirectory = updateCacheRoot ? join(updateCacheRoot, "@opencode-aidesktop-electron-updater") : undefined
-const windowsInstallDirectory = "C:\\Entwicklung\\OpenCode"
 
 export function setupAutoUpdater(stop: () => Promise<void>) {
   const logger = getLogger()
-  if (process.platform === "win32" && updateCacheRoot) {
-    const appAdapter = Reflect.get(autoUpdater, "app")
-    if (appAdapter && typeof appAdapter === "object") {
-      Object.defineProperty(appAdapter, "baseCachePath", {
-        configurable: true,
-        get: () => updateCacheRoot,
-      })
-    }
-  }
   autoUpdater.logger = logger
   autoUpdater.channel = "latest"
   autoUpdater.allowPrerelease = false
-  autoUpdater.allowDowngrade = false
+  autoUpdater.allowDowngrade = true
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = false
   logger.log("auto updater configured", {
@@ -39,8 +26,6 @@ export function setupAutoUpdater(stop: () => Promise<void>) {
     allowPrerelease: autoUpdater.allowPrerelease,
     allowDowngrade: autoUpdater.allowDowngrade,
     currentVersion: app.getVersion(),
-    cacheRoot: updateCacheRoot ?? null,
-    cacheDirectory: updateCacheDirectory ?? null,
   })
 
   const store = getStore("opencode.updater")
@@ -54,57 +39,26 @@ export function setupAutoUpdater(stop: () => Promise<void>) {
         if (updateServer.compareVersions(app.getVersion(), remote.version) >= 0) {
           return { isUpdateAvailable: false, updateInfo: { version: remote.version } }
         }
-
         autoUpdater.setFeedURL({ provider: "generic", url: remote.url })
         const result = await autoUpdater.checkForUpdates()
         if (result?.updateInfo?.version !== remote.version) {
-          return {
-            isUpdateAvailable: false,
-            updateInfo: { version: remote.version },
-          }
+          return { isUpdateAvailable: false, updateInfo: { version: remote.version } }
         }
         return result
       },
       downloadUpdate: () => autoUpdater.downloadUpdate(),
-      quitAndInstall: async () => {
-        if (process.platform !== "win32") return autoUpdater.quitAndInstall()
-        const installerPath = Reflect.get(autoUpdater, "installerPath")
-        const downloadedUpdateHelper = Reflect.get(autoUpdater, "downloadedUpdateHelper")
-        const packageFile = Reflect.get(downloadedUpdateHelper, "packageFile")
-        if (typeof installerPath !== "string" || !installerPath) return autoUpdater.quitAndInstall()
-
-        const helperID = randomUUID()
-        const logPath = join(app.getPath("temp"), `opencode-installer-${helperID}.log`)
-        const helperTargetPath = join(
-          updateCacheDirectory ?? dirname(installerPath),
-          "pending",
-          `OpenCode.UpdaterHelper-${helperID}.exe`,
-        )
-        await mkdir(dirname(helperTargetPath), { recursive: true })
-        await writeFile(logPath, `${new Date().toISOString()} helper scheduled\r\n`)
-        await copyFile(join(process.resourcesPath, "updater-helper", "OpenCode.UpdaterHelper.exe"), helperTargetPath)
-        await new Promise<void>((resolve, reject) => {
-          const child = spawn(
-            helperTargetPath,
-            [
-              "--parent-pid",
-              String(process.pid),
-              "--installer-path",
-              installerPath,
-              "--log-path",
-              logPath,
-              "--install-dir",
-              windowsInstallDirectory,
-              ...(typeof packageFile === "string" && packageFile ? ["--package-file", packageFile] : []),
-            ],
-            { detached: true, stdio: "ignore", windowsHide: true },
-          )
-          child.on("error", reject)
-          child.unref()
-          resolve()
-        })
-        logger.log("scheduling deferred installer launch", { installerPath, helperTargetPath, logPath })
-        app.quit()
+      quitAndInstall: () => {
+        // quitAndInstall closes all windows before emitting before-quit, so
+        // flag the quit first to keep window ids persisted for restore.
+        setAppQuitting()
+        try {
+          autoUpdater.quitAndInstall()
+        } catch (error) {
+          // The install failed and the app keeps running; clear the flag so
+          // deliberate window closes prune ids again.
+          setAppQuitting(false)
+          throw error
+        }
       },
     },
     persistence: {
@@ -121,23 +75,6 @@ export function setupAutoUpdater(stop: () => Promise<void>) {
   })
 }
 
-export async function checkUpdate(controller: ReturnType<typeof setupAutoUpdater>) {
-  const state = await controller.check()
-  return {
-    updateAvailable: state.status === "ready",
-    version: state.status === "ready" ? state.version : undefined,
-    failed: state.status === "error",
-    message: state.status === "error" ? state.message : undefined,
-  }
-}
-
-export async function installUpdate(controller: ReturnType<typeof setupAutoUpdater>) {
-  const result = await checkUpdate(controller)
-  if (!result.updateAvailable) return result
-  await controller.install()
-  return result
-}
-
 export async function resetData() {
   if (process.platform !== "win32") return
   const root = "C:\\Entwicklung\\opencode"
@@ -146,25 +83,34 @@ export async function resetData() {
 }
 
 export async function showUpdaterDialog(controller: ReturnType<typeof setupAutoUpdater>, alertOnFail: boolean) {
-  const result = await checkUpdate(controller)
-  if (result.failed) {
+  const state = await controller.check()
+  if (state.status === "error") {
     if (!alertOnFail) return
-    await dialog.showMessageBox({ type: "error", message: "Update check failed.", title: "Update Error" })
+    await dialog.showMessageBox({
+      type: "error",
+      message: nativeT("desktop.updater.dialog.checkFailed.message"),
+      title: nativeT("desktop.updater.dialog.checkFailed.title"),
+    })
     return
   }
-  if (!result.updateAvailable) {
+  if (state.status === "up-to-date") {
     if (!alertOnFail) return
-    await dialog.showMessageBox({ type: "info", message: "You're up to date.", title: "No Updates" })
+    await dialog.showMessageBox({
+      type: "info",
+      message: nativeT("desktop.updater.dialog.upToDate.message"),
+      title: nativeT("desktop.updater.dialog.upToDate.title"),
+    })
     return
   }
+  if (state.status !== "ready") return
 
   const response = await dialog.showMessageBox({
     type: "info",
-    message: `Update ${result.version ?? ""} downloaded. Restart now?`,
-    title: "Update Ready",
-    buttons: ["Restart", "Later"],
+    message: nativeT("desktop.updater.dialog.ready.message", { version: state.version }),
+    title: nativeT("desktop.updater.dialog.ready.title"),
+    buttons: [nativeT("desktop.updater.dialog.restart"), nativeT("desktop.updater.dialog.later")],
     defaultId: 0,
     cancelId: 1,
   })
-  if (response.response === 0) await installUpdate(controller)
+  if (response.response === 0) await controller.install()
 }

@@ -28,7 +28,10 @@ const SESSION_RENAME_INSTRUCTION =
   "As soon as the session has a clear, stable subject, proactively call `session_rename` once with a concise, descriptive title. Do not wait for the user to ask and never claim that a session was renamed unless the tool call succeeded. Do not rename again unless the subject materially changes."
 
 export function provider(model: Provider.Model) {
-  if (model.api.id.includes("muse-spark")) return [PROMPT_META, SESSION_RENAME_INSTRUCTION]
+  if (model.api.id.includes("muse")) {
+    const name = model.api.id.includes("muse-glimmer") ? "Muse Glimmer" : "Muse Spark"
+    return [PROMPT_META.replaceAll("{{MODEL_NAME}}", name), SESSION_RENAME_INSTRUCTION]
+  }
   if (model.api.id.includes("gpt-4") || model.api.id.includes("o1") || model.api.id.includes("o3"))
     return [PROMPT_BEAST, SESSION_RENAME_INSTRUCTION]
   if (model.api.id.includes("gpt")) {
@@ -40,7 +43,11 @@ export function provider(model: Provider.Model) {
   if (model.api.id.includes("gemini-")) return [PROMPT_GEMINI, SESSION_RENAME_INSTRUCTION]
   if (model.api.id.includes("claude")) return [PROMPT_ANTHROPIC, SESSION_RENAME_INSTRUCTION]
   if (model.api.id.toLowerCase().includes("trinity")) return [PROMPT_TRINITY, SESSION_RENAME_INSTRUCTION]
-  if (model.api.id.toLowerCase().includes("kimi")) return [PROMPT_KIMI, SESSION_RENAME_INSTRUCTION]
+  if (
+    model.api.id.toLowerCase().includes("kimi") ||
+    ["kimi-for-coding", "moonshotai", "moonshotai-cn"].includes(model.providerID)
+  )
+    return [PROMPT_KIMI, SESSION_RENAME_INSTRUCTION]
   return [PROMPT_DEFAULT, SESSION_RENAME_INSTRUCTION]
 }
 

@@ -6,7 +6,7 @@ import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { getCACertificates, setDefaultCACertificates } from "node:tls"
 import type { Event } from "electron"
-import { app } from "electron"
+import { app, BrowserWindow } from "electron"
 
 import { Deferred, Effect, Fiber } from "effect"
 import contextMenu from "electron-context-menu"
@@ -17,7 +17,6 @@ import { CHANNEL } from "./constants"
 import { registerIpcHandlers, sendDeepLinks, sendMenuCommand } from "./ipc"
 import { forwardInitializationFailure } from "./initialization"
 import { exportDebugLogs, initCrashReporter, initLogging, startNetLog, write as writeLog } from "./logging"
-import { parseMarkdown } from "./markdown"
 import { createMenu } from "./menu"
 import {
   finishFirstLaunchOnboarding,
@@ -35,16 +34,15 @@ import {
 import { resetData, setupAutoUpdater, showUpdaterDialog } from "./updater"
 import { getStore } from "./store"
 import { MOTD_KEY } from "./store-keys"
-import { updateServer } from "./update-server"
 import { safeWebContentsURL } from "./window-state"
 import {
-  createMainWindow,
   getLastFocusedWindow,
   registerRendererProtocol,
   setRelaunchHandler,
   setAppQuitting,
   setBackgroundColor,
   setDockIcon,
+  restoreMainWindows,
 } from "./windows"
 import { createWslServersController } from "./wsl/servers"
 import { registerWslIpcHandlers } from "./wsl/ipc"
@@ -52,6 +50,8 @@ import { spawnWslSidecar } from "./wsl/sidecar"
 import { migrate } from "./migrate"
 import { cleanupStoreFiles } from "./store-cleanup"
 import { startBackgroundCli } from "./background-cli"
+import { setNativeTranslations } from "./native-translations"
+import { updateServer } from "./update-server"
 
 const APP_NAMES: Record<string, string> = {
   dev: "OpenCode Dev",
@@ -200,7 +200,7 @@ const main = Effect.gen(function* () {
     setAppQuitting()
     void stopSidecars().finally(() => {
       app.relaunch()
-      app.exit(0)
+      app.quit()
     })
   }
 
@@ -274,7 +274,7 @@ const main = Effect.gen(function* () {
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, () => {
       setAppQuitting()
-      void stopSidecars().finally(() => app.exit(0))
+      void stopSidecars().finally(() => app.quit())
     })
   }
 
@@ -300,6 +300,14 @@ const main = Effect.gen(function* () {
   registerRendererProtocol()
   setDockIcon()
   const updater = setupAutoUpdater(stopSidecars)
+  const menuDeps = {
+    trigger: (id: string) => {
+      const win = getLastFocusedWindow()
+      if (win) sendMenuCommand(win, id)
+    },
+    checkForUpdates: () => void showUpdaterDialog(updater, true),
+    relaunch,
+  }
   registerIpcHandlers({
     killSidecar: () => killSidecar(),
     relaunch,
@@ -320,7 +328,6 @@ const main = Effect.gen(function* () {
     isOldLayoutEligible,
     getDisplayBackend: async () => null,
     setDisplayBackend: async () => undefined,
-    parseMarkdown: async (markdown) => parseMarkdown(markdown),
     checkAppExists: (appName) => checkAppExists(appName),
     resolveAppPath: async (appName) => resolveAppPath(appName),
     updater,
@@ -333,6 +340,9 @@ const main = Effect.gen(function* () {
     setBackgroundColor: (color) => setBackgroundColor(color),
     exportDebugLogs: () => exportDebugLogs(),
     recordFatalRendererError: (error) => writeLog("renderer", "fatal renderer error", { ...error }, "error"),
+    setNativeTranslations: (bundle) => {
+      if (setNativeTranslations(bundle)) createMenu(menuDeps)
+    },
     setAifactoryApiKey: (key) => {
       const next = key?.trim() || null
       if (aifactoryApiKey === next) return
@@ -439,21 +449,17 @@ const main = Effect.gen(function* () {
 
   yield* Fiber.await(loadingTask)
 
-  const mainWindow = createMainWindow()
-  if (mainWindow) {
-    createMenu({
-      trigger: (id) => {
-        const win = getLastFocusedWindow()
-        if (win) sendMenuCommand(win, id)
-      },
-      checkForUpdates: () => {
-        void showUpdaterDialog(updater, true)
-      },
-      relaunch: () => {
-        relaunch()
-      },
-    })
-  }
+  app.on("window-all-closed", () => {
+    if (process.platform === "darwin") return
+    app.quit()
+  })
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length > 0) return
+    restoreMainWindows()
+  })
+
+  const windows = restoreMainWindows()
+  if (windows.length) createMenu(menuDeps)
 })
 
 Effect.runFork(main)

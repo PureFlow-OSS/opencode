@@ -4,8 +4,6 @@ import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { PlanExitTool } from "./plan"
 import { Session } from "@/session/session"
 import { QuestionTool } from "./question"
-import { BashReadTool } from "./bash_read"
-import { BashStopTool } from "./bash_stop"
 import { ShellTool } from "./shell"
 import { EditTool } from "./edit"
 import { GlobTool } from "./glob"
@@ -53,13 +51,11 @@ import { BackgroundJob } from "@/background/job"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
-import * as BashProcess from "./bash-process"
 import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { McpCatalog } from "@/mcp/catalog"
-import { SessionRenameTool } from "./session_rename"
 
-export function webSearchEnabled() {
+export function webSearchEnabled(_providerID: ProviderV2.ID, _flags = { exa: false, parallel: false }) {
   return true
 }
 
@@ -100,10 +96,7 @@ const layer = Layer.effect(
     const invalid = yield* InvalidTool
     const task = yield* TaskTool
     const read = yield* ReadTool
-    const bashRead = yield* BashReadTool
-    const bashStop = yield* BashStopTool
     const question = yield* QuestionTool
-    const sessionRename = yield* SessionRenameTool
     const todo = yield* TodoWriteTool
     const lsptool = yield* LspTool
     const plan = yield* PlanExitTool
@@ -211,8 +204,6 @@ const layer = Layer.effect(
         const tool = yield* Effect.all({
           invalid: Tool.init(invalid),
           shell: Tool.init(shell),
-          bash_read: Tool.init(bashRead),
-          bash_stop: Tool.init(bashStop),
           read: Tool.init(read),
           glob: Tool.init(globtool),
           grep: Tool.init(greptool),
@@ -225,7 +216,6 @@ const layer = Layer.effect(
           skill: Tool.init(skilltool),
           patch: Tool.init(patchtool),
           question: Tool.init(question),
-          session_rename: Tool.init(sessionRename),
           lsp: Tool.init(lsptool),
           plan: Tool.init(plan),
           ...(codeModeTool ? { execute: Tool.init(codeModeTool) } : {}),
@@ -236,7 +226,6 @@ const layer = Layer.effect(
           builtin: [
             tool.invalid,
             ...(questionEnabled ? [tool.question] : []),
-            tool.session_rename,
             tool.shell,
             tool.read,
             tool.glob,
@@ -297,7 +286,7 @@ const layer = Layer.effect(
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
       const filtered = (yield* all()).filter((tool) => {
         if (tool.id === WebSearchTool.id) {
-          return webSearchEnabled()
+          return webSearchEnabled(input.providerID, { exa: flags.enableExa, parallel: flags.enableParallel })
         }
 
         const usePatch =
@@ -452,13 +441,10 @@ export const node = LayerNode.make({
     Format.node,
     Truncate.node,
     RuntimeFlags.node,
-    BashProcess.node,
     MCP.node,
     Database.node,
     Ripgrep.node,
   ],
 })
-
-export const defaultLayer = Layer.provide(layer, BashProcess.defaultLayer)
 
 export * as ToolRegistry from "./registry"

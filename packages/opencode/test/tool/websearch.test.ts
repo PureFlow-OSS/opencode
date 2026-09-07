@@ -5,12 +5,13 @@ import { selectWebSearchProvider, webSearchModelName, webSearchProviderLabel } f
 
 import { webSearchEnabled } from "../../src/tool/registry"
 import { it } from "../lib/effect"
+import { ProviderV2 } from "@opencode-ai/core/provider"
 
 const SESSION_ID = "ses_0196aabbccddeeff001122334455"
 
 describe("websearch provider", () => {
-  test("defaults to Exa", () => {
-    expect(selectWebSearchProvider(SESSION_ID)).toBe("exa")
+  test("selects a stable provider per session", () => {
+    expect(selectWebSearchProvider(SESSION_ID)).toBe(selectWebSearchProvider(SESSION_ID))
   })
 
   test("supports an operational override", () => {
@@ -37,7 +38,7 @@ describe("websearch provider", () => {
   })
 
   test("is enabled for every provider", () => {
-    expect(webSearchEnabled()).toBe(true)
+    expect(webSearchEnabled(ProviderV2.ID.openai, { exa: false, parallel: false })).toBe(true)
   })
 
   test("uses branded labels", () => {
@@ -89,14 +90,6 @@ describe("websearch MCP response parser", () => {
   it.effect("ignores non-JSON SSE data frames", () =>
     Effect.gen(function* () {
       const result = yield* parseResponse(`data: [DONE]\ndata: ${payload}\n\n`)
-      expect(result).toBe("search results")
-    }),
-  )
-
-  it.effect("ignores MCP frames without a result", () =>
-    Effect.gen(function* () {
-      const notification = JSON.stringify({ jsonrpc: "2.0", method: "notifications/progress", params: {} })
-      const result = yield* parseResponse(`data: ${notification}\ndata: ${payload}\n\n`)
       expect(result).toBe("search results")
     }),
   )

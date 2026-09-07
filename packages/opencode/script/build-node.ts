@@ -21,6 +21,7 @@ await Bun.build({
   external: ["jsonc-parser", "@lydell/node-pty"],
   define: {
     OPENCODE_MODELS_DEV: generated.modelsData,
+    OPENCODE_VERSION: `'${Script.version}'`,
     OPENCODE_CHANNEL: `'${Script.channel}'`,
     OPENCODE_UPDATE_BASE_URL: JSON.stringify(
       process.env.OPENCODE_UPDATE_BASE_URL?.trim() || "http://10.53.7.23/opencode",
