@@ -4,12 +4,13 @@ import { Switch } from "@opencode-ai/ui/v2/switch-v2"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
-import { type Component, For, Show } from "solid-js"
+import { type Component, createResource, For, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/context/language"
 import { useModels } from "@/context/models"
+import { usePlatform } from "@/context/platform"
 import { useServerSDK } from "@/context/server-sdk"
-import { popularProviders } from "@/hooks/use-providers"
+import { useServerSync } from "@/context/server-sync"
 import { Persist, persisted } from "@/utils/persist"
 import { SettingsListV2 } from "./parts/list"
 import { SettingsRowV2 } from "./parts/row"
@@ -18,37 +19,97 @@ import "./settings-v2.css"
 type ModelItem = ReturnType<ReturnType<typeof useModels>["list"]>[number]
 
 const PROVIDER_ICON_SIZE = 16
+const AIFACTORY_PROVIDER_ID = "aifactory"
+const AIFACTORY_API_KEY_HEADER = "X-OpenCode-AiFactory-Api-Key"
+
+type ModelCard = {
+  model: string
+  context?: number | null
+  output?: number | null
+  reasoning?: boolean | null
+  config?: {
+    pattern?: string | null
+    context?: number | null
+    output?: number | null
+    reasoning?: boolean | null
+  } | null
+  price?: { input?: number | null; output?: number | null } | null
+  liteLLM?: {
+    inputCostPerMillionTokens?: number | null
+    outputCostPerMillionTokens?: number | null
+    maxInputTokens?: number | null
+    maxOutputTokens?: number | null
+    supportsReasoning?: boolean | null
+  } | null
+}
+
+type ModelCardResponse = { aifactory?: { models?: ModelCard[] } | null }
+
+function modelCardsRequestInit(apiKey?: string) {
+  if (!apiKey?.trim()) return { cache: "no-store", signal: AbortSignal.timeout(3000) } satisfies RequestInit
+  return {
+    cache: "no-store",
+    headers: { [AIFACTORY_API_KEY_HEADER]: apiKey.trim() },
+    signal: AbortSignal.timeout(3000),
+  } satisfies RequestInit
+}
 
 export const SettingsModelsV2: Component = () => {
   const language = useLanguage()
   const models = useModels()
+  const platform = usePlatform()
   const serverSdk = useServerSDK()
+  const serverSync = useServerSync()
   const [store, setStore] = persisted(
     Persist.serverGlobal(serverSdk().scope, "settings-v2.models.providers"),
     createStore({ collapsed: {} as Record<string, boolean> }),
   )
+  const updateBaseUrl = (import.meta.env.OPENCODE_UPDATE_BASE_URL ?? "http://10.53.7.23/opencode")
+    .trim()
+    .replace(/\/+$/, "")
+  const aifactoryApiKey = () => {
+    const key = serverSync().data.config.provider?.[AIFACTORY_PROVIDER_ID]?.options?.apiKey
+    return typeof key === "string" && key.trim() ? key.trim() : undefined
+  }
+  const [modelcards] = createResource(
+    () => ({ baseUrl: updateBaseUrl, apiKey: aifactoryApiKey() }),
+    (input) =>
+      (platform.fetch ?? fetch)(`${input.baseUrl}/modelcards.json`, modelCardsRequestInit(input.apiKey))
+        .then((response) => (response.ok ? response.json() : null))
+        .catch(() => null) ?? null,
+    { initialValue: null as ModelCardResponse | null },
+  )
+  const cards = () =>
+    (modelcards()?.aifactory?.models ?? []).filter((card: ModelCard) =>
+      models.policyVisible({ providerID: AIFACTORY_PROVIDER_ID, modelID: card.model }),
+    )
 
   const list = useFilteredList<ModelItem>({
-    items: (_filter) => models.list(),
+    items: (_filter) => models.manageable().filter((item) => item.provider.id === AIFACTORY_PROVIDER_ID),
     key: (x) => `${x.provider.id}:${x.id}`,
     filterKeys: ["provider.name", "name", "id"],
     sortBy: (a, b) => a.name.localeCompare(b.name),
     groupBy: (x) => x.provider.id,
     sortGroupsBy: (a, b) => {
-      const aIndex = popularProviders.indexOf(a.category)
-      const bIndex = popularProviders.indexOf(b.category)
-      const aPopular = aIndex >= 0
-      const bPopular = bIndex >= 0
-
-      if (aPopular && !bPopular) return -1
-      if (!aPopular && bPopular) return 1
-      if (aPopular && bPopular) return aIndex - bIndex
-
       const aName = a.items[0].provider.name
       const bName = b.items[0].provider.name
       return aName.localeCompare(bName)
     },
   })
+
+  const formatNumber = (value?: number | null) =>
+    value === undefined || value === null ? "n/a" : new Intl.NumberFormat("de-DE").format(value)
+  const formatBoolean = (value?: boolean | null) =>
+    value === undefined || value === null ? "n/a" : value ? "yes" : "no"
+  const formatMoney = (value?: number | null) =>
+    value === undefined || value === null
+      ? "n/a"
+      : new Intl.NumberFormat("de-DE", {
+          style: "currency",
+          currency: "EUR",
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(value)
 
   return (
     <>
@@ -181,6 +242,60 @@ export const SettingsModelsV2: Component = () => {
             </For>
           </Show>
         </Show>
+
+        <div class="settings-v2-section settings-v2-modelcards-section">
+          <div class="settings-v2-modelcards-header">
+            <h3 class="settings-v2-section-title">Model Cards</h3>
+            <span class="settings-v2-modelcards-count">Models: {cards().length}</span>
+          </div>
+          <Show
+            when={cards().length}
+            fallback={<div class="settings-v2-modelcards-status">No model cards available yet.</div>}
+          >
+            <div class="settings-v2-modelcards-grid">
+              <For each={cards()}>
+                {(card) => (
+                  <section class="settings-v2-modelcard">
+                    <div class="settings-v2-modelcard-head">
+                      <div class="settings-v2-modelcard-copy">
+                        <strong>{card.model}</strong>
+                        <span>{card.config?.pattern || "All models"}</span>
+                      </div>
+                    </div>
+                    <div class="settings-v2-modelcard-meta">
+                      <div class="settings-v2-modelcard-item">
+                        <small>Context</small>
+                        <strong>
+                          {formatNumber(card.context ?? card.config?.context ?? card.liteLLM?.maxInputTokens)}
+                        </strong>
+                      </div>
+                      <div class="settings-v2-modelcard-item">
+                        <small>Output</small>
+                        <strong>
+                          {formatNumber(card.output ?? card.config?.output ?? card.liteLLM?.maxOutputTokens)}
+                        </strong>
+                      </div>
+                      <div class="settings-v2-modelcard-item">
+                        <small>Thinking</small>
+                        <strong>
+                          {formatBoolean(card.reasoning ?? card.config?.reasoning ?? card.liteLLM?.supportsReasoning)}
+                        </strong>
+                      </div>
+                      <div class="settings-v2-modelcard-item">
+                        <small>Input Cost /1M</small>
+                        <strong>{formatMoney(card.price?.input ?? card.liteLLM?.inputCostPerMillionTokens)}</strong>
+                      </div>
+                      <div class="settings-v2-modelcard-item">
+                        <small>Output Cost /1M</small>
+                        <strong>{formatMoney(card.price?.output ?? card.liteLLM?.outputCostPerMillionTokens)}</strong>
+                      </div>
+                    </div>
+                  </section>
+                )}
+              </For>
+            </div>
+          </Show>
+        </div>
       </div>
     </>
   )

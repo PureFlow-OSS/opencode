@@ -3,7 +3,7 @@ import { Tag } from "@opencode-ai/ui/v2/badge-v2"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { showToast } from "@/utils/toast"
-import { popularProviders, useProviders } from "@/hooks/use-providers"
+import { isVisibleProvider, useProviders } from "@/hooks/use-providers"
 import { createMemo, type Accessor, type Component, For, Show } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { useServerProtocol, useServerSDK } from "@/context/server-sdk"
@@ -28,6 +28,7 @@ const PROVIDER_NOTES = [
 ] as const
 
 const PROVIDER_ICON_SIZE = 16
+const AIFACTORY_PROVIDER_ID = "aifactory"
 
 export const SettingsProvidersV2: Component<{
   directory: Accessor<string | undefined>
@@ -49,17 +50,21 @@ export const SettingsProvidersV2: Component<{
   const connected = createMemo(() => {
     return providers
       .connected()
+      .filter((provider) => isVisibleProvider(provider.id))
       .filter((p) => p.id !== "opencode" || Object.values(p.models).find((m) => m.cost?.input))
   })
 
   const popular = createMemo(() => {
     const connectedIDs = new Set(connected().map((p) => p.id))
-    const items = providers
-      .popular()
-      .filter((p) => !connectedIDs.has(p.id))
-      .slice()
-    items.sort((a, b) => popularProviders.indexOf(a.id) - popularProviders.indexOf(b.id))
-    return items
+    const aiFactory = providers.all().get(AIFACTORY_PROVIDER_ID) ?? {
+      id: AIFACTORY_PROVIDER_ID,
+      name: "RRZ AI Factory",
+      source: "api" as const,
+      env: [],
+      options: {},
+      models: {},
+    }
+    return connectedIDs.has(aiFactory.id) ? [] : [aiFactory]
   })
 
   const source = (item: ProviderItem): ProviderSource | undefined => {
@@ -208,7 +213,7 @@ export const SettingsProvidersV2: Component<{
                     <div class="settings-v2-provider-copy">
                       <div class="settings-v2-provider-main">
                         <span class="settings-v2-provider-name">{item.name}</span>
-                        <Show when={item.id === "opencode" || item.id === "opencode-go"}>
+                        <Show when={item.id === AIFACTORY_PROVIDER_ID}>
                           <Tag>{language.t("dialog.provider.tag.recommended")}</Tag>
                         </Show>
                       </div>
