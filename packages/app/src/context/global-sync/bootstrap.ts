@@ -79,6 +79,12 @@ function errors(list: PromiseSettledResult<unknown>[]) {
   return list.filter((item): item is PromiseRejectedResult => item.status === "rejected").map((item) => item.reason)
 }
 
+function isCancelledRequest(error: unknown) {
+  if (!(error instanceof Error)) return false
+  if (typeof error.cause !== "object" || error.cause === null) return false
+  return "status" in error.cause && error.cause.status === 499
+}
+
 const providerRev = new Map<string, number>()
 
 export function clearProviderRev(scope: ServerScope, directory: string) {
@@ -528,6 +534,7 @@ export async function bootstrapDirectory(input: {
         input.queryClient
           .fetchQuery(loadProvidersQuery(input.scope, input.directory, input.api, input.sdk, input.protocol))
           .catch((err) => {
+            if (isCancelledRequest(err)) return
             const project = getFilename(input.directory)
             showToast({
               variant: "error",
@@ -538,7 +545,7 @@ export async function bootstrapDirectory(input: {
     ].filter(Boolean) as (() => Promise<any>)[]
 
     await waitForPaint()
-    const slowErrs = errors(await runAll(slow))
+    const slowErrs = errors(await runAll(slow)).filter((error) => !isCancelledRequest(error))
     if (slowErrs.length > 0) {
       console.error("Failed to finish bootstrap instance", slowErrs[0])
       const project = getFilename(input.directory)
