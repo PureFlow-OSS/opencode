@@ -1,5 +1,5 @@
 import type { Component, JSX } from "solid-js"
-import { createMemo, splitProps } from "solid-js"
+import { createMemo, Show, splitProps } from "solid-js"
 import sprite from "./provider-icons/sprite.svg"
 import { iconNames, type IconName } from "./provider-icons/types"
 
@@ -11,8 +11,22 @@ export const ProviderIcon: Component<ProviderIconProps> = (props) => {
   const [local, rest] = splitProps(props, ["id", "class", "classList"])
   const aiFactory = createMemo(() => local.id === "aifactory")
   const resolved = createMemo(() => (iconNames.includes(local.id as IconName) ? local.id : "synthetic"))
-  if (aiFactory()) {
-    return (
+  return (
+    <Show
+      when={aiFactory()}
+      fallback={
+        <svg
+          data-component="provider-icon"
+          {...rest}
+          classList={{
+            ...local.classList,
+            [local.class ?? ""]: !!local.class,
+          }}
+        >
+          <use href={`${sprite}#${resolved()}`} />
+        </svg>
+      }
+    >
       <svg
         data-component="provider-icon"
         viewBox="0 0 48 48"
@@ -37,18 +51,6 @@ export const ProviderIcon: Component<ProviderIconProps> = (props) => {
           R
         </text>
       </svg>
-    )
-  }
-  return (
-    <svg
-      data-component="provider-icon"
-      {...rest}
-      classList={{
-        ...local.classList,
-        [local.class ?? ""]: !!local.class,
-      }}
-    >
-      <use href={`${sprite}#${resolved()}`} />
-    </svg>
+    </Show>
   )
 }

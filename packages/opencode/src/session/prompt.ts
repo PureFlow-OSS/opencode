@@ -2380,15 +2380,7 @@ const layer = Layer.effect(
                 message.info.role === "user" &&
                 message.parts.some((part) => part.type === "file" && part.mime === "application/pdf"),
             )
-            const hasDelegatedImage =
-              !!model.document?.vision &&
-              !model.capabilities.input.image &&
-              msgs.some(
-                (message) =>
-                  message.info.role === "user" &&
-                  message.parts.some((part) => part.type === "file" && part.mime.startsWith("image/")),
-              )
-            if (hasDocumentPdf || hasDelegatedImage) {
+            if (hasDocumentPdf) {
               for (const key of Object.keys(tools)) {
                 if (
                   ![
@@ -2422,7 +2414,7 @@ const layer = Layer.effect(
               ...(mcpInstructions ? [mcpInstructions] : []),
               ...(skills ? [skills] : []),
             ]
-            if (hasDocumentPdf || hasDelegatedImage)
+            if (hasDocumentPdf)
               system.push(
                 "A document attachment is present. Before answering questions about document text, data, rankings, totals, comparisons, summaries, or facts that may span pages, use the document tools. For any fact lookup or question about one PDF, call document_search and use its result. Call document_summary only when the user explicitly asks to summarize, synthesize, or compare multiple PDFs; it processes every indexed document before combining the result. Never infer a document-wide answer from an attachment preview or a single page. Use vision_recall for visual questions.",
               )
