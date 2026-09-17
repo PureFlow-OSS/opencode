@@ -1,145 +1,139 @@
 :host {
   display: block;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top left, rgba(91, 140, 255, 0.16), transparent 24%),
-    radial-gradient(circle at top right, rgba(37, 205, 170, 0.12), transparent 26%),
-    linear-gradient(180deg, #0a0d14 0%, #080b11 100%);
+  background: var(--color-background);
+  color: var(--color-text);
+  font-size: 14px;
 }
 
 .shell {
-  max-width: 1240px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 64px 24px 88px;
+  padding: 0 32px 80px;
 }
 
 .hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.9fr);
-  gap: 20px;
-  align-items: end;
-  margin-bottom: 28px;
+  margin: 0 -32px 0;
+  padding: 24px 32px 20px;
+  background: var(--color-surface);
+  border-bottom: 4px solid var(--rrz-yellow);
+}
+
+.hero-copy {
+  max-width: none;
+  margin: 0;
 }
 
 .eyebrow {
   text-transform: uppercase;
-  letter-spacing: 0.18em;
-  font-size: 12px;
-  color: #8aa4ff;
-  margin: 0 0 12px;
+  letter-spacing: 0.14em;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--rrz-blue);
+  margin: 0 0 8px;
 }
 
 h1 {
-  font-size: clamp(48px, 6.8vw, 92px);
-  line-height: 0.95;
-  margin: 0 0 16px;
+  font-size: 30px;
+  line-height: 1.15;
+  font-weight: 700;
+  color: var(--rrz-blue-dark);
+  margin: 0 0 8px;
 }
 
 .lede {
   max-width: 760px;
-  font-size: 17px;
+  font-size: 14px;
   line-height: 1.6;
-  color: rgba(242, 244, 248, 0.78);
+  color: var(--color-text);
 }
 
 .nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 22px;
+  gap: 8px;
+  margin-top: 20px;
 }
 
 .nav button {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(242, 244, 248, 0.82);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  padding: 9px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.nav button:hover {
+  background: var(--rrz-blue-soft);
+  border-color: var(--rrz-blue);
+  color: var(--rrz-blue-dark);
 }
 
 .nav button.active {
-  background: linear-gradient(180deg, #7b8cff, #5e73ff);
-  color: #fff;
-}
-
-.hero-panel {
-  padding: 22px;
-  border-radius: 26px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background:
-    linear-gradient(180deg, rgba(16, 21, 31, 0.92), rgba(8, 10, 15, 0.96)),
-    radial-gradient(circle at top right, rgba(74, 144, 226, 0.12), transparent 35%);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
-}
-
-.hero-kicker {
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 11px;
-  color: rgba(138, 164, 255, 0.9);
-  margin-bottom: 16px;
-}
-
-.hero-panel strong {
-  display: block;
-  font-size: 30px;
-  margin-bottom: 12px;
-}
-
-.hero-panel p {
-  color: rgba(242, 244, 248, 0.7);
+  background: var(--rrz-blue);
+  border-color: var(--rrz-blue);
+  color: #ffffff;
 }
 
 .grid {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(0, 1.1fr);
-  gap: 18px;
+  gap: 16px;
 }
 
 .single {
   display: grid;
-  gap: 18px;
+  gap: 16px;
+  padding-top: 24px;
 }
 
 .card {
-  min-height: 240px;
   padding: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 26px;
-  background:
-    linear-gradient(180deg, rgba(16, 21, 31, 0.92), rgba(8, 10, 15, 0.96)),
-    radial-gradient(circle at top right, rgba(74, 144, 226, 0.12), transparent 35%);
-  backdrop-filter: blur(18px);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  box-shadow: 0 2px 6px rgba(32, 38, 44, 0.06);
 }
 
 .card h2 {
-  margin: 0 0 10px;
-  font-size: 22px;
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--rrz-blue);
 }
 
 .card p {
-  margin: 0 0 18px;
-  color: rgba(242, 244, 248, 0.78);
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
   line-height: 1.6;
 }
 
 .controls {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
-  margin: 18px 0 22px;
+  margin: 16px 0 20px;
 }
 
 .controls button {
-  padding: 12px 16px;
+  padding: 9px 16px;
 }
 
 @media (max-width: 980px) {
-  .hero,
   .grid {
     grid-template-columns: 1fr;
   }
 
   .shell {
-    padding: 28px 16px 72px;
+    padding: 0 16px 56px;
+  }
+
+  .hero {
+    margin: 0 -16px 0;
+    padding: 20px 16px 16px;
   }
 }

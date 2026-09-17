@@ -4,13 +4,14 @@ import { FeedbackPanelComponent } from "./feedback-panel.component"
 import { AuditPanelComponent } from "./audit-panel.component"
 import { ModelStatusPanelComponent } from "./model-status-panel.component"
 import { McpPanelComponent } from "./mcp-panel.component"
+import { McpStorePanelComponent } from "./mcp-store-panel.component"
 
-type Page = "upload" | "beta-feedback" | "inbox" | "model-status" | "mcp"
+type Page = "upload" | "beta-feedback" | "inbox" | "model-status" | "mcp" | "mcp-store"
 
 @Component({
   selector: "app-root",
   standalone: true,
-  imports: [UploadPanelComponent, FeedbackPanelComponent, AuditPanelComponent, ModelStatusPanelComponent, McpPanelComponent],
+  imports: [UploadPanelComponent, FeedbackPanelComponent, AuditPanelComponent, ModelStatusPanelComponent, McpPanelComponent, McpStorePanelComponent],
   templateUrl: "./app.component.html",
   styleUrl: "./app.component.css",
 })

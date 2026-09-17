@@ -12,36 +12,8 @@
         <button type="button" [class.active]="page === 'inbox'" (click)="show('inbox')">Feedback Inbox</button>
         <button type="button" [class.active]="page === 'model-status'" (click)="show('model-status')">Model Status</button>
         <button type="button" [class.active]="page === 'mcp'" (click)="show('mcp')">MCP</button>
+        <button type="button" [class.active]="page === 'mcp-store'" (click)="show('mcp-store')">MCP Store</button>
       </nav>
-    </div>
-    <div class="hero-panel">
-      <div class="hero-kicker">Flow</div>
-      <strong>
-        @if (page === 'upload') {
-          ZIP only
-        } @else if (page === 'beta-feedback') {
-          Beta review
-        } @else if (page === 'model-status') {
-          Model cards
-        } @else if (page === 'mcp') {
-          Managed MCPs
-        } @else {
-          General inbox
-        }
-      </strong>
-      <p>
-        @if (page === 'upload') {
-          ZIP goes into feed/beta and the version is read from latest.yml.
-        } @else if (page === 'beta-feedback') {
-          Beta feedback is real data from OpenCode and promotion happens after 50% positive.
-        } @else if (page === 'model-status') {
-          Live model cards are synced from the updater server.
-        } @else if (page === 'mcp') {
-          Centrally manage the MCP servers delivered to OpenCode clients.
-        } @else {
-          General inbox shows live feedback from OpenCode.
-        }
-      </p>
     </div>
   </section>
 
@@ -61,6 +33,10 @@
   } @else if (page === 'mcp') {
     <section class="single">
       <app-mcp-panel />
+    </section>
+  } @else if (page === 'mcp-store') {
+    <section class="single">
+      <app-mcp-store-panel />
     </section>
   } @else {
     <section class="single">

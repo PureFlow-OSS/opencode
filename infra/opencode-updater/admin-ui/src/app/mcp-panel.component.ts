@@ -2,6 +2,7 @@ import { Component, inject } from "@angular/core"
 import { FormsModule } from "@angular/forms"
 import { injectMutation, injectQuery } from "@tanstack/angular-query-experimental"
 import { ApiService, McpConfig } from "./api.service"
+import { ChannelPickerComponent } from "./channel-picker.component"
 
 type Channel = "normal" | "beta"
 
@@ -42,7 +43,7 @@ const emptyDraft = (): McpDraft => ({
 @Component({
   selector: "app-mcp-panel",
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, ChannelPickerComponent],
   templateUrl: "./mcp-panel.component.html",
   styleUrl: "./mcp-panel.component.css",
 })
@@ -69,7 +70,7 @@ export class McpPanelComponent {
     return Object.entries(this.mcps.data() ?? {})
   }
 
-  selectChannel(channel: Channel) {
+  selectChannel(channel: "beta" | "normal") {
     if (this.channel === channel) return
     this.channel = channel
     this.cancel()

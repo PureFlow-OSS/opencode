@@ -48,6 +48,7 @@ builder.Services.AddSingleton<UpdaterVersionResolver>();
 builder.Services.AddSingleton<UpdaterRolloutResolver>();
 builder.Services.AddSingleton<ModelCardStore>();
 builder.Services.AddSingleton<McpConfigStore>();
+builder.Services.AddSingleton<McpStoreStore>();
 var modelCardSyncSeconds = Math.Max(60, betaConfiguration.GetSection("UpdaterBeta:LiteLLM:SyncIntervalSeconds").Get<int?>() ?? 600);
 builder.Services.AddQuartz((quartz) =>
 {
@@ -550,6 +551,9 @@ app.MapGet("/opencode/provider-config.json", async (HttpRequest request, Updater
   return Results.Json(config);
 });
 
+app.MapGet("/opencode/mcp-store.json", async (McpStoreStore store, CancellationToken cancellationToken) =>
+  Results.Json(await store.ListPublicAsync(cancellationToken)));
+
 app.MapGet("/opencode/admin/mcp", async (string? channel, UpdaterConfigStore configStore, McpConfigStore mcps, CancellationToken cancellationToken) =>
 {
   var selectedChannel = McpConfigStore.NormalizeChannel(channel);
@@ -570,6 +574,27 @@ app.MapDelete("/opencode/admin/mcp/{name}", async (string name, string? channel,
 {
   if (string.IsNullOrWhiteSpace(name)) return Results.BadRequest(new { error = "MCP name is required" });
   await mcps.DeleteAsync(McpConfigStore.NormalizeChannel(channel), name, cancellationToken);
+  return Results.NoContent();
+});
+
+app.MapGet("/opencode/admin/mcp-store", async (McpStoreStore store, CancellationToken cancellationToken) =>
+{
+  var items = await store.ListAsync(cancellationToken);
+  return Results.Json(items.OrderByDescending((item) => item.UpdatedAt));
+});
+
+app.MapPut("/opencode/admin/mcp-store/{name}", async (string name, McpStoreOptions body, McpStoreStore store, CancellationToken cancellationToken) =>
+{
+  var error = McpStoreStore.Validate(name, body);
+  if (error is not null) return Results.BadRequest(new { error });
+  await store.SetAsync(name, body, cancellationToken);
+  return Results.Ok(new { name = name.Trim(), item = body });
+});
+
+app.MapDelete("/opencode/admin/mcp-store/{name}", async (string name, McpStoreStore store, CancellationToken cancellationToken) =>
+{
+  if (string.IsNullOrWhiteSpace(name)) return Results.BadRequest(new { error = "Store entry name is required" });
+  await store.DeleteAsync(name, cancellationToken);
   return Results.NoContent();
 });
 
@@ -860,6 +885,13 @@ static async Task EnsureAdminTablesAsync(DbConnection connection, IWebHostEnviro
       Deleted INTEGER NOT NULL DEFAULT 0,
       UpdatedAt TEXT NOT NULL,
       PRIMARY KEY (Channel, Name)
+    );
+
+    CREATE TABLE IF NOT EXISTS UpdaterMcpStore (
+      Name TEXT PRIMARY KEY NOT NULL,
+      Config TEXT NOT NULL,
+      Deleted INTEGER NOT NULL DEFAULT 0,
+      UpdatedAt TEXT NOT NULL
     );
     """;
   await command.ExecuteNonQueryAsync();
@@ -1800,6 +1832,124 @@ sealed class McpManagedAuthOptions
 
   [JsonPropertyName("prefix")]
   public string? Prefix { get; set; }
+}
+
+sealed class McpStoreOptions
+{
+  [JsonPropertyName("name")]
+  public string Name { get; set; } = "";
+
+  [JsonPropertyName("description")]
+  public string? Description { get; set; }
+
+  [JsonPropertyName("url")]
+  public string Url { get; set; } = "";
+
+  [JsonPropertyName("headerNames")]
+  public string[] HeaderNames { get; set; } = [];
+
+  [JsonPropertyName("headerPlaceholder")]
+  public string? HeaderPlaceholder { get; set; }
+
+  [JsonPropertyName("enabled")]
+  public bool Enabled { get; set; } = true;
+
+  [JsonPropertyName("updatedAt")]
+  public string? UpdatedAt { get; set; }
+}
+
+sealed class McpStoreStore(IWebHostEnvironment env)
+{
+  readonly string dbPath = Path.Combine(env.ContentRootPath, "data", "feedback.db");
+
+  async Task<SqliteConnection> OpenAsync()
+  {
+    Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+    var connection = new SqliteConnection($"Data Source={dbPath}");
+    await connection.OpenAsync();
+    return connection;
+  }
+
+  public static string? Validate(string name, McpStoreOptions config)
+  {
+    if (string.IsNullOrWhiteSpace(name)) return "Store entry name is required";
+    if (name.Trim().Length > 128) return "Store entry name must not exceed 128 characters";
+    if (!Uri.TryCreate(config.Url, UriKind.Absolute, out var uri)) return "Store entries require an absolute URL";
+    if (uri.Scheme is not ("http" or "https")) return "Store URLs must use HTTP or HTTPS";
+    if (config.HeaderNames.Length == 0) return "Store entries require at least one header name";
+    if (config.HeaderNames.Any((header) => string.IsNullOrWhiteSpace(header) || header.Trim().Length > 128)) return "Header names must be non-empty and at most 128 characters";
+    if (new HashSet<string>(config.HeaderNames.Select((header) => header.Trim()), StringComparer.OrdinalIgnoreCase).Count != config.HeaderNames.Length) return "Header names must be unique";
+    return null;
+  }
+
+  public async Task<List<McpStoreOptions>> ListAsync(CancellationToken cancellationToken)
+  {
+    await using var connection = await OpenAsync();
+    await using var command = connection.CreateCommand();
+    command.CommandText = "SELECT Name, Config FROM UpdaterMcpStore WHERE Deleted = 0 ORDER BY Name";
+    await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+    var items = new List<McpStoreOptions>();
+    while (await reader.ReadAsync(cancellationToken))
+    {
+      var config = JsonSerializer.Deserialize<McpStoreOptions>(reader.GetString(1));
+      if (config is null) continue;
+      config.Name = reader.GetString(0);
+      items.Add(config);
+    }
+    return items;
+  }
+
+  public async Task<List<object>> ListPublicAsync(CancellationToken cancellationToken)
+  {
+    var items = await ListAsync(cancellationToken);
+    return items
+      .Where((item) => item.Enabled)
+      .Select((item) => (object)new
+      {
+        name = item.Name,
+        description = item.Description,
+        url = item.Url,
+        headerNames = item.HeaderNames,
+        headerPlaceholder = item.HeaderPlaceholder,
+      })
+      .ToList();
+  }
+
+  public async Task SetAsync(string name, McpStoreOptions config, CancellationToken cancellationToken)
+  {
+    await using var connection = await OpenAsync();
+    await using var command = connection.CreateCommand();
+    command.CommandText = """
+      INSERT INTO UpdaterMcpStore (Name, Config, Deleted, UpdatedAt)
+      VALUES ($name, $config, 0, $updatedAt)
+      ON CONFLICT(Name) DO UPDATE SET Config = excluded.Config, Deleted = 0, UpdatedAt = excluded.UpdatedAt
+      """;
+    command.Parameters.AddWithValue("$name", name.Trim());
+    command.Parameters.AddWithValue("$config", JsonSerializer.Serialize(new
+    {
+      description = config.Description,
+      url = config.Url,
+      headerNames = config.HeaderNames,
+      headerPlaceholder = config.HeaderPlaceholder,
+      enabled = config.Enabled,
+    }));
+    command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));
+    await command.ExecuteNonQueryAsync(cancellationToken);
+  }
+
+  public async Task DeleteAsync(string name, CancellationToken cancellationToken)
+  {
+    await using var connection = await OpenAsync();
+    await using var command = connection.CreateCommand();
+    command.CommandText = """
+      INSERT INTO UpdaterMcpStore (Name, Config, Deleted, UpdatedAt)
+      VALUES ($name, '{}', 1, $updatedAt)
+      ON CONFLICT(Name) DO UPDATE SET Deleted = 1, UpdatedAt = excluded.UpdatedAt
+      """;
+    command.Parameters.AddWithValue("$name", name.Trim());
+    command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));
+    await command.ExecuteNonQueryAsync(cancellationToken);
+  }
 }
 
 sealed class McpConfigStore(IWebHostEnvironment env)

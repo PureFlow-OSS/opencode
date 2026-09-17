@@ -8,10 +8,7 @@
     <button type="button" class="secondary" (click)="add()">+ Add MCP</button>
   </header>
 
-  <div class="channel-switch" role="tablist" aria-label="Updater channel">
-    <button type="button" [class.active]="channel === 'beta'" (click)="selectChannel('beta')">Beta channel</button>
-    <button type="button" [class.active]="channel === 'normal'" (click)="selectChannel('normal')">Normal channel</button>
-  </div>
+  <app-channel-picker class="channel-picker" [channel]="channel" (channelChange)="selectChannel($event)" />
 
   @if (editing) {
     <form class="mcp-form" (submit)="submit($event)">

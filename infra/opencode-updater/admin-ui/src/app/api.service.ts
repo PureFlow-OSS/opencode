@@ -145,6 +145,16 @@ export type McpConfig = {
   auth?: { type: "pat"; label?: string; description?: string; placeholder?: string; header?: string; prefix?: string }
 }
 
+export type McpStoreItem = {
+  name: string
+  description?: string | null
+  url: string
+  headerNames: string[]
+  headerPlaceholder?: string | null
+  enabled: boolean
+  updatedAt?: string | null
+}
+
 type ReleaseStatus = {
   releases: ReleaseRecord[]
   normalStopped: boolean
@@ -300,6 +310,25 @@ export class ApiService {
 
   async deleteMcp(channel: "normal" | "beta", name: string) {
     const response = await fetch(`/opencode/admin/mcp/${encodeURIComponent(name)}?channel=${channel}`, { method: "DELETE" })
+    if (!response.ok) throw new Error(await response.text())
+  }
+
+  async listMcpStore() {
+    return this.readJson<McpStoreItem[]>(await fetch("/opencode/admin/mcp-store", { cache: "no-store" }))
+  }
+
+  async saveMcpStoreItem(name: string, item: Omit<McpStoreItem, "updatedAt">) {
+    const response = await fetch(`/opencode/admin/mcp-store/${encodeURIComponent(name)}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(item),
+    })
+    if (!response.ok) throw new Error(await response.text())
+    return this.readJson<{ name: string; item: McpStoreItem }>(response)
+  }
+
+  async deleteMcpStoreItem(name: string) {
+    const response = await fetch(`/opencode/admin/mcp-store/${encodeURIComponent(name)}`, { method: "DELETE" })
     if (!response.ok) throw new Error(await response.text())
   }
 }

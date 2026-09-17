@@ -1,85 +1,153 @@
 :root {
-  color-scheme: dark;
-  font-family: Inter, system-ui, sans-serif;
-  background: #0f1218;
-  color: #f2f4f8;
+  --rrz-yellow: #ffd500;
+  --rrz-yellow-hover: #edc600;
+  --rrz-yellow-soft: #fff5b5;
+
+  --rrz-blue: #285d82;
+  --rrz-blue-hover: #214f70;
+  --rrz-blue-dark: #1d4869;
+  --rrz-blue-soft: #eaf1f6;
+
+  --rrz-ochre: #d4a504;
+  --rrz-cream: #f8f4e7;
+
+  --color-background: #f6f8fa;
+  --color-surface: #ffffff;
+  --color-surface-warm: #fefdf9;
+  --color-border: #dce3e8;
+  --color-border-strong: #c6d0d8;
+
+  --color-text: #20262c;
+  --color-text-secondary: #5f6870;
+  --color-text-muted: #7b858d;
+
+  --color-success: #168a4a;
+  --color-danger: #c73c32;
+  --color-warning: #a96600;
+
+  color-scheme: light;
 }
 
 html,
 body {
   margin: 0;
   min-height: 100%;
-  background:
-    radial-gradient(circle at top left, rgba(74, 144, 226, 0.25), transparent 30%),
-    radial-gradient(circle at top right, rgba(32, 201, 151, 0.2), transparent 24%),
-    #0f1218;
+  background: var(--color-background);
 }
 
 * {
   box-sizing: border-box;
 }
 
-button,
-input,
-textarea,
-select {
-  font: inherit;
-}
-
 body {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "IBM Plex Sans", Assistant, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  color: var(--color-text);
   overflow-x: hidden;
 }
 
+h1,
+h2,
+h3 {
+  color: var(--rrz-blue);
+}
+
 button,
 input,
 textarea,
 select {
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
-  color: inherit;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
 }
 
 button {
-  padding: 12px 16px;
-  background: linear-gradient(180deg, #7b8cff, #5e73ff);
-  color: #fff;
-  border: 0;
+  padding: 10px 18px;
+  background: var(--rrz-blue);
+  color: #ffffff;
+  border: 1px solid var(--rrz-blue);
   font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+button:hover {
+  background: var(--rrz-blue-hover);
+  border-color: var(--rrz-blue-hover);
 }
 
 button.secondary {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--color-surface);
+  border: 1px solid var(--rrz-blue);
+  color: var(--rrz-blue);
+}
+
+button.secondary:hover {
+  background: var(--rrz-blue-soft);
+  border-color: var(--rrz-blue-hover);
+  color: var(--rrz-blue-dark);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 input,
 textarea,
 select {
   width: 100%;
-  padding: 12px 14px;
+  padding: 9px 12px;
   margin-top: 8px;
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+input:focus,
+textarea:focus,
+select:focus,
+button:focus-visible {
+  outline: 2px solid var(--rrz-blue);
+  outline-offset: 1px;
 }
 
 label {
   display: block;
   margin-bottom: 14px;
-  color: rgba(242, 244, 248, 0.9);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
 }
 
 .list {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   margin-top: 12px;
 }
 
 .item {
-  padding: 16px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--rrz-yellow);
 }
 
 .item-top {
@@ -87,19 +155,22 @@ label {
   justify-content: space-between;
   gap: 12px;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .item-top span {
-  font-size: 12px;
-  color: rgba(242, 244, 248, 0.6);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 
 .progress {
-  height: 10px;
-  border-radius: 999px;
+  height: 8px;
+  border-radius: 2px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--rrz-blue-soft);
   margin: 12px 0;
 }
 
@@ -107,5 +178,5 @@ label {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #23d5ab, #7b8cff);
+  background: var(--rrz-blue);
 }

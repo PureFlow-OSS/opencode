@@ -2,11 +2,12 @@ import { FormsModule } from "@angular/forms"
 import { Component, effect, inject, signal } from "@angular/core"
 import { injectQuery } from "@tanstack/angular-query-experimental"
 import { ApiService, ModelLimitsReport, ModelSettings, ProviderSettings } from "./api.service"
+import { ChannelPickerComponent } from "./channel-picker.component"
 
 @Component({
   selector: "app-model-status-panel",
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, ChannelPickerComponent],
   template: `
     <article class="card">
       <div class="header-row">
@@ -15,10 +16,7 @@ import { ApiService, ModelLimitsReport, ModelSettings, ProviderSettings } from "
           <p>Änderungen werden direkt in die gewählte Konfigurationsdatei gespeichert.</p>
         </div>
         <div class="header-actions">
-          <div class="channel-switch" role="tablist" aria-label="Updater channel">
-            <button type="button" [class.active]="channel() === 'beta'" (click)="setChannel('beta')">Beta channel</button>
-            <button type="button" [class.active]="channel() === 'stable'" (click)="setChannel('stable')">Normal channel</button>
-          </div>
+          <app-channel-picker [channel]="channel()" (channelChange)="setChannel($event === 'normal' ? 'stable' : 'beta')" />
           <button type="button" class="secondary" (click)="syncModels()" [disabled]="syncingModels()">{{ syncingModels() ? 'Refreshing…' : 'Fetch models from LiteLLM' }}</button>
           <div class="count-pill">Models: {{ models().length }}</div>
         </div>
@@ -181,7 +179,7 @@ import { ApiService, ModelLimitsReport, ModelSettings, ProviderSettings } from "
 })
 export class ModelStatusPanelComponent {
   readonly api = inject(ApiService)
-  readonly channel = signal<"stable" | "beta">("stable")
+  readonly channel = signal<"stable" | "beta">("beta")
   readonly editing = signal<string | null>(null)
   readonly draft = signal<ModelSettings>({})
   readonly providerDraft = signal<ProviderSettings>({})
@@ -215,6 +213,7 @@ export class ModelStatusPanelComponent {
   }
 
   setChannel(channel: "stable" | "beta") {
+    if (this.channel() === channel) return
     this.channel.set(channel)
     this.editing.set(null)
     this.error.set(null)

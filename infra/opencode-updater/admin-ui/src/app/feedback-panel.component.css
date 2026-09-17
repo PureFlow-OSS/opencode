@@ -3,15 +3,15 @@
 }
 
 .card {
-  min-height: 240px;
+  min-height: 200px;
 }
 
 .toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
   align-items: end;
-  margin: 18px 0 22px;
+  margin: 14px 0 18px;
 }
 
 .toolbar label {
@@ -21,27 +21,28 @@
 
 .toolbar select {
   margin-top: 6px;
-  color-scheme: dark;
-  background-color: #171b23;
+  background-color: var(--color-surface);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
 }
 
 .toolbar select option {
-  color: #f2f4f8;
-  background-color: #171b23;
+  color: var(--color-text);
+  background-color: var(--color-surface);
 }
 
 .toolbar select option:checked {
-  color: #fff;
-  background-color: #5e73ff;
+  color: #ffffff;
+  background-color: var(--rrz-blue);
 }
 
 .refresh {
-  min-width: 172px;
+  min-width: 170px;
 }
 
 .refresh:disabled {
   cursor: wait;
-  opacity: 0.72;
+  opacity: 0.6;
 }
 
 .refresh-icon {
@@ -60,31 +61,35 @@
 }
 
 .item.empty {
-  opacity: 0.95;
+  opacity: 0.9;
 }
 
 .item p {
   margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text);
 }
 
 .item small {
   display: block;
-  margin-top: 10px;
-  color: rgba(242, 244, 248, 0.68);
+  margin-top: 8px;
+  color: var(--color-text-muted);
+  font-size: 11px;
 }
 
 .attachments {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .attachment {
   display: block;
   overflow: hidden;
-  border: 1px solid rgba(242, 244, 248, 0.2);
-  border-radius: 8px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
   color: inherit;
 }
 
@@ -97,5 +102,8 @@
 
 .attachment span {
   display: block;
-  padding: 8px 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rrz-blue);
 }
