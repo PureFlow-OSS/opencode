@@ -116,6 +116,39 @@ type ServerStatusItem = {
   onSelect: () => void
 }
 
+export type BudgetUsage = {
+  percentage: number
+  value: string
+}
+
+function BudgetUsagePanel(props: { usage?: BudgetUsage; label: string; unknown: string }) {
+  const percentage = () => Math.min(100, Math.max(0, props.usage?.percentage ?? 0))
+
+  return (
+    <div data-slot="budget-usage" class="flex flex-col gap-2 px-3 py-2">
+      <div class="flex items-center justify-between gap-3">
+        <span class="text-14-regular text-text-base">{props.label}</span>
+        <span class="text-12-regular text-text-weak">{props.usage?.value ?? props.unknown}</span>
+      </div>
+      <div
+        role="progressbar"
+        aria-label={props.label}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={props.usage ? percentage() : undefined}
+        class="h-1.5 w-full overflow-hidden rounded-full bg-border-weak-base"
+      >
+        <Show when={props.usage}>
+          <div
+            class="h-full rounded-full bg-v2-background-bg-accent transition-[width]"
+            style={{ width: `${percentage()}%` }}
+          />
+        </Show>
+      </div>
+    </div>
+  )
+}
+
 export function StatusPopoverServerBody() {
   const global = useGlobal()
   const server = useServer()
@@ -249,7 +282,7 @@ function ServerStatusList(props: { state: ServerStatusState }) {
   )
 }
 
-export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
+export function StatusPopoverBody(props: { shown: Accessor<boolean>; budgetUsage?: BudgetUsage }) {
   const sync = useSync()
   const global = useGlobal()
   const server = useServer()
@@ -322,6 +355,11 @@ export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
             {lspCount() > 0 ? `${lspCount()} ` : ""}
             {language.t("status.popover.tab.lsp")}
           </Tabs.Trigger>
+          <Show when={settings.general.newLayoutDesigns()}>
+            <Tabs.Trigger value="usage" data-slot="tab" class="text-12-regular">
+              {language.t("context.stats.usage")}
+            </Tabs.Trigger>
+          </Show>
           <Show when={protocol() === "v1"}>
             <Tabs.Trigger value="plugins" data-slot="tab" class="text-12-regular">
               {pluginCount() > 0 ? `${pluginCount()} ` : ""}
@@ -486,6 +524,20 @@ export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
             </div>
           </div>
         </Tabs.Content>
+
+        <Show when={settings.general.newLayoutDesigns()}>
+          <Tabs.Content value="usage">
+            <div class="flex flex-col px-2 pb-2">
+              <div class="flex flex-col p-3 bg-background-base rounded-sm min-h-14">
+                <BudgetUsagePanel
+                  usage={props.budgetUsage}
+                  label={language.t("context.stats.usage")}
+                  unknown={language.t("common.unknown")}
+                />
+              </div>
+            </div>
+          </Tabs.Content>
+        </Show>
 
         <Show when={protocol() === "v1"}>
           <Tabs.Content value="plugins">
