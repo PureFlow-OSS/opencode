@@ -6,8 +6,9 @@ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Effect } from "effect"
 import { testEffect } from "../lib/effect"
 import { MCP } from "../../src/mcp/index"
+import { Auth } from "../../src/auth"
 
-const it = testEffect(LayerNode.compile(MCP.node))
+const it = testEffect(LayerNode.compile(LayerNode.group([MCP.node, Auth.node])))
 
 const serve = Effect.acquireRelease(
   Effect.promise(async () => {
@@ -96,6 +97,28 @@ describe("mcp.headers", () => {
       for (const headers of server.requests) {
         expect(headers.has("authorization")).toBe(false)
         expect(headers.has("x-custom-header")).toBe(false)
+      }
+    }),
+  )
+
+  it.instance("uses the AI Factory credential for an empty x-litellm-api-key header", () =>
+    Effect.gen(function* () {
+      const server = yield* serve
+      const auth = yield* Auth.Service
+      yield* auth.set("aifactory", { type: "api", key: "sk-aifactory" })
+      const mcp = yield* MCP.Service
+      const result = yield* mcp.add("test-server-aifactory", {
+        type: "remote",
+        url: server.url,
+        headers: {
+          "x-litellm-api-key": "",
+        },
+      })
+
+      expect(result.status).toMatchObject({ "test-server-aifactory": { status: "connected" } })
+      expect(server.requests.length).toBeGreaterThan(0)
+      for (const headers of server.requests) {
+        expect(headers.get("x-litellm-api-key")).toBe("sk-aifactory")
       }
     }),
   )

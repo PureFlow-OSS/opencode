@@ -1,4 +1,4 @@
-import { Component, createSignal, Show, startTransition } from "solid-js"
+import { Component, createSignal, Show } from "solid-js"
 import { Dialog } from "@opencode-ai/ui/dialog"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -25,13 +25,7 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
 
   return (
     <Dialog size="x-large" class="h-full" transition>
-      <Tabs
-        orientation="vertical"
-        variant="settings"
-        value={tab()}
-        onChange={(value) => void startTransition(() => setTab(value))}
-        class="h-full settings-dialog"
-      >
+      <Tabs orientation="vertical" variant="settings" value={tab()} onChange={setTab} class="h-full settings-dialog">
         <Tabs.List>
           <div class="flex flex-col justify-between h-full w-full gap-4">
             <div class="flex flex-col gap-3 w-full pt-3">

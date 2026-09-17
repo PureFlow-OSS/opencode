@@ -6,6 +6,7 @@ export function make(overrides: Partial<Config.Interface> = {}) {
   return Config.Service.of({
     get: () => Effect.succeed({}),
     getGlobal: () => Effect.succeed({}),
+    aifactoryApiKey: () => Effect.succeed(undefined),
     managedMcp: () => Effect.succeed({}),
     getConsoleState: () => Effect.succeed(emptyConsoleState),
     update: () => Effect.void,

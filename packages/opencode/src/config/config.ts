@@ -128,6 +128,7 @@ type State = {
 export interface Interface {
   readonly get: () => Effect.Effect<Info>
   readonly getGlobal: () => Effect.Effect<Info>
+  readonly aifactoryApiKey: () => Effect.Effect<string | undefined>
   readonly managedMcp: () => Effect.Effect<Record<string, ConfigManaged.Mcp>>
   readonly getConsoleState: () => Effect.Effect<ConsoleState>
   readonly update: (config: Info) => Effect.Effect<void>
@@ -378,6 +379,12 @@ export const layer = Layer.effect(
       return yield* cachedGlobal
     })
 
+    const aifactoryApiKey = Effect.fn("Config.aifactoryApiKey")(function* () {
+      const credentials = yield* authSvc.get("aifactory").pipe(Effect.orElseSucceed(() => undefined))
+      if (credentials?.type !== "api" || !credentials.key.trim()) return
+      return credentials.key.trim()
+    })
+
     const ensureGitignore = Effect.fn("Config.ensureGitignore")(function* (dir: string) {
       yield* fs.ensureDir(dir)
       const gitignore = path.join(dir, ".gitignore")
@@ -486,7 +493,11 @@ export const layer = Layer.effect(
         yield* merge(Global.Path.config, global, "global")
 
         const providerConfig = yield* Effect.promise(() =>
-          ConfigManaged.readProviderConfig(fetch, ConfigManaged.providerConfigRequestInit({ config: result, auth }), result),
+          ConfigManaged.readProviderConfig(
+            fetch,
+            ConfigManaged.providerConfigRequestInit({ config: result, auth }),
+            result,
+          ),
         )
         const defaultModel = ConfigManaged.aiFactoryModel(providerConfig.model)
         const defaultSmallModel = ConfigManaged.aiFactoryModel(providerConfig.small_model)
@@ -501,11 +512,7 @@ export const layer = Layer.effect(
             .map(([name, value]) => [name, value.config]),
         )
         if (Object.keys(missingManagedMcp).length) {
-          yield* merge(
-            ConfigManaged.providerConfigUrl(result),
-            { mcp: missingManagedMcp },
-            "global",
-          )
+          yield* merge(ConfigManaged.providerConfigUrl(result), { mcp: missingManagedMcp }, "global")
         }
 
         if (Flag.OPENCODE_CONFIG) {
@@ -794,6 +801,7 @@ export const layer = Layer.effect(
     return Service.of({
       get,
       getGlobal,
+      aifactoryApiKey,
       managedMcp,
       getConsoleState,
       update,

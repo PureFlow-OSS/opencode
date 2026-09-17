@@ -36,7 +36,8 @@ import { McpCatalog } from "./catalog"
 import { McpEvent } from "@opencode-ai/schema/mcp-event"
 import { McpBrowser } from "./browser"
 
-const DEFAULT_TIMEOUT = 30_000
+const DEFAULT_TIMEOUT = 5_000
+const AIFACTORY_API_KEY_HEADER = "x-litellm-api-key"
 const CLIENT_OPTIONS = {
   capabilities: {
     // https://github.com/anomalyco/opencode/issues/11948
@@ -235,6 +236,14 @@ const layer = Layer.effect(
 
     const DISABLED_RESULT: CreateResult = { status: { status: "disabled" } }
 
+    const remoteHeaders = Effect.fn("MCP.remoteHeaders")(function* (headers?: Record<string, string>) {
+      const name = Object.keys(headers ?? {}).find((key) => key.toLowerCase() === AIFACTORY_API_KEY_HEADER)
+      if (!name || headers?.[name]?.trim()) return headers
+      const apiKey = yield* cfgSvc.aifactoryApiKey()
+      if (!apiKey) return headers
+      return { ...headers, [name]: apiKey }
+    })
+
     const connectRemote = Effect.fn("MCP.connectRemote")(function* (
       key: string,
       mcp: ConfigMCPV1.Info & { type: "remote" },
@@ -248,6 +257,7 @@ const layer = Layer.effect(
           status: { status: "failed" as const, error: `Invalid MCP URL for "${key}"` },
         }
       }
+      const headers = yield* remoteHeaders(mcp.headers)
       let authProvider: McpOAuthProvider | undefined
 
       if (!oauthDisabled) {
@@ -273,23 +283,26 @@ const layer = Layer.effect(
           name: "StreamableHTTP",
           transport: new StreamableHTTPClientTransport(url, {
             authProvider,
-            requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
+            requestInit: headers ? { headers } : undefined,
           }),
         },
         {
           name: "SSE",
           transport: new SSEClientTransport(url, {
             authProvider,
-            requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
+            requestInit: headers ? { headers } : undefined,
           }),
         },
       ]
 
       const connectTimeout = mcp.timeout ?? DEFAULT_TIMEOUT
+      const deadline = Date.now() + connectTimeout
       let lastStatus: Status | undefined
 
       for (const { name, transport } of transports) {
-        const result = yield* connectTransport(transport, connectTimeout).pipe(
+        const remaining = deadline - Date.now()
+        if (remaining <= 0) break
+        const result = yield* connectTransport(transport, remaining).pipe(
           Effect.map((client) => ({ client, transportName: name })),
           Effect.catch((error) => {
             const lastError = error instanceof Error ? error : new Error(String(error))
@@ -845,10 +858,11 @@ const layer = Layer.effect(
         },
         auth,
       )
+      const headers = yield* remoteHeaders(mcpConfig.headers)
 
       const transport = new StreamableHTTPClientTransport(url, {
         authProvider,
-        requestInit: mcpConfig.headers ? { headers: mcpConfig.headers } : undefined,
+        requestInit: headers ? { headers } : undefined,
       })
       const directory = yield* InstanceState.directory
 

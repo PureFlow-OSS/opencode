@@ -35,6 +35,10 @@ function headersToRecord(rows: HeaderRow[]): Record<string, string> | undefined 
   return Object.keys(result).length ? result : undefined
 }
 
+function usesAifactoryApiKey(key: string) {
+  return key.trim().toLowerCase() === "x-litellm-api-key"
+}
+
 type OAuthState = {
   clientId: string
   clientSecret: string
@@ -129,7 +133,7 @@ export function DialogMcpForm(props: Props) {
     const errs: FormState["err"] = {}
 
     for (const [index, header] of form.headers.entries()) {
-      if (!isLockedHeader(header.key) || header.value.trim()) continue
+      if (!isLockedHeader(header.key) || header.value.trim() || usesAifactoryApiKey(header.key)) continue
       setForm("headers", index, "err", "value", "Header value is required")
     }
 
@@ -319,8 +323,10 @@ export function DialogMcpForm(props: Props) {
                           label={language.t("settings.mcp.form.field.headers.value.placeholder")}
                           hideLabel
                           placeholder={
-                            props.headerValuePlaceholder ??
-                            language.t("settings.mcp.form.field.headers.value.placeholder")
+                            usesAifactoryApiKey(h.key)
+                              ? "Uses your AI Factory API key when empty"
+                              : (props.headerValuePlaceholder ??
+                                language.t("settings.mcp.form.field.headers.value.placeholder"))
                           }
                           value={h.value}
                           onChange={(v) => setHeader(i(), "value", v)}

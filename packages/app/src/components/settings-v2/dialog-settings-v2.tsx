@@ -1,4 +1,4 @@
-import { Component, createMemo, createSignal, Show, startTransition } from "solid-js"
+import { Component, createMemo, createSignal, Show } from "solid-js"
 import { Dialog } from "@opencode-ai/ui/v2/dialog-v2"
 import { TabsV2 } from "@opencode-ai/ui/v2/tabs-v2"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -49,13 +49,7 @@ export const DialogSettings: Component<{
 
   return (
     <Dialog size="x-large" variant="settings" class="settings-v2-dialog">
-      <TabsV2
-        orientation="vertical"
-        variant="settings"
-        value={tab()}
-        onChange={(value) => void startTransition(() => setTab(value))}
-        class="settings-v2"
-      >
+      <TabsV2 orientation="vertical" variant="settings" value={tab()} onChange={setTab} class="settings-v2">
         <TabsV2.List>
           <div class="flex flex-col justify-between h-full w-full">
             <div class="flex flex-col gap-3 w-full">
