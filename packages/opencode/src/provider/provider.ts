@@ -201,7 +201,7 @@ type CustomDep = {
   get: (key: string) => Effect.Effect<string | undefined>
 }
 
-type AiFactoryRule = {
+export type AiFactoryRule = {
   pattern: string
   context?: number
   output?: number
@@ -366,25 +366,30 @@ async function discoverAiFactoryModelcards(
   return models
 }
 
-function aiFactoryModels(
+/** @internal Exported for testing. */
+export function aiFactoryModels(
   modelIDs: string[],
   baseURL: string,
   rules: AiFactoryRule[] | undefined,
   visibility: AiFactoryVisibilityRule[],
   defaults: string[],
 ) {
-  const hiddenWorkers = new Set(
+  const workerIDs = new Set(
     (rules ?? [])
       .flatMap((rule) => [rule.document_ocr_model, rule.document_vision_model])
-      .filter((id): id is string => typeof id === "string" && id.trim() !== "")
-      .filter((id) => !modelIDs.includes(id) && !defaults.includes(id)),
+      .filter((id): id is string => typeof id === "string" && id.trim() !== ""),
+  )
+  const hiddenWorkers = new Set(
+    [...workerIDs].filter(
+      (id) => !defaults.includes(id) && (!modelIDs.includes(id) || !aiFactoryVisible(id, visibility, defaults)),
+    ),
   )
   const models = Object.fromEntries(
-    [...new Set([...modelIDs, ...defaults, ...hiddenWorkers])]
-      .filter((id) => hiddenWorkers.has(id) || aiFactoryVisible(id, visibility, defaults))
+    [...new Set([...modelIDs, ...defaults, ...workerIDs])]
+      .filter((id) => workerIDs.has(id) || aiFactoryVisible(id, visibility, defaults))
       .map((id) => {
         const override = aiFactoryRule(id, rules)
-        const input = hiddenWorkers.has(id) ? [...new Set([...override.input, "image"])] : override.input
+        const input = workerIDs.has(id) ? [...new Set([...override.input, "image"])] : override.input
         return [
           id,
           {
