@@ -1218,7 +1218,15 @@ export function UserMessageDisplay(props: {
     const match = data.store.provider?.all?.get(providerID)
     return match?.models?.[modelID]?.name ?? modelID
   })
-  const timefmt = createMemo(() => new Intl.DateTimeFormat(i18n.locale(), { timeStyle: "short" }))
+  const timefmt = createMemo(
+    () =>
+      new Intl.DateTimeFormat(i18n.locale(), {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+  )
 
   const stamp = createMemo(() => {
     const created = props.message.time?.created
