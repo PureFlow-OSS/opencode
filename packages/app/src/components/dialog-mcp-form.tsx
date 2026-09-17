@@ -60,6 +60,9 @@ type FormState = {
 type Props = {
   name?: string
   config?: McpConfig
+  preset?: boolean
+  lockedHeaderNames?: string[]
+  headerValuePlaceholder?: string
 }
 
 export function DialogMcpForm(props: Props) {
@@ -67,7 +70,9 @@ export function DialogMcpForm(props: Props) {
   const globalSync = useGlobalSync()
   const language = useLanguage()
 
-  const isEditing = () => !!props.name
+  const isEditing = () => !!props.name && !props.preset
+  const isPreset = () => !!props.preset
+  const isLockedHeader = (key: string) => props.lockedHeaderNames?.includes(key) ?? false
 
   const initialOAuth: OAuthState = (() => {
     if (props.config?.type === "remote" && props.config.oauth) {
@@ -123,6 +128,11 @@ export function DialogMcpForm(props: Props) {
   const validate = (): McpConfig | null => {
     const errs: FormState["err"] = {}
 
+    for (const [index, header] of form.headers.entries()) {
+      if (!isLockedHeader(header.key) || header.value.trim()) continue
+      setForm("headers", index, "err", "value", "Header value is required")
+    }
+
     if (!form.name.trim()) errs.name = language.t("settings.mcp.form.validation.nameRequired")
     if (!isEditing() && form.name.trim() && (globalSync().data.config.mcp ?? {})[form.name.trim()])
       errs.name = language.t("settings.mcp.form.validation.nameTaken")
@@ -130,13 +140,12 @@ export function DialogMcpForm(props: Props) {
     if (form.type === "local" && !form.command.trim())
       errs.command = language.t("settings.mcp.form.validation.commandRequired")
 
-    if (form.type === "remote" && !form.url.trim())
-      errs.url = language.t("settings.mcp.form.validation.urlRequired")
+    if (form.type === "remote" && !form.url.trim()) errs.url = language.t("settings.mcp.form.validation.urlRequired")
     if (form.type === "remote" && form.url.trim() && !isValidRemoteUrl(form.url.trim()))
       errs.url = "URL must start with http:// or https://"
 
     setForm("err", errs)
-    if (Object.keys(errs).length) return null
+    if (Object.keys(errs).length || form.headers.some((header) => header.err.value)) return null
 
     if (form.type === "local") {
       return {
@@ -224,7 +233,7 @@ export function DialogMcpForm(props: Props) {
             placeholder={language.t("settings.mcp.form.field.name.placeholder")}
             description={language.t("settings.mcp.form.field.name.description")}
             value={form.name}
-            readOnly={isEditing()}
+            readOnly={isEditing() || isPreset()}
             onChange={(v) => {
               setForm("name", v)
               setForm("err", "name", undefined)
@@ -241,7 +250,7 @@ export function DialogMcpForm(props: Props) {
                 size="large"
                 variant={form.type === "local" ? "primary" : "secondary"}
                 onClick={() => setForm("type", "local")}
-                disabled={isEditing()}
+                disabled={isEditing() || isPreset()}
               >
                 {language.t("settings.mcp.server.type.local")}
               </Button>
@@ -250,7 +259,7 @@ export function DialogMcpForm(props: Props) {
                 size="large"
                 variant={form.type === "remote" ? "primary" : "secondary"}
                 onClick={() => setForm("type", "remote")}
-                disabled={isEditing()}
+                disabled={isEditing() || isPreset()}
               >
                 {language.t("settings.mcp.server.type.remote")}
               </Button>
@@ -299,6 +308,7 @@ export function DialogMcpForm(props: Props) {
                           hideLabel
                           placeholder={language.t("settings.mcp.form.field.headers.key.placeholder")}
                           value={h.key}
+                          readOnly={isLockedHeader(h.key)}
                           onChange={(v) => setHeader(i(), "key", v)}
                           validationState={h.err.key ? "invalid" : undefined}
                           error={h.err.key}
@@ -308,25 +318,41 @@ export function DialogMcpForm(props: Props) {
                         <TextField
                           label={language.t("settings.mcp.form.field.headers.value.placeholder")}
                           hideLabel
-                          placeholder={language.t("settings.mcp.form.field.headers.value.placeholder")}
+                          placeholder={
+                            props.headerValuePlaceholder ??
+                            language.t("settings.mcp.form.field.headers.value.placeholder")
+                          }
                           value={h.value}
                           onChange={(v) => setHeader(i(), "value", v)}
+                          validationState={h.err.value ? "invalid" : undefined}
+                          error={h.err.value}
                         />
                       </div>
-                      <IconButton
-                        type="button"
-                        icon="trash"
-                        variant="ghost"
-                        class="mt-1.5"
-                        onClick={() => removeHeader(i())}
-                        aria-label={language.t("settings.mcp.form.field.headers.remove")}
-                      />
+                      <Show when={!isLockedHeader(h.key)}>
+                        <IconButton
+                          type="button"
+                          icon="trash"
+                          variant="ghost"
+                          class="mt-1.5"
+                          onClick={() => removeHeader(i())}
+                          aria-label={language.t("settings.mcp.form.field.headers.remove")}
+                        />
+                      </Show>
                     </div>
                   )}
                 </For>
-                <Button type="button" size="small" variant="ghost" icon="plus-small" onClick={addHeader} class="self-start">
-                  {language.t("settings.mcp.form.field.headers.add")}
-                </Button>
+                <Show when={!isPreset()}>
+                  <Button
+                    type="button"
+                    size="small"
+                    variant="ghost"
+                    icon="plus-small"
+                    onClick={addHeader}
+                    class="self-start"
+                  >
+                    {language.t("settings.mcp.form.field.headers.add")}
+                  </Button>
+                </Show>
               </div>
 
               <div class="flex flex-col gap-4">

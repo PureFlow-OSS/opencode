@@ -1,4 +1,4 @@
-import { Component, createMemo, createSignal, startTransition } from "solid-js"
+import { Component, createMemo, createSignal, Show, startTransition } from "solid-js"
 import { Dialog } from "@opencode-ai/ui/v2/dialog-v2"
 import { TabsV2 } from "@opencode-ai/ui/v2/tabs-v2"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -10,7 +10,12 @@ import { SettingsProvidersV2 } from "./providers"
 import { SettingsModelsV2 } from "./models"
 import "./settings-v2.css"
 import { SettingsServersV2 } from "./servers"
+import { SettingsMcp } from "../settings-mcp"
+import { SettingsMcpStore } from "../settings-mcp-store"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { SettingsChangelog } from "../settings-changelog"
+import { SettingsFeedback } from "../settings-feedback"
+import { useBetaTester } from "@/context/beta-status"
 import { useLayout } from "@/context/layout"
 import { useTabs } from "@/context/tabs"
 import { useServerSync } from "@/context/server-sync"
@@ -26,6 +31,7 @@ export const DialogSettings: Component<{
   const tabs = useTabs()
   const serverSync = useServerSync()
   const [tab, setTab] = createSignal(props.defaultValue ?? "general")
+  const betaTester = useBetaTester()
   const directory = createMemo(() => {
     const route = layout.route()
     if (route.type === "dir-new-sesssion") return route.dir
@@ -65,6 +71,20 @@ export const DialogSettings: Component<{
                       <Icon name="keyboard" />
                       {language.t("settings.tab.shortcuts")}
                     </TabsV2.Trigger>
+                    <TabsV2.Trigger value="changelog">
+                      <Icon name="bullet-list" />
+                      {language.t("settings.tab.changelog")}
+                    </TabsV2.Trigger>
+                    <TabsV2.Trigger value="feedback">
+                      <Icon name="bubble-5" />
+                      {language.t("settings.tab.feedback")}
+                    </TabsV2.Trigger>
+                    <Show when={betaTester()}>
+                      <TabsV2.Trigger value="beta-feedback">
+                        <Icon name="bubble-5" />
+                        {language.t("settings.tab.betaFeedback")}
+                      </TabsV2.Trigger>
+                    </Show>
                   </div>
                 </div>
 
@@ -83,6 +103,14 @@ export const DialogSettings: Component<{
                       <Icon name="models" />
                       {language.t("settings.models.title")}
                     </TabsV2.Trigger>
+                    <TabsV2.Trigger value="mcp">
+                      <Icon name="mcp" />
+                      MCP
+                    </TabsV2.Trigger>
+                    <TabsV2.Trigger value="mcp-store">
+                      <Icon name="mcp" />
+                      MCP Store
+                    </TabsV2.Trigger>
                   </div>
                 </div>
               </div>
@@ -99,6 +127,17 @@ export const DialogSettings: Component<{
         <TabsV2.Content value="shortcuts" class="settings-v2-panel">
           <SettingsKeybinds v2 />
         </TabsV2.Content>
+        <TabsV2.Content value="changelog" class="settings-v2-panel">
+          <SettingsChangelog />
+        </TabsV2.Content>
+        <TabsV2.Content value="feedback" class="settings-v2-panel">
+          <SettingsFeedback />
+        </TabsV2.Content>
+        <Show when={betaTester()}>
+          <TabsV2.Content value="beta-feedback" class="settings-v2-panel">
+            <SettingsFeedback mode="beta" />
+          </TabsV2.Content>
+        </Show>
         <TabsV2.Content value="servers" class="settings-v2-panel">
           <SettingsServersV2 />
         </TabsV2.Content>
@@ -107,6 +146,12 @@ export const DialogSettings: Component<{
         </TabsV2.Content>
         <TabsV2.Content value="models" class="settings-v2-panel">
           <SettingsModelsV2 />
+        </TabsV2.Content>
+        <TabsV2.Content value="mcp" class="settings-v2-panel">
+          <SettingsMcp />
+        </TabsV2.Content>
+        <TabsV2.Content value="mcp-store" class="settings-v2-panel">
+          <SettingsMcpStore />
         </TabsV2.Content>
       </TabsV2>
     </Dialog>

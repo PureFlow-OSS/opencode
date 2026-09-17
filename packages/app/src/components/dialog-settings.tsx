@@ -9,6 +9,7 @@ import { SettingsGeneral } from "./settings-general"
 import { SettingsKeybinds } from "./settings-keybinds"
 import { SettingsModels } from "./settings-models"
 import { SettingsMcp } from "./settings-mcp"
+import { SettingsMcpStore } from "./settings-mcp-store"
 import { SettingsServers } from "./settings-servers"
 import { SettingsProviders } from "./settings-providers"
 import { SettingsChangelog } from "./settings-changelog"
@@ -82,6 +83,10 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
                       <Icon name="server" />
                       {language.t("settings.mcp.title")}
                     </Tabs.Trigger>
+                    <Tabs.Trigger value="mcp-store">
+                      <Icon name="mcp" />
+                      MCP Store
+                    </Tabs.Trigger>
                   </div>
                 </div>
               </div>
@@ -120,6 +125,9 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
         </Tabs.Content>
         <Tabs.Content value="mcp" class="no-scrollbar">
           <SettingsMcp />
+        </Tabs.Content>
+        <Tabs.Content value="mcp-store" class="no-scrollbar">
+          <SettingsMcpStore />
         </Tabs.Content>
       </Tabs>
     </Dialog>
