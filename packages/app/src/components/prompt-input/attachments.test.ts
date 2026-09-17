@@ -44,6 +44,7 @@ describe("createPromptAttachmentsCore", () => {
     await Promise.all([attachments.addAttachment(file), attachments.addAttachment(file)])
 
     expect(prompt).toHaveLength(1)
+    expect(prompt[0]).toMatchObject({ type: "image", filename: "guide.pdf", blob: { url: expect.any(String) } })
   })
 })
 

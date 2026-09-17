@@ -33,8 +33,8 @@ describe("layout transition", () => {
     expect(newLayoutDesignsDefault).toBe(true)
   })
 
-  test("hides the transition until a sunset is scheduled", () => {
-    expect(layoutTransitionState(false, true, false, false)).toEqual({ available: false, notice: false })
+  test("keeps the transition available without a planned sunset", () => {
+    expect(layoutTransitionState(false, false, false, false)).toEqual({ available: true, notice: false })
   })
 
   test("existing profiles can switch before sunset", () => {

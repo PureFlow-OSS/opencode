@@ -4,26 +4,10 @@ import { showToast } from "@/utils/toast"
 import { type ContentPart, type ImageAttachmentPart, type usePrompt } from "@/context/prompt"
 import { useLanguage } from "@/context/language"
 import { uuid } from "@/utils/uuid"
+import { createBlobReference } from "@/utils/draft-store"
 import { getCursorPosition } from "./editor-dom"
 import { attachmentMime } from "./files"
 import { normalizePaste, pasteMode } from "./paste"
-
-function dataUrl(file: File, mime: string) {
-  return new Promise<string>((resolve) => {
-    const reader = new FileReader()
-    reader.addEventListener("error", () => resolve(""))
-    reader.addEventListener("load", () => {
-      const value = typeof reader.result === "string" ? reader.result : ""
-      const idx = value.indexOf(",")
-      if (idx === -1) {
-        resolve(value)
-        return
-      }
-      resolve(`data:${mime};base64,${value.slice(idx + 1)}`)
-    })
-    reader.readAsDataURL(file)
-  })
-}
 
 type PromptTarget = Pick<ReturnType<ReturnType<typeof usePrompt>["capture"]>, "current" | "cursor" | "set">
 type AttachmentTarget = { prompt: PromptTarget; cursor: number | undefined }
@@ -65,12 +49,11 @@ export function createPromptAttachmentsCore(input: PromptAttachmentsCoreInput) {
       return false
     }
 
-    const url = await dataUrl(file, mime)
-    if (!url) return false
+    const blob = await createBlobReference(file)
 
     const duplicate = target.prompt
       .current()
-      .some((part) => part.type === "image" && part.filename === file.name && part.mime === mime && part.dataUrl === url)
+      .some((part) => part.type === "image" && part.filename === file.name && part.mime === mime && part.blob.id === blob.id)
     if (duplicate) return true
 
     const attachment: ImageAttachmentPart = {
@@ -79,7 +62,7 @@ export function createPromptAttachmentsCore(input: PromptAttachmentsCoreInput) {
       filename: file.name,
       sourcePath: input.getPathForFile?.(file) || undefined,
       mime,
-      dataUrl: url,
+      blob,
     }
     target.prompt.set([...target.prompt.current(), attachment], target.cursor)
     return true
