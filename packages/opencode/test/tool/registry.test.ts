@@ -2,7 +2,7 @@ import { afterEach, describe, expect } from "bun:test"
 import path from "path"
 import fs from "fs/promises"
 import { fileURLToPath, pathToFileURL } from "url"
-import { Effect, Layer, Result, Schema } from "effect"
+import { Deferred, Effect, Layer, Result, Schema } from "effect"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { ToolRegistry } from "@/tool/registry"
 import { Tool } from "@/tool/tool"
@@ -16,6 +16,8 @@ import { InstanceState } from "@/effect/instance-state"
 
 import { ToolJsonSchema } from "@/tool/json-schema"
 import { MessageID, SessionID } from "@/session/schema"
+import { Session } from "@/session/session"
+import { EventV2Bridge } from "@/event-v2-bridge"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
@@ -50,7 +52,7 @@ const brokenPluginLayer = Layer.succeed(
   }),
 )
 
-const root = LayerNode.group([ToolRegistry.node, Agent.node])
+const root = LayerNode.group([ToolRegistry.node, Agent.node, EventV2Bridge.node])
 const replacements = [
   [Config.node, configLayer],
   [RuntimeFlags.node, RuntimeFlags.layer()],
@@ -254,6 +256,55 @@ describe("tool.registry", () => {
       const loaded = (yield* registry.all()).find((t) => t.id === "noargs")
       if (!loaded) throw new Error("noargs tool was not loaded")
       expect(loaded.jsonSchema).toMatchObject({ type: "object", properties: {} })
+    }),
+  )
+
+  // Regression: a custom tool file whose imports cannot be resolved (e.g.
+  // `@opencode-ai/plugin` missing because node dependencies could not be
+  // downloaded) must not crash registry initialization and block every
+  // message. The file is skipped, the remaining tools load, and the error is
+  // published to the session so the user sees how to fix it.
+  it.instance("skips a custom tool file with unresolvable imports", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const tool = path.join(test.directory, ".opencode", "tool")
+      yield* Effect.promise(() => fs.mkdir(tool, { recursive: true }))
+      yield* Effect.promise(() =>
+        Bun.write(
+          path.join(tool, "broken-import.ts"),
+          'import { Tool } from "@opencode-ai/nonexistent-package-for-regression"\nexport default {\n  description: "broken import tool",\n  args: {},\n  execute: async () => `ok ${Tool}`,\n}\n',
+        ),
+      )
+      yield* Effect.promise(() =>
+        Bun.write(
+          path.join(tool, "healthy.ts"),
+          "export default {\n  description: 'healthy tool',\n  args: {},\n  execute: async () => 'ok',\n}\n",
+        ),
+      )
+
+      const events = yield* EventV2Bridge.Service
+      const received = yield* Deferred.make<unknown>()
+      const unsub = yield* events.listen((event) => {
+        if (event.type === Session.Event.Error.type) Deferred.doneUnsafe(received, Effect.succeed(event.data))
+        return Effect.void
+      })
+      yield* Effect.addFinalizer(() => unsub)
+
+      const registry = yield* ToolRegistry.Service
+      const ids = yield* registry.ids()
+      expect(ids).toContain("read")
+      expect(ids).toContain("healthy")
+      expect(ids).not.toContain("broken_import")
+
+      const data = (yield* Effect.race(
+        Deferred.await(received),
+        Effect.sleep("2 seconds").pipe(
+          Effect.flatMap(() => Effect.fail(new Error("timed out waiting for session error"))),
+        ),
+      )) as { error: { data: { message: string } } }
+      expect(data.error.data.message).toContain("broken-import.ts")
+      expect(data.error.data.message).toContain("nonexistent-package-for-regression")
+      expect(data.error.data.message).toContain("bun add @opencode-ai/plugin")
     }),
   )
 

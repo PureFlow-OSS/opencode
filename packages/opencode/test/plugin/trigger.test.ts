@@ -29,20 +29,21 @@ const it = testEffect(
 )
 const systemHook = "experimental.chat.system.transform"
 
-function withProject<A, E, R>(source: string, self: Effect.Effect<A, E, R>) {
+function withProject<A, E, R>(source: string | string[], self: Effect.Effect<A, E, R>) {
   return Effect.gen(function* () {
     const test = yield* TestInstance
-    const file = path.join(test.directory, "plugin.ts")
+    const sources = Array.isArray(source) ? source : [source]
+    const files = sources.map((_, index) => path.join(test.directory, `plugin-${index}.ts`))
     yield* Effect.all(
       [
-        Effect.promise(() => Bun.write(file, source)),
+        ...files.map((file, index) => Effect.promise(() => Bun.write(file, sources[index]))),
         Effect.promise(() =>
           Bun.write(
             path.join(test.directory, "opencode.json"),
             JSON.stringify(
               {
                 $schema: "https://opencode.ai/config.json",
-                plugin: [pathToFileURL(file).href],
+                plugin: files.map((file) => pathToFileURL(file).href),
               },
               null,
               2,
@@ -104,5 +105,42 @@ describe("plugin.trigger", () => {
         expect(yield* triggerSystemTransform()).toEqual(["async"])
       }),
     ),
+  )
+
+  it.instance("disables a failing plugin without blocking other hooks", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const attempts = path.join(test.directory, "attempts.txt")
+      yield* withProject(
+        [
+          [
+            "export default async () => ({",
+            `  ${JSON.stringify(systemHook)}: async () => {`,
+            `    const file = Bun.file(${JSON.stringify(attempts)})`,
+            '    await Bun.write(file, String(Number(await file.text().catch(() => "0")) + 1))',
+            '    throw new Error("missing dependency")',
+            "  },",
+            "})",
+            "",
+          ].join("\n"),
+          [
+            "export default async () => ({",
+            `  ${JSON.stringify(systemHook)}: (_input, output) => {`,
+            '    output.system.push("healthy")',
+            "  },",
+            "})",
+            "",
+          ].join("\n"),
+        ],
+        Effect.gen(function* () {
+          expect(yield* triggerSystemTransform()).toEqual(["healthy"])
+          expect(yield* triggerSystemTransform()).toEqual(["healthy"])
+          expect(yield* Effect.promise(() => Bun.file(attempts).text())).toBe("1")
+
+          const plugin = yield* Plugin.Service
+          expect((yield* plugin.list()).length).toBe(1)
+        }),
+      )
+    }),
   )
 })

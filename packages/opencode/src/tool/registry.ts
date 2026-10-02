@@ -27,9 +27,12 @@ import { Provider } from "@/provider/provider"
 
 import { WebSearchTool } from "./websearch"
 import { LspTool } from "./lsp"
+import * as BashProcess from "./bash-process"
 import * as Truncate from "./truncate"
 import { ApplyPatchTool } from "./apply_patch"
 import { Glob } from "@opencode-ai/core/util/glob"
+import { NamedError } from "@opencode-ai/core/util/error"
+import { errorMessage } from "@/util/error"
 import path from "path"
 import { pathToFileURL } from "url"
 import { Effect, Layer, Context } from "effect"
@@ -112,6 +115,7 @@ const layer = Layer.effect(
     const agent = yield* Agent.Service
     const codeMode = flags.experimentalCodeMode ? yield* Effect.promise(() => import("./code-mode")) : undefined
     const codeModeTool = codeMode ? yield* codeMode.CodeModeTool : undefined
+    const events = yield* EventV2Bridge.Service
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("ToolRegistry.state")(function* (ctx) {
@@ -179,13 +183,46 @@ const layer = Layer.effect(
         const matches = dirs.flatMap((dir) =>
           Glob.scanSync("{tool,tools}/*.{js,ts}", { cwd: dir, absolute: true, dot: true, symlink: true }),
         )
-        if (matches.length) yield* config.waitForDependencies()
+        const bridge = yield* EffectBridge.make()
+
+        function publishToolLoadError(file: string, error: string) {
+          bridge.fork(
+            events.publish(Session.Event.Error, {
+              error: new NamedError.Unknown({
+                message: `Could not load custom tool file "${file}" and it was skipped: ${error}
+
+If this tool needs node dependencies, install them in the opencode config directory (${path.dirname(file)}) by running e.g. "bun add @opencode-ai/plugin" there (or "npm install @opencode-ai/plugin"). This creates the node_modules folder next to your tool file so the import can be resolved.`,
+              }).toObject(),
+            }),
+          )
+        }
+        if (matches.length) {
+          yield* config.waitForDependencies().pipe(
+            Effect.tapError((error) => Effect.logError("tool dependency install failed", { error })),
+            Effect.catch(() => Effect.void),
+          )
+        }
         for (const match of matches) {
           const namespace = path.basename(match, path.extname(match))
           // `match` is an absolute filesystem path from `Glob.scanSync(..., { absolute: true })`.
           // Import it as `file://` so Node on Windows accepts the dynamic import.
-          const mod = yield* Effect.promise(() => import(pathToFileURL(match).href))
-          for (const [id, def] of Object.entries(mod)) {
+          const mod = yield* Effect.tryPromise({
+            try: () => import(pathToFileURL(match).href),
+            catch: errorMessage,
+          }).pipe(
+            Effect.tapError((error) =>
+              Effect.logError("custom tool failed to load; skipping file", {
+                file: match,
+                error,
+              }),
+            ),
+            Effect.tapError((error) => Effect.sync(() => publishToolLoadError(match, error))),
+            Effect.option,
+          )
+          if (mod._tag === "None") {
+            continue
+          }
+          for (const [id, def] of Object.entries(mod.value)) {
             if (!isPluginTool(def)) continue
             custom.push(fromPlugin(id === "default" ? namespace : `${namespace}_${id}`, def))
           }
@@ -444,6 +481,7 @@ export const node = LayerNode.make({
     MCP.node,
     Database.node,
     Ripgrep.node,
+    BashProcess.node,
   ],
 })
 
