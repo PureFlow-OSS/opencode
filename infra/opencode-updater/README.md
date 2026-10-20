@@ -32,7 +32,9 @@ Set `ProviderConfig.model` to provision the default model. Local or project conf
 Set `ProviderConfig.small_model` to provision the default small model.
 Set `ProviderConfig.aifactory.model_visibility` to override default visibility for AI Factory models in the client.
 
-Requests may include `X-OpenCode-AiFactory-Api-Key`. When `UpdaterBeta.Enabled` is `true`, server calls LiteLLM `key/info`, collects common group fields like `groups`, `group`, `team_id`, `team_alias`, `team`, and `tags`, plus user-like fields such as `username`, `display_name`, `key_alias`, and `key_name`, and serves `appsettings.beta.json` when any configured `UpdaterBeta.Groups` or `UpdaterBeta.Users` value matches.
+Requests may include `X-OpenCode-AiFactory-Api-Key`. When `UpdaterBeta.Enabled` is `true`, server calls LiteLLM `key/info`, collects common group fields like `groups`, `group`, `team_id`, `team_alias`, `team`, and `tags`, plus user-like fields such as `username`, `display_name`, `key_alias`, and `key_name`, and serves `appsettings.beta.json` when any configured `UpdaterBeta.Groups` or `UpdaterBeta.Users` value matches (beta) or any `UpdaterBeta.AiGildeGroups` or `UpdaterBeta.AiGildeUsers` value matches (AI-Gilde).
+
+AI-Gilde is a rollout stage between beta and normal. Beta users receive `feed/beta`, AI-Gilde users receive `feed/ai-gilde`, everyone else receives `feed`. When a key matches both lists, beta wins. The promotion flow is beta to AI-Gilde to normal.
 
 `/opencode/url` and `/opencode/config` return a feed URL with a short-lived hashed `beta` token for matched beta users so downstream feed requests stay on beta config without exposing raw API keys.
 
@@ -42,8 +44,10 @@ Local feed layout:
 - stable changelog: `feed/changelog.md`
 - beta: `feed/beta/latest.json`, `feed/beta/latest.yml`, `feed/beta/<asset>`
 - beta changelog: `feed/beta/changelog.md`
+- ai-gilde: `feed/ai-gilde/latest.json`, `feed/ai-gilde/latest.yml`, `feed/ai-gilde/<asset>`
+- ai-gilde changelog: `feed/ai-gilde/changelog.md`
 
-When beta user is matched, updater first looks in `feed/beta/`. Stable users keep using `feed/`. Missing files return `404`.
+When beta user is matched, updater first looks in `feed/beta/`. AI-Gilde users use `feed/ai-gilde/`. Stable users keep using `feed/`. Missing files return `404`.
 
 `GET /opencode/changelog.md` returns markdown changelog from matching feed directory using same stable/beta resolution as update files.
 
@@ -95,6 +99,7 @@ Matching is case-insensitive.
 
 - `UpdaterBeta.Groups` should contain the exact group or tag names that LiteLLM returns for the API key
 - `UpdaterBeta.Users` should contain the exact user names you want to allow
+- `UpdaterBeta.AiGildeGroups` / `UpdaterBeta.AiGildeUsers` follow the same rules for the AI-Gilde stage
 - for `key_alias`, updater also accepts the part before `" - "`, so `Klaus Scheiböck` matches `Klaus Scheiböck - DEV`
 
 ### Minimal working setup
@@ -171,6 +176,8 @@ Example `appsettings.beta.json`:
     "HeaderName": "X-OpenCode-AiFactory-Api-Key",
     "Groups": ["desktop-beta", "early-access"],
     "Users": ["Klaus Scheiböck"],
+    "AiGildeGroups": ["ai-gilde"],
+    "AiGildeUsers": [],
     "LiteLLM": {
       "BaseUrl": "https://litellm.example.com",
       "KeyInfoPath": "/key/info",

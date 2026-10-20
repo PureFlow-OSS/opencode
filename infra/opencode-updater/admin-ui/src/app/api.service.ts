@@ -160,10 +160,27 @@ type ReleaseStatus = {
   normalStopped: boolean
   betaUserCount: number
   betaPositiveThreshold: number
+  aiGildeUserCount?: number
+  aiGildePositiveThreshold?: number
+  aiGildeFeedVersion?: string | null
   betaRelease?: ReleaseRecord | null
   normalRelease?: ReleaseRecord | null
   betaFeedVersion?: string | null
   normalFeedVersion?: string | null
+}
+
+export type Testers = {
+  betaUsers: string[]
+  aiGildeUsers: string[]
+}
+
+export type TesterSearchEntry = {
+  userName: string
+  currentChannel: "beta" | "ai-gilde" | "none"
+}
+
+export type TesterSearchResponse = {
+  results: TesterSearchEntry[]
 }
 
 @Injectable({ providedIn: "root" })
@@ -192,6 +209,22 @@ export class ApiService {
 
   async promoteRelease(id: string) {
     return this.readJson<ReleaseRecord>(await fetch(`/opencode/admin/releases/${id}/promote`, { method: "POST" }))
+  }
+
+  async listTesters() {
+    return this.readJson<Testers>(await fetch("/opencode/admin/testers", { cache: "no-store" }))
+  }
+
+  async searchTesters(term: string) {
+    return this.readJson<TesterSearchResponse>(await fetch(`/opencode/admin/testers/search?q=${encodeURIComponent(term)}`, { cache: "no-store" }))
+  }
+
+  async saveTesters(testers: Testers) {
+    return this.readJson<Testers>(await fetch("/opencode/admin/testers", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...testers, betaGroups: [], aiGildeGroups: [] }),
+    }))
   }
 
   async stopNormalChannel() {

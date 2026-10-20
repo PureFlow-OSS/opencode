@@ -1,6 +1,7 @@
 bin
 obj
 .vs
+feed
 admin-ui/node_modules
 admin-ui/.angular
 admin-ui/dist

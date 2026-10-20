@@ -34,6 +34,11 @@ type ReleaseRecord = {
           <small>{{ normalStateText }}</small>
         </section>
         <section class="status-box">
+          <span>AI-Gilde Channel</span>
+          <strong>{{ aiGildeFeedVersion }}</strong>
+          <small>{{ aiGildeUserCount }} testers · {{ aiGildePositiveThreshold }} positive approvals required</small>
+        </section>
+        <section class="status-box">
           <span>Beta testers</span>
           <strong>{{ betaUserCount }}</strong>
           <small>{{ betaPositiveThreshold }} positive approvals required</small>
@@ -109,6 +114,18 @@ export class UploadPanelComponent {
 
   get betaPositiveThreshold() {
     return this.status?.betaPositiveThreshold ?? 0
+  }
+
+  get aiGildeFeedVersion() {
+    return this.status?.aiGildeFeedVersion || "No AI-Gilde release yet"
+  }
+
+  get aiGildeUserCount() {
+    return this.status?.aiGildeUserCount ?? 0
+  }
+
+  get aiGildePositiveThreshold() {
+    return this.status?.aiGildePositiveThreshold ?? 0
   }
 
   submit(event: SubmitEvent) {

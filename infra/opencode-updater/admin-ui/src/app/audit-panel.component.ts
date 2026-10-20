@@ -17,7 +17,7 @@ type ReleaseRecord = {
   template: `
     <article class="card">
       <h2>Beta uploads</h2>
-      <p>Promote the active beta upload after the configured number of positive beta feedback items. Normal channel can be stopped here.</p>
+      <p>Promote releases step by step: beta to AI-Gilde, then AI-Gilde to normal. Each step requires positive feedback from the matching tester group. Normal channel can be stopped here.</p>
       <div class="controls">
         <button type="button" class="secondary" (click)="refresh()">Refresh</button>
         <button type="button" class="secondary" (click)="stopNormal()" [disabled]="statusQuery.data()?.normalStopped">Stop normal</button>
@@ -36,7 +36,7 @@ type ReleaseRecord = {
               <strong>{{ release.version }}</strong>
               <span>{{ release.channel }}</span>
             </div>
-            <p>{{ release.positiveCount }}/{{ betaPositiveThreshold }} positive beta feedback required</p>
+            <p>{{ release.positiveCount }}/{{ threshold(release) }} positive feedback required</p>
             <small>{{ release.totalCount }} beta feedback item(s) submitted</small>
             @if (release.notes) {
               <small>{{ release.notes }}</small>
@@ -50,14 +50,14 @@ type ReleaseRecord = {
                 [disabled]="!canPromote(release)"
                 (click)="promote(release.id)"
               >
-                Promote to normal
+                Promote to {{ nextChannel(release) }}
               </button>
               @if (!canPromote(release)) {
                 <small>
                   @if (isSuperseded(release)) {
-                    A newer beta release is active.
+                    A newer release is active in this channel.
                   } @else if (release.totalCount === 0) {
-                    Waiting for beta feedback.
+                    Waiting for feedback.
                   } @else {
                     Need {{ remainingPositive(release) }} more positive feedback item(s).
                   }
@@ -99,21 +99,30 @@ export class AuditPanelComponent {
     return this.statusQuery.data()?.betaPositiveThreshold ?? 1
   }
 
+  threshold(release: ReleaseRecord) {
+    return release.channel === "ai-gilde" ? (this.statusQuery.data()?.aiGildePositiveThreshold ?? 1) : this.betaPositiveThreshold
+  }
+
+  nextChannel(release: ReleaseRecord) {
+    return release.channel === "beta" ? "AI-Gilde" : "normal"
+  }
+
   progress(release: ReleaseRecord) {
-    return Math.min(100, (release.positiveCount / this.betaPositiveThreshold) * 100)
+    return Math.min(100, (release.positiveCount / this.threshold(release)) * 100)
   }
 
   canPromote(release: ReleaseRecord) {
-    return !this.isSuperseded(release) && release.channel !== "normal" && release.positiveCount >= this.betaPositiveThreshold
+    return !this.isSuperseded(release) && release.channel !== "normal" && release.positiveCount >= this.threshold(release)
   }
 
   isSuperseded(release: ReleaseRecord) {
-    const activeBetaVersion = this.statusQuery.data()?.betaFeedVersion
-    return release.channel !== "normal" && !!activeBetaVersion && release.version !== activeBetaVersion
+    if (release.channel !== "beta" && release.channel !== "ai-gilde") return false
+    const activeVersion = release.channel === "ai-gilde" ? this.statusQuery.data()?.aiGildeFeedVersion : this.statusQuery.data()?.betaFeedVersion
+    return !!activeVersion && release.version !== activeVersion
   }
 
   remainingPositive(release: ReleaseRecord) {
-    return Math.max(0, this.betaPositiveThreshold - release.positiveCount)
+    return Math.max(0, this.threshold(release) - release.positiveCount)
   }
 
   promote(id: string) {
