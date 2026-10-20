@@ -2062,6 +2062,9 @@ sealed class McpManagedAuthOptions
 
 sealed class McpStoreOptions
 {
+  [JsonPropertyName("oauthRequired")]
+  public bool OAuthRequired { get; set; }
+
   [JsonPropertyName("name")]
   public string Name { get; set; } = "";
 
@@ -2102,7 +2105,7 @@ sealed class McpStoreStore(IWebHostEnvironment env)
     if (name.Trim().Length > 128) return "Store entry name must not exceed 128 characters";
     if (!Uri.TryCreate(config.Url, UriKind.Absolute, out var uri)) return "Store entries require an absolute URL";
     if (uri.Scheme is not ("http" or "https")) return "Store URLs must use HTTP or HTTPS";
-    if (config.HeaderNames.Length == 0) return "Store entries require at least one header name";
+    if (!config.OAuthRequired && config.HeaderNames.Length == 0) return "Store entries require at least one header name or OAuth";
     if (config.HeaderNames.Any((header) => string.IsNullOrWhiteSpace(header) || header.Trim().Length > 128)) return "Header names must be non-empty and at most 128 characters";
     if (new HashSet<string>(config.HeaderNames.Select((header) => header.Trim()), StringComparer.OrdinalIgnoreCase).Count != config.HeaderNames.Length) return "Header names must be unique";
     return null;
@@ -2137,6 +2140,7 @@ sealed class McpStoreStore(IWebHostEnvironment env)
         url = item.Url,
         headerNames = item.HeaderNames,
         headerPlaceholder = item.HeaderPlaceholder,
+        oauthRequired = item.OAuthRequired,
       })
       .ToList();
   }
@@ -2157,6 +2161,7 @@ sealed class McpStoreStore(IWebHostEnvironment env)
       url = config.Url,
       headerNames = config.HeaderNames,
       headerPlaceholder = config.HeaderPlaceholder,
+      oauthRequired = config.OAuthRequired,
       enabled = config.Enabled,
     }));
     command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));

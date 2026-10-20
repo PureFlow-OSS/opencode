@@ -65,6 +65,7 @@ type Props = {
   name?: string
   config?: McpConfig
   preset?: boolean
+  oauthRequired?: boolean
   lockedHeaderNames?: string[]
   headerValuePlaceholder?: string
 }
@@ -95,7 +96,7 @@ export function DialogMcpForm(props: Props) {
     command: props.config?.type === "local" ? props.config.command.join(" ") : "",
     url: props.config?.type === "remote" ? props.config.url : "",
     headers: headersFromRecord(props.config?.type === "remote" ? props.config.headers : undefined),
-    oauthEnabled: props.config?.type === "remote" && !!props.config.oauth,
+    oauthEnabled: !!props.oauthRequired || (props.config?.type === "remote" && !!props.config.oauth),
     oauth: initialOAuth,
     enabled: props.config?.enabled ?? true,
     err: {},
@@ -364,6 +365,7 @@ export function DialogMcpForm(props: Props) {
               <div class="flex flex-col gap-4">
                 <Switch
                   checked={form.oauthEnabled}
+                  disabled={props.oauthRequired}
                   onChange={(v) => setForm("oauthEnabled", v)}
                   description={language.t("settings.mcp.form.field.oauth.description")}
                 >

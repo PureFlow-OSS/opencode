@@ -4,6 +4,7 @@ import { injectMutation, injectQuery } from "@tanstack/angular-query-experimenta
 import { ApiService, McpStoreItem } from "./api.service"
 
 type StoreDraft = {
+  oauthRequired: boolean
   name: string
   description: string
   url: string
@@ -13,6 +14,7 @@ type StoreDraft = {
 }
 
 const emptyDraft = (): StoreDraft => ({
+  oauthRequired: false,
   name: "",
   description: "",
   url: "",
@@ -60,6 +62,7 @@ export class McpStorePanelComponent {
   edit(item: McpStoreItem) {
     this.editing = item.name
     this.draft = {
+      oauthRequired: item.oauthRequired ?? false,
       name: item.name,
       description: item.description ?? "",
       url: item.url,
@@ -103,7 +106,7 @@ export class McpStorePanelComponent {
       return
     }
     const headerNames = this.draft.headerNames.map((header) => header.trim()).filter(Boolean)
-    if (headerNames.length === 0) {
+    if (!this.draft.oauthRequired && headerNames.length === 0) {
       this.error = "Add at least one header name (users fill in the values in OpenCode)."
       return
     }
@@ -117,6 +120,7 @@ export class McpStorePanelComponent {
       {
         name,
         item: {
+          oauthRequired: this.draft.oauthRequired,
           name,
           description: this.draft.description.trim() || null,
           url: this.draft.url.trim(),

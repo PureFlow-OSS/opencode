@@ -12,6 +12,7 @@ const UPDATE_SERVER_BASE_URL = (import.meta.env.OPENCODE_UPDATE_BASE_URL ?? "htt
 const MCP_STORE_URL = `${UPDATE_SERVER_BASE_URL}/mcp-store.json`
 
 type McpStoreItem = {
+  oauthRequired?: boolean
   name: string
   description?: string
   url: string
@@ -33,12 +34,14 @@ export const SettingsMcpStore: Component = () => {
     dialog.show(() => (
       <DialogMcpForm
         preset
+        oauthRequired={item.oauthRequired}
         name={item.name}
         config={{
           type: "remote",
           url: item.url,
           headers: Object.fromEntries(item.headerNames.map((header) => [header, ""])),
           enabled: true,
+          oauth: item.oauthRequired ? {} : undefined,
         }}
         lockedHeaderNames={item.headerNames}
         headerValuePlaceholder={item.headerPlaceholder}
@@ -82,6 +85,7 @@ export const SettingsMcpStore: Component = () => {
                       <div class="flex items-center gap-2">
                         <span class="text-14-medium text-text-strong truncate">{item.name}</span>
                         <Tag>Remote</Tag>
+                        <Show when={item.oauthRequired}><Tag>OAuth</Tag></Show>
                       </div>
                       <Show when={item.description}>
                         {(description) => <span class="text-12-regular text-text-weak">{description()}</span>}

@@ -146,6 +146,7 @@ export type McpConfig = {
 }
 
 export type McpStoreItem = {
+  oauthRequired?: boolean
   name: string
   description?: string | null
   url: string
