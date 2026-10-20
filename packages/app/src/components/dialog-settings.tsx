@@ -2,6 +2,7 @@ import { Component, createSignal, Show } from "solid-js"
 import { Dialog } from "@opencode-ai/ui/dialog"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { Icon } from "@opencode-ai/ui/icon"
+import { Tag } from "@opencode-ai/ui/v2/badge-v2"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
@@ -13,7 +14,6 @@ import { SettingsMcpStore } from "./settings-mcp-store"
 import { SettingsServers } from "./settings-servers"
 import { SettingsProviders } from "./settings-providers"
 import { SettingsChangelog } from "./settings-changelog"
-import { SettingsFeedback } from "./settings-feedback"
 import { useBetaTester } from "@/context/beta-status"
 
 export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
@@ -45,15 +45,10 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
                       <Icon name="bullet-list" />
                       {language.t("settings.tab.changelog")}
                     </Tabs.Trigger>
-                    <Tabs.Trigger value="feedback">
-                      <Icon name="bubble-5" />
-                      {language.t("settings.tab.feedback")}
-                    </Tabs.Trigger>
                     <Show when={betaTester()}>
-                      <Tabs.Trigger value="beta-feedback">
-                        <Icon name="bubble-5" />
-                        {language.t("settings.tab.betaFeedback")}
-                      </Tabs.Trigger>
+                      <div class="flex items-center px-2 py-1">
+                        <Tag variant="accent">{language.t("settings.beta.badge")}</Tag>
+                      </div>
                     </Show>
                     <Tabs.Trigger value="servers">
                       <Icon name="server" />
@@ -100,14 +95,6 @@ export const DialogSettings: Component<{ defaultValue?: string }> = (props) => {
         <Tabs.Content value="changelog" class="no-scrollbar">
           <SettingsChangelog />
         </Tabs.Content>
-        <Tabs.Content value="feedback" class="no-scrollbar">
-          <SettingsFeedback />
-        </Tabs.Content>
-        <Show when={betaTester()}>
-          <Tabs.Content value="beta-feedback" class="no-scrollbar">
-            <SettingsFeedback mode="beta" />
-          </Tabs.Content>
-        </Show>
         <Tabs.Content value="servers" class="no-scrollbar">
           <SettingsServers />
         </Tabs.Content>

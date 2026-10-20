@@ -2,6 +2,7 @@ import { Component, createMemo, createSignal, Show } from "solid-js"
 import { Dialog } from "@opencode-ai/ui/v2/dialog-v2"
 import { TabsV2 } from "@opencode-ai/ui/v2/tabs-v2"
 import { Icon } from "@opencode-ai/ui/icon"
+import { Tag } from "@opencode-ai/ui/v2/badge-v2"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { SettingsGeneralV2 } from "./general"
@@ -14,7 +15,6 @@ import { SettingsMcp } from "../settings-mcp"
 import { SettingsMcpStore } from "../settings-mcp-store"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { SettingsChangelog } from "../settings-changelog"
-import { SettingsFeedback } from "../settings-feedback"
 import { useBetaTester } from "@/context/beta-status"
 import { useLayout } from "@/context/layout"
 import { useTabs } from "@/context/tabs"
@@ -69,15 +69,10 @@ export const DialogSettings: Component<{
                       <Icon name="bullet-list" />
                       {language.t("settings.tab.changelog")}
                     </TabsV2.Trigger>
-                    <TabsV2.Trigger value="feedback">
-                      <Icon name="bubble-5" />
-                      {language.t("settings.tab.feedback")}
-                    </TabsV2.Trigger>
                     <Show when={betaTester()}>
-                      <TabsV2.Trigger value="beta-feedback">
-                        <Icon name="bubble-5" />
-                        {language.t("settings.tab.betaFeedback")}
-                      </TabsV2.Trigger>
+                      <div class="flex items-center px-1.5 py-1">
+                        <Tag variant="accent">{language.t("settings.beta.badge")}</Tag>
+                      </div>
                     </Show>
                   </div>
                 </div>
@@ -124,14 +119,6 @@ export const DialogSettings: Component<{
         <TabsV2.Content value="changelog" class="settings-v2-panel">
           <SettingsChangelog />
         </TabsV2.Content>
-        <TabsV2.Content value="feedback" class="settings-v2-panel">
-          <SettingsFeedback />
-        </TabsV2.Content>
-        <Show when={betaTester()}>
-          <TabsV2.Content value="beta-feedback" class="settings-v2-panel">
-            <SettingsFeedback mode="beta" />
-          </TabsV2.Content>
-        </Show>
         <TabsV2.Content value="servers" class="settings-v2-panel">
           <SettingsServersV2 />
         </TabsV2.Content>
