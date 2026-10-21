@@ -24,8 +24,8 @@ test("creates a session in a new project and selects its model", async ({ page }
     provider: () => ({
       all: [
         {
-          id: "opencode",
-          name: "OpenCode",
+          id: "openai",
+          name: "OpenAI",
           models: {
             "free-model": {
               id: "free-model",
@@ -36,8 +36,8 @@ test("creates a session in a new project and selects its model", async ({ page }
           },
         },
         {
-          id: "opencode-go",
-          name: "OpenCode Go",
+          id: "aifactory",
+          name: "RRZ AI Factory",
           models: {
             "go-model-1": {
               id: "go-model-1",
@@ -47,10 +47,31 @@ test("creates a session in a new project and selects its model", async ({ page }
             },
           },
         },
+        {
+          id: "anthropic",
+          name: "Anthropic",
+          models: { "blocked-model": { id: "blocked-model", name: "Blocked Model", limit: { context: 200_000 } } },
+        },
+        {
+          id: "github-copilot",
+          name: "GitHub Copilot",
+          models: { "copilot-model": { id: "copilot-model", name: "Copilot Model", limit: { context: 200_000 } } },
+        },
       ],
-      connected: ["opencode", "opencode-go"],
-      default: { providerID: "opencode", modelID: "free-model" },
+      connected: ["openai", "aifactory", "anthropic", "github-copilot"],
+      default: { providerID: "openai", modelID: "free-model" },
     }),
+    integrations: [
+      { id: "anthropic", name: "Anthropic", methods: [{ type: "key", label: "API key" }], connections: [] },
+      { id: "openai", name: "OpenAI", methods: [{ type: "key", label: "API key" }], connections: [] },
+      { id: "aifactory", name: "RRZ AI Factory", methods: [{ type: "key", label: "API key" }], connections: [] },
+      {
+        id: "github-copilot",
+        name: "GitHub Copilot",
+        methods: [{ type: "oauth", label: "GitHub Copilot" }],
+        connections: [],
+      },
+    ],
     sessions: [],
     pageMessages: () => ({ items: [] }),
     // Listings are requested by absolute path and returned relative to the stable Location.
@@ -62,10 +83,15 @@ test("creates a session in a new project and selects its model", async ({ page }
       "opencode.global.dat:model",
       JSON.stringify({
         user: [
-          { providerID: "opencode", modelID: "free-model", visibility: "show" },
-          { providerID: "opencode-go", modelID: "go-model-1", visibility: "show" },
+          { providerID: "openai", modelID: "free-model", visibility: "show" },
+          { providerID: "aifactory", modelID: "go-model-1", visibility: "show" },
+          { providerID: "anthropic", modelID: "blocked-model", visibility: "show" },
+          { providerID: "github-copilot", modelID: "copilot-model", visibility: "show" },
         ],
-        recent: [{ providerID: "opencode-go", modelID: "go-model-1" }],
+        recent: [
+          { providerID: "anthropic", modelID: "blocked-model" },
+          { providerID: "aifactory", modelID: "go-model-1" },
+        ],
         variant: {},
       }),
     )
@@ -104,6 +130,9 @@ test("creates a session in a new project and selects its model", async ({ page }
   await modelControl.click()
   const modelSearch = page.getByPlaceholder("Search models", { exact: true })
   await expect(modelSearch).toBeFocused()
+  await expect(page.locator("[data-option-key]").first()).toHaveAttribute("data-option-key", "aifactory:go-model-1")
+  await expect(page.getByText("Blocked Model", { exact: true })).toHaveCount(0)
+  await expect(page.locator('[data-option-key="github-copilot:copilot-model"]')).toBeVisible()
   await modelSearch.press("ArrowDown")
   await modelSearch.press("Enter")
   await expect(modelControl).toContainText("Free Model")
@@ -114,25 +143,53 @@ test("creates a session in a new project and selects its model", async ({ page }
   await modelSearch.press("Enter")
 
   await expect(modelControl).toContainText("Go Model 1")
+
+  await modelControl.click()
+  await page.locator('[data-option-key="github-copilot:copilot-model"]').click()
+  await expect(modelControl).toContainText("Copilot Model")
+
+  await page.goto("/settings")
+  const settings = page.getByTestId("settings-screen")
+  await settings.getByRole("tab", { name: "Providers", exact: true }).click()
+  await expect(settings.getByText("Anthropic", { exact: true })).toHaveCount(0)
+  await settings.getByRole("button", { name: "Show more providers", exact: true }).click()
+  const connections = page.getByRole("dialog", { name: "Connect provider", exact: true })
+  await expect(connections.locator("[data-provider-id]")).toHaveCount(3)
+  expect(
+    await connections
+      .locator("[data-provider-id]")
+      .evaluateAll((items) => items.map((item) => item.getAttribute("data-provider-id"))),
+  ).toEqual(["aifactory", "openai", "github-copilot"])
+  await expect(connections.locator('[data-provider-id="_custom"]')).toHaveCount(0)
 })
 
 test("restores each existing session's model and variant when switching tabs", async ({ page }) => {
   const sessions = ["A", "B"].map((name) => ({
     id: `ses_model_${name}`,
     title: `Model ${name}`,
-    model: { id: `model-${name}`, providerID: "opencode", variant: "balanced" },
+    model: { id: `model-${name}`, providerID: "openai", variant: "balanced" },
   }))
 
   await openSession(page, {
     name: "ModelSelection",
     sessions,
-    provider: provider(
-      ...sessions.map((session) => ({
-        id: session.model.id,
-        name: session.title,
-        variants: { balanced: {}, high: {} },
-      })),
-    ),
+    provider: {
+      all: [
+        {
+          ...provider(
+            ...sessions.map((session) => ({
+              id: session.model.id,
+              name: session.title,
+              variants: { balanced: {}, high: {} },
+            })),
+          ).all[0],
+          id: "openai",
+          name: "OpenAI",
+        },
+      ],
+      connected: ["openai"],
+      default: { providerID: "openai", modelID: "model-A" },
+    },
   })
 
   const hrefA = sessionHref(sessions[0]!.id)

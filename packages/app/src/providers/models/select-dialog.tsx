@@ -6,6 +6,7 @@ import { useLocal, type ModelSelection } from "@/providers/models/selection"
 import { isFreeModel } from "@/providers/models/models"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { popularProviders } from "@/providers/catalog/providers"
+import { providerOrder } from "@/providers/catalog/order"
 import { Button } from "@opencode/ui/button"
 import { Badge } from "@opencode/ui/badge"
 import { Dialog, DialogBody, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
@@ -155,9 +156,7 @@ const ModelList: Component<{
                     placement="right-start"
                     gutter={12}
                     openDelay={0}
-                    value={
-                      <ModelTooltip model={item} latest={item.latest} free={isFreeModel(item)} v2 />
-                    }
+                    value={<ModelTooltip model={item} latest={item.latest} free={isFreeModel(item)} v2 />}
                   >
                     <span class="min-w-0 truncate">{item.name}</span>
                   </Tooltip>
@@ -469,7 +468,10 @@ function createModelSelectorController(input: {
         ? allModels().filter((item) => matchesModelSearch(query, [item.name, item.id, item.provider.name]))
         : allModels()
 
-      return [...filtered].sort((a, b) => a.name.localeCompare(b.name))
+      return [...filtered].sort(
+        (a, b) =>
+          providerOrder(a.provider.id) - providerOrder(b.provider.id) || a.name.localeCompare(b.name),
+      )
     },
     groups: (models: ModelItem[]) => {
       const byProvider = new Map<string, ModelItem[]>()
@@ -722,14 +724,7 @@ export function ModelSelectorPopoverView(props: {
                               placement="right-start"
                               gutter={6}
                               openDelay={0}
-                              value={
-                                <ModelTooltip
-                                  model={item}
-                                  latest={item.latest}
-                                  free={isFreeModel(item)}
-                                  v2
-                                />
-                              }
+                              value={<ModelTooltip model={item} latest={item.latest} free={isFreeModel(item)} v2 />}
                             >
                               <Menu.RadioItem
                                 value={modelKey(item)}

@@ -1,6 +1,7 @@
 import { useServerSDK } from "@/runtime/server/client"
 import { useData } from "@/runtime/server/current"
 import { createEffect, type Accessor } from "solid-js"
+import { isAvailableProvider } from "./policy"
 
 export function useIntegrations(directory: Accessor<string | undefined>) {
   const serverSDK = useServerSDK()
@@ -25,6 +26,7 @@ export function useIntegrations(directory: Accessor<string | undefined>) {
 
   return {
     ready: () => data.location.integration.list(location()) !== undefined,
-    list: () => data.location.integration.list(location()) ?? [],
+    list: () =>
+      (data.location.integration.list(location()) ?? []).filter((integration) => isAvailableProvider(integration.id)),
   }
 }

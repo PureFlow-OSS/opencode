@@ -30,10 +30,11 @@ import { useServerSDK } from "@/runtime/server/client"
 import { useData } from "@/runtime/server/current"
 import { useGlobal } from "@/runtime/server/runtime"
 import { ServerConnection } from "@/runtime/server/registry"
-import { useProviders } from "@/providers/catalog/providers"
 import { consoleProviderGroup, consoleProviderName } from "@/providers/catalog/console"
 import { useIntegrations } from "@/providers/catalog/integrations"
-import { CustomProviderForm } from "@/providers/credentials/dialog"
+import { isAvailableProvider } from "@/providers/catalog/policy"
+import { popularProviders } from "@/providers/catalog/order"
+import { useProviders } from "@/providers/catalog/providers"
 import { ProviderModelGroup, ProviderModelIcon } from "@/providers/models/provider-group"
 import type { ModelSelection } from "@/providers/models/selection"
 import { decode64 } from "@/runtime/persistence/base64"
@@ -59,8 +60,6 @@ import { IconButton } from "@opencode/ui/icon-button"
 import { Menu } from "@opencode/ui/menu"
 import "./models.css"
 
-const CUSTOM_ID = "_custom"
-
 type IntegrationForm = NonNullable<ProviderConnectMethod["form"]>[number]
 
 type StringForm = Extract<IntegrationForm, { type: "string" }>
@@ -71,7 +70,10 @@ export function useProviderConnectController() {
 
   return {
     selected: () => store.selected,
-    select: (provider?: string) => setStore("selected", provider),
+    // Deep links can name providers the desktop picker no longer offers; keep those on the picker
+    // instead of mounting a connection form for an unavailable integration.
+    select: (provider?: string) =>
+      setStore("selected", provider !== undefined && isAvailableProvider(provider) ? provider : undefined),
     reset,
   }
 }
@@ -125,13 +127,7 @@ export const DialogConnectProvider: Component<{
   function Content() {
     return (
       <Switch>
-        <Match when={controller.selected() === CUSTOM_ID}>
-          <CustomProviderForm autofocus={false} />
-        </Match>
-        <Match
-          keyed
-          when={controller.selected() && controller.selected() !== CUSTOM_ID ? controller.selected() : undefined}
-        >
+        <Match keyed when={controller.selected()}>
           {(provider) => (
             <ProviderConnection
               provider={provider}
@@ -237,14 +233,13 @@ function ProviderPicker(props: { directory?: string; onSelect: (provider: string
     filter: "",
   })
 
-  const featured = ["opencode-go", "opencode", "anthropic", "openai", "google", "openrouter", "vercel"]
-  const custom = () => ({ id: CUSTOM_ID, name: language.t("dialog.provider.custom.label") })
+  const featured = popularProviders
 
   const all = createMemo(() => {
     language.locale()
     const query = store.filter.trim().toLowerCase()
 
-    const values = [custom(), ...integrations.list()]
+    const values = integrations.list()
 
     if (!query) return values
 
@@ -260,13 +255,7 @@ function ProviderPicker(props: { directory?: string; onSelect: (provider: string
   const other = createMemo(() =>
     all()
       .filter((provider) => !featured.includes(provider.id))
-      .sort((a, b) => {
-        if (a.id === CUSTOM_ID) return -1
-
-        if (b.id === CUSTOM_ID) return 1
-
-        return a.name.localeCompare(b.name)
-      }),
+      .sort((a, b) => a.name.localeCompare(b.name)),
   )
 
   const rows = createMemo(() => [...popular(), ...other()])
@@ -371,11 +360,6 @@ function ProviderPicker(props: { directory?: string; onSelect: (provider: string
                           </span>
                           <span class="flex h-4 shrink-0 items-center rounded-xs border-[0.5px] border-v2-border-border-base bg-v2-background-bg-layer-03 px-1 text-[11px] font-[530] leading-none tracking-[0.05px] text-v2-text-text-muted">
                             {language.t("dialog.provider.tag.recommended")}
-                          </span>
-                        </Show>
-                        <Show when={provider.id === CUSTOM_ID}>
-                          <span class="flex h-4 shrink-0 items-center rounded-xs border-[0.5px] border-v2-border-border-base bg-v2-background-bg-layer-03 px-1 text-[11px] font-[530] leading-none tracking-[0.05px] text-v2-text-text-muted">
-                            {language.t("settings.providers.tag.custom")}
                           </span>
                         </Show>
                         <Show when={store.connecting === provider.id}>

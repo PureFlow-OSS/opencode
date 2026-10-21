@@ -6,6 +6,7 @@ import { createEffect, createMemo, type Accessor } from "solid-js"
 import type { ProviderListResponse } from "@/runtime/server/types"
 import { useIntegrations } from "./integrations"
 import { popularProviders } from "./order"
+import { availableProviderCatalog } from "./policy"
 
 export { popularProviders } from "./order"
 
@@ -41,7 +42,7 @@ export function useProviders(directory: Accessor<string | undefined>) {
 
     if (!provider || !model) return emptyProviderCatalog
 
-    return normalizeProviderList(provider, model)
+    return availableProviderCatalog(normalizeProviderList(provider, model))
   })
 
   const ready = () => {

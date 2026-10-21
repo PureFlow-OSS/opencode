@@ -1,10 +1,7 @@
-export const popularProviders = [
-  "opencode-go",
-  "opencode",
-  "anthropic",
-  "github-copilot",
-  "openai",
-  "google",
-  "openrouter",
-  "vercel",
-]
+export const popularProviders = ["aifactory", "openai", "github-copilot"]
+
+export function providerOrder(id: string) {
+  const index = popularProviders.indexOf(id)
+
+  return index < 0 ? popularProviders.length : index
+}

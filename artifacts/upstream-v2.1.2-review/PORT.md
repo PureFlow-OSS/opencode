@@ -334,3 +334,24 @@ ohne falsche Zielnachrichten und mit 0 px unterem Ankerfehler. Wegen unterschied
 Build-Modi ist daraus keine belastbare Performance-Differenz ableitbar; ein neuer
 Produktionsvergleich bleibt bis zum nächsten vom Nutzer gestarteten Build offen.
 Gemäß Nutzervorgabe kein Gesamtbuild, keine Paketierung und kein App-/Serverneustart.
+
+### Anbieter-Auswahl begrenzen
+
+Der Desktop bietet nur AI Factory, OpenAI und GitHub Copilot an. Die gemeinsamen
+UI-Kataloge filtern sowohl verfügbare Integrationen als auch verbundene Anbieter
+und deren Standardmodelle. Dadurch erscheinen auch gespeicherte oder zuletzt
+verwendete Modelle anderer Anbieter nicht erneut im Chat-Selektor. Gespeicherte
+Verbindungen und Backend-Plugins bleiben unangetastet.
+
+Der Verbindungsdialog bietet keine benutzerdefinierten Anbieter mehr an und weist
+ausgeschlossene IDs beim direkten Öffnen zurück auf die Auswahl. Die OpenAI-
+Anmeldewege für ChatGPT/Codex sowie Copilot bleiben erhalten. AI Factory steht im
+Modellselektor zuerst; Modellzeilen und Gruppen verwenden dieselbe Anbieterfolge,
+damit auch die Tastaturnavigation dazu passt.
+
+Verifiziert: beide Browser-Fälle in `model-selection-flow.spec.ts`, App-Typecheck
+und Linting ohne Befunde. Die Browser-Prüfung enthält einen bereits verbundenen,
+lokal sichtbar und zuletzt verwendet gespeicherten ausgeschlossenen Anbieter,
+AI-Factory-Priorität, OpenAI-/Copilot-Auswahl, den beschränkten Verbindungsdialog
+sowie erhaltene Modell-/Variantenauswahl beim Sitzungswechsel. Gegen das vorherige
+dist schlägt der Ausschluss-Test erwartungsgemäß fehl. Kein Gesamtbuild/Packaging.
