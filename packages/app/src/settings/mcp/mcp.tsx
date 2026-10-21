@@ -19,7 +19,6 @@ import "@/settings/settings.css"
 const statusError = (status: Mcp.Status) =>
   status.status === "failed" || status.status === "needs_auth" ? status.error : undefined
 
-
 const statusKeys = {
   connected: "mcp.status.connected",
   pending: "settings.mcp.status.pending",
@@ -33,7 +32,7 @@ export const SettingsMcp: Component = () => {
   const dialog = useDialog()
   const serverSdk = useServerSDK()
   const data = useData()
-  const toggle = useMcpToggle(() => undefined)
+  const toggle = useMcpToggle()
 
   const connected = () => serverSdk.connection.status() === "connected"
   const directory = () => data.location.default().directory
@@ -48,8 +47,7 @@ export const SettingsMcp: Component = () => {
 
   const operations = createMcpOperations({
     configUpdate: (patch) => serverSdk.api.config.update(patch),
-    mcpAdd: (input) =>
-      serverSdk.api.mcp.add({ server: input.name, config: input.config, location: ref() }),
+    mcpAdd: (input) => serverSdk.api.mcp.add({ server: input.name, config: input.config, location: ref() }),
     mcpRemove: (input) => serverSdk.api.mcp.remove({ server: input.name, location: ref() }),
     refresh,
   })
@@ -90,9 +88,7 @@ export const SettingsMcp: Component = () => {
   )
   const status = (name: string) => data.location.mcp.server.list(ref())?.find((server) => server.name === name)?.status
   const rowsByName = createMemo(() => new Map(rows().map((row) => [row.name, row])))
-  const storeItems = createMemo(() =>
-    (catalog.data?.data.store ?? []).toSorted((a, b) => a.name.localeCompare(b.name)),
-  )
+  const storeItems = createMemo(() => (catalog.data?.data.store ?? []).toSorted((a, b) => a.name.localeCompare(b.name)))
 
   const saveForm = async (name: string, configValue: Mcp.ServerConfig) => {
     await persist.mutateAsync({ name, config: configValue })
@@ -275,7 +271,7 @@ export const SettingsMcp: Component = () => {
         <div class="flex flex-col gap-3">
           <div class="flex items-center justify-between">
             <h3 class="text-13-medium">{language.t("settings.mcp.store.title")}</h3>
-          <Show when={catalog.isError}>
+            <Show when={catalog.isError}>
               <Button variant="ghost" onClick={() => void catalog.refetch()}>
                 {language.t("common.retry")}
               </Button>

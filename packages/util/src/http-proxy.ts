@@ -118,8 +118,9 @@ export const fetch: typeof globalThis.fetch = Object.assign(
   },
   {
     preconnect: (url: string | URL, options?: { dns?: boolean; tcp?: boolean; http?: boolean; https?: boolean }) => {
-      if ("preconnect" in globalThis.fetch && typeof globalThis.fetch.preconnect === "function")
-        globalThis.fetch.preconnect(url, options)
+      const runtimeFetch = globalThis.fetch
+      if ("preconnect" in runtimeFetch && typeof runtimeFetch.preconnect === "function")
+        runtimeFetch.preconnect(url, options)
     },
   },
 )
