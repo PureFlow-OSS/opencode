@@ -11,12 +11,10 @@ node_modules
 playground
 tmp
 dist
-**/bin/
-**/obj/
-packages/desktop*/build/
-packages/desktop*/dist-*/
+dist-node
 ts-dist
 .turbo
+.typecheck-profiles
 **/.serena
 .serena/
 **/.omo
@@ -28,17 +26,14 @@ Session.vim
 a.out
 target
 .scripts
+.cache
 .direnv/
 
 # Local dev files
 opencode-dev
 UPCOMING_CHANGELOG.md
+RELEASE_REVIEW.md
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
-# Updater feed artifacts
-infra/opencode-updater/feed/
-/infra/opencode-updater/appsettings.beta.json
-/infra/opencode-updater/admin-ui/.angular/cache
-/infra/opencode-updater/bin
-/infra/opencode-updater/bin
+/artifacts/
