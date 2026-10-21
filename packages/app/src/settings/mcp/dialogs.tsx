@@ -1,6 +1,6 @@
 import { Button } from "@opencode/ui/button"
 import { useDialog } from "@opencode/ui/context/dialog"
-import { Dialog, DialogBody, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
+import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Switch } from "@opencode/ui/switch"
@@ -187,15 +187,15 @@ export const DialogMcpForm: Component<{
   }
 
   return (
-    <Dialog size="large">
+    <Dialog size="x-large">
       <DialogHeader>
         <DialogTitleGroup
           title={language.t(props.name ? "settings.mcp.form.title.edit" : "settings.mcp.form.title.add")}
           description={language.t("settings.mcp.form.description")}
         />
       </DialogHeader>
-      <DialogBody class="flex flex-col gap-5">
-        <form class="flex flex-col gap-5" onSubmit={submit}>
+      <DialogBody class="min-h-0 px-4 pt-4 pb-4">
+        <form id="mcp-server-form" class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto" onSubmit={submit}>
           <TextField
             autofocus
             label={language.t("settings.mcp.form.name")}
@@ -341,16 +341,16 @@ export const DialogMcpForm: Component<{
           >
             {language.t("settings.mcp.form.enabled")}
           </Switch>
-          <div class="flex gap-2">
-            <Button type="submit" variant="contrast" disabled={props.saving}>
-              {props.saving ? language.t("common.saving") : language.t("common.save")}
-            </Button>
-            <Button type="button" variant="ghost" onClick={() => dialog.close()}>
-              {language.t("common.cancel")}
-            </Button>
-          </div>
         </form>
       </DialogBody>
+      <DialogFooter>
+        <Button type="submit" form="mcp-server-form" variant="contrast" disabled={props.saving}>
+          {props.saving ? language.t("common.saving") : language.t("common.save")}
+        </Button>
+        <Button type="button" variant="ghost" onClick={() => dialog.close()}>
+          {language.t("common.cancel")}
+        </Button>
+      </DialogFooter>
     </Dialog>
   )
 }
@@ -365,14 +365,14 @@ export const DialogMcpPat: Component<{
   const [token, setToken] = createStore({ value: props.row.current })
 
   return (
-    <Dialog>
+    <Dialog fit>
       <DialogHeader>
         <DialogTitleGroup
           title={props.row.auth.label ?? props.row.name}
           description={props.row.auth.description ?? language.t("settings.mcp.pat.description")}
         />
       </DialogHeader>
-      <DialogBody>
+      <DialogBody class="px-4 pt-4 pb-4">
         <form
           class="flex flex-col gap-4"
           onSubmit={async (event) => {

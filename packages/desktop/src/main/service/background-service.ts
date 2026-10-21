@@ -1,5 +1,6 @@
 import { app } from "electron"
 import { Context, Effect, FileSystem, Layer, Path } from "effect"
+import { BackgroundServiceEnvironment } from "./background-service-environment"
 import { BackgroundServiceState } from "./background-service-state"
 import { cleanStages } from "./cli-stages"
 import { DesktopCli } from "./desktop-cli"
@@ -60,6 +61,7 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
         "--service",
         ...(isolated ? ["--hostname", "0.0.0.0", "--port", String(0x0c0c)] : []),
       ],
+      env: BackgroundServiceEnvironment.fromProcess(),
       onStart: (reason, previousVersion) =>
         runFork(Effect.logInfo("v2 CLI background service starting", { reason, previousVersion })),
     })

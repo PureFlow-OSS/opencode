@@ -10,8 +10,6 @@ describe("settings route", () => {
   test("round trips root, server, and project pages", () => {
     const root: SettingsView = { type: "root", tab: "appearance" }
     const server: SettingsView = { type: "server", server: "wsl:Debian", tab: "models" }
-    const mcp: SettingsView = { type: "server", server: "wsl:Debian", tab: "mcp" }
-
     const project: SettingsView = {
       type: "project",
       server: "local",
@@ -29,11 +27,28 @@ describe("settings route", () => {
       ...server,
       subtab: undefined,
     })
-    expect(parseSettingsView(new URL(settingsViewUrl(mcp), "http://localhost").search, true)).toEqual({
-      ...mcp,
-      subtab: undefined,
-    })
     expect(parseSettingsView(new URL(settingsViewUrl(project), "http://localhost").search, true)).toEqual(project)
+  })
+
+  test("resolves legacy MCP URLs to the Extensions MCP subtab", () => {
+    expect(parseSettingsView("?tab=mcp", false)).toEqual({
+      type: "root",
+      tab: "extensions",
+      subtab: "mcps",
+    })
+    expect(parseSettingsView("?server=wsl%3ADebian&tab=mcp", true)).toEqual({
+      type: "server",
+      server: "wsl:Debian",
+      tab: "extensions",
+      subtab: "mcps",
+    })
+    expect(settingsViewUrl({ type: "root", tab: "mcp" })).toBe("/settings?tab=extensions&subtab=mcps")
+    expect(
+      parseSettingsView(
+        new URL(settingsViewUrl({ type: "server", server: "wsl:Debian", tab: "mcp" }), "http://localhost").search,
+        true,
+      ),
+    ).toEqual({ type: "server", server: "wsl:Debian", tab: "extensions", subtab: "mcps" })
   })
 
   test("derives project ancestry and keeps search reveal state transient", () => {

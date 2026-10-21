@@ -140,3 +140,28 @@ App und der Server wurden dabei nicht neu gestartet.
 
 Es wurde nichts gepusht, veröffentlicht, installiert oder am laufenden Desktop
 beziehungsweise dessen Server neu gestartet.
+
+### Native MCP-Ansicht und Korrekturen am 21. Oktober
+
+MCP-Verwaltung und Store sind jetzt gemeinsam unter Erweiterungen → MCPs eingebunden.
+Die separate Navigation entfällt; alte MCP-URLs verweisen auf den nativen Untertab.
+Vorhandene Server, Hinzufügen, Bearbeiten, Löschen und die nativen Schalter bleiben verfügbar.
+
+Ausstehende Katalogabfragen werden vor jedem Query-Datenzugriff abgefangen, damit die
+Seite während des Ladens sichtbar bleibt. Der Hinzufügen-Dialog verwendet wieder die
+frühere Größe `x-large`, mit Innenabständen, scrollbarem Formular und festem Aktionsbereich.
+Der Scrollbereich liegt im Formular, da die Dialog-Basiskomponente ihren Body abschneidet.
+
+Der lokale Docker-Store lieferte zwei gültige Einträge. Die laufende CLI verwendete jedoch
+noch ihre eingebettete ältere Update-URL. Der Desktop übergibt seine eingebettete URL nun
+beim Start eines neuen CLI-Dienstes als Umgebung; eine explizite Laufzeitvariable hat Vorrang.
+Ein bereits kompatibel laufender Dienst wird weiterhin übernommen und nicht neu gestartet.
+
+Verifiziert: App- und Desktop-Typecheck, Lint ohne Fehler, 29 gezielte App-Tests,
+drei Desktop-Umgebungstests und drei Browser-Komponententests. Diese prüfen verzögertes
+Katalogladen, Umschalten, Hinzufügen, Store-Installation, Dialoggröße/Abstände/Scrollen
+sowie den Erhalt erweiterter lokaler und Remote-Konfiguration beim Bearbeiten.
+
+Auf ausdrücklichen Wunsch wurden für diese letzten Korrekturen kein vollständiger Build
+und keine Paketierung ausgeführt. Die zuvor erstellten Installer enthalten diese
+abschließenden Korrekturen deshalb noch nicht.

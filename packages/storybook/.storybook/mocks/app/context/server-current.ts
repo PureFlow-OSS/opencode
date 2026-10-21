@@ -1,8 +1,26 @@
-// Stories render without a connected server: no location has synced integrations yet.
+import { unwrap } from "solid-js/store"
+import { mcpStoryState } from "./server-sdk"
+
 const data = {
   location: {
     default: () => ({ directory: "/tmp/story" }),
     syncInfo: async () => {},
+    mcp: {
+      server: {
+        list: () => structuredClone(unwrap(mcpStoryState.runtime)),
+        sync: async () => {},
+        invalidate: () => {},
+      },
+      resource: {
+        list: () => [],
+        sync: async () => {},
+        invalidate: () => {},
+      },
+    },
+    skill: {
+      list: () => [{ name: "Storybook skill", path: "/skills/storybook" }],
+      sync: async () => {},
+    },
     integration: {
       list: () => undefined,
       sync: async () => {},

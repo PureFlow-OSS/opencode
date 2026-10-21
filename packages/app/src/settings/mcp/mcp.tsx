@@ -3,6 +3,7 @@ import { Button } from "@opencode/ui/button"
 import { Badge } from "@opencode/ui/badge"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { Icon } from "@opencode/ui/icon"
+import { Switch } from "@opencode/ui/switch"
 import { For, Show, type Component, createMemo, onCleanup } from "solid-js"
 import type { Mcp } from "@opencode/schema/mcp"
 import { useLanguage } from "@/runtime/i18n/language"
@@ -83,12 +84,18 @@ export const SettingsMcp: Component = () => {
   const rows = createMemo(() =>
     serverRows({
       entries: config.isPending || config.isError ? [] : (config.data ?? []),
-      catalog: catalog.isError ? { managed: {}, store: [] } : (catalog.data?.data ?? { managed: {}, store: [] }),
+      catalog:
+        catalog.isPending || catalog.isError
+          ? { managed: {}, store: [] }
+          : (catalog.data?.data ?? { managed: {}, store: [] }),
     }),
   )
   const status = (name: string) => data.location.mcp.server.list(ref())?.find((server) => server.name === name)?.status
   const rowsByName = createMemo(() => new Map(rows().map((row) => [row.name, row])))
-  const storeItems = createMemo(() => (catalog.data?.data.store ?? []).toSorted((a, b) => a.name.localeCompare(b.name)))
+  const catalogUnavailable = () => catalog.isPending || catalog.isError
+  const storeItems = createMemo(() =>
+    catalogUnavailable() ? [] : (catalog.data?.data.store ?? []).toSorted((a, b) => a.name.localeCompare(b.name)),
+  )
 
   const saveForm = async (name: string, configValue: Mcp.ServerConfig) => {
     await persist.mutateAsync({ name, config: configValue })
@@ -164,19 +171,16 @@ export const SettingsMcp: Component = () => {
   )
 
   return (
-    <>
-      <div class="settings-tab-header">
-        <div class="settings-tab-header-row">
-          <div class="flex flex-col gap-1">
-            <h2 class="settings-tab-title">{language.t("settings.mcp.title")}</h2>
-            <span class="text-11-regular text-v2-text-text-muted">{language.t("settings.mcp.description")}</span>
-          </div>
+    <div class="flex flex-col gap-6">
+      <div class="settings-section">
+        <div class="flex items-center justify-between">
+          <span class="settings-extension-heading text-13-medium">
+            {language.t("settings.extensions.availableAll")}
+          </span>
           <Button variant="outline" icon="plus" onClick={() => showForm()}>
             {language.t("settings.mcp.add")}
           </Button>
         </div>
-      </div>
-      <div class="settings-tab-body flex flex-col gap-6">
         <SettingsList variant="catalog">
           <For each={rows()}>
             {(row) => (
@@ -217,7 +221,18 @@ export const SettingsMcp: Component = () => {
                     </Show>
                   </div>
                 </div>
-                <div class="flex items-center gap-1">
+                <div class="flex items-center gap-2">
+                  <Switch
+                    checked={status(row.name)?.status === "connected"}
+                    disabled={toggle.isPending || persist.isPending}
+                    hideLabel
+                    onChange={(checked) => {
+                      if (toggle.isPending || persist.isPending) return
+                      toggle.mutate({ name: row.name, enabled: checked })
+                    }}
+                  >
+                    {row.name}
+                  </Switch>
                   <Show when={row.source === "managed" && row.auth?.type === "pat"}>
                     <Button
                       variant="ghost"
@@ -275,6 +290,9 @@ export const SettingsMcp: Component = () => {
               <Button variant="ghost" onClick={() => void catalog.refetch()}>
                 {language.t("common.retry")}
               </Button>
+            </Show>
+            <Show when={catalog.isPending}>
+              <span class="text-13-regular text-v2-text-text-muted">{language.t("common.loading")}</span>
             </Show>
             <Show when={!catalog.isPending && !catalog.isError && storeItems().length === 0}>
               <span class="text-13-regular text-v2-text-text-muted">{language.t("settings.mcp.store.empty")}</span>
@@ -355,6 +373,6 @@ export const SettingsMcp: Component = () => {
           </SettingsList>
         </div>
       </div>
-    </>
+    </div>
   )
 }

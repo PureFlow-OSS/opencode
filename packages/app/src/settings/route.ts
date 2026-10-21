@@ -94,10 +94,14 @@ export function parseSettingsView(
   extensionTabs?: ReadonlySet<string>,
 ): SettingsView {
   const params = new URLSearchParams(search)
-  const tab = params.get("tab") ?? "general"
+  const requestedTab = params.get("tab") ?? "general"
+  // Legacy MCP URLs resolve to the MCP subtab of Extensions.
+  const mcpAlias = requestedTab === "mcp"
+  const tab = mcpAlias ? "extensions" : requestedTab
   const server = params.get("server")
   const project = params.get("project")
-  const subtab = params.get("subtab")
+  const requestedSubtab = params.get("subtab")
+  const subtab = mcpAlias ? "mcps" : requestedSubtab
   const nested = subtab && isSubtab(subtab) && tab === "extensions" ? subtab : undefined
 
   if (project && server && isProjectTab(tab)) {
@@ -131,9 +135,12 @@ export function settingsViewUrl(view: SettingsView) {
 
   if (view.type === "project") params.set("project", view.project)
 
-  if (view.tab !== "general") params.set("tab", view.tab)
+  const tab = view.tab === "mcp" ? "extensions" : view.tab
 
-  if (view.tab === "extensions" && view.subtab) params.set("subtab", view.subtab)
+  if (tab !== "general") params.set("tab", tab)
+
+  const subtab = view.tab === "mcp" ? "mcps" : view.subtab
+  if (tab === "extensions" && subtab) params.set("subtab", subtab)
   const search = params.toString()
 
   return search ? `/settings?${search}` : "/settings"
