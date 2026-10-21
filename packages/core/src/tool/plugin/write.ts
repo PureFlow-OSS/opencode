@@ -84,15 +84,29 @@ export const Plugin = {
                 agent: context.agent,
                 source,
               })
-              const result = yield* fileMutation.writeTextPreservingBom({ target, content: input.content })
-              const bom = (yield* FileMutation.readText(environment.files, target.absolute)).bom
-              if (yield* formatter.file(target.absolute)) {
-                yield* FileMutation.syncTextBom(environment.files, target.absolute, bom)
+              const result = yield* fileMutation.writeTextPreservingBom({
+                target,
+                content: next.text,
+                bom: next.bom || current?.bom,
+                encoding: current?.encoding ?? "utf-8",
+              })
+              const currentAfterWrite = yield* FileMutation.readText(environment.files, target.absolute)
+              if (currentAfterWrite.encoding === "utf-8" && (yield* formatter.file(target.absolute))) {
+                yield* FileMutation.syncTextBom(
+                  environment.files,
+                  target.absolute,
+                  currentAfterWrite.bom,
+                  currentAfterWrite.encoding,
+                )
               }
               return result
             }).pipe(
               Effect.map((output) => ({ output, content: toModelContent(output) })),
-              Effect.mapError((error) => new ToolFailure({ message: `Unable to write ${input.path}`, error })),
+              Effect.mapError((error) =>
+                error instanceof Bom.RepresentableError
+                  ? new ToolFailure({ message: error.message, error })
+                  : new ToolFailure({ message: `Unable to write ${input.path}`, error }),
+              ),
             ),
         }),
       )

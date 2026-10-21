@@ -299,14 +299,17 @@ export const Plugin = {
                 })
               }
               const replacementBom = replaced.startsWith("\uFEFF")
-              const result = yield* fileMutation.write({
+              const result = yield* fileMutation.writeTextPreservingBom({
                 target,
                 content: Bom.join(replaced, original.bom || replacementBom),
+                encoding: original.encoding,
               })
               const bom = original.bom || replacementBom
-              const formatted = (yield* formatter.file(target.absolute))
-                ? yield* FileMutation.syncTextBom(environment.files, target.absolute, bom)
-                : (yield* FileMutation.readText(environment.files, target.absolute)).text
+              const current = yield* FileMutation.readText(environment.files, target.absolute)
+              const formatted =
+                current.encoding === "utf-8" && (yield* formatter.file(target.absolute))
+                  ? yield* FileMutation.syncTextBom(environment.files, target.absolute, bom, current.encoding)
+                  : current.text
               return {
                 files: [fileDiff(result.resource, source, formatted)],
                 replacements,
@@ -321,7 +324,9 @@ export const Plugin = {
               Effect.mapError((error) =>
                 error instanceof ToolFailure
                   ? error
-                  : new ToolFailure({ message: `Unable to edit ${input.path}`, error }),
+                  : error instanceof Bom.RepresentableError
+                    ? new ToolFailure({ message: error.message, error })
+                    : new ToolFailure({ message: `Unable to edit ${input.path}`, error }),
               ),
             )
           },

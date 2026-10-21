@@ -19,6 +19,8 @@ export interface WriteInput {
 export interface TextWriteInput {
   readonly target: Target
   readonly content: string
+  readonly bom?: boolean
+  readonly encoding?: Bom.Encoding
 }
 
 export interface WriteResult {
@@ -37,7 +39,7 @@ export interface Interface {
   /** Write text while retaining an existing UTF-8 BOM and emitting at most one BOM. */
   readonly writeTextPreservingBom: (
     input: TextWriteInput,
-  ) => Effect.Effect<WriteResult, Environment.WrongKind | Environment.Failed>
+  ) => Effect.Effect<WriteResult, Environment.WrongKind | Environment.Failed | Bom.RepresentableError>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/FileMutation") {}
@@ -50,8 +52,9 @@ export const syncTextBom = Effect.fn("FileMutation.syncTextBom")(function* (
   files: Files,
   target: string,
   bom: boolean,
+  encoding?: Bom.Encoding,
 ) {
-  const synced = Bom.syncBytes((yield* files.read(target)).bytes, bom)
+  const synced = Bom.syncBytes((yield* files.read(target)).bytes, bom, encoding)
   if (synced.bytes) yield* files.write(target, synced.bytes)
   return synced.text
 })
@@ -104,14 +107,20 @@ const layer = Layer.effect(
       withTargetLock(input.target)(
         Effect.gen(function* () {
           const next = Bom.split(input.content)
-          const current = yield* environment.files.read(input.target.absolute, { offset: 0, length: 3 }).pipe(
-            Effect.map((result) => result.bytes),
-            Effect.catchTag("Environment.NotFound", () => Effect.undefined),
+          const current = yield* environment.files.read(input.target.absolute).pipe(
+            Effect.map((result) => Bom.decodeBytes(result.bytes)),
+            Effect.catchTag("Environment.NotFound", () => Effect.succeed(undefined)),
           )
-          yield* environment.files.write(
-            input.target.absolute,
-            new TextEncoder().encode(Bom.join(next.text, Boolean(current && Bom.has(current)) || next.bom)),
-          )
+          const encoding = input.encoding ?? current?.encoding ?? "utf-8"
+          const bom = input.bom ?? (current?.bom || next.bom)
+          const bytes = yield* Effect.try({
+            try: () => Bom.encode(Bom.join(next.text, bom), encoding),
+            catch: (error) =>
+              error instanceof Bom.RepresentableError
+                ? error
+                : new Environment.Failed({ path: input.target.absolute, cause: error }),
+          })
+          yield* environment.files.write(input.target.absolute, bytes)
           return writeResult(input.target, current !== undefined)
         }),
       ),

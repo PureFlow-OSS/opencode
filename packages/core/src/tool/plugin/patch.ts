@@ -48,6 +48,8 @@ type Prepared =
   | (Extract<Patch.Hunk, { readonly type: "add" }> & {
       readonly target: FileAccess.Target
       readonly content: string
+      readonly bytes: Uint8Array
+      readonly encoding: Bom.Encoding
       readonly before: string
       readonly after: string
     })
@@ -59,6 +61,8 @@ type Prepared =
   | (Extract<Patch.Hunk, { readonly type: "update" }> & {
       readonly target: FileAccess.Target
       readonly content: string
+      readonly bytes: Uint8Array
+      readonly encoding: Bom.Encoding
       readonly before: string
       readonly after: string
       readonly moveTarget?: FileAccess.Target
@@ -113,7 +117,7 @@ export const Plugin = {
                 return yield* new ToolFailure({ message: "patch rejected: empty patch" })
               }
               const prepared: Prepared[] = []
-              const updates = new Map<string, string>()
+              const updates = new Map<string, { content: string; encoding: Bom.Encoding }>()
               const resolveTarget = Effect.fnUntraced(function* (value: string) {
                 const target = yield* access.resolve({ path: value, kind: "file" })
                 if (!target.externalDirectory) return target
@@ -129,10 +133,13 @@ export const Plugin = {
                   if (hunk.type === "add") {
                     const content =
                       hunk.contents.endsWith("\n") || hunk.contents === "" ? hunk.contents : `${hunk.contents}\n`
+                    const bytes = yield* encodePatch(content, "utf-8")
                     prepared.push({
                       ...hunk,
                       target,
                       content,
+                      bytes,
+                      encoding: "utf-8",
                       before: "",
                       after: Bom.split(content).text,
                     })
@@ -151,34 +158,37 @@ export const Plugin = {
                     return
                   }
                   const previous = updates.get(target.absolute)
-                  const original =
-                    previous ??
-                    (yield* Effect.gen(function* () {
-                      const content = yield* FileMutation.readText(environment.files, target.absolute).pipe(
-                        Effect.mapError(
-                          (error) =>
-                            new ToolFailure({
-                              message: `patch verification failed: Failed to read file to update ${target.absolute}: ${errorMessage(error)}`,
-                            }),
-                        ),
-                      )
-                      return Bom.join(content.text, content.bom)
-                    }))
+                  const source = previous ?? (yield* Effect.gen(function* () {
+                    const content = yield* FileMutation.readText(environment.files, target.absolute).pipe(
+                      Effect.mapError(
+                        (error) =>
+                          new ToolFailure({
+                            message: `patch verification failed: Failed to read file to update ${target.absolute}: ${errorMessage(error)}`,
+                          }),
+                      ),
+                    )
+                    return { content: Bom.join(content.text, content.bom), encoding: content.encoding }
+                  }))
+                  const original = source.content
                   const before = Bom.split(original).text
                   const update = yield* Effect.try({
                     try: () => Patch.derive(hunk.path, hunk.chunks, original),
                     catch: (error) => new ToolFailure({ message: `patch verification failed: ${errorMessage(error)}` }),
                   })
+                  const content = Patch.joinBom(withSourceLineEndings(original, update.content), update.bom)
+                  const bytes = yield* encodePatch(content, source.encoding)
                   const moveTarget = hunk.movePath ? yield* resolveTarget(hunk.movePath) : undefined
                   prepared.push({
                     ...hunk,
                     target,
-                    content: Patch.joinBom(update.content, update.bom),
+                    content,
+                    bytes,
+                    encoding: source.encoding,
                     before,
                     after: update.content,
                     moveTarget,
                   })
-                  if (!moveTarget) updates.set(target.absolute, Patch.joinBom(update.content, update.bom))
+                  if (!moveTarget) updates.set(target.absolute, { content, encoding: source.encoding })
                 }).pipe(
                   Effect.mapError((error) =>
                     error instanceof ToolFailure
@@ -225,7 +235,7 @@ export const Plugin = {
                     if (change.type === "update" && change.moveTarget) {
                       const moveTarget = change.moveTarget
                       yield* environment.files
-                        .write(moveTarget.absolute, new TextEncoder().encode(change.content))
+                        .write(moveTarget.absolute, change.bytes)
                         .pipe(Effect.mapError((error) => fail(`Failed to write ${moveTarget.resource}`, error)))
                       yield* environment.files
                         .remove(change.target.absolute)
@@ -242,7 +252,7 @@ export const Plugin = {
                       return
                     }
                     yield* environment.files
-                      .write(change.target.absolute, new TextEncoder().encode(change.content))
+                      .write(change.target.absolute, change.bytes)
                       .pipe(Effect.mapError((error) => fail(`Failed to write ${change.target.resource}`, error)))
                     applied.push({
                       type: change.type,
@@ -262,8 +272,13 @@ export const Plugin = {
                     )
                     formatted.set(
                       target,
-                      (yield* formatter.file(target))
-                        ? yield* FileMutation.syncTextBom(environment.files, target, current.bom).pipe(
+                      current.encoding === "utf-8" && (yield* formatter.file(target))
+                        ? yield* FileMutation.syncTextBom(
+                            environment.files,
+                            target,
+                            current.bom,
+                            current.encoding,
+                          ).pipe(
                             Effect.mapError((error) => fail(`Failed to sync ${target}`, error)),
                           )
                         : current.text,
@@ -317,6 +332,20 @@ function errorMessage(error: unknown) {
   if (error instanceof Environment.Failed) return errorMessage(error.cause)
   return error instanceof Error ? error.message : String(error)
 }
+
+/** Preserve the source's dominant line ending when the shared patch engine emits its LF view. */
+const withSourceLineEndings = (source: string, content: string) => {
+  const sourceCrlf = source.split('\r\n').length - 1
+  const sourceLf = source.split('\n').length - 1 - sourceCrlf
+  if (sourceCrlf <= sourceLf) return content
+  return content.replaceAll('\n', '\r\n')
+}
+
+const encodePatch = (content: string, encoding: Bom.Encoding) =>
+  Effect.try({
+    try: () => Bom.encode(content, encoding),
+    catch: (error) => new ToolFailure({ message: `patch verification failed: ${errorMessage(error)}` }),
+  })
 
 function patchFile(change: Prepared, after = change.after): typeof FileDiff.Info.Type {
   const target = (change.type === "update" ? change.moveTarget : undefined)?.resource ?? change.target.resource

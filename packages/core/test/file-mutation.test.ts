@@ -80,11 +80,34 @@ describe("FileMutation", () => {
         const created = yield* access.resolve({ path: "created.txt" })
         const files = yield* FileMutation.Service
 
-        yield* files.writeTextPreservingBom({ target: preserved, content: "\uFEFFafter" })
+        yield* files.writeTextPreservingBom({ target: preserved, content: "after" })
         yield* files.writeTextPreservingBom({ target: created, content: "\uFEFF\uFEFF\uFEFFcreated" })
 
         expect(yield* Effect.promise(() => fs.readFile(preservedPath, "utf8"))).toBe("\uFEFFafter")
         expect(yield* Effect.promise(() => fs.readFile(created.absolute, "utf8"))).toBe("\uFEFFcreated")
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("preserves Windows-1252 and its BOM for text writes", () =>
+    withTempDir(({ path: directory }) =>
+      Effect.gen(function* () {
+        const preservedPath = path.join(directory, "preserved.txt")
+        yield* Effect.promise(() => fs.writeFile(preservedPath, Uint8Array.from([0x47, 0xfc, 0xdf, 0x65])))
+        const access = yield* FileAccess.Service
+        const preserved = yield* access.resolve({ path: "preserved.txt" })
+        const created = yield* access.resolve({ path: "created.txt" })
+        const files = yield* FileMutation.Service
+
+        yield* files.writeTextPreservingBom({ target: preserved, content: "Güße" })
+        yield* files.writeTextPreservingBom({ target: created, content: "Güße", bom: true, encoding: "windows-1252" })
+
+        expect(Uint8Array.from(yield* Effect.promise(() => fs.readFile(preservedPath)))).toEqual(
+          Uint8Array.from([0x47, 0xfc, 0xdf, 0x65]),
+        )
+        expect(Uint8Array.from(yield* Effect.promise(() => fs.readFile(created.absolute)))).toEqual(
+          Uint8Array.from([0xef, 0xbb, 0xbf, 0x47, 0xfc, 0xdf, 0x65]),
+        )
       }).pipe(provide(directory)),
     ),
   )

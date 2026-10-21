@@ -709,6 +709,59 @@ describe("PatchTool", () => {
     ),
   )
 
+  it.live("preserves Windows-1252 for updates and moves and rejects unrepresentable bytes before writes", () =>
+    withTempTool((directory, registry) =>
+      Effect.gen(function* () {
+        const update = path.join(directory, "update.txt")
+        const move = path.join(directory, "old.txt")
+        const failed = path.join(directory, "failed.txt")
+        const updateBytes = Uint8Array.from([
+          0x47, 0x72, 0xfc, 0xdf, 0x65, 0x0d, 0x0a, 0x72, 0x65, 0x73, 0x74, 0x0d, 0x0a,
+        ])
+        const moveBytes = Uint8Array.from([0x62, 0x65, 0x66, 0x6f, 0x72, 0x65, 0x0a])
+        yield* Effect.promise(() =>
+          Promise.all([
+            fs.writeFile(update, updateBytes),
+            fs.writeFile(move, moveBytes),
+            fs.writeFile(failed, updateBytes),
+          ]),
+        )
+
+        const settled = yield* executeTool(
+          registry,
+          call(
+            "*** Begin Patch\n*** Update File: update.txt\n@@\n-Grüße\n-rest\n+Grüße\n+Geändert\n*** Update File: old.txt\n*** Move to: moved.txt\n@@\n-before\n+after\n*** End Patch",
+          ),
+        )
+        const failedResult = yield* executeTool(
+          registry,
+          call(
+            "*** Begin Patch\n*** Add File: first.txt\n+first\n*** Update File: failed.txt\n@@\n-Grüße\n-rest\n+Grüße\n+checked ✓\n*** End Patch",
+          ),
+        )
+
+        expect(settled.status).toBe("completed")
+        expect(failedResult).toMatchObject({
+          status: "error",
+          error: {
+            message:
+              'patch verification failed: Cannot preserve Windows-1252 encoding: character "✓" cannot be represented.',
+          },
+        })
+        expect(Uint8Array.from(yield* Effect.promise(() => fs.readFile(update)))).toEqual(
+          Uint8Array.from([
+            0x47, 0x72, 0xfc, 0xdf, 0x65, 0x0d, 0x0a, 0x47, 0x65, 0xe4, 0x6e, 0x64, 0x65, 0x72, 0x74, 0x0d, 0x0a,
+          ]),
+        )
+        expect(Uint8Array.from(yield* Effect.promise(() => fs.readFile(path.join(directory, "moved.txt"))))).toEqual(
+          Uint8Array.from([0x61, 0x66, 0x74, 0x65, 0x72, 0x0a]),
+        )
+        expect(yield* exists(path.join(directory, "first.txt"))).toBe(false)
+        expect(Uint8Array.from(yield* Effect.promise(() => fs.readFile(failed)))).toEqual(updateBytes)
+      }),
+    ),
+  )
+
   it.live("does not invent a first-line diff for BOM files", () =>
     withTempTool((directory, registry) =>
       Effect.gen(function* () {

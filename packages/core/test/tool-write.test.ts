@@ -230,6 +230,31 @@ describe("WriteTool", () => {
     }),
   )
 
+  it.live("preserves Windows-1252 when overwriting and defaults new files to UTF-8", () =>
+    withTempDir((tmp) => {
+      const fixture = makeWriteFixture()
+      const preserved = path.join(tmp.path, "preserved.txt")
+      const created = path.join(tmp.path, "created.txt")
+      return Effect.promise(() => fs.writeFile(preserved, Uint8Array.from([0x47, 0x72, 0xfc, 0xdf, 0x65]))).pipe(
+        Effect.andThen(
+          withTool(tmp.path, fixture, (registry) =>
+            Effect.gen(function* () {
+              yield* executeTool(registry, call({ path: "preserved.txt", content: "Grüße" }, "call-preserved"))
+              yield* executeTool(registry, call({ path: "created.txt", content: "Grüße" }, "call-created"))
+            }),
+          ),
+        ),
+        Effect.andThen(() => Effect.promise(() => Promise.all([fs.readFile(preserved), fs.readFile(created)]))),
+        Effect.tap(([preservedBytes, createdBytes]) =>
+          Effect.sync(() => {
+            expect(Uint8Array.from(preservedBytes)).toEqual(Uint8Array.from([0x47, 0x72, 0xfc, 0xdf, 0x65]))
+            expect(Uint8Array.from(createdBytes)).toEqual(new TextEncoder().encode("Grüße"))
+          }),
+        ),
+      )
+    }),
+  )
+
   it.live("accepts an absolute file path inside the active Location", () =>
     withTempDir((tmp) => {
       const fixture = makeWriteFixture()

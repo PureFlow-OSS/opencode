@@ -10,6 +10,7 @@ import type { Files } from "../environment/index.js"
 import { FileSystem } from "../filesystem.js"
 import { Mime } from "../mime.js"
 import { AbsolutePath, NonNegativeInt, PositiveInt, RelativePath } from "../schema.js"
+import { Bom } from "@opencode/util/bom"
 
 export const MAX_READ_LINES = 2_000
 export const MAX_READ_BYTES = 50 * 1024
@@ -149,26 +150,30 @@ export const read = Effect.fn("ReadTool.read")(function* (
   }
 
   const paged = first.info.size > MAX_READ_BYTES || page.offset !== undefined || page.limit !== undefined
+  const encoding = Bom.detect(first.bytes, first.bytes.length < first.info.size)
+  const bomLength = first.bytes.length > 2 && Bom.has(first.bytes) ? 3 : 0
   if (!paged) {
     if (first.bytes.includes(0)) return yield* new BinaryFileError({ resource })
+    const content = Bom.decodeBytes(first.bytes, encoding).text
     return {
       type: "file" as const,
       uri: pathToFileURL(input).href,
       name: path.basename(input),
-      content: new TextDecoder().decode(first.bytes).split("\n").map(clampLine).join("\n"),
+      content: content.split("\n").map(clampLine).join("\n"),
       encoding: "utf8" as const,
       mime: mimeType(input),
     }
   }
 
   if (first.bytes.length >= first.info.size) {
-    const result = textPage(first.bytes, true, page)
+    const decoded = Bom.decodeBytes(first.bytes, encoding).text
+    const result = textPage(decoded, true, page, encoding)
     if (result === undefined) return yield* Effect.die("Read page did not settle for a complete first chunk")
     return yield* makeTextPage(
       input,
       resource,
       result,
-      first.bytes.subarray(0, result.consumed).includes(0),
+      first.bytes.subarray(0, bomLength + result.consumed).includes(0),
       lineCount(textLeaf(first.bytes).summary.lines, first.bytes.at(-1)),
     )
   }
@@ -193,14 +198,21 @@ export const read = Effect.fn("ReadTool.read")(function* (
           return [leaf.bytes.subarray(Math.max(0, start - leafStart))]
         }),
       )
-      const result = textPage(selected, eof, { limit })
+      const selectedEncoding = encoding === "utf-8" ? Bom.detect(selected, !eof) : encoding
+      const selectedText = Bom.decode(selected, selectedEncoding, !eof)
+      const result = textPage(
+        start === 0 ? Bom.split(selectedText).text : selectedText,
+        eof,
+        { limit },
+        selectedEncoding,
+      )
       if (result !== undefined) {
         const translated = {
           ...result,
           offset,
           ...(result.next === undefined ? { next: undefined } : { next: offset + result.next - 1 }),
         }
-        const consumed = start + result.consumed
+        const consumed = start + (start === 0 ? bomLength : 0) + result.consumed
         let checked = 0
         const binary = leaves.some((leaf) => {
           const length = Math.min(leaf.summary.bytes, consumed - checked)
@@ -288,10 +300,9 @@ const list = (items: ReadonlyArray<Environment.DirEntry>, page: PageInput) => {
   })
 }
 
-const textPage = (bytes: Uint8Array, eof: boolean, page: PageInput) => {
+const textPage = (decoded: string, eof: boolean, page: PageInput, encoding: Bom.Encoding) => {
   const offset = page.offset || 1
   const limit = Math.min(page.limit || MAX_READ_LINES, MAX_READ_LINES)
-  const decoded = new TextDecoder().decode(bytes)
   const split = decoded.split("\n")
   const complete = eof ? (split.at(-1) === "" ? split.slice(0, -1) : split) : split.slice(0, -1)
   const available = complete.map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line))
@@ -306,7 +317,7 @@ const textPage = (bytes: Uint8Array, eof: boolean, page: PageInput) => {
       break
     }
     const text = clampLine(value)
-    const lineSize = Buffer.byteLength(text, "utf-8") + (entries.length > 0 ? 1 : 0)
+    const lineSize = Bom.encode(text, encoding).length + (entries.length > 0 ? 1 : 0)
     if (size + lineSize > MAX_READ_BYTES) {
       next = line
       break
@@ -319,7 +330,7 @@ const textPage = (bytes: Uint8Array, eof: boolean, page: PageInput) => {
   if (!eof && next === undefined) return
 
   const consumedLines = next === undefined ? available.length : next - 1
-  const consumed = consumedLines === 0 ? 0 : (nthNewline(bytes, consumedLines) ?? bytes.length)
+  const consumed = consumedLines === 0 ? 0 : (nthNewlineBytes(decoded, consumedLines, encoding) ?? decoded.length)
   return { entries, offset, next, consumed }
 }
 
@@ -385,6 +396,15 @@ const nthNewline = (bytes: Uint8Array, count: number) => {
     if (byte !== 10) continue
     found++
     if (found === count) return index + 1
+  }
+}
+
+const nthNewlineBytes = (text: string, count: number, encoding: Bom.Encoding) => {
+  let found = 0
+  for (let index = 0; index < text.length; index++) {
+    if (text[index] !== "\n") continue
+    found++
+    if (found === count) return Bom.encode(text.slice(0, index + 1), encoding).length
   }
 }
 

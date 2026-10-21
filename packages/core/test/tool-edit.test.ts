@@ -586,6 +586,48 @@ describe("EditTool", () => {
     }),
   )
 
+  it.live("preserves Windows-1252 and CRLF while reporting the exact unrepresentable character", () =>
+    withTempDir((tmp) => {
+      const edit = makeEditFixture()
+      const target = path.join(tmp.path, "legacy.txt")
+      const failed = path.join(tmp.path, "failed.txt")
+      const original = Uint8Array.from([0x47, 0x72, 0xfc, 0xdf, 0x65, 0x0d, 0x0a, 0x72, 0x65, 0x73, 0x74])
+      return Effect.promise(() => Promise.all([fs.writeFile(target, original), fs.writeFile(failed, original)])).pipe(
+        Effect.andThen(
+          withTool(tmp.path, edit, (registry) =>
+            Effect.gen(function* () {
+              yield* executeTool(
+                registry,
+                call({ path: "legacy.txt", oldString: "Grüße\nrest", newString: "Grüße\nGeändert" }),
+              )
+              const result = yield* executeTool(
+                registry,
+                call({ path: "failed.txt", oldString: "Grüße\nrest", newString: "Grüße\nchecked ✓" }),
+              )
+              expect(result).toMatchObject({
+                status: "error",
+                error: {
+                  message: 'Cannot preserve Windows-1252 encoding: character "✓" cannot be represented.',
+                },
+              })
+            }),
+          ),
+        ),
+        Effect.andThen(() => Effect.promise(() => Promise.all([fs.readFile(target), fs.readFile(failed)]))),
+        Effect.tap(([targetBytes, failedBytes]) =>
+          Effect.sync(() => {
+            expect(Uint8Array.from(targetBytes)).toEqual(
+              Uint8Array.from([
+                0x47, 0x72, 0xfc, 0xdf, 0x65, 0x0d, 0x0a, 0x47, 0x65, 0xe4, 0x6e, 0x64, 0x65, 0x72, 0x74,
+              ]),
+            )
+            expect(Uint8Array.from(failedBytes)).toEqual(original)
+          }),
+        ),
+      )
+    }),
+  )
+
   it.live("matches across mixed line endings and keeps each region's endings", () =>
     withTempDir((tmp) => {
       const edit = makeEditFixture()
@@ -642,7 +684,10 @@ describe("EditTool", () => {
       // A CRLF file with a block pasted in from an LF editor, edited with surrounding context.
       const target = path.join(tmp.path, "store.cs")
       return Effect.promise(() =>
-        fs.writeFile(target, "All(item.Sku);\r\n\r\nFind(sku);\r\n\r\nvoid Add()\n{\n  _items[item.Sku] = item;\n}\r\n"),
+        fs.writeFile(
+          target,
+          "All(item.Sku);\r\n\r\nFind(sku);\r\n\r\nvoid Add()\n{\n  _items[item.Sku] = item;\n}\r\n",
+        ),
       ).pipe(
         Effect.andThen(
           withTool(tmp.path, edit, (registry) =>
@@ -686,7 +731,10 @@ describe("EditTool", () => {
           withTool(tmp.path, edit, (registry) =>
             Effect.gen(function* () {
               expect(
-                yield* executeTool(registry, call({ path: "strip.sh", oldString: "\r", newString: "", replaceAll: true })),
+                yield* executeTool(
+                  registry,
+                  call({ path: "strip.sh", oldString: "\r", newString: "", replaceAll: true }),
+                ),
               ).toMatchObject({ status: "completed", output: { replacements: 2 } })
               expect(
                 yield* executeTool(registry, call({ path: "whole.sh", oldString: "x\r\ny\r\n", newString: "x\ny\n" })),
@@ -726,7 +774,10 @@ describe("EditTool", () => {
             Effect.gen(function* () {
               // The typography tier matches the curly quote, and the replacement writes the same bytes back.
               expect(
-                yield* executeTool(registry, call({ path: "quote.txt", oldString: "it's here", newString: "it’s here" })),
+                yield* executeTool(
+                  registry,
+                  call({ path: "quote.txt", oldString: "it's here", newString: "it’s here" }),
+                ),
               ).toEqual({
                 status: "error",
                 error: {

@@ -141,7 +141,7 @@ describe("ReadToolFileSystem", () => {
     }),
   )
 
-  it.effect("reads malformed UTF-8 lossily and still rejects null-byte binary content", () =>
+  it.effect("reads Windows-1252 and still rejects null-byte binary content", () =>
     Effect.gen(function* () {
       const { environment, files, directory } = yield* fixture
       const binary = path.join(directory, "archive.dat")
@@ -154,7 +154,24 @@ describe("ReadToolFileSystem", () => {
 
       expect(binaryError).toBeInstanceOf(ReadToolFileSystem.BinaryFileError)
       expect(binaryError.message).toBe("Cannot read binary file: archive.dat")
-      expect(malformedResult).toMatchObject({ type: "file", content: "hi\uFFFD", encoding: "utf8" })
+      expect(malformedResult).toMatchObject({ type: "file", content: "hi€", encoding: "utf8" })
+    }),
+  )
+
+  it.effect("pages Windows-1252 text and strips a leading BOM only on the first page", () =>
+    Effect.gen(function* () {
+      const { environment, files, directory } = yield* fixture
+      const file = path.join(directory, "legacy.txt")
+      yield* files.writeFile(file, Uint8Array.from([0xef, 0xbb, 0xbf, 0xe9, 0xed, 0x0d, 0x0a, 0x80, 0x0d, 0x0a]))
+
+      const first = yield* ReadToolFileSystem.read(environment, absolute(file), "legacy.txt", { limit: 1 })
+      const second = yield* ReadToolFileSystem.read(environment, absolute(file), "legacy.txt", {
+        offset: 2,
+        limit: 1,
+      })
+
+      expect(first).toMatchObject({ type: "text-page", content: "éí", offset: 1, truncated: true, next: 2 })
+      expect(second).toMatchObject({ type: "text-page", content: "€", offset: 2, truncated: false })
     }),
   )
 
@@ -360,6 +377,19 @@ describe("ReadToolFileSystem", () => {
       })
 
       expect(result).toMatchObject({ type: "text-page", content: "second", offset: 2, truncated: false })
+    }),
+  )
+
+  it.effect("keeps UTF-8 across a split multibyte character and a later line's BOM marker", () =>
+    Effect.gen(function* () {
+      const tmp = yield* fixture
+      const file = path.join(tmp.directory, "utf8-boundary.txt")
+      yield* tmp.files.writeFileString(file, `${"a".repeat(256 * 1024 - 1)}€\n\uFEFFGrüße\n`)
+      const result = yield* ReadToolFileSystem.read(tmp.environment, absolute(file), "utf8-boundary.txt", {
+        offset: 2,
+        limit: 1,
+      })
+      expect(result).toMatchObject({ type: "text-page", content: "\uFEFFGrüße", offset: 2, truncated: false })
     }),
   )
 
