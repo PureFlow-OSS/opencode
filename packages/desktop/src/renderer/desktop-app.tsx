@@ -17,13 +17,14 @@ import {
 } from "@opencode/app/desktop"
 import { useTheme } from "@opencode/ui/theme/context"
 import type { BaseRouterProps } from "@solidjs/router"
-import { createEffect, createMemo, createResource, lazy, Show, Suspense } from "solid-js"
+import { createEffect, createMemo, createResource, lazy, onCleanup, Show, Suspense } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { ElectronAPI } from "./api-types"
 import { DesktopFirstLaunchOnboarding } from "./onboarding"
 import { createDesktopPlatform } from "./platform"
 import { bindDesktopMenu } from "./platform/menu"
 import { createSidecarResolver, initializationData, sidecarHttp } from "./startup/initialization"
+import { awaitMigrationCompleted } from "./startup/migration"
 import { preloadStoredLocale } from "./startup/locale"
 import { LoadingSplash } from "./startup/splash"
 import { getLastActiveUrl } from "./window/route-storage"
@@ -61,7 +62,14 @@ export function DesktopApp(props: { api: ElectronAPI; version: string }) {
   )
 
   const platform = createDesktopPlatform(props.api, windowState)
-  const [sidecar, { mutate: setSidecar }] = createResource(() => props.api.awaitInitialization())
+  const migration = new AbortController()
+  onCleanup(() => migration.abort())
+
+  const [sidecar, { mutate: setSidecar }] = createResource(async () => {
+    const data = await props.api.awaitInitialization()
+    await awaitMigrationCompleted(data, migration.signal)
+    return data
+  })
 
   const [locale] = createResource(() => preloadStoredLocale(platform))
 

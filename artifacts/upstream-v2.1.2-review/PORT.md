@@ -112,6 +112,17 @@ Eine echte Key-Vault-Signierung und ein Installationslauf wurden nicht ausgefüh
 
 ### Weitere Grenzen
 
+Beim ersten Desktop-Start konnte ein wiederhergestellter Sitzungstab vor Abschluss
+der asynchronen V1-Migration ein 404 erhalten. Die Fehleransicht blieb anschließend
+bestehen, obwohl der Server die Sitzung nach der Migration wieder erfolgreich lieferte.
+Der Renderer wartet jetzt vor Freigabe des Sidecars und Aufbau der Tabs auf den
+abgeschlossenen Migrationsstatus. Fehler und Abbruch werden weitergereicht.
+Acht Tests für Initialisierung und Migrationsablauf sowie der vollständige Check
+bestehen. Ein separater unsignierter NSIS-Build unter
+`packages/desktop/dist-v2.1.2-migration-fix` wurde erstellt; seine SHA-512-Metadaten
+und die Übereinstimmung der paketierten Main-Chunks wurden geprüft. Die laufende
+App und der Server wurden dabei nicht neu gestartet.
+
 - Die Provider-, Proxy- und Store-Netzwerktests verwenden lokale Test-Server.
   Ein produktiver Aufruf im Unternehmensnetz wurde nicht ausgeführt.
 - Desktop und Helfer wurden gebaut; der NSIS-Installer wurde nicht ausgeführt und
