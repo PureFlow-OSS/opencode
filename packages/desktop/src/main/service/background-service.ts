@@ -53,6 +53,7 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
             )
           : undefined,
       version,
+      buildID: mode === "initial" ? cli.buildID : undefined,
       // A fixed port makes a second contender fail to bind and back off; port 0 never collides, so two
       // services could boot against the same database.
       command: [
@@ -61,14 +62,14 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
         "--service",
         ...(isolated ? ["--hostname", "0.0.0.0", "--port", String(0x0c0c)] : []),
       ],
-      env: BackgroundServiceEnvironment.fromProcess(),
+      env: { ...BackgroundServiceEnvironment.fromProcess(), OPENCODE_SERVICE_BUILD_ID: cli.buildID ?? "" },
       onStart: (reason, previousVersion) =>
         runFork(Effect.logInfo("v2 CLI background service starting", { reason, previousVersion })),
     })
 
   // A compatible service the entry module already found is adopted at once; ensure() still runs
   // afterwards for its side effects (terminal handoff completion), off the renderer's path.
-  const early = mode === "initial" && !isolated ? yield* Effect.promise(sidecarProbe) : undefined
+  const early = mode === "initial" && !isolated ? yield* Effect.promise(() => sidecarProbe(cli.buildID)) : undefined
 
   if (early) yield* Effect.sync(() => void ensure().catch(() => undefined))
   const service = early ?? (yield* Effect.tryPromise(ensure))

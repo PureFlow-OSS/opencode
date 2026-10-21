@@ -4,6 +4,23 @@ import { decide, type LocalService } from "../src/service-probe"
 const protocolError =
   "Background service uses an incompatible health protocol. Update this client or explicitly restart the service."
 
+test.each([
+  { registered: undefined, requested: "new-build", expected: "replace" },
+  { registered: "old-build", requested: "new-build", expected: "replace" },
+  { registered: "new-build", requested: "new-build", expected: "reuse" },
+  { registered: "old-build", requested: undefined, expected: "reuse" },
+])("checks executable identity for same-version services: $registered / $requested", (input) => {
+  const current = service({ version: "2.1.2", state: "ready", compatible: true })
+  const decision = decide(
+    { ...current, info: { ...current.info, buildID: input.registered } },
+    {
+      version: "2.1.2",
+      buildID: input.requested,
+    },
+  )
+  expect(decision._tag).toBe(input.expected)
+})
+
 function service(input: Pick<LocalService, "state" | "compatible" | "version">) {
   return {
     info: { url: "http://127.0.0.1:4096", pid: 4242, version: input.version },

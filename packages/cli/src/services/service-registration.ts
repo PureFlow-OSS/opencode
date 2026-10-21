@@ -22,6 +22,7 @@ export const register = Effect.fnUntraced(function* (options: {
   const temp = options.file + "." + options.id + ".tmp"
   yield* fs.makeDirectory(path.dirname(options.file), { recursive: true })
   const info = {
+    buildID: process.env.OPENCODE_SERVICE_BUILD_ID,
     id: options.id,
     version: OPENCODE_VERSION,
     url: HttpServer.formatAddress(options.address),

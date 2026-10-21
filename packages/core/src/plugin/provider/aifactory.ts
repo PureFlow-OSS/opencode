@@ -326,9 +326,9 @@ function rule(modelID: string, limits: Rule[]) {
 }
 
 function visible(modelID: string, visibility: VisibilityRule[], defaults: readonly string[]) {
-  if (defaults.includes(modelID)) return true
   const item = visibility.filter((item) => matches(item.pattern, modelID)).at(-1)
   if (item) return item.visible
+  if (defaults.includes(modelID)) return true
   return !hiddenDefaults.some((pattern) => matches(pattern, modelID))
 }
 

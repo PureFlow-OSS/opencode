@@ -1,7 +1,7 @@
 export * as DesktopCli from "./desktop-cli"
 
 import { execFile, spawn } from "node:child_process"
-import { existsSync, readFileSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { promisify } from "node:util"
 import { app } from "electron"
 import { Context, Effect, FileSystem, Layer, Option, Path, Schema } from "effect"
@@ -10,10 +10,13 @@ import { DesktopPaths } from "../paths"
 import { BUNDLED_CLI_VERSION_KEY } from "../storage/keys"
 import { getStore } from "../storage/store"
 import { parseCliVersion } from "./cli-version"
+import { cliBuildID } from "./cli-build"
+import { stageCli } from "./cli-stages"
 
 const execFileAsync = promisify(execFile)
 
 export interface Resolved {
+  readonly buildID?: string
   readonly version: string
   readonly command: readonly string[]
   readonly binary?: string
@@ -84,9 +87,14 @@ const resolveBundledCli = Effect.fn("DesktopCli.resolveBundled")(function* (isol
 
   yield* Effect.logInfo("v2 CLI executable resolved", { bundled, packaged: app.isPackaged })
   const version = yield* bundledVersion(bundled)
-  const binary = app.isPackaged || isolated ? yield* installCli(bundled, version) : bundled
+  const buildID = yield* Effect.promise(() => cliBuildID(bundled))
 
-  return { version, binary, command: [binary] }
+  const binary =
+    app.isPackaged || isolated
+      ? yield* stageCli(bundled, path.join(app.getPath("userData"), "cli"), version, buildID)
+      : bundled
+
+  return { version, buildID, binary, command: [binary] }
 })
 
 // Spawning the bundled executable for `--version` costs ~400 ms of startup on a 200 MB binary (and
@@ -135,33 +143,6 @@ const bundledVersion = Effect.fn("DesktopCli.bundledVersion")(function* (bundled
 const VersionCache = Schema.Struct({ path: Schema.String, identity: Schema.String, version: Schema.String })
 
 const ExecFailure = Schema.Struct({ stdout: Schema.optional(Schema.String), stderr: Schema.optional(Schema.String) })
-
-const installCli = Effect.fn("DesktopCli.install")(function* (source: string, version: string) {
-  const fs = yield* FileSystem.FileSystem
-  const path = yield* Path.Path
-  // x64 and ARM64 installers share userData on Windows ARM64, so a same-version switch must not reuse the other copy.
-  const stage = `${version}-${process.arch}`.replace(/[^a-zA-Z0-9._-]/g, "-")
-  const directory = path.join(app.getPath("userData"), "cli", stage)
-  const destination = path.join(directory, executableName())
-
-  if (existsSync(destination)) {
-    yield* Effect.logInfo("v2 CLI staged executable reused", { path: destination, version })
-
-    return destination
-  }
-
-  const temp = destination + `.${process.pid}.tmp`
-  yield* fs.makeDirectory(directory, { recursive: true })
-  yield* fs.copyFile(source, temp)
-
-  if (process.platform !== "win32") yield* fs.chmod(temp, 0o755)
-  yield* fs
-    .rename(temp, destination)
-    .pipe(Effect.catch((error) => fs.remove(temp, { force: true }).pipe(Effect.andThen(Effect.fail(error)))))
-  yield* Effect.logInfo("v2 CLI executable staged", { source, path: destination, version })
-
-  return destination
-})
 
 const run = Effect.fn("DesktopCli.run")(function* (binary: string, args: string[]) {
   yield* Effect.logInfo("v2 CLI command started", { binary, args })

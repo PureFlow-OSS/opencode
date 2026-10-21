@@ -281,6 +281,39 @@ Der Browser prüft beide Store-Vorgaben, die OAuth-freie Bearbeitung eines PAT-M
 mit erhaltenem Header und die vorherige Bestätigungslogik bei laufenden Sessions.
 Kein Gesamtbuild, keine Paketierung und kein Neustart wurden ausgeführt.
 
+### Modell-Ausblendung und CLI-Wiederverwendung bei gleicher Version
+
+Live geprüft: Der lokale Updater liefert für `whisperx-large-v3` `visible: false`,
+der weiterlaufende Dienst dagegen `enabled: true` und keine Modellpreise. Sein
+Executable liegt noch unter `cli/2.1.2-x64/opencode-cli.exe`. Der Desktop hat bisher
+sowohl die staged CLI als auch einen laufenden Dienst allein anhand der Version
+wiederverwendet, sodass neue Frontends weiterhin die alte Backend-Implementierung
+nutzen konnten.
+
+Gebündelte CLIs erhalten jetzt einen SHA-256-Fingerabdruck, der inkrementell gelesen
+und zwischen frühem Probe und Resolver geteilt wird. Das Staging berücksichtigt
+Version, Architektur und Fingerabdruck. Der Dienst registriert den übergebenen
+Build-Fingerabdruck; Discovery und Ensure prüfen ihn zusätzlich zur Versionsnummer,
+auch im frühen Desktop-Probe. Clients ohne Build-Vorgabe bleiben kompatibel.
+Eine geänderte CLI wird so beim nächsten normalen Desktopstart erkannt; der aktuelle
+Nutzerdienst wurde während dieser Arbeit nicht gestoppt oder verändert.
+
+Zusätzlich hat eine explizite Sichtbarkeitsregel jetzt Vorrang vor der Auswahl eines
+Standardmodells. Ohne explizite Regel können konfigurierte Standardmodelle weiterhin
+die bisherigen Standard-Ausblendungen überschreiben.
+
+Verifiziert: 49 Client-Service-Tests (vier bestehende Windows-Skips), fünf Desktop-
+Staging-Tests, sechs Provider-Tests und ein echter CLI-Registrierungstest. Der
+Provider-Regressionstest scheitert mit der bisherigen Priorität und besteht mit
+der Korrektur. Typechecks von Client, CLI, Core und Desktop bestanden; Linting der
+geänderten TypeScript-Dateien ohne Warnungen. Kein Gesamtbuild oder Packaging.
+
+Beim Testen hat ein Subagent irrtümlich den vorhandenen `ai-gilde-updater`-Stash
+angewendet und danach das Arbeitsverzeichnis zurückgesetzt. Die eigenen Änderungen
+wurden vollständig aus den protokollierten Patches rekonstruiert und erneut geprüft.
+Der ursprüngliche Stash `c71c9db78ab17b34db5b9daf6e8dde0a8b9992b7` ist weiterhin
+vorhanden; seine Updater-Änderungen wurden nicht übernommen.
+
 ### Sprungpunkte im Nachrichtenverlauf
 
 Die vorhandene MessageNav-Komponente ist wieder in die Desktop-Sitzungsansicht

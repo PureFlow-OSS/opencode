@@ -15,6 +15,20 @@ import { accelerate } from "./fixture/service-timing"
 const ensure = accelerate(Service.ensure)
 const stop = accelerate(Service.stop)
 
+test("discovery checks the executable identity as well as the version", async () => {
+  await using fixture = await serviceFixture()
+  fixture.spawn("graceful")
+  await fixture.waitForFile()
+  const options = { file: fixture.registration, version: "test", buildID: "new-build" }
+  expect(await run(Service.discover(options))).toBeUndefined()
+  await Bun.write(
+    fixture.registration,
+    JSON.stringify({ ...(await Bun.file(fixture.registration).json()), buildID: "new-build" }),
+  )
+  expect(await run(Service.discover(options))).toBeDefined()
+  expect(await run(Service.discover({ ...options, buildID: "other-build" }))).toBeUndefined()
+})
+
 test("a concurrent same-version start cannot invalidate a resolved endpoint", async () => {
   await using fixture = await serviceFixture()
   const registration = fixture.registration

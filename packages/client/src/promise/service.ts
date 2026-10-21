@@ -20,7 +20,7 @@ export async function discover(options: DiscoverOptions = {}) {
   const found = (await registered(options.file)).service
   if (found?.state !== "ready") return undefined
   if (!found.compatible) return undefined
-  if (!matchesVersion(found.version, options)) return undefined
+  if (!matchesVersion(found.version, options, found.info.buildID)) return undefined
   return found.endpoint
 }
 

@@ -5,7 +5,40 @@ import path from "node:path"
 import { NodeFileSystem, NodePath } from "@effect/platform-node"
 import { Effect, Layer } from "effect"
 
-import { cleanStages } from "./cli-stages"
+import { cleanStages, stageCli } from "./cli-stages"
+import { cliBuildID } from "./cli-build"
+
+test("same-version rebuilds stage different executables and preserve the old copy", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "opencode-cli-rebuild-"))
+
+  try {
+    const first = path.join(root, "first", "opencode-cli.exe")
+    const second = path.join(root, "second", "opencode-cli.exe")
+    mkdirSync(path.dirname(first))
+    mkdirSync(path.dirname(second))
+    writeFileSync(first, "old CLI")
+    writeFileSync(second, "fixed CLI")
+    const firstBuild = await cliBuildID(first)
+    const secondBuild = await cliBuildID(second)
+    expect(secondBuild).not.toBe(firstBuild)
+
+    const stage = (source: string, buildID: string) =>
+      Effect.runPromise(
+        stageCli(source, path.join(root, "staged"), "2.1.2", buildID).pipe(
+          Effect.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
+        ),
+      )
+
+    const old = await stage(first, firstBuild)
+    const current = await stage(second, secondBuild)
+    expect(current).not.toBe(old)
+    expect(await Bun.file(old).text()).toBe("old CLI")
+    expect(await Bun.file(current).text()).toBe("fixed CLI")
+    expect(await stage(second, secondBuild)).toBe(current)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
 
 describe("cleanStages", () => {
   test.each([

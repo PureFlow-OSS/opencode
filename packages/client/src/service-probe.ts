@@ -20,7 +20,7 @@ export type LocalService = {
  * it starts, replace it because its version does not meet the requirement, or fail.
  */
 export function decide(service: LocalService, options: DiscoverOptions) {
-  if (!matchesVersion(service.version, options))
+  if (!matchesVersion(service.version, options, service.info.buildID))
     return { _tag: "replace", pty: service.state === "ready" ? "handoff" : "clear" } as const
   if (!service.compatible)
     return fail(

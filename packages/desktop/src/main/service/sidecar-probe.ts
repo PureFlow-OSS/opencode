@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs"
 import path from "node:path"
 import { app } from "electron"
 import type { Endpoint } from "@opencode/client/service"
+import { cliBuildID } from "./cli-build"
 
 // The main thread idles between showing the first window and evaluating the main bundle, waiting
 // for the renderer's asset requests. That slot is long enough to find out whether a compatible
@@ -10,18 +11,25 @@ import type { Endpoint } from "@opencode/client/service"
 // which set the environment the CLI expects.
 let probe: Promise<Endpoint | undefined> | undefined
 
+let buildID: Promise<string> | undefined
+
 export function startSidecarProbe() {
   if (!app.isPackaged) return
   const version = bundledVersion()
 
   if (!version) return
+  buildID = cliBuildID(
+    path.join(process.resourcesPath, process.platform === "win32" ? "opencode-cli.exe" : "opencode-cli"),
+  )
   probe = import("@opencode/client/service")
-    .then(({ Service }) => Service.discover({ version }))
+    .then(async ({ Service }) => Service.discover({ version, buildID: await buildID }))
     .catch(() => undefined)
 }
 
-export function sidecarProbe() {
-  return probe ?? Promise.resolve(undefined)
+export async function sidecarProbe(expectedBuildID?: string) {
+  if (expectedBuildID !== undefined && expectedBuildID !== (await buildID?.catch(() => undefined))) return undefined
+
+  return probe ?? undefined
 }
 
 function bundledVersion() {

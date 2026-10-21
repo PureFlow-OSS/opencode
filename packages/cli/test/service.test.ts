@@ -637,6 +637,8 @@ test("port contender recognizes an incumbent registered during the bind race", a
 }, 45_000)
 
 test("service registration replaces a stale owner with the bound address", async () => {
+  const previousBuildID = process.env.OPENCODE_SERVICE_BUILD_ID
+  process.env.OPENCODE_SERVICE_BUILD_ID = "rebuilt-cli"
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-service-stale-"))
   const registration = path.join(root, "state", "opencode", "service-local.json")
   await fs.mkdir(path.dirname(registration), { recursive: true })
@@ -655,6 +657,7 @@ test("service registration replaces a stale owner with the bound address", async
       }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer)),
     )
     expect(await Bun.file(registration).json()).toEqual({
+      buildID: "rebuilt-cli",
       id: "owner",
       version: OPENCODE_VERSION,
       url: "http://127.0.0.1:4321",
@@ -664,6 +667,8 @@ test("service registration replaces a stale owner with the bound address", async
     await Effect.runPromise(cleanup.pipe(Effect.provide(NodeFileSystem.layer)))
     expect(await Bun.file(registration).exists()).toBe(false)
   } finally {
+    if (previousBuildID === undefined) delete process.env.OPENCODE_SERVICE_BUILD_ID
+    else process.env.OPENCODE_SERVICE_BUILD_ID = previousBuildID
     await fs.rm(root, { recursive: true, force: true })
   }
 })

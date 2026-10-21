@@ -22,6 +22,10 @@ test("discovers a registered service", async () => {
     expect.objectContaining({ url: expect.stringMatching(/^http:\/\//) }),
   )
   expect(await Service.discover({ file: registration, version: "other" })).toBeUndefined()
+  expect(await Service.discover({ file: registration, version: "test", buildID: "new-build" })).toBeUndefined()
+  await Bun.write(registration, JSON.stringify({ ...(await Bun.file(registration).json()), buildID: "new-build" }))
+  expect(await Service.discover({ file: registration, version: "test", buildID: "new-build" })).toBeDefined()
+  expect(await Service.discover({ file: registration, version: "test", buildID: "other-build" })).toBeUndefined()
 })
 
 test("discovers a compatible registered service", async () => {

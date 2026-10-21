@@ -26,7 +26,7 @@ export const discover = Effect.fn("service.discover")(function* (options: Discov
   const found = (yield* registered(options.file)).service
   if (found?.state !== "ready") return undefined
   if (!found.compatible) return undefined
-  if (!matchesVersion(found.version, options)) return undefined
+  if (!matchesVersion(found.version, options, found.info.buildID)) return undefined
   return found.endpoint
 })
 
@@ -38,7 +38,7 @@ export const incumbent = Effect.fn("service.incumbent")(function* (
   if (info === undefined) return undefined
   const found = (yield* Effect.promise(() => probeResult({ ...info, url: options.url }))).service
   if (!found?.compatible) return undefined
-  if (!matchesVersion(found.version, options)) return undefined
+  if (!matchesVersion(found.version, options, found.info.buildID)) return undefined
   return { endpoint: found.endpoint, state: found.state }
 })
 
@@ -140,6 +140,7 @@ export const stop = Effect.fn("service.stop")(function* (options: StopOptions = 
 
 /** Schema for the local service registration file. */
 export const Info = Schema.Struct({
+  buildID: Schema.optional(Schema.String),
   id: Schema.optional(Schema.String),
   version: Schema.optional(Schema.String),
   url: Schema.String,

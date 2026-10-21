@@ -308,6 +308,7 @@ describe("AiFactoryPlugin", () => {
               if (path === "/v1/models")
                 return Response.json({
                   data: [
+                    { id: "all-proxy-models" },
                     { id: "worker-model" },
                     { id: "gpt-5.6" },
                     { id: "deepseek-r1" },
@@ -346,10 +347,11 @@ describe("AiFactoryPlugin", () => {
           const models = yield* Model.Service
           const providers = yield* Provider.Service
           const source = {
+            model: "aifactory/gpt-5.6",
             agent: { title: { model: "aifactory/deepseek-r1" } },
             aifactory_host: server.url.origin,
             updater: server.url.origin,
-            provider: { aifactory: { options: { apiKey: "legacy-secret" } } },
+            provider: { aifactory: { options: { apiKey: "legacy-secret", small_model: "all-proxy-models" } } },
             aifactory: {
               model_limits: [
                 {
@@ -411,6 +413,12 @@ describe("AiFactoryPlugin", () => {
                 model.providerID === Provider.ID.make("aifactory") && model.id === Model.ID.make("glm-5.3-flash"),
             ),
           )
+          const proxy = required(
+            all.find(
+              (model) =>
+                model.providerID === Provider.ID.make("aifactory") && model.id === Model.ID.make("all-proxy-models"),
+            ),
+          )
 
           expect(requests.filter((request) => request.path === "/v1/models")).toEqual([
             { authorization: "Bearer legacy-secret", header: "legacy-secret", path: "/v1/models" },
@@ -462,8 +470,10 @@ describe("AiFactoryPlugin", () => {
               },
             ],
           })
+          expect(proxy).toMatchObject({ enabled: true })
           expect((yield* models.available()).map((model) => model.id)).toContain(Model.ID.make("worker-model"))
           expect((yield* models.available()).map((model) => model.id)).not.toContain(Model.ID.make("gpt-5.6"))
+          expect((yield* models.available()).map((model) => model.id)).toContain(Model.ID.make("all-proxy-models"))
           const missingWorker = required(
             (yield* models.all()).find(
               (model) =>

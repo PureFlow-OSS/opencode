@@ -15,6 +15,8 @@ export type Endpoint = {
 
 /** Options used to discover the local OpenCode service. */
 export type DiscoverOptions = {
+  /** Required bundled executable fingerprint, when supplied by a desktop build. */
+  readonly buildID?: string
   /** Absolute registration file path. Defaults to the XDG state directory. */
   readonly file?: string
   /** Required exact service version or compatibility predicate. */
@@ -44,6 +46,8 @@ export type StopOptions = {
 
 /** Contents of the local service registration file. */
 export type Info = {
+  /** Fingerprint of the desktop executable that started this service. */
+  readonly buildID?: string
   /** Unique service instance identifier. */
   readonly id?: string
   /** OpenCode version served by the process. */
