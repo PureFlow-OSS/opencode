@@ -101,6 +101,7 @@ export const iconNames = [
   "alibaba",
   "alibaba-cn",
   "aihubmix",
+  "aifactory",
   "abacus",
   "302ai",
 ] as const
