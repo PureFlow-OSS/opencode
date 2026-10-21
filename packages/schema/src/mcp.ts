@@ -66,6 +66,43 @@ export class RemoteConfig extends Schema.Class<RemoteConfig>("Mcp.RemoteConfig")
 export const ServerConfig = Schema.Union([LocalConfig, RemoteConfig]).pipe(Schema.toTaggedUnion("type"))
 export type ServerConfig = typeof ServerConfig.Type
 
+export interface PatAuth extends Schema.Schema.Type<typeof PatAuth> {}
+export const PatAuth = Schema.Struct({
+  type: Schema.Literal("pat"),
+  label: Schema.String.pipe(optional),
+  description: Schema.String.pipe(optional),
+  placeholder: Schema.String.pipe(optional),
+  header: Schema.String.pipe(optional),
+  prefix: Schema.String.pipe(optional),
+}).annotate({ identifier: "Mcp.PatAuth" })
+
+export interface ManagedServer extends Schema.Schema.Type<typeof ManagedServer> {}
+export const ManagedServer = Schema.Struct({
+  config: ServerConfig,
+  auth: PatAuth.pipe(optional),
+  locked: Schema.Boolean.pipe(optional).annotate({
+    description: "Whether the managed base configuration can be edited or removed. Defaults to true.",
+  }),
+  provenance: Schema.String.pipe(optional).annotate({
+    description: "Source of the managed server definition, for diagnostics and enterprise policy UI.",
+  }),
+}).annotate({ identifier: "Mcp.ManagedServer" })
+
+export interface StoreItem extends Schema.Schema.Type<typeof StoreItem> {}
+export const StoreItem = Schema.Struct({
+  name: Schema.String,
+  description: Schema.String.pipe(optional),
+  url: Schema.String,
+  lockedHeaderNames: Schema.Array(Schema.String),
+  headerPlaceholder: Schema.String.pipe(optional),
+}).annotate({ identifier: "Mcp.StoreItem" })
+
+export interface ManagedCatalog extends Schema.Schema.Type<typeof ManagedCatalog> {}
+export const ManagedCatalog = Schema.Struct({
+  managed: Schema.Record(Schema.String, ManagedServer),
+  store: Schema.Array(StoreItem),
+}).annotate({ identifier: "Mcp.ManagedCatalog" })
+
 const Connected = Schema.Struct({ status: Schema.Literal("connected") }).annotate({
   identifier: "Mcp.Status.Connected",
 })

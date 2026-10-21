@@ -10,6 +10,7 @@ describe("settings route", () => {
   test("round trips root, server, and project pages", () => {
     const root: SettingsView = { type: "root", tab: "appearance" }
     const server: SettingsView = { type: "server", server: "wsl:Debian", tab: "models" }
+    const mcp: SettingsView = { type: "server", server: "wsl:Debian", tab: "mcp" }
 
     const project: SettingsView = {
       type: "project",
@@ -26,6 +27,10 @@ describe("settings route", () => {
     })
     expect(parseSettingsView(new URL(settingsViewUrl(server), "http://localhost").search, true)).toEqual({
       ...server,
+      subtab: undefined,
+    })
+    expect(parseSettingsView(new URL(settingsViewUrl(mcp), "http://localhost").search, true)).toEqual({
+      ...mcp,
       subtab: undefined,
     })
     expect(parseSettingsView(new URL(settingsViewUrl(project), "http://localhost").search, true)).toEqual(project)

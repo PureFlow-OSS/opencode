@@ -1,3 +1,4 @@
+import { ConfigManagedMcp } from "@opencode/core/config/managed-mcp"
 import { Mcp } from "@opencode/core/mcp/index"
 import { McpServerNotFoundError } from "@opencode/protocol/errors"
 import { Effect } from "effect"
@@ -24,6 +25,12 @@ export const McpHandler = HttpApiBuilder.group(Api, "server.mcp", (handlers) =>
                 ),
               ),
           )
+        }),
+      )
+      .handle(
+        "mcp.catalog",
+        Effect.fn(function* () {
+          return yield* response(ConfigManagedMcp.catalogEffect())
         }),
       )
       .handle(

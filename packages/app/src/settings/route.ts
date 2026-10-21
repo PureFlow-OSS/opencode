@@ -8,6 +8,7 @@ export type SettingsRootTab =
   | "providers"
   | "models"
   | "extensions"
+  | "mcp"
   | "servers"
   | "experimental"
   | "gui-extensions"
@@ -18,7 +19,7 @@ declare const extensionTab: unique symbol
 /** A root page a GUI extension contributes; the value is its SettingsPage id. */
 export type SettingsExtensionTab = string & { readonly [extensionTab]: true }
 
-export type SettingsServerTab = "general" | "projects" | "workspaces" | "providers" | "models" | "extensions"
+export type SettingsServerTab = "general" | "projects" | "workspaces" | "providers" | "models" | "extensions" | "mcp"
 
 export type SettingsProjectTab = "general" | "workspaces" | "extensions"
 
@@ -56,6 +57,7 @@ const rootTabs: Record<SettingsRootTab, true> = {
   providers: true,
   models: true,
   extensions: true,
+  mcp: true,
   servers: true,
   experimental: true,
   "gui-extensions": true,
@@ -69,6 +71,7 @@ const serverTabs: Record<SettingsServerTab, true> = {
   providers: true,
   models: true,
   extensions: true,
+  mcp: true,
 }
 
 const projectTabs: Record<SettingsProjectTab, true> = {

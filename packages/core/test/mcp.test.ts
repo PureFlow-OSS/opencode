@@ -111,6 +111,7 @@ function resourceServer(
         ] as Array<{ uri: string; text: string; mimeType?: string } | { uri: string; blob: string; mimeType?: string }>,
         resourceLists: 0,
         resourceReads: [] as string[],
+        requestHeaders: [] as Array<[string, string]>,
         templatesUnsupported: false,
         missing: [] as string[],
         templateLists: 0,
@@ -236,6 +237,7 @@ function resourceServer(
         port: 0,
         fetch: async (request) => {
           state.urls.push(request.url)
+          state.requestHeaders.push(...request.headers)
           const session = request.headers.get("mcp-session-id")
           if (session !== null && !state.sessions.includes(session)) state.sessions.push(session)
           const body: unknown = request.method === "POST" ? await request.clone().json() : undefined
@@ -276,6 +278,7 @@ function resourceMcpLayer(
     policies?: readonly ConfigPolicy.Info[]
     entries?: Config.Interface["entries"]
     subscribe?: Bus.Interface["subscribe"]
+    credentialKey?: () => string
     environment?: Layer.Layer<Environment.Service>
     published?: string[]
   },
@@ -307,7 +310,8 @@ function resourceMcpLayer(
                 changes: () => Stream.never,
               }),
             )
-          : Config.testLayer([
+          : overrides?.credentialKey === undefined
+            ? Config.testLayer([
               new Document({
                 type: "document",
                 info: new Info({
@@ -322,7 +326,29 @@ function resourceMcpLayer(
                   }),
                 }),
               }),
-            ]),
+            ])
+            : Layer.succeed(
+                Config.Service,
+                Config.Service.of({
+                  entries: () =>
+                    Effect.succeed([
+                      new Document({
+                        type: "document",
+                        info: new Info({
+                          mcp: new ConfigMCP.Info({
+                            servers: {
+                              resources:
+                                typeof server === "string"
+                                  ? new ConfigMCP.Remote({ type: "remote", url: server, oauth: false })
+                                  : server,
+                            },
+                          }),
+                        }),
+                      }),
+                    ]),
+                  changes: () => Stream.never,
+                }),
+              ),
         Layer.succeed(Location.Service, Location.Service.of(location({ directory }))),
         Layer.mock(Bus.Service, {
           subscribe: overrides?.subscribe ?? (() => Stream.never),
@@ -340,8 +366,20 @@ function resourceMcpLayer(
         Layer.mock(Integration.Service, {
           revision: () => 0,
           connection: {
-            active: unusedIntegration,
-            resolve: unusedIntegration,
+            active:
+              overrides?.credentialKey === undefined
+                ? () => Effect.succeed(undefined)
+                : () =>
+                    Effect.succeed({
+                      type: "credential" as const,
+                      id: Credential.ID.make("cred_aifactory"),
+                      label: "AI Factory",
+                      method: "key" as const,
+                    }),
+            resolve:
+              overrides?.credentialKey === undefined
+                ? unusedIntegration
+                : () => Effect.succeed(Credential.Key.make({ type: "key", key: overrides.credentialKey!() })),
             key: unusedIntegration,
             external: unusedIntegration,
             activate: unusedIntegration,
@@ -1502,6 +1540,124 @@ it.live("discovers and reads MCP resources through Code Mode", () =>
     }).pipe(Effect.provide(resourceMcpLayer(server.url)))
   }),
 )
+
+test("injects the active AI Factory key only into an explicitly empty configured header", async () => {
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const server = yield* resourceServer({ modern: true, resources: false })
+        const document = new Document({
+          type: "document",
+          info: new Info({
+            mcp: new ConfigMCP.Info({
+              servers: {
+                resources: new ConfigMCP.Remote({
+                  type: "remote",
+                  url: server.url,
+                  headers: { "X-LiteLLM-API-Key": "" },
+                  oauth: false,
+                  protocol: "2026-07-28",
+                }),
+              },
+            }),
+            providers: { aifactory: { settings: { apiKey: "managed-key" } } },
+          }),
+        })
+        yield* Effect.gen(function* () {
+          const service = yield* Mcp.Service
+          yield* settled(service)
+          expect(server.state.requestHeaders).toContainEqual(["x-litellm-api-key", "managed-key"])
+        }).pipe(
+          Effect.provide(
+            resourceMcpLayer(server.url, undefined, undefined, { entries: () => Effect.succeed([document]) }),
+          ),
+        )
+      }),
+    ),
+  )
+})
+
+test("does not send the AI Factory key without a configured empty header", async () => {
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const server = yield* resourceServer()
+        yield* Effect.gen(function* () {
+          const service = yield* Mcp.Service
+          yield* settled(service)
+          expect(
+            server.state.requestHeaders.some(([name]) => name.toLowerCase() === "x-litellm-api-key"),
+          ).toBe(false)
+        }).pipe(
+          Effect.provide(resourceMcpLayer(server.url, undefined, undefined, { entries: () => Effect.succeed([]) })),
+        )
+      }),
+    ),
+  )
+})
+
+test("uses a fresh AI Factory key when the active credential switches", async () => {
+  const key = { value: "first-key" }
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const updates = yield* PubSub.unbounded<Payload<typeof Credential.Event.Switched>>()
+        const server = yield* resourceServer({ modern: true, resources: false })
+        const document = new Document({
+          type: "document",
+          info: new Info({
+            mcp: new ConfigMCP.Info({
+              servers: {
+                resources: new ConfigMCP.Remote({
+                  type: "remote",
+                  url: server.url,
+                  headers: { "X-LiteLLM-API-Key": "" },
+                  oauth: false,
+                  protocol: "2026-07-28",
+                }),
+              },
+            }),
+          }),
+        })
+        yield* Effect.gen(function* () {
+          const service = yield* Mcp.Service
+          yield* settled(service)
+          expect(server.state.requestHeaders).toContainEqual(["x-litellm-api-key", "first-key"])
+
+          key.value = "second-key"
+          yield* PubSub.publish(updates, {
+            id: ID.create(),
+            created: Date.now(),
+            type: Credential.Event.Switched.type,
+            data: {
+              integrationID: Integration.ID.make("aifactory"),
+              credentialID: Credential.ID.make("cred_second"),
+            },
+          } satisfies Payload<typeof Credential.Event.Switched>)
+          yield* Effect.sync(() =>
+            server.state.requestHeaders.some(([name, value]) => name.toLowerCase() === "x-litellm-api-key" && value === "second-key"),
+          )
+            .pipe(
+              Effect.filterOrFail(
+                (sent) => sent,
+                () => new Error("MCP server did not send the refreshed key"),
+              ),
+              Effect.retry({ times: 200, schedule: Schedule.spaced("10 millis") }),
+            )
+          expect(server.state.requestHeaders).toContainEqual(["x-litellm-api-key", "second-key"])
+        }).pipe(
+          Effect.provide(
+            resourceMcpLayer(server.url, undefined, undefined, {
+              credentialKey: () => key.value,
+              entries: () => Effect.succeed([document]),
+              subscribe: (() => Stream.fromPubSub(updates)) as Bus.Interface["subscribe"],
+            }),
+          ),
+        )
+      }),
+    ),
+  )
+})
 
 test("adds, disconnects, and reconnects MCP servers at runtime", async () => {
   const published: string[] = []

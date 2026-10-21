@@ -38,6 +38,7 @@ import { SettingsWorkspaces } from "./workspaces/workspaces"
 import { useWorkspacesPrefetch } from "./workspaces/queries"
 import { SettingsProjects } from "./workspaces/projects"
 import { SettingsExtensions } from "./providers/extensions"
+import { SettingsMcp } from "./mcp/mcp"
 import { SettingsAbout } from "./about/about"
 import { SettingsServerDataScope } from "./server-scope"
 import { SettingsNavigation, type SettingsNavGroup } from "./navigation"
@@ -69,6 +70,7 @@ const serverTabs = [
   { value: "providers", icon: pageIcons.providers, label: "settings.providers.title" },
   { value: "models", icon: pageIcons.models, label: "settings.models.title" },
   { value: "extensions", icon: pageIcons.extensions, label: "settings.tab.extensions" },
+  { value: "mcp", icon: pageIcons.mcp, label: "settings.tab.mcp" },
 ] as const
 
 const experimentalTab = [
@@ -331,7 +333,7 @@ function RootSettings() {
 
     if (view.type !== "root" || !loaded() || !multiple()) return
 
-    if (["projects", "workspaces", "providers", "models", "extensions", "servers"].includes(view.tab))
+    if (["projects", "workspaces", "providers", "models", "extensions", "mcp", "servers"].includes(view.tab))
       surface.open("general")
   })
 
@@ -420,6 +422,9 @@ function RootSettings() {
             </Tabs.Content>
             <Tabs.Content value="extensions" class="settings-panel">
               <SettingsExtensions subtab={surface.view().subtab} onSubtab={(value) => surface.subtab(value)} />
+            </Tabs.Content>
+            <Tabs.Content value="mcp" class="settings-panel">
+              <SettingsMcp />
             </Tabs.Content>
           </SettingsServerDataScope>
         )}
@@ -520,6 +525,9 @@ function ServerSettings(props: { entry: SettingsServer }) {
             </Tabs.Content>
             <Tabs.Content value="extensions" class="settings-panel">
               <SettingsExtensions subtab={surface.view().subtab} onSubtab={(value) => surface.subtab(value)} />
+            </Tabs.Content>
+            <Tabs.Content value="mcp" class="settings-panel">
+              <SettingsMcp />
             </Tabs.Content>
           </SettingsServerDataScope>
         )}

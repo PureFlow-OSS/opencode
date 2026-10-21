@@ -21,6 +21,20 @@ export const McpGroup = HttpApiGroup.make("server.mcp")
       ),
   )
   .add(
+    HttpApiEndpoint.get("mcp.catalog", "/api/mcp/catalog", {
+      query: LocationQuery,
+      success: Location.response(Mcp.ManagedCatalog),
+    })
+      .annotateMerge(locationQueryOpenApi)
+      .annotateMerge(
+        OpenApi.annotations({
+          identifier: "mcp.catalog",
+          summary: "List managed MCP servers and store items",
+          description: "Retrieve enterprise-managed MCP definitions and optional servers available for installation.",
+        }),
+      ),
+  )
+  .add(
     HttpApiEndpoint.put("mcp.add", "/api/experimental/mcp/:server", {
       params: { server: Schema.String },
       query: LocationQuery,

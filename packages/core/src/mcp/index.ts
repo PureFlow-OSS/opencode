@@ -10,9 +10,11 @@ import { Cause, Context, Effect, Exit, FiberSet, Latch, Layer, Schema, Scope, Se
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { Credential } from "../credential.js"
 import { Bus } from "../bus.js"
+import { Config } from "../config.js"
 import { Environment } from "../environment/index.js"
 import { Form } from "../form.js"
 import { Integration } from "../integration.js"
+import { McpHeaders } from "./headers.js"
 import { KeyedMutex } from "../effect/keyed-mutex.js"
 import { Location } from "../location.js"
 import { waitForAbort } from "@opencode/util/process"
@@ -156,6 +158,7 @@ export const layer = (options?: Options) =>
     Effect.gen(function* () {
       const location = yield* Location.Service
       const environment = yield* Environment.Service
+      const config = yield* Config.Service
       const bus = yield* Bus.Service
       const forms = yield* Form.Service
       const integration = yield* Integration.Service
@@ -167,6 +170,7 @@ export const layer = (options?: Options) =>
       // Serializes lifecycle operations per server. Anything taking this lock from a connection
       // callback must stay forked: lifecycle operations close scopes while holding it, firing onClose.
       const locks = KeyedMutex.makeUnsafe<ServerName>()
+      const aiFactoryHeaders = McpHeaders.makeResolver(config, integration)
       // Legacy era only: pending URL-mode elicitation forms, settled by notifications/elicitation/complete.
       const urlElicitations = new Map<string, Form.ID>()
 
@@ -433,12 +437,13 @@ export const layer = (options?: Options) =>
           const scope = yield* Scope.fork(root)
           entry.scope = scope
           const authProvider = yield* connectProvider(entry)
+          const resolvedConfig = yield* aiFactoryHeaders(entry.config)
           const { McpClient } = yield* Effect.promise(() => import("./client.js"))
           // List tools as part of connect so a failure here marks the server failed rather than
           // leaving it connected with a silently empty tool list and no path to recover.
           const load = McpClient.connect(
             name,
-            entry.config,
+            resolvedConfig,
             location.directory,
             authProvider,
             elicitation,
@@ -576,24 +581,42 @@ export const layer = (options?: Options) =>
 
       // Bring a server online (or back to needs_auth) when its integration's credential changes, so an
       // OAuth login takes effect without a restart. Only fires for the integrations we registered.
+      const restartServer = (name: ServerName, entry: ServerEntry) =>
+        Effect.gen(function* () {
+          if (entries.get(name) !== entry) return
+          if (entry.status.status === "disabled") return
+          yield* stopServer(name, entry)
+          yield* startServer(name, entry)
+        }).pipe(locks.withLock(name))
+
       const reconnect = (integrationID: Integration.ID) =>
         Effect.gen(function* () {
           const match = Array.from(entries).find(([, entry]) => entry.integrationID === integrationID)
           if (!match) return
-          const name = match[0]
-          yield* Effect.gen(function* () {
-            // add() or remove() may have replaced or deleted the entry while we waited for the lock.
-            const entry = entries.get(name)
-            if (!entry || entry.integrationID !== integrationID) return
-            if (entry.status.status === "disabled") return
-            yield* stopServer(name, entry)
-            yield* startServer(name, entry)
-          }).pipe(locks.withLock(name))
+          // add() or remove() may have replaced or deleted the entry while we waited for the lock.
+          const entry = entries.get(match[0])
+          if (!entry || entry.integrationID !== integrationID) return
+          yield* restartServer(match[0], entry)
         })
       fork(
         bus.subscribe(Credential.Event.Switched).pipe(
           Stream.filter((event) => owned.has(event.data.integrationID)),
           Stream.runForEach((event) => Effect.sync(() => fork(reconnect(event.data.integrationID)))),
+        ),
+      )
+      // Enterprise store rows opt in with an empty X-LiteLLM-API-Key header. Its value comes from the
+      // active AI Factory credential at connection time, so a credential switch must reconnect them.
+      fork(
+        bus.subscribe(Credential.Event.Switched).pipe(
+          Stream.filter((event) => event.data.integrationID === Integration.ID.make("aifactory")),
+          Stream.runForEach(() =>
+            Effect.sync(() => {
+              for (const [name, entry] of entries) {
+                if (entry.config.type !== "remote" || !McpHeaders.hasAiFactoryHeader(entry.config.headers)) continue
+                fork(restartServer(name, entry))
+              }
+            }),
+          ),
         ),
       )
       const state: State.Interface<Data, Editor> = State.create<Data, Editor>({
@@ -775,7 +798,7 @@ export function configured(options?: Options) {
   return makeLocationNode({
     service: Service,
     layer: layer(options),
-    deps: [Location.node, Environment.node, Bus.node, Form.node, Integration.node, Credential.node],
+    deps: [Location.node, Environment.node, Bus.node, Config.node, Form.node, Integration.node, Credential.node],
   })
 }
 

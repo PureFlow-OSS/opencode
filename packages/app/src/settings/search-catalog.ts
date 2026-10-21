@@ -159,6 +159,7 @@ export const serverSettings: Entry<SettingsServerTab>[] = [
   { tab: "workspaces", label: "settings.tab.workspaces", keywords: "workspaces disk usage cleanup delete" },
   { tab: "providers", label: "settings.providers.title", keywords: "connect api key credentials" },
   { tab: "models", label: "settings.models.title", keywords: "model picker visibility" },
+  { tab: "mcp", label: "settings.tab.mcp", keywords: "model context protocol managed store remote local" },
   { tab: "extensions", label: "settings.tab.extensions" },
   {
     tab: "extensions",
