@@ -1,3 +1,9 @@
+# v1.18.29
+
+## Fixed
+
+- Avoided full chat reloads when returning to a window with an uninterrupted event stream, while preserving refresh after connection interruptions.
+
 # v1.14.38
 
 ## Added

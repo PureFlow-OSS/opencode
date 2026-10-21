@@ -97,6 +97,7 @@ import { useSessionHashScroll } from "@/pages/session/use-session-hash-scroll"
 import { Identifier } from "@/utils/id"
 import { diffs as list } from "@/utils/diffs"
 import { Persist, persisted } from "@/utils/persist"
+import { createSessionResumeRefresh } from "@/utils/session-resume"
 import { extractPromptFromParts } from "@/utils/prompt"
 import { formatServerError, isLocalSessionNotFoundError, isSessionNotFoundError } from "@/utils/server-errors"
 import { legacySessionHref, requireServerKey, sessionHref } from "@/utils/session-route"
@@ -2000,14 +2001,27 @@ export default function Page() {
 
   onMount(() => {
     makeEventListener(document, "keydown", handleKeyDown)
-    makeEventListener(document, "visibilitychange", () => {
-      if (document.visibilityState !== "visible") return
-      const id = params.id
-      if (!id) return
-      void sync().session.sync(id, { force: true }).catch((error) => {
-        console.error("[session] failed to refresh after returning to the app", { directory: sdk().directory, sessionID: id, error })
-      })
+    const resume = createSessionResumeRefresh({
+      snapshot: () => ({
+        sessionID: params.id,
+        connection: serverSDK().event.connection,
+        healthy: serverSDK().event.healthy,
+      }),
+      refresh: (id) => {
+        void sync()
+          .session.sync(id, { force: true })
+          .catch((error) => {
+            console.error("[session] failed to refresh after returning to the app", {
+              directory: sdk().directory,
+              sessionID: id,
+              error,
+            })
+          })
+      },
     })
+    const visibility = () => resume(document.visibilityState === "visible")
+    visibility()
+    makeEventListener(document, "visibilitychange", visibility)
   })
 
   onCleanup(() => {

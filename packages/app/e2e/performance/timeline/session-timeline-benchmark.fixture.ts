@@ -101,6 +101,7 @@ export async function setupTimelineBenchmark(
     newLayoutDesigns?: boolean
     vcsDiff?: unknown[]
     turnDiffs?: unknown[]
+    eventStream?: string
   },
 ) {
   const events: EventPayload[] = []
@@ -124,6 +125,9 @@ export async function setupTimelineBenchmark(
     events: () => events.splice(0, eventBatch),
     eventRetry: 16,
   })
+  if (options.eventStream) {
+    await page.route("**/global/event", (route) => route.continue({ url: options.eventStream! }))
+  }
   await page.addInitScript(
     (input) => {
       localStorage.setItem(

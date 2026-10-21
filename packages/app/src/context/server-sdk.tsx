@@ -146,6 +146,8 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
   let run: Promise<void> | undefined
   let started = false
   let generation = 0
+  let connections = 0
+  let connected = false
   const HEARTBEAT_TIMEOUT_MS = 15_000
   let lastEventAt = Date.now()
   let heartbeat: ReturnType<typeof setTimeout> | undefined
@@ -196,6 +198,10 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
           for await (const event of events.stream) {
             resetHeartbeat()
             streamErrorLogged = false
+            if (event.payload.type === "server.connected") {
+              connections++
+              connected = true
+            }
             if (event.payload.type !== "sync") {
               const directory = event.directory ?? "global"
               const payload = event.payload as Event
@@ -216,6 +222,7 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
             })
           }
         } finally {
+          connected = false
           abort.signal.removeEventListener("abort", onAbort)
           attempt = undefined
           clearHeartbeat()
@@ -235,6 +242,7 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
 
   const stop = () => {
     started = false
+    connected = false
     generation++
     attempt?.abort()
     clearHeartbeat()
@@ -293,6 +301,12 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
       })
     },
     event: {
+      get connection() {
+        return connections
+      },
+      get healthy() {
+        return connected && attempt?.signal.aborted === false && Date.now() - lastEventAt < HEARTBEAT_TIMEOUT_MS
+      },
       on: emitter.on.bind(emitter),
       listen: emitter.listen.bind(emitter),
       start,
