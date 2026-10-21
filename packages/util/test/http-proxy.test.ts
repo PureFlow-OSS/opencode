@@ -133,7 +133,7 @@ describe("corporate HTTP proxy", () => {
     })
     expect(requests).toEqual([`${origin.url}provider-config.json`])
     origin.stop(true)
-  })
+  }, 30000) // A cold child process loads the actual undici package on Windows.
 
   test.each(["bun", "node"] as const)("performs a real %s request through the configured proxy", async (runtime) => {
     const origin = Bun.serve({

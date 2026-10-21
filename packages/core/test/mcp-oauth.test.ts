@@ -7,9 +7,34 @@ import { McpClient } from "@opencode/core/mcp/client"
 import { McpOAuth } from "@opencode/core/mcp/oauth"
 import { Cause, Effect, Exit } from "effect"
 import { hostEnvironmentLayer } from "./fixture/environment"
+import { HttpProxy } from "@opencode/util/http-proxy"
 
 const authServer = Bun.serve({ port: 0, fetch: () => new Response(null, { status: 404 }) })
 afterAll(() => authServer.stop(true))
+
+test("routes MCP transport and OAuth requests through the configured corporate proxy", async () => {
+  const requests: { url: string; authorization: string | null }[] = []
+  const proxy = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: (request) => {
+      requests.push({ url: request.url, authorization: request.headers.get("authorization") })
+      return Response.json({ proxied: true })
+    },
+  })
+  HttpProxy.configure({ use_http_proxy: true, http_proxy: proxy.url.toString() })
+  try {
+    const fetch = await Effect.runPromise(McpOAuth.loggedFetch({ server: "proxy-check" }))
+    const response = await fetch("http://mcp-proxy-check.invalid/mcp", {
+      headers: { authorization: "Bearer mcp-test" },
+    })
+    expect(await response.json()).toEqual({ proxied: true })
+    expect(requests).toEqual([{ url: "http://mcp-proxy-check.invalid/mcp", authorization: "Bearer mcp-test" }])
+  } finally {
+    HttpProxy.configure({})
+    proxy.stop(true)
+  }
+})
 
 const integrationID = Integration.ID.make("mcp_test")
 const methodID = Integration.MethodID.make("oauth")
@@ -166,10 +191,7 @@ describe("MCP OAuth", () => {
       fetch(request) {
         if (request.method !== "POST" || new URL(request.url).pathname !== "/token")
           return new Response(null, { status: 404 })
-        return Response.json(
-          { error: "invalid_client", error_description: "bad_client_secret" },
-          { status: 400 },
-        )
+        return Response.json({ error: "invalid_client", error_description: "bad_client_secret" }, { status: 400 })
       },
     })
 

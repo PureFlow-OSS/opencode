@@ -84,36 +84,42 @@ export function proxyFor(input: string | URL) {
 export const fetch: typeof globalThis.fetch = Object.assign(
   async (input: Parameters<typeof globalThis.fetch>[0], init?: Parameters<typeof globalThis.fetch>[1]) => {
     const proxy = proxyFor(input instanceof Request ? input.url : input.toString())
-    if (typeof Bun !== "undefined" && proxy) return Bun.fetch(input, { ...init, proxy })
-    if (typeof Bun !== "undefined" && !proxyVariables.some((key) => process.env[key]))
-      return globalThis.fetch(input, init)
+    if (process.versions.bun && proxy) {
+      const options = { ...init }
+      Object.defineProperty(options, "proxy", { value: proxy, enumerable: true })
+      return globalThis.fetch(input, options)
+    }
+    if (process.versions.bun && !proxyVariables.some((key) => process.env[key])) return globalThis.fetch(input, init)
     // The explicit entrypoint avoids Bun's built-in "undici" shim, which delegates back to global fetch.
     const { Agent, ProxyAgent, fetch } = await import("undici/index.js")
     if (proxy && !agents.has(proxy)) agents.set(proxy, new ProxyAgent(proxy))
     if (!proxy && !direct.agent) direct.agent = new Agent()
     const options = { ...init }
-    Object.defineProperty(options, "dispatcher", { value: proxy ? agents.get(proxy) : direct.agent, enumerable: true })
-    if (typeof Bun !== "undefined") {
-      // Bun 1.4.2 has no per-request environment-proxy bypass. Use a direct dispatcher instead of mutating process.env.
-      const request = input instanceof Request ? new Request(input, init) : new Request(input.toString(), init)
-      const response = await fetch(request.url, {
-        method: request.method,
-        headers: Object.fromEntries(request.headers),
-        body: request.body,
-        signal: request.signal,
-        redirect: request.redirect,
-        duplex: "half",
-        dispatcher: direct.agent,
-      })
-      const result = new Response(response.body as ReadableStream<Uint8Array> | null, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Array.from(response.headers),
-      })
-      Object.defineProperties(result, { url: { value: response.url }, redirected: { value: response.redirected } })
-      return result
-    }
-    return globalThis.fetch(input, options)
+    Object.defineProperty(options, "duplex", { value: "half", enumerable: true })
+    const request = input instanceof Request ? new Request(input, options) : new Request(input.toString(), options)
+    // Keep fetch and dispatcher from the same undici version: Node's bundled fetch can use an older handler API.
+    // A direct dispatcher also bypasses Bun 1.4.2's inherited proxy environment without mutating process.env.
+    const response = await fetch(request.url, {
+      method: request.method,
+      headers: Object.fromEntries(request.headers),
+      body: request.body,
+      signal: request.signal,
+      redirect: request.redirect,
+      duplex: "half",
+      dispatcher: proxy ? agents.get(proxy) : direct.agent,
+    })
+    const result = new Response(response.body as ReadableStream<Uint8Array> | null, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Array.from(response.headers),
+    })
+    Object.defineProperties(result, { url: { value: response.url }, redirected: { value: response.redirected } })
+    return result
   },
-  { preconnect: globalThis.fetch.preconnect },
+  {
+    preconnect: (url: string | URL, options?: { dns?: boolean; tcp?: boolean; http?: boolean; https?: boolean }) => {
+      if ("preconnect" in globalThis.fetch && typeof globalThis.fetch.preconnect === "function")
+        globalThis.fetch.preconnect(url, options)
+    },
+  },
 )

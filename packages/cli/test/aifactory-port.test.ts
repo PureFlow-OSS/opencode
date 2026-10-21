@@ -119,7 +119,8 @@ test("runs AI Factory through the V2 CLI with a real tool roundtrip", async () =
         },
         stdout: "pipe",
         stderr: "pipe",
-        signal: AbortSignal.timeout(25000),
+        // Cold Windows runs load the complete V2 runtime twice: CLI and isolated standalone server.
+        signal: AbortSignal.timeout(60000),
       },
     )
     const [stdout, stderr, code] = await Promise.all([
@@ -127,7 +128,7 @@ test("runs AI Factory through the V2 CLI with a real tool roundtrip", async () =
       new Response(child.stderr).text(),
       child.exited,
     ])
-    expect(code, stderr).toBe(0)
+    expect(code, `${stderr}\n${stdout}\nRequests: ${JSON.stringify(calls)}`).toBe(0)
     expect(stdout).toContain("PORT_OK")
     expect(stdout).toContain('"tool":"execute"')
     expect(stdout).toContain('"status":"completed"')
@@ -137,4 +138,4 @@ test("runs AI Factory through the V2 CLI with a real tool roundtrip", async () =
   } finally {
     factory.stop(true)
   }
-})
+}, 90000)
