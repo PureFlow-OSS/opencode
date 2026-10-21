@@ -9,6 +9,8 @@ import { PluginHost } from "@opencode/core/plugin/host"
 import { AiFactoryPlugin } from "@opencode/core/plugin/provider/aifactory"
 import { ProviderPlugins } from "@opencode/core/plugin/provider"
 import { Provider } from "@opencode/core/provider"
+import { SessionUsage } from "@opencode/core/session/usage"
+import { Usage } from "@opencode/ai"
 import { Document, Info } from "@opencode/schema/config"
 import { describe, expect, test } from "bun:test"
 import { Effect, Layer, Schema } from "effect"
@@ -179,6 +181,7 @@ describe("AiFactoryPlugin", () => {
                 header: request.headers.get("X-OpenCode-AiFactory-Api-Key"),
                 path,
               })
+              if (path === "/modelcards.json") return new Response("{}", { status: 500 })
               return Response.json({ data: [{ id: "gpt-5.6" }, { id: "all-proxy-models" }] })
             },
           }),
@@ -303,8 +306,36 @@ describe("AiFactoryPlugin", () => {
                 path,
               })
               if (path === "/v1/models")
-                return Response.json({ data: [{ id: "worker-model" }, { id: "gpt-5.6" }, { id: "deepseek-r1" }] })
-              return Response.json({})
+                return Response.json({
+                  data: [
+                    { id: "worker-model" },
+                    { id: "gpt-5.6" },
+                    { id: "deepseek-r1" },
+                    { id: "glm5.3" },
+                    { id: "glm-5.3-flash" },
+                  ],
+                })
+              return Response.json({
+                aifactory: {
+                  models: [
+                    {
+                      model: "gpt-5.6",
+                      config: { pattern: "gpt-*" },
+                      price: { input: 1, output: 2 },
+                    },
+                    {
+                      model: "glm5.3",
+                      config: { pattern: "*" },
+                      price: { input: 1.801, output: 5.6604 },
+                    },
+                    {
+                      model: "glm-5.3-flash",
+                      config: { pattern: "*" },
+                      price: { input: 0.193, output: 0.6432 },
+                    },
+                  ],
+                },
+              })
             },
           }),
         }
@@ -369,9 +400,23 @@ describe("AiFactoryPlugin", () => {
                 model.providerID === Provider.ID.make("aifactory") && model.id === Model.ID.make("deepseek-r1"),
             ),
           )
+          const glm = required(
+            all.find(
+              (model) => model.providerID === Provider.ID.make("aifactory") && model.id === Model.ID.make("glm5.3"),
+            ),
+          )
+          const glmFlash = required(
+            all.find(
+              (model) =>
+                model.providerID === Provider.ID.make("aifactory") && model.id === Model.ID.make("glm-5.3-flash"),
+            ),
+          )
 
           expect(requests.filter((request) => request.path === "/v1/models")).toEqual([
             { authorization: "Bearer legacy-secret", header: "legacy-secret", path: "/v1/models" },
+          ])
+          expect(requests.filter((request) => request.path === "/modelcards.json")).toEqual([
+            { authorization: null, header: "legacy-secret", path: "/modelcards.json" },
           ])
           expect(worker).toMatchObject({
             enabled: true,
@@ -382,6 +427,16 @@ describe("AiFactoryPlugin", () => {
             enabled: false,
             capabilities: { input: ["text", "image"], output: ["text", "audio"] },
             limit: { context: 1000, output: 2000 },
+            cost: [
+              {
+                input: Money.USDPerMillionTokens.make(1),
+                output: Money.USDPerMillionTokens.make(2),
+                cache: {
+                  read: Money.USDPerMillionTokens.zero,
+                  write: Money.USDPerMillionTokens.zero,
+                },
+              },
+            ],
           })
           expect(deepseek).toMatchObject({
             enabled: true,
@@ -389,6 +444,22 @@ describe("AiFactoryPlugin", () => {
               { id: Model.VariantID.make("low"), settings: { reasoningEffort: "low" } },
               { id: Model.VariantID.make("medium"), settings: { reasoningEffort: "medium" } },
               { id: Model.VariantID.make("high"), settings: { reasoningEffort: "high" } },
+            ],
+          })
+          expect(glm).toMatchObject({
+            cost: [
+              {
+                input: Money.USDPerMillionTokens.make(1.801),
+                output: Money.USDPerMillionTokens.make(5.6604),
+              },
+            ],
+          })
+          expect(glmFlash).toMatchObject({
+            cost: [
+              {
+                input: Money.USDPerMillionTokens.make(0.193),
+                output: Money.USDPerMillionTokens.make(0.6432),
+              },
             ],
           })
           expect((yield* models.available()).map((model) => model.id)).toContain(Model.ID.make("worker-model"))
@@ -405,6 +476,26 @@ describe("AiFactoryPlugin", () => {
           ).toBe(false)
           expect(JSON.stringify(yield* providers.available())).not.toContain("legacy-secret")
           expect(JSON.stringify(yield* models.available())).not.toContain("legacy-secret")
+          expect(
+            SessionUsage.record(
+              new Usage({
+                nonCachedInputTokens: 1_000,
+                outputTokens: 4_000,
+                reasoningTokens: 1_000,
+                cacheReadInputTokens: 0,
+                cacheWriteInputTokens: 0,
+              }),
+              gpt.cost,
+            ),
+          ).toEqual({
+            tokens: {
+              input: 1_000,
+              output: 3_000,
+              reasoning: 1_000,
+              cache: { read: 0, write: 0 },
+            },
+            cost: Money.USD.make((1_000 * 1 + (3_000 + 1_000) * 2) / 1_000_000),
+          })
         }),
       ({ server }) => Effect.promise(() => server.stop(true)),
     ),

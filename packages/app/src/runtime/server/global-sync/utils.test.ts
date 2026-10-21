@@ -44,6 +44,19 @@ describe("normalizeProviderList", () => {
       [{ id: "openai", name: "OpenAI", package: "@ai-sdk/openai" }] as ProviderListOutput["data"],
       [
         {
+          id: "gpt-disabled",
+          modelID: "gpt-disabled",
+          providerID: "openai",
+          name: "GPT Disabled",
+          capabilities: { tools: false, input: ["text"], output: ["text"] },
+          variants: [],
+          time: { released: 1 },
+          cost: [],
+          status: "active",
+          enabled: false,
+          limit: { context: 1, output: 1 },
+        },
+        {
           id: "gpt-5",
           modelID: "gpt-5",
           providerID: "openai",
@@ -74,6 +87,7 @@ describe("normalizeProviderList", () => {
 
     expect(result.connected).toEqual(["openai"])
     expect(result.default).toEqual({ openai: "gpt-5" })
+    expect(result.all.get("openai")?.models["gpt-disabled"]).toBeUndefined()
     expect(result.all.get("openai")?.models["gpt-old"]).toBeUndefined()
     expect(result.all.get("openai")?.models["gpt-5"]).toMatchObject({
       id: "gpt-5",

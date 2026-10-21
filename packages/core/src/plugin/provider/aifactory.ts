@@ -68,7 +68,7 @@ export const AiFactoryPlugin = define({
           )
         : {}
       const ids = nextToken ? yield* discover(http, nextToken, nextBaseURL) : noModels
-      const cards = nextToken && ids.length === 0 ? yield* modelCards(http, nextToken, settings) : []
+      const cards = nextToken ? yield* modelCards(http, nextToken, settings) : []
       const fallback = cards.flatMap((card) => (card.model?.trim() ? [card.model.trim()] : []))
       const allEntries = yield* config.entries()
       const localAIFactory = Config.latest(allEntries, "aifactory")
@@ -380,6 +380,12 @@ function catalog(
 }
 
 function price(modelID: string, cards: readonly ModelCard[]) {
+  const exact = cards.find((card) => card.model?.trim().toLowerCase() === modelID.toLowerCase())
+  if (exact)
+    return {
+      input: exact.price?.input ?? exact.liteLLM?.inputCostPerMillionTokens,
+      output: exact.price?.output ?? exact.liteLLM?.outputCostPerMillionTokens,
+    }
   const item = cards
     .map((card) => ({ card, pattern: card.config?.pattern?.trim() || card.model?.trim() }))
     .filter((item): item is { card: ModelCard; pattern: string } => item.pattern !== undefined)

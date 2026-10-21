@@ -209,3 +209,29 @@ Abschließende Prüfungen: 22 Corporate-Updater-Tests und 21 vorhandene Updater-
 bestanden; der Typecheck von `packages/gui-extensions` und `lint:changed HEAD` bestanden
 ohne Probleme in den zwei geänderten TypeScript-Dateien. Es wurde kein Desktop gebaut
 oder paketiert; die Client-Korrektur ist erst im nächsten Desktop-Build enthalten.
+
+### Modellpreise und zentrale Sichtbarkeit
+
+Die native Gesamtkostenanzeige summiert gespeicherte Sitzungskosten. Im Provider
+wurden Model Cards bisher nur nach fehlgeschlagener Modell-Discovery geladen;
+bei erfolgreichem `/models` fehlten dadurch die Preise. Der lokale Model-Card-Endpunkt
+lieferte für `glm5.3` tatsächlich Preise, während die laufende CLI Nullpreise meldete.
+Model Cards werden nun auch bei erfolgreicher Discovery geladen. Konkrete Modellnamen
+haben bei der Preiszuordnung Vorrang vor allgemeinen Konfigurationsmustern wie `*`.
+Die Kostenberechnung gilt für neue Provider-Turns; historische Nullkosten werden
+nicht nachträglich mit heutigen Preisen überschrieben.
+
+Der lokale zentrale Provider-Config-Endpunkt liefert `whisperx-large-v3` mit
+`visible: false`. Der App-Adapter übernahm zuvor auch serverseitig deaktivierte
+Modelle und verlor deren Freigabestatus. Er entfernt solche Modelle jetzt aus dem
+UI-Katalog und berücksichtigt sie auch nicht mehr als Provider-Standard. Lokale
+Sichtbarkeitsschalter können sie damit nicht erneut zur Auswahl hinzufügen.
+Die zuvor korrigierte Übergabe der lokalen Update-URL an eine neue CLI ist ebenfalls
+erforderlich, damit diese denselben zentralen Katalog wie die lokale Admin-Oberfläche liest.
+
+Verifiziert: sechs Provider-Tests mit lokalem HTTP-Server, darunter erfolgreiche
+Discovery mit Model-Card-Preisen, unterschiedliche Preise bei gleichen Wildcard-Mustern,
+unveränderte Modell-Discovery bei fehlgeschlagenem Kartenabruf und nichtleere Kosten
+durch die echte `SessionUsage.record`-Berechnung. Neun App-Adaptertests und die
+Typechecks in Core und App bestehen. Keine Gesamtbuilds, Paketierung, Neuberechnung
+historischer Sitzungen oder Neustarts wurden ausgeführt.

@@ -67,7 +67,7 @@ export function normalizeProviderList(
   for (const model of models ?? []) {
     const provider = all.get(model.providerID)
 
-    if (!provider || model.status === "deprecated") continue
+    if (!provider || !model.enabled || model.status === "deprecated") continue
     const cost = model.cost.find((item) => item.tier === undefined) ?? model.cost[0]
     provider.models[model.id] = {
       id: model.id,
@@ -122,7 +122,9 @@ export function normalizeProviderList(
     connected: providers.map((provider) => provider.id),
     default: Object.fromEntries(
       providers.flatMap((provider) => {
-        const model = models?.find((item) => item.providerID === provider.id && item.status !== "deprecated")
+        const model = models?.find(
+          (item) => item.providerID === provider.id && item.enabled && item.status !== "deprecated",
+        )
 
         return model ? [[provider.id, model.id]] : []
       }),
