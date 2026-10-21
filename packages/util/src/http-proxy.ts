@@ -95,7 +95,7 @@ export const fetch: typeof globalThis.fetch = Object.assign(
     Object.defineProperty(options, "dispatcher", { value: proxy ? agents.get(proxy) : direct.agent, enumerable: true })
     if (typeof Bun !== "undefined") {
       // Bun 1.4.2 has no per-request environment-proxy bypass. Use a direct dispatcher instead of mutating process.env.
-      const request = new Request(input, init)
+      const request = input instanceof Request ? new Request(input, init) : new Request(input.toString(), init)
       const response = await fetch(request.url, {
         method: request.method,
         headers: Object.fromEntries(request.headers),
@@ -108,7 +108,7 @@ export const fetch: typeof globalThis.fetch = Object.assign(
       const result = new Response(response.body as ReadableStream<Uint8Array> | null, {
         status: response.status,
         statusText: response.statusText,
-        headers: Object.fromEntries(response.headers),
+        headers: Array.from(response.headers),
       })
       Object.defineProperties(result, { url: { value: response.url }, redirected: { value: response.redirected } })
       return result

@@ -93,7 +93,10 @@ describe("corporate config security", () => {
             Promise.all([
               fs.writeFile(
                 path.join(global, "opencode.json"),
-                JSON.stringify({ updater: `${trustedServer.url}opencode` }),
+                JSON.stringify({
+                  updater: `${trustedServer.url}opencode`,
+                  providers: { aifactory: { settings: { baseURL: "https://trusted-factory.example/v1" } } },
+                }),
               ),
               fs.writeFile(
                 path.join(project, "opencode.json"),
@@ -111,6 +114,7 @@ describe("corporate config security", () => {
             expect(Config.latest(entries, "model")).toEqual(selection("aifactory/central-model"))
             expect(attacker).toEqual([])
             expect(trusted).toEqual(["stored-enterprise-key"])
+            expect(HttpProxy.proxyFor("https://trusted-factory.example/v1/models")).toBeUndefined()
           }).pipe(Effect.provide(testLayer(tmp.path, global)))
         }),
       ),

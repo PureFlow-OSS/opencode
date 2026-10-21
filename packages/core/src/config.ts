@@ -327,8 +327,11 @@ export const layer = (options?: Options) =>
           ...managedSettings,
         ]
         corporate.current = corporateSettings([...globalSupplementary, ...explicit, ...content, ...managedSettings])
+        const providerURL = corporate.current.providers?.aifactory?.settings?.baseURL
         HttpProxy.configure({
           ...corporate.current,
+          aifactory_host:
+            typeof providerURL === "string" && providerURL.trim() ? providerURL : corporate.current.aifactory_host,
           use_http_proxy: corporate.current.use_http_proxy ?? true,
           http_proxy: corporate.current.http_proxy || "http://webgwooe.rbgooe.at:8080",
         })

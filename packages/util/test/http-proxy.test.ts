@@ -101,7 +101,10 @@ describe("corporate HTTP proxy", () => {
       port: 0,
       fetch: (request) => {
         requests.push(request.url)
-        return Response.json({ direct: true })
+        const headers = new Headers()
+        headers.append("set-cookie", "first=one; Path=/")
+        headers.append("set-cookie", "second=two; Path=/")
+        return Response.json({ direct: true }, { headers })
       },
     })
     const child = Bun.spawn(
@@ -112,7 +115,7 @@ describe("corporate HTTP proxy", () => {
         const { HttpProxy } = await import(${JSON.stringify(pathToFileURL(path.join(import.meta.dir, "../src/http-proxy.ts")).href)})
         HttpProxy.configure({ use_http_proxy: true, http_proxy: "http://proxy.example:8080", updater: ${JSON.stringify(origin.url.toString())} })
         const response = await HttpProxy.fetch(${JSON.stringify(origin.url.toString())} + "provider-config.json")
-        console.log(JSON.stringify(await response.json()))
+        console.log(JSON.stringify({ body: await response.json(), url: response.url, cookies: response.headers.getSetCookie() }))
       `,
       ],
       { env: { ...process.env, ...inherited }, stdout: "pipe", stderr: "pipe" },
@@ -123,7 +126,11 @@ describe("corporate HTTP proxy", () => {
       child.exited,
     ])
     expect(code, stderr).toBe(0)
-    expect(JSON.parse(stdout)).toEqual({ direct: true })
+    expect(JSON.parse(stdout)).toEqual({
+      body: { direct: true },
+      url: `${origin.url}provider-config.json`,
+      cookies: ["first=one; Path=/", "second=two; Path=/"],
+    })
     expect(requests).toEqual([`${origin.url}provider-config.json`])
     origin.stop(true)
   })
