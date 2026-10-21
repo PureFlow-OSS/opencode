@@ -6,6 +6,21 @@ import { LocationQuery, locationQueryOpenApi } from "./location.js"
 
 export const ConfigGroup = HttpApiGroup.make("server.config")
   .add(
+    HttpApiEndpoint.get("config.corporate", "/api/config/corporate", {
+      query: LocationQuery,
+      success: Config.Corporate,
+    })
+      .annotateMerge(locationQueryOpenApi)
+      .annotateMerge(
+        OpenApi.annotations({
+          identifier: "config.corporate",
+          summary: "Get trusted corporate settings",
+          description:
+            "Return enterprise endpoints and proxy settings from global and managed sources, excluding provider credentials and project overrides.",
+        }),
+      ),
+  )
+  .add(
     HttpApiEndpoint.get("config.get", "/api/config", {
       query: LocationQuery,
       success: Schema.Array(Config.Entry),

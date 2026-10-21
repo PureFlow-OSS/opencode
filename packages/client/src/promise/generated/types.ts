@@ -232,6 +232,25 @@ export type McpStatusFailed = { status: "failed"; error: string }
 
 export type McpStatusNeedsAuth = { status: "needs_auth"; error: string }
 
+export type McpProtocol = "legacy" | "auto" | "2026-07-28"
+
+export type McpPatAuth = {
+  type: "pat"
+  label?: string
+  description?: string
+  placeholder?: string
+  header?: string
+  prefix?: string
+}
+
+export type McpStoreItem = {
+  name: string
+  description?: string
+  url: string
+  lockedHeaderNames: Array<string>
+  headerPlaceholder?: string
+}
+
 export type McpResource = { server: string; name: string; uri: string; description?: string; mimeType?: string }
 
 export type McpResourceTemplate = {
@@ -306,7 +325,12 @@ export type WebSearchID = string
 
 export type WebSearchResult = { url: string; title?: string; content?: string; time: { published?: number } }
 
-export type McpProtocol = "legacy" | "auto" | "2026-07-28"
+export type ConfigCorporate = {
+  updater?: string
+  aifactory_host?: string
+  use_http_proxy?: boolean
+  http_proxy?: string
+}
 
 export type ConfigWorktree = { directory: string }
 
@@ -710,6 +734,42 @@ export type McpServer = {
   name: string
   status: McpStatusConnected | McpStatusPending | McpStatusDisabled | McpStatusFailed | McpStatusNeedsAuth
   integrationID?: IntegrationID
+}
+
+export type McpManagedServer = {
+  config:
+    | {
+        type: "local"
+        command: Array<string>
+        cwd?: string
+        environment?: { [x: string]: string }
+        disabled?: boolean
+        codemode?: boolean
+        timeout?: { startup?: number; catalog?: number; execution?: number }
+        protocol?: McpProtocol
+      }
+    | {
+        type: "remote"
+        url: string
+        headers?: { [x: string]: string }
+        oauth?:
+          | {
+              client_id?: string
+              client_secret?: string
+              scope?: string
+              callback_port?: number
+              redirect_uri?: string
+              auth_server_metadata_url?: string
+            }
+          | false
+        disabled?: boolean
+        codemode?: boolean
+        timeout?: { startup?: number; catalog?: number; execution?: number }
+        protocol?: McpProtocol
+      }
+  auth?: McpPatAuth
+  locked?: boolean
+  provenance?: string
 }
 
 export type McpResourceCatalog = { resources: Array<McpResource>; templates: Array<McpResourceTemplate> }
@@ -1991,6 +2051,8 @@ export type CredentialValue = CredentialOAuth | CredentialKey | CredentialExtern
 
 export type ConnectionInfo = ConnectionCredentialInfo | ConnectionEnvInfo
 
+export type McpManagedCatalog = { managed: { [x: string]: McpManagedServer }; store: Array<McpStoreItem> }
+
 export type PtyCreated = {
   id: EventID
   created: number
@@ -2333,6 +2395,11 @@ export type ConfigEntry =
             }
           }
         }
+        aifactory_host?: string
+        aifactory?: { [x: string]: JsonValue }
+        use_http_proxy?: boolean
+        http_proxy?: string
+        updater?: string
         experimental?: {
           portable_shell_scanner?: boolean
           todo?: boolean
@@ -5147,6 +5214,12 @@ export type McpListInput = {
 
 export type McpListOutput = { location: LocationPublicRef; data: Array<McpServer> }
 
+export type McpCatalogInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+}
+
+export type McpCatalogOutput = { location: LocationPublicRef; data: McpManagedCatalog }
+
 export type McpAddInput = {
   readonly server: { readonly server: string }["server"]
   readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
@@ -6012,6 +6085,12 @@ export type WebsearchQueryOutput = {
   data: { providerID: WebSearchID; results: Array<WebSearchResult> }
 }
 
+export type ConfigCorporateInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+}
+
+export type ConfigCorporateOutput = ConfigCorporate
+
 export type ConfigGetInput = {
   readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
 }
@@ -6020,6 +6099,83 @@ export type ConfigGetOutput = Array<ConfigEntry>
 
 export type ConfigShellsOutput = Array<ConfigShellOption>
 
-export type ConfigUpdateInput = { readonly shell: { readonly shell: string | null }["shell"] }
+export type ConfigUpdateInput = {
+  readonly shell?: {
+    readonly shell?: string | null
+    readonly mcp?: {
+      readonly servers: {
+        readonly [x: string]:
+          | {
+              readonly type: "local"
+              readonly command: ReadonlyArray<string>
+              readonly cwd?: string
+              readonly environment?: { readonly [x: string]: string }
+              readonly disabled?: boolean
+              readonly codemode?: boolean
+              readonly timeout?: { readonly startup?: number; readonly catalog?: number; readonly execution?: number }
+              readonly protocol?: "legacy" | "auto" | "2026-07-28"
+            }
+          | {
+              readonly type: "remote"
+              readonly url: string
+              readonly headers?: { readonly [x: string]: string }
+              readonly oauth?:
+                | {
+                    readonly client_id?: string
+                    readonly client_secret?: string
+                    readonly scope?: string
+                    readonly callback_port?: number
+                    readonly redirect_uri?: string
+                    readonly auth_server_metadata_url?: string
+                  }
+                | false
+              readonly disabled?: boolean
+              readonly codemode?: boolean
+              readonly timeout?: { readonly startup?: number; readonly catalog?: number; readonly execution?: number }
+              readonly protocol?: "legacy" | "auto" | "2026-07-28"
+            }
+          | null
+      }
+    }
+  }["shell"]
+  readonly mcp?: {
+    readonly shell?: string | null
+    readonly mcp?: {
+      readonly servers: {
+        readonly [x: string]:
+          | {
+              readonly type: "local"
+              readonly command: ReadonlyArray<string>
+              readonly cwd?: string
+              readonly environment?: { readonly [x: string]: string }
+              readonly disabled?: boolean
+              readonly codemode?: boolean
+              readonly timeout?: { readonly startup?: number; readonly catalog?: number; readonly execution?: number }
+              readonly protocol?: "legacy" | "auto" | "2026-07-28"
+            }
+          | {
+              readonly type: "remote"
+              readonly url: string
+              readonly headers?: { readonly [x: string]: string }
+              readonly oauth?:
+                | {
+                    readonly client_id?: string
+                    readonly client_secret?: string
+                    readonly scope?: string
+                    readonly callback_port?: number
+                    readonly redirect_uri?: string
+                    readonly auth_server_metadata_url?: string
+                  }
+                | false
+              readonly disabled?: boolean
+              readonly codemode?: boolean
+              readonly timeout?: { readonly startup?: number; readonly catalog?: number; readonly execution?: number }
+              readonly protocol?: "legacy" | "auto" | "2026-07-28"
+            }
+          | null
+      }
+    }
+  }["mcp"]
+}
 
 export type ConfigUpdateOutput = void

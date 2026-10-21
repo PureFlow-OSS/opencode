@@ -8,6 +8,52 @@ import { it } from "../../core/test/lib/effect"
 import { startServer } from "./fixture/server"
 import { AbsolutePath } from "@opencode/schema/schema"
 
+it.live("returns trusted corporate endpoints without project overrides or provider secrets", () =>
+  Effect.gen(function* () {
+    const tmp = yield* Effect.acquireDisposable(Effect.promise(() => tmpdir("opencode-corporate-endpoint-")))
+    const central = yield* Effect.acquireRelease(
+      Effect.sync(() => Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ data: [] }) })),
+      (server) => Effect.sync(() => server.stop(true)),
+    )
+    const global = path.join(tmp.path, "global")
+    const project = path.join(tmp.path, "project")
+    yield* Effect.promise(() => Promise.all([fs.mkdir(global), fs.mkdir(project)]))
+    yield* Effect.promise(() =>
+      Promise.all([
+        fs.writeFile(
+          path.join(global, "opencode.json"),
+          JSON.stringify({
+            updater: `${central.url}opencode`,
+            aifactory_host: `${central.url}v1`,
+            use_http_proxy: false,
+            providers: { aifactory: { settings: { apiKey: "must-not-be-in-response" } } },
+          }),
+        ),
+        fs.writeFile(
+          path.join(project, "opencode.json"),
+          JSON.stringify({
+            updater: "http://project.invalid/opencode",
+            aifactory_host: "http://project.invalid/v1",
+          }),
+        ),
+      ]),
+    )
+    const server = yield* startServer(global)
+    const url = new URL("/api/config/corporate", server.base)
+    url.searchParams.set("location[directory]", project)
+    const response = yield* Effect.promise(() => fetch(url, { headers: server.headers }))
+    const text = yield* Effect.promise(() => response.text())
+    expect(response.status).toBe(200)
+    expect(JSON.parse(text)).toEqual({
+      updater: `${central.url}opencode`,
+      aifactory_host: `${central.url}v1`,
+      use_http_proxy: false,
+    })
+    expect(text).not.toContain("must-not-be-in-response")
+    expect(text).not.toContain("project.invalid")
+  }),
+)
+
 it.live("returns ordered config entries for the requested directory", () =>
   Effect.gen(function* () {
     const tmp = yield* Effect.acquireDisposable(Effect.promise(() => tmpdir("opencode-config-endpoint-")))

@@ -120,8 +120,21 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   experimental: ConfigExperimental.Info.pipe(optional),
 }) {}
 
+export const Corporate = Schema.Struct({
+  updater: Schema.String.pipe(optional),
+  aifactory_host: Schema.String.pipe(optional),
+  use_http_proxy: Schema.Boolean.pipe(optional),
+  http_proxy: Schema.String.pipe(optional),
+}).annotate({ identifier: "Config.Corporate" })
+export type Corporate = typeof Corporate.Type
+
 export const Patch = Schema.Struct({
-  shell: Schema.NullOr(Schema.String),
+  shell: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  mcp: Schema.optionalKey(
+    Schema.Struct({
+      servers: Schema.Record(Schema.String, Schema.NullOr(ConfigMCP.Server)),
+    }),
+  ),
 }).annotate({ identifier: "Config.Patch" })
 export interface Patch extends Schema.Schema.Type<typeof Patch> {}
 

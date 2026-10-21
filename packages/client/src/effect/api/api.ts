@@ -1612,6 +1612,10 @@ export type McpListInput = { readonly location?: { readonly directory?: string |
 export type McpListOutput = { readonly location: Location.PublicRef; readonly data: ReadonlyArray<Mcp.Server> }
 export type McpListOperation<E = never> = (input?: McpListInput) => Effect.Effect<McpListOutput, E>
 
+export type McpCatalogInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+export type McpCatalogOutput = { readonly location: Location.PublicRef; readonly data: Mcp.ManagedCatalog }
+export type McpCatalogOperation<E = never> = (input?: McpCatalogInput) => Effect.Effect<McpCatalogOutput, E>
+
 export type McpAddInput = {
   readonly server: string
   readonly location?: { readonly directory?: string | undefined } | undefined
@@ -1649,6 +1653,7 @@ export type McpResourceCatalogOperation<E = never> = (
 
 export interface McpApi<E = never> {
   readonly list: McpListOperation<E>
+  readonly catalog: McpCatalogOperation<E>
   readonly add: McpAddOperation<E>
   readonly remove: McpRemoveOperation<E>
   readonly connect: McpConnectOperation<E>
@@ -2290,6 +2295,12 @@ export interface WebsearchApi<E = never> {
   readonly query: WebsearchQueryOperation<E>
 }
 
+export type ConfigCorporateInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+export type ConfigCorporateOutput = Config.Corporate
+export type ConfigCorporateOperation<E = never> = (
+  input?: ConfigCorporateInput,
+) => Effect.Effect<ConfigCorporateOutput, E>
+
 export type ConfigGetInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
 export type ConfigGetOutput = ReadonlyArray<Config.Entry>
 export type ConfigGetOperation<E = never> = (input?: ConfigGetInput) => Effect.Effect<ConfigGetOutput, E>
@@ -2301,11 +2312,15 @@ export type ConfigShellsOutput = ReadonlyArray<{
 }>
 export type ConfigShellsOperation<E = never> = () => Effect.Effect<ConfigShellsOutput, E>
 
-export type ConfigUpdateInput = { readonly shell: string | null }
+export type ConfigUpdateInput = {
+  readonly shell?: string | null
+  readonly mcp?: { readonly servers: { readonly [x: string]: Mcp.LocalConfig | Mcp.RemoteConfig | null } }
+}
 export type ConfigUpdateOutput = void
-export type ConfigUpdateOperation<E = never> = (input: ConfigUpdateInput) => Effect.Effect<ConfigUpdateOutput, E>
+export type ConfigUpdateOperation<E = never> = (input?: ConfigUpdateInput) => Effect.Effect<ConfigUpdateOutput, E>
 
 export interface ConfigApi<E = never> {
+  readonly corporate: ConfigCorporateOperation<E>
   readonly get: ConfigGetOperation<E>
   readonly shells: ConfigShellsOperation<E>
   readonly update: ConfigUpdateOperation<E>

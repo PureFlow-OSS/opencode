@@ -24,6 +24,7 @@ import { ConfigManaged } from "./config/managed.js"
 import { HttpProxy } from "@opencode/util/http-proxy"
 import { Integration } from "@opencode/schema/integration"
 import { FetchHttpClient } from "effect/http"
+import { isRecord } from "@opencode/ai/utils/record"
 
 export function latest<K extends keyof Info>(entries: readonly Entry[], key: K): Info[K] | undefined {
   return entries.findLast((entry): entry is Document => entry.type === "document" && entry.info[key] !== undefined)
@@ -453,13 +454,32 @@ export const layer = (options?: Options) =>
             (yield* Effect.filter(candidates, fs.isFile)).at(-1) ?? path.join(directory, "opencode.jsonc")
           const text = (yield* fs.readFileStringSafe(filepath)) ?? "{}\n"
           const updated = yield* Effect.try({
-            try: () =>
-              applyEdits(
+            try: () => {
+              const errors: ParseError[] = []
+              const input: unknown = parse(text, errors, { allowTrailingComma: true })
+              if (errors.length || !isRecord(input)) throw new Error("Cannot update malformed global configuration")
+              const mcp = isRecord(input.mcp) ? input.mcp : undefined
+              const changes = [
+                ...("shell" in patch ? [{ path: ["shell"], value: patch.shell ?? undefined }] : []),
+                ...Object.entries(patch.mcp?.servers ?? {}).flatMap(([name, config]) => [
+                  // Remove a matching V1 entry too, without treating the native "servers" container as a server.
+                  ...(isRecord(mcp?.[name]) && (mcp[name].type === "local" || mcp[name].type === "remote")
+                    ? [{ path: ["mcp", name], value: undefined }]
+                    : []),
+                  { path: ["mcp", "servers", name], value: config ?? undefined },
+                ]),
+              ]
+              return changes.reduce(
+                (current, change) =>
+                  applyEdits(
+                    current,
+                    modify(current, change.path, change.value, {
+                      formattingOptions: { tabSize: 2, insertSpaces: true },
+                    }),
+                  ),
                 text,
-                modify(text, ["shell"], patch.shell ?? undefined, {
-                  formattingOptions: { tabSize: 2, insertSpaces: true },
-                }),
-              ),
+              )
+            },
             catch: (cause) => new FSUtil.FileSystemError({ method: "config.update", cause }),
           })
           yield* fs.writeWithDirs(filepath, updated.endsWith("\n") ? updated : `${updated}\n`)

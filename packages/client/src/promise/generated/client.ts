@@ -141,6 +141,8 @@ import type {
   IntegrationCommandCancelOutput,
   McpListInput,
   McpListOutput,
+  McpCatalogInput,
+  McpCatalogOutput,
   McpAddInput,
   McpAddOutput,
   McpRemoveInput,
@@ -267,6 +269,8 @@ import type {
   WebsearchProvidersOutput,
   WebsearchQueryInput,
   WebsearchQueryOutput,
+  ConfigCorporateInput,
+  ConfigCorporateOutput,
   ConfigGetInput,
   ConfigGetOutput,
   ConfigShellsOutput,
@@ -1374,6 +1378,18 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
+      catalog: (input?: McpCatalogInput, requestOptions?: RequestOptions) =>
+        request<McpCatalogOutput>(
+          {
+            method: "GET",
+            path: `/api/mcp/catalog`,
+            query: { location: input?.["location"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ),
       add: (input: McpAddInput, requestOptions?: RequestOptions) =>
         request<McpAddOutput>(
           {
@@ -2246,6 +2262,18 @@ export function make(options: ClientOptions) {
         ),
     },
     config: {
+      corporate: (input?: ConfigCorporateInput, requestOptions?: RequestOptions) =>
+        request<ConfigCorporateOutput>(
+          {
+            method: "GET",
+            path: `/api/config/corporate`,
+            query: { location: input?.["location"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ),
       get: (input?: ConfigGetInput, requestOptions?: RequestOptions) =>
         request<ConfigGetOutput>(
           {
@@ -2269,12 +2297,12 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
-      update: (input: ConfigUpdateInput, requestOptions?: RequestOptions) =>
+      update: (input?: ConfigUpdateInput, requestOptions?: RequestOptions) =>
         request<ConfigUpdateOutput>(
           {
             method: "PATCH",
             path: `/api/experimental/config`,
-            body: { shell: input["shell"] },
+            body: { shell: input?.["shell"], mcp: input?.["mcp"] },
             successStatus: 204,
             declaredStatuses: [400, 401, 404],
             empty: true,

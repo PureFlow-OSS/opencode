@@ -6,6 +6,19 @@ import { Api } from "../api"
 
 export const ConfigHandler = HttpApiBuilder.group(Api, "server.config", (handlers) =>
   handlers
+    .handle(
+      "config.corporate",
+      Effect.fn(function* () {
+        const config = yield* Config.Service
+        const settings = config.corporate ? yield* config.corporate() : {}
+        return {
+          updater: settings.updater,
+          aifactory_host: settings.aifactory_host,
+          use_http_proxy: settings.use_http_proxy,
+          http_proxy: settings.http_proxy,
+        }
+      }),
+    )
     .handle("config.get", () => Config.Service.use((config) => config.entries()))
     .handle(
       "config.update",

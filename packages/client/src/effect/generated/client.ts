@@ -147,6 +147,8 @@ import type {
   IntegrationCommandCancelOutput,
   McpListInput,
   McpListOutput,
+  McpCatalogInput,
+  McpCatalogOutput,
   McpAddInput,
   McpAddOutput,
   McpRemoveInput,
@@ -269,6 +271,8 @@ import type {
   WebsearchProvidersOutput,
   WebsearchQueryInput,
   WebsearchQueryOutput,
+  ConfigCorporateInput,
+  ConfigCorporateOutput,
   ConfigGetInput,
   ConfigGetOutput,
   ConfigShellsOutput,
@@ -1029,6 +1033,11 @@ const EndpointMcpList = (raw: RawClient["server.mcp"]) => (input?: McpListInput)
     raw["mcp.list"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
   )
 
+const EndpointMcpCatalog = (raw: RawClient["server.mcp"]) => (input?: McpCatalogInput) =>
+  preserveEffect<McpCatalogOutput>()(
+    raw["mcp.catalog"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
 const EndpointMcpAdd = (raw: RawClient["server.mcp"]) => (input: McpAddInput) =>
   preserveEffect<McpAddOutput>()(
     raw["mcp.add"]({
@@ -1066,6 +1075,7 @@ const EndpointMcpResourceCatalog = (raw: RawClient["server.mcp"]) => (input?: Mc
 
 const adaptGroupMcp = (raw: RawClient["server.mcp"]) => ({
   list: EndpointMcpList(raw),
+  catalog: EndpointMcpCatalog(raw),
   add: EndpointMcpAdd(raw),
   remove: EndpointMcpRemove(raw),
   connect: EndpointMcpConnect(raw),
@@ -1625,6 +1635,11 @@ const adaptGroupWebsearch = (raw: RawClient["server.websearch"]) => ({
   query: EndpointWebsearchQuery(raw),
 })
 
+const EndpointConfigCorporate = (raw: RawClient["server.config"]) => (input?: ConfigCorporateInput) =>
+  preserveEffect<ConfigCorporateOutput>()(
+    raw["config.corporate"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
 const EndpointConfigGet = (raw: RawClient["server.config"]) => (input?: ConfigGetInput) =>
   preserveEffect<ConfigGetOutput>()(
     raw["config.get"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
@@ -1633,12 +1648,15 @@ const EndpointConfigGet = (raw: RawClient["server.config"]) => (input?: ConfigGe
 const EndpointConfigShells = (raw: RawClient["server.config"]) => () =>
   preserveEffect<ConfigShellsOutput>()(raw["config.shells"]({}).pipe(Effect.mapError(mapClientError)))
 
-const EndpointConfigUpdate = (raw: RawClient["server.config"]) => (input: ConfigUpdateInput) =>
+const EndpointConfigUpdate = (raw: RawClient["server.config"]) => (input?: ConfigUpdateInput) =>
   preserveEffect<ConfigUpdateOutput>()(
-    raw["config.update"]({ payload: { shell: input["shell"] } }).pipe(Effect.mapError(mapClientError)),
+    raw["config.update"]({ payload: { shell: input?.["shell"], mcp: input?.["mcp"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
   )
 
 const adaptGroupConfig = (raw: RawClient["server.config"]) => ({
+  corporate: EndpointConfigCorporate(raw),
   get: EndpointConfigGet(raw),
   shells: EndpointConfigShells(raw),
   update: EndpointConfigUpdate(raw),

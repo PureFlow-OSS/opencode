@@ -31,6 +31,7 @@ import { emptyCredentialNode, emptyWellknownNode } from "../fixture/config-nodes
 import { location } from "../fixture/location"
 import { tmpdir } from "../fixture/tmpdir"
 import { testEffect } from "../lib/effect"
+import { parse } from "jsonc-parser"
 
 const it = testEffect(Layer.empty)
 const itWithPermissions = process.platform === "win32" || process.getuid?.() === 0 ? it.live.skip : it.live
@@ -92,6 +93,64 @@ const provider = {
 }
 
 describe("Config", () => {
+  it.live("persists MCP server patches without losing comments, shell or concurrent server changes", () =>
+    Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
+      Effect.flatMap((tmp) =>
+        Effect.gen(function* () {
+          const global = path.join(tmp.path, "global")
+          const file = path.join(global, "opencode.jsonc")
+          yield* Effect.promise(async () => {
+            await fs.mkdir(global)
+            await fs.writeFile(
+              file,
+              `{
+            // retain deployment notes
+            "shell": "existing-shell",
+            "mcp": {
+              "legacy": { "type": "remote", "url": "https://legacy.example/mcp" },
+              "servers": { "keep": { "type": "remote", "url": "https://keep.example/mcp" } }
+            }
+          }`,
+            )
+          })
+          yield* Effect.gen(function* () {
+            const config = yield* Config.Service
+            const server = { type: "remote" as const, url: "https://store.example/mcp" }
+            yield* Effect.all(
+              [
+                config.update!({ mcp: { servers: { first: server, servers: server } } }),
+                config.update!({ mcp: { servers: { second: server } } }),
+              ],
+              { concurrency: 2 },
+            )
+            const saved = yield* Effect.promise(() => fs.readFile(file, "utf8"))
+            expect(saved).toContain("// retain deployment notes")
+            expect(parse(saved)).toMatchObject({
+              shell: "existing-shell",
+              mcp: {
+                servers: { first: server, second: server, servers: server, keep: { url: "https://keep.example/mcp" } },
+              },
+            })
+            yield* config.update!({ mcp: { servers: { legacy: server, first: null } } })
+            yield* config.update!({ mcp: { servers: { legacy: null } } })
+            expect(parse(yield* Effect.promise(() => fs.readFile(file, "utf8")))).toMatchObject({
+              shell: "existing-shell",
+              mcp: { servers: { second: server, keep: { url: "https://keep.example/mcp" } } },
+            })
+          }).pipe(Effect.provide(testLayer(tmp.path, global)))
+          yield* Effect.gen(function* () {
+            const config = yield* Config.Service
+            const servers = Config.latest(yield* config.entries(), "mcp")?.servers
+            expect(servers?.second?.type).toBe("remote")
+            expect(servers?.first).toBeUndefined()
+            expect(servers?.legacy).toBeUndefined()
+            expect(Config.latest(yield* config.entries(), "shell")).toBe("existing-shell")
+          }).pipe(Effect.provide(testLayer(tmp.path, global)))
+        }),
+      ),
+    ),
+  )
+
   test("preserves corporate provider, proxy and updater configuration during normalization", () => {
     const corporate = {
       aifactory_host: "https://factory.example/v1",
