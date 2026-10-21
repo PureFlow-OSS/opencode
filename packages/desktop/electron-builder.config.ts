@@ -115,6 +115,15 @@ const getBase = (appId: string): Configuration => {
         to: "",
         filter: ["opencode-cli", "opencode-cli.exe", "opencode-cli.version"],
       },
+      ...(target.os === "win32"
+        ? [
+            {
+              from: "build/updater-helper/win-x64/",
+              to: "updater-helper/",
+              filter: ["OpenCode.UpdaterHelper.exe"],
+            },
+          ]
+        : []),
     ],
     afterPack: async (context) => {
       const arch = Arch[context.arch]
@@ -190,7 +199,8 @@ const getBase = (appId: string): Configuration => {
     },
     nsis: {
       include: path.join(packageDir, "resources", "windows", "installer.nsh"),
-      oneClick: true,
+      oneClick: false,
+      allowToChangeInstallationDirectory: false,
       perMachine: false,
       installerIcon: `resources/icons/icon.ico`,
       installerHeaderIcon: `resources/icons/icon.ico`,

@@ -5,6 +5,8 @@ import { copyBuiltCliToResources, downloadCliToResources, resolveChannel } from 
 
 const channel = resolveChannel()
 
+if (process.platform === "win32") await $`bun ./scripts/build-updater-helper.ts`
+
 if (channel === "prod" && !Bun.env.OPENCODE_CLI_DIST) {
   throw new Error("OPENCODE_CLI_DIST is required for production desktop builds")
 }

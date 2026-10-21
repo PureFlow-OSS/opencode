@@ -71,7 +71,7 @@ test("legacy Linux launcher stays hidden", async () => {
 })
 
 test("shared packaging defaults", async () => {
-  const config = load("dev")
+  const config = load("dev", "x86_64-pc-windows-msvc")
   expect(config.mac?.sign).toBeFunction()
   expect(config.dmg?.sign).not.toBe(true)
   expect(config.mac?.extendInfo?.NSAutoFillRequiresTextContentTypeForOneTimeCodeOnMac).toBe(true)
@@ -79,7 +79,18 @@ test("shared packaging defaults", async () => {
   expect(config.nsis?.include).toBe(include)
   expect(await Bun.file(include).exists()).toBe(true)
   expect(config.files).toContain("!resources/opencode-cli*")
+  expect(config.nsis?.oneClick).toBe(false)
+  expect(config.nsis?.allowToChangeInstallationDirectory).toBe(false)
   expect(config.extraResources).toEqual([
+    { from: "resources/", to: "", filter: ["opencode-cli", "opencode-cli.exe", "opencode-cli.version"] },
+    {
+      from: "build/updater-helper/win-x64/",
+      to: "updater-helper/",
+      filter: ["OpenCode.UpdaterHelper.exe"],
+    },
+  ])
+
+  expect(load("dev", "aarch64-apple-darwin").extraResources).toEqual([
     { from: "resources/", to: "", filter: ["opencode-cli", "opencode-cli.exe", "opencode-cli.version"] },
   ])
 })

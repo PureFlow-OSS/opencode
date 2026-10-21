@@ -1,0 +1,8 @@
+version: 1.14.29
+files:
+  - url: opencode-electron-win-x64.exe
+    sha512: REPLACE_WITH_REAL_SHA512
+    size: 123456789
+path: opencode-electron-win-x64.exe
+sha512: REPLACE_WITH_REAL_SHA512
+releaseDate: "2026-04-27T21:03:43.807Z"

@@ -244,6 +244,10 @@ jobs:
         with:
           install-flags: ${{ matrix.settings.bun_install_flags }}
 
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.x
+
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "26.4.0"
@@ -614,6 +618,20 @@ jobs:
           pattern: opencode-desktop-*
           path: /tmp/desktop
           merge-multiple: true
+
+      - name: Package corporate release archive
+        if: needs.version.outputs.release
+        run: bun packages/desktop/scripts/package-corporate-release.ts --assets /tmp/desktop --metadata /tmp/latest-yml --output /tmp/corporate/opencode-corporate-v${{ needs.version.outputs.version }}.zip
+        env:
+          OPENCODE_VERSION: ${{ needs.version.outputs.version }}
+          OPENCODE_RELEASE_NOTES: ${{ (github.ref_name == 'dev' && inputs.release_notes) || '' }}
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: needs.version.outputs.release
+        with:
+          name: opencode-corporate-release
+          path: /tmp/corporate
+          if-no-files-found: error
 
       - name: Setup git committer
         id: committer

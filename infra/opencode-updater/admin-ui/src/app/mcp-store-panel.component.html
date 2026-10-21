@@ -1,0 +1,92 @@
+<article class="card store-card">
+  <header class="panel-header">
+    <div>
+      <p class="panel-kicker">MCP Store</p>
+      <h2>MCP Store</h2>
+      <p>Offered MCPs users can add in OpenCode. Admin defines URL and header names; users fill in the values.</p>
+    </div>
+    <button type="button" class="secondary" (click)="add()">+ Add entry</button>
+  </header>
+
+  @if (editing) {
+    <form class="store-form" (submit)="submit($event)">
+      <div class="form-title">
+        <strong>{{ editing === 'new' ? 'Add store entry' : 'Edit ' + editing }}</strong>
+        <span>Store entries are not enforced. Users adopt them in a later OpenCode settings tab.</span>
+      </div>
+      <div class="form-grid">
+        <label>
+          Entry name
+          <input name="name" [(ngModel)]="draft.name" [readonly]="editing !== 'new'" placeholder="for example, devops" required />
+        </label>
+        <label>
+          MCP URL
+          <input name="url" [(ngModel)]="draft.url" type="url" placeholder="https://mcp.example.com/mcp" required />
+        </label>
+        <label class="full-width">
+          Description
+          <input name="description" [(ngModel)]="draft.description" placeholder="What this MCP offers to users" />
+        </label>
+        <div class="header-fields">
+          @for (header of draft.headerNames; track $index; let i = $index) {
+            <div class="header-row">
+              <input
+                name="header{{ i }}"
+                type="text"
+                [value]="header"
+                (input)="setHeader(i, $any($event.target).value)"
+                placeholder="Header-Name, z. B. Authorization"
+              />
+              @if (draft.headerNames.length > 1) {
+                <button type="button" class="secondary header-remove" (click)="removeHeader(i)" aria-label="Remove header">×</button>
+              }
+            </div>
+          }
+          <button type="button" class="secondary header-add" (click)="addHeader()">+ Add header</button>
+          <small class="header-hint">Users fill in the values in OpenCode; header names stay locked there.</small>
+        </div>
+        <label class="full-width">
+          Header placeholder hint
+          <input name="headerPlaceholder" [(ngModel)]="draft.headerPlaceholder" placeholder="Personal access token or API key" />
+        </label>
+        <label class="toggle">
+          <input name="enabled" [(ngModel)]="draft.enabled" type="checkbox" />
+          <span><strong>Visible in store</strong><small>Hidden entries stay in the list but are not offered to users.</small></span>
+        </label>
+      </div>
+      <div class="form-actions">
+        <button type="submit" [disabled]="saveMutation.isPending()">{{ saveMutation.isPending() ? 'Saving…' : 'Save entry' }}</button>
+        <button type="button" class="secondary" (click)="cancel()">Cancel</button>
+      </div>
+    </form>
+  }
+
+  @if (error) { <p class="message error">{{ error }}</p> }
+  @if (status) { <p class="message">{{ status }}</p> }
+
+  <div class="store-list">
+    @if (store.isPending()) {
+      <div class="empty">Loading store entries…</div>
+    } @else if (items().length === 0) {
+      <div class="empty">No store entries yet.</div>
+    } @else {
+      @for (item of items(); track item.name) {
+        <section class="store-row" [class.off]="!item.enabled">
+          <div class="store-copy">
+            <div>
+              <strong>{{ item.name }}</strong>
+              <span class="badge" [class.muted]="!item.enabled">{{ item.enabled ? 'Visible' : 'Hidden' }}</span>
+            </div>
+            @if (item.description) { <small>{{ item.description }}</small> }
+            <code>{{ item.url }}</code>
+            <small>Headers: {{ item.headerNames.join(', ') }}</small>
+          </div>
+          <div class="row-actions">
+            <button type="button" class="secondary" (click)="edit(item)">Edit</button>
+            <button type="button" class="danger" [disabled]="deleteMutation.isPending()" (click)="remove(item.name)">Remove</button>
+          </div>
+        </section>
+      }
+    }
+  </div>
+</article>

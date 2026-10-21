@@ -11,6 +11,50 @@ const load = async (command: "build" | "serve") => ({
   config: await createConfig({ command, mode: command === "build" ? "production" : "development" }),
 })
 
+test("embeds the corporate updater URL only when the build supplies it", async () => {
+  const previous = process.env.OPENCODE_UPDATE_BASE_URL
+  try {
+    process.env.OPENCODE_UPDATE_BASE_URL = "https://updates.example/opencode/"
+    expect((await load("build")).config.main?.define).toMatchObject({
+      OPENCODE_UPDATE_BASE_URL: JSON.stringify("https://updates.example/opencode/"),
+    })
+    delete process.env.OPENCODE_UPDATE_BASE_URL
+    expect((await load("build")).config.main?.define).toMatchObject({
+      OPENCODE_UPDATE_BASE_URL: "undefined",
+    })
+  } finally {
+    if (previous === undefined) delete process.env.OPENCODE_UPDATE_BASE_URL
+    else process.env.OPENCODE_UPDATE_BASE_URL = previous
+  }
+})
+
+test("embeds the corporate updater URL in the packaged main bundle", async () => {
+  const previous = process.env.OPENCODE_UPDATE_BASE_URL
+
+  try {
+    process.env.OPENCODE_UPDATE_BASE_URL = "https://updates.example/opencode"
+    const config = await createConfig({ command: "build", mode: "production" })
+    if (!config.main) throw new Error("Missing main-process build configuration")
+
+    const built = await new MainConfigFactory(
+      config.main,
+      { configFile: false, mode: "production" },
+      { root: import.meta.dirname },
+    ).build()
+    built.build = { ...built.build, minify: false, write: false }
+    built.logLevel = "silent"
+    const output = await build(built)
+    const chunks = (Array.isArray(output) ? output : [output]).flatMap((item) =>
+      "output" in item ? item.output.filter((entry) => entry.type === "chunk") : [],
+    )
+
+    expect(chunks.some((chunk) => chunk.code.includes("https://updates.example/opencode"))).toBe(true)
+  } finally {
+    if (previous === undefined) delete process.env.OPENCODE_UPDATE_BASE_URL
+    else process.env.OPENCODE_UPDATE_BASE_URL = previous
+  }
+}, 30_000)
+
 // Bundled into the main process, so the manifest must not also ship them as external packages.
 const bundled = ["effect", "@effect/platform-node", "@effect/platform-node-shared", "drizzle-orm"]
 

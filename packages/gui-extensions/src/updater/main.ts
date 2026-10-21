@@ -18,7 +18,16 @@ const setup: MainSetup<typeof definition> = async (ctx) => {
 
   // electron-updater loads only in packaged builds that update, after the first window is up.
   const platform = enabled
-    ? await import("./platform").then((module) => runPromise(module.make(build.channel)))
+    ? await import("./platform").then((module) =>
+        runPromise(
+          module.make({
+            channel: build.channel,
+            currentVersion: build.version,
+            corporateSettings: () => corporateSettings(ctx),
+            apiKey: () => apiKey(ctx),
+          }),
+        ),
+      )
     : undefined
 
   if (ctx.scope.signal.aborted) return
@@ -116,6 +125,39 @@ const setup: MainSetup<typeof definition> = async (ctx) => {
 
 function promise<A>(evaluate: () => Promise<A>) {
   return Effect.tryPromise(evaluate).pipe(Effect.orDie)
+}
+
+async function corporateSettings(ctx: Parameters<MainSetup<typeof definition>>[0]) {
+  const client = await sidecarClient(ctx)
+  return client.config.corporate()
+}
+
+async function apiKey(ctx: Parameters<MainSetup<typeof definition>>[0]) {
+  const client = await sidecarClient(ctx)
+  const credentials = await client.credential.list()
+  const key = credentials.find((entry) => entry.integrationID === "aifactory" && entry.active)
+
+  if (key?.value.type === "key") {
+    const value = key.value.key.trim()
+    if (value) return value
+  }
+
+  return process.env.OPENCODE_AIFACTORY_API_KEY?.trim()
+}
+
+/**
+ * Reads the current sidecar each call so a restarted server cannot be reached through a stale URL or password.
+ * The basic authorization header stays on these two API requests and is never passed to the corporate update server.
+ */
+async function sidecarClient(ctx: Parameters<MainSetup<typeof definition>>[0]) {
+  const server = ctx.serverEndpoints.get("sidecar")
+  if (!server) throw new Error("Sidecar server is unavailable")
+
+  const { OpenCode } = await import("@opencode/client/promise")
+  return OpenCode.make({
+    baseUrl: server.url,
+    headers: Object.keys(server.headers).length ? server.headers : undefined,
+  })
 }
 
 export default setup

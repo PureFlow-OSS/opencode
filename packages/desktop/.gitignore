@@ -23,6 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 out/
+build/updater-helper/
 
 resources/opencode-cli*
 resources/icons
