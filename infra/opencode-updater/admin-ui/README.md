@@ -10,3 +10,5 @@ Planned screens:
 - general feedback inbox
 
 This folder is intentionally isolated from the OpenCode app UI.
+
+The nginx config in this folder proxies the updater server and allows request bodies up to 1 GB (`client_max_body_size 1g`) so desktop release ZIP uploads are not rejected before Kestrel receives them.

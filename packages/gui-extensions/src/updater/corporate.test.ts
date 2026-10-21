@@ -29,7 +29,7 @@ describe("corporate updater", () => {
     })
   })
 
-  test("prefers trusted configured settings over environment and default", () => {
+  test("prefers configured settings, runtime environment, and the embedded default", () => {
     const previous = process.env.OPENCODE_UPDATE_BASE_URL
     process.env.OPENCODE_UPDATE_BASE_URL = "https://environment.example/opencode"
 
@@ -61,14 +61,17 @@ test("applies only a newer corporate version", () => {
 
   test("fetches the authenticated version and feed URL", async () => {
     const seen: { url: URL; headers: Headers }[] = []
+
     const result = await fetchCorporateUpdate(
       {},
       {
         apiKey: " secret ",
         fetchFn: (url, init) => {
           const request = new Request(url, init)
+
           const target = new URL(request.url)
           seen.push({ url: target, headers: request.headers })
+
           return response(target.pathname.endsWith("/version") ? "2.1.3" : "http://10.53.7.23/opencode/feed")
         },
       },
@@ -82,6 +85,47 @@ test("applies only a newer corporate version", () => {
     })
     expect(seen.map((item) => item.url.pathname)).toEqual(["/opencode/version", "/opencode/url"])
     expect(seen.map((item) => item.headers.get(API_KEY_HEADER))).toEqual(["secret", "secret"])
+  })
+
+  test("preserves a same-origin feed URL and query", async () => {
+    const result = await fetchCorporateUpdate({ updater: "http://localhost/opencode" }, {
+      fetchFn: endpointFetch({
+        "/opencode/version": "2.1.3",
+        "/opencode/url": "http://localhost/opencode/feed?beta=stable-token",
+      }),
+    })
+
+    expect(result.url).toBe("http://localhost/opencode/feed?beta=stable-token")
+  })
+
+  test.each([
+    ["http://advertised.example/opencode/feed", "http://localhost/opencode/feed"],
+    ["http://advertised.example/opencode/feed?beta=test-token", "http://localhost/opencode/feed?beta=test-token"],
+  ])("rebases a known feed path to the trusted origin", async (advertised, feed) => {
+    const result = await fetchCorporateUpdate({ updater: "http://localhost/opencode" }, {
+      fetchFn: endpointFetch({ "/opencode/version": "2.1.3", "/opencode/url": advertised }),
+    })
+
+    expect(result.url).toBe(feed)
+  })
+
+  test.each([
+    "ftp://advertised.example/opencode/feed",
+    "http://user:pass@advertised.example/opencode/feed",
+    "http://advertised.example/opencode/feed#fragment",
+    "http://advertised.example/opencode/feed/",
+    "http://advertised.example/beta/feed",
+    "http://advertised.example/opencode/other/feed",
+    "http://advertised.example/opencode/feed?beta=",
+    "http://advertised.example/opencode/feed?channel=stable",
+    "http://advertised.example/opencode/feed?beta=a&channel=stable",
+    "http://advertised.example/opencode/feed?beta=a&beta=b",
+  ])("rejects an unsafe off-origin feed URL: %s", async (advertised) => {
+    await expect(
+      fetchCorporateUpdate({ updater: "http://localhost/opencode" }, {
+        fetchFn: endpointFetch({ "/opencode/version": "2.1.3", "/opencode/url": advertised }),
+      }),
+    ).rejects.toThrow("Update server feed URL is not allowed")
   })
 
   test("reports the URL and HTTP status for failed responses", async () => {

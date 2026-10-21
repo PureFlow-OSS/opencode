@@ -165,3 +165,47 @@ sowie den Erhalt erweiterter lokaler und Remote-Konfiguration beim Bearbeiten.
 Auf ausdrücklichen Wunsch wurden für diese letzten Korrekturen kein vollständiger Build
 und keine Paketierung ausgeführt. Die zuvor erstellten Installer enthalten diese
 abschließenden Korrekturen deshalb noch nicht.
+
+### Updater: lokale Serveradresse und veröffentlichte Feed-Adresse
+
+Der gemeldete Fehler ließ sich mit dem lokalen Docker-Server reproduzieren:
+`http://localhost/opencode/url` antwortete mit der produktiven Firmenadresse und
+dem Pfad `/opencode/feed`. Die bisherige Origin-Prüfung lehnte diese Antwort ab.
+Das Backend bildet die Adresse aus `Updater.PublicBaseUrl`; bei Beta bleibt der
+Pfad gleich und erhält den Query-Parameter `beta`.
+
+Der Server meldete bei der Diagnose Version `1.14.35`, also keine neuere Version
+als der aktuelle Desktop `2.1.2`. Der lokale Abruf von `/opencode/feed/latest.yml`
+lieferte außerdem HTTP 404. Ein vollständiger Download-/Installationslauf ist
+damit durch diese Diagnose nicht nachgewiesen. Der laufende Container und seine
+Konfiguration wurden nicht verändert.
+
+Die Client-Auflösung bindet den exakt passenden Feed-Pfad jetzt an die konfigurierte
+Origin zurück, auch bei einer einzelnen nichtleeren `beta`-Query. Andere externe
+Pfade, Schemes, URL-Zugangsdaten und Fragmente werden weiterhin abgewiesen.
+Ein direkter Abruf mit dem korrigierten Quellcode lieferte den Feed unter
+`http://localhost/opencode/feed` ohne die vorherige URL-Ablehnung.
+
+### Beta-Upload: HTTP 413 im Admin-Proxy
+
+Der 281.704.498 Byte große Upload überschritt das Nginx-Limit von 200 MiB.
+Das Backend erlaubte bereits große Multipart-Anfragen. Das Proxy-Limit wurde
+auf 1 GiB erhöht und im Admin-UI-README dokumentiert. Die Konfiguration bestand
+`nginx -t` sowohl in einem temporären Container als auch im laufenden Admin-Proxy.
+Die vorherige Konfiguration wurde lokal gesichert; anschließend wurde nur die
+Proxy-Konfiguration mit `nginx -s reload` neu geladen. Das aktive Limit beträgt
+1 GiB und die Admin-Oberfläche antwortet mit HTTP 200. Kein Image-Build und kein
+Backend-Neustart wurden ausgeführt; den vollständigen ZIP-Upload wiederholt der Nutzer.
+
+Der Nutzer hat den Upload anschließend erfolgreich wiederholt. Die Release-Liste
+enthält Beta `2.1.2`. Mit dem aktiven AI-Factory-Zugang des lokalen Sidecars wurde
+die echte Beta-Auswahl geprüft: Version `2.1.2`, Beta-Parameter vorhanden, Feed-Origin
+`http://localhost`, `latest.yml` HTTP 200 und Metadatenversion `2.1.2`. Schlüssel und
+Beta-Token wurden nur im Speicher verwendet und nicht ausgegeben. Diese Beta ist
+nicht neuer als der laufende Desktop `2.1.2`; ein Download oder eine Installation
+wurde nicht ausgelöst.
+
+Abschließende Prüfungen: 22 Corporate-Updater-Tests und 21 vorhandene Updater-/Cache-Tests
+bestanden; der Typecheck von `packages/gui-extensions` und `lint:changed HEAD` bestanden
+ohne Probleme in den zwei geänderten TypeScript-Dateien. Es wurde kein Desktop gebaut
+oder paketiert; die Client-Korrektur ist erst im nächsten Desktop-Build enthalten.
