@@ -249,6 +249,7 @@ export type McpStoreItem = {
   url: string
   lockedHeaderNames: Array<string>
   headerPlaceholder?: string
+  oauthRequired?: boolean
 }
 
 export type McpResource = { server: string; name: string; uri: string; description?: string; mimeType?: string }

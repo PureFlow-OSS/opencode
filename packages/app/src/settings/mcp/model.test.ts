@@ -91,9 +91,31 @@ describe("MCP settings rows", () => {
         lockedHeaderNames: ["x-company", "X-LiteLLM-API-Key"],
       }),
     ).toEqual({
+      url: "https://example.com/jira",
+      type: "remote",
+      headers: { "x-company": "", "X-LiteLLM-API-Key": "" },
+      oauth: false,
+      disabled: false,
+    })
+  })
+
+  test.each([
+    ["required", true, {}],
+    ["optional opt-in", false, false],
+    ["legacy missing flag", undefined, false],
+  ] as const)("maps store OAuth requirement %s to explicit config", (_name, oauthRequired, oauth) => {
+    expect(
+      storeConfig({
+        name: "Jira",
+        url: "https://example.com/jira",
+        lockedHeaderNames: ["x-company"],
+        oauthRequired,
+      }),
+    ).toEqual({
       type: "remote",
       url: "https://example.com/jira",
-      headers: { "x-company": "", "X-LiteLLM-API-Key": "" },
+      headers: { "x-company": "" },
+      oauth,
       disabled: false,
     })
   })

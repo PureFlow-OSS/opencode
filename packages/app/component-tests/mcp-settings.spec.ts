@@ -1,5 +1,18 @@
 import { expect, story } from "../../storybook/playwright/story"
 
+story("keeps OAuth off when a remote PAT server has no OAuth configuration", async ({ mount, page }) => {
+  const component = await mount("settings-mcp-dialogs--remote-without-oauth")
+  await component.getByRole("button", { name: "Edit MCP server", exact: true }).click()
+  const dialog = page.getByRole("dialog")
+  await expect(dialog.getByRole("switch", { name: "OAuth", exact: true })).not.toBeChecked()
+  await expect(dialog.getByLabel("Client ID", { exact: true })).toHaveCount(0)
+  await dialog.getByRole("button", { name: "Save", exact: true }).click()
+  const saved = component.getByRole("status", { name: "Saved MCP configuration" })
+  await expect(saved).toContainText('"oauth":false')
+  expect(JSON.parse((await saved.textContent())!).config.headers).toEqual({ "X-ADO-PAT": "test-token" })
+  await expect(dialog).toHaveCount(0)
+})
+
 story("saves an installed store server without treating its existing name as a duplicate", async ({ mount, page }) => {
   const component = await mount("settings-mcp-dialogs--store-edit")
   await component.getByRole("button", { name: "Edit MCP server", exact: true }).click()

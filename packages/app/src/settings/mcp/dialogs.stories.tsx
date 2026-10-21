@@ -70,3 +70,12 @@ export const LocalEdit = {
     />
   ),
 }
+
+export const RemoteWithoutOauth = {
+  render: () => (
+    <FormStory
+      name="Company PAT"
+      config={{ type: "remote", url: "https://mcp.example/pat", headers: { "X-ADO-PAT": "test-token" } }}
+    />
+  ),
+}

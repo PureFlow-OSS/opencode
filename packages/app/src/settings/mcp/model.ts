@@ -67,6 +67,7 @@ export function storeConfig(item: Mcp.StoreItem): Mcp.RemoteConfig {
     type: "remote",
     url: item.url,
     headers: Object.fromEntries(item.lockedHeaderNames.map((header) => [header, ""])),
+    oauth: item.oauthRequired === true ? {} : false,
     disabled: false,
   }
 }

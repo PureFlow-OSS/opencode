@@ -136,6 +136,13 @@ const api = {
               description: "Search company documentation",
               url: "https://mcp.example/docs",
               lockedHeaderNames: ["x-company-token"],
+              oauthRequired: false,
+            },
+            {
+              name: "Company OAuth",
+              url: "https://mcp.example/oauth",
+              lockedHeaderNames: [],
+              oauthRequired: true,
             },
           ],
         },

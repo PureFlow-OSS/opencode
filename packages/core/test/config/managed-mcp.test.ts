@@ -198,6 +198,20 @@ test("MCP store decoding accepts updater header-name field", () => {
   ])
 })
 
+test("MCP store decoding preserves the OAuth required flag", () => {
+  expect(
+    ConfigManagedMcp.store([
+      { name: "Required", url: "https://example.com/required", lockedHeaderNames: [], oauthRequired: true },
+      { name: "Optional", url: "https://example.com/optional", lockedHeaderNames: [], oauthRequired: false },
+      { name: "Default", url: "https://example.com/default", lockedHeaderNames: [] },
+    ]),
+  ).toStrictEqual([
+    { name: "Required", url: "https://example.com/required", lockedHeaderNames: [], oauthRequired: true },
+    { name: "Optional", url: "https://example.com/optional", lockedHeaderNames: [], oauthRequired: false },
+    { name: "Default", url: "https://example.com/default", lockedHeaderNames: [] },
+  ])
+})
+
 test("MCP catalog combines managed servers and store items", () => {
   expect(
     ConfigManagedMcp.catalog({

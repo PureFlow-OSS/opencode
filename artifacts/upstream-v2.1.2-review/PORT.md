@@ -261,3 +261,22 @@ bei Ablehnung, erhaltene Eingaben, erfolgreiche Zustimmung, abgebrochenes Lösch
 und Trennen, Hinzufügen während einer aktiven Session und bestehende Editierfälle.
 Die Korrektur wurde nicht gebaut oder paketiert; App und Server bleiben unverändert
 in Betrieb, bis der Nutzer einen neuen Desktop-/CLI-Build verwendet.
+
+### OAuth-Vorgabe aus dem MCP Store
+
+Der lokale Store liefert für TiRex2 und rrz-devops `oauthRequired: false` und für
+alfresco `true`. Das Feld fehlte im öffentlichen Store-Schema und ging dadurch beim
+Decodieren verloren. Es ist jetzt optional im Schema enthalten; der Client wurde
+mit `bun run generate` aus `packages/client` neu generiert.
+
+Store-Installationen setzen OAuth nur bei `oauthRequired: true` auf aktiv und sonst
+explizit auf `false`. Ein Remote-Formular ohne OAuth-Konfiguration startet ebenfalls
+mit ausgeschaltetem OAuth statt fehlende Angaben als aktiv zu interpretieren.
+Explizit vorhandene OAuth-Konfigurationen bleiben erhalten; bestehende Dateien oder
+Sitzungsdaten wurden nicht automatisch geändert.
+
+Verifiziert: zehn Core-Decoder-/Store-Tests, zwölf App-Modell-/Operationstests,
+fünf Browser-Komponententests und die Typechecks von Schema, Core und App.
+Der Browser prüft beide Store-Vorgaben, die OAuth-freie Bearbeitung eines PAT-MCPs
+mit erhaltenem Header und die vorherige Bestätigungslogik bei laufenden Sessions.
+Kein Gesamtbuild, keine Paketierung und kein Neustart wurden ausgeführt.

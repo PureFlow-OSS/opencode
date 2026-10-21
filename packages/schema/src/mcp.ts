@@ -95,6 +95,9 @@ export const StoreItem = Schema.Struct({
   url: Schema.String,
   lockedHeaderNames: Schema.Array(Schema.String),
   headerPlaceholder: Schema.String.pipe(optional),
+  oauthRequired: Schema.Boolean.pipe(optional).annotate({
+    description: "Whether the store item requires OAuth authentication. Defaults to false.",
+  }),
 }).annotate({ identifier: "Mcp.StoreItem" })
 
 export interface ManagedCatalog extends Schema.Schema.Type<typeof ManagedCatalog> {}

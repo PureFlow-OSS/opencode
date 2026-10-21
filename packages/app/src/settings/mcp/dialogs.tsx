@@ -105,7 +105,7 @@ export const DialogMcpForm: Component<{
     command: props.config?.type === "local" ? formatCommand(props.config.command) : "",
     url: props.config?.type === "remote" ? props.config.url : "",
     headers: headersFromRecord(props.config?.type === "remote" ? props.config.headers : undefined),
-    oauthEnabled: props.config?.type === "remote" && props.config.oauth !== false,
+    oauthEnabled: props.config?.type === "remote" && !!props.config.oauth,
     oauth:
       props.config?.type === "remote" && !!props.config.oauth
         ? {
