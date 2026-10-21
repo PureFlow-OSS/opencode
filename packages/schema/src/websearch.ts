@@ -2,6 +2,8 @@ export * as WebSearch from "./websearch.js"
 
 import { Schema } from "effect"
 import { ephemeral, inventory } from "./event.js"
+import type { Model } from "./model.js"
+import type { Session } from "./session.js"
 import { optional } from "./schema.js"
 
 export const ID = Schema.String.pipe(Schema.brand("WebSearch.ID"), Schema.annotate({ identifier: "WebSearch.ID" }))
@@ -19,6 +21,10 @@ export const Input = Schema.Struct({
   providerID: ID.pipe(optional),
 }).annotate({ identifier: "WebSearch.Input" })
 export type ProviderInput = Pick<Input, "query">
+export interface ProviderContext {
+  readonly sessionID?: Session.ID
+  readonly model?: Model.Ref
+}
 
 export interface Result extends Schema.Schema.Type<typeof Result> {}
 export const Result = Schema.Struct({

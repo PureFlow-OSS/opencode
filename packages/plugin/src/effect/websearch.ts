@@ -6,7 +6,10 @@ import type { Transform } from "./registration.js"
 export interface WebSearchDefinition {
   readonly id: string
   readonly name: string
-  readonly execute: (input: WebSearch.ProviderInput) => Effect.Effect<readonly WebSearch.Result[], unknown>
+  readonly execute: (
+    input: WebSearch.ProviderInput,
+    context: WebSearch.ProviderContext,
+  ) => Effect.Effect<readonly WebSearch.Result[], unknown>
 }
 
 export interface WebSearchDomain extends WebSearchApi<unknown> {

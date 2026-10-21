@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect } from "bun:test"
 import { Effect } from "effect"
+import { Model } from "@opencode/schema/model"
+import { Session } from "@opencode/schema/session"
 import { Integration } from "@opencode/core/integration"
 import { WebSearch } from "@opencode/core/websearch"
 import { WebSearchExa } from "@opencode/core/plugin/websearch/exa"
@@ -15,6 +17,7 @@ import {
   setResponseHeaders,
   webSearchIntegrationTest,
 } from "./websearch-fixture"
+import { withEnv } from "../fixture/env"
 
 beforeEach(() => {
   resetWebSearchFixture(
@@ -284,6 +287,93 @@ describe("built-in web search providers", () => {
         headers: { authorization: "Bearer tavily-secret", "x-client-name": "opencode2" },
       })
       expect(requests[1]?.headers["x-tavily-access-mode"]).toBeUndefined()
+    }),
+  )
+
+  it.effect("sends the Parallel session and model context", () =>
+    Effect.gen(function* () {
+      resetWebSearchFixture(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          result: {
+            content: [{ type: "text", text: "search results" }],
+            structuredContent: {
+              search_id: "search_1",
+              results: [
+                {
+                  url: "https://effect.website",
+                  title: "Effect",
+                  publish_date: null,
+                  excerpts: ["Effect documentation"],
+                },
+              ],
+              warnings: null,
+              usage: null,
+              session_id: "ses_context",
+            },
+          },
+        }),
+      )
+      const integrations = yield* Integration.Service
+      const websearch = yield* WebSearch.Service
+      yield* WebSearchParallel.Plugin.effect(
+        host({ integration: integrationHost(integrations), websearch: webSearchHost(websearch) }),
+      )
+
+      yield* websearch.query(
+        { query: "effect layers", providerID: WebSearch.ID.make("parallel") },
+        {
+          sessionID: Session.ID.make("ses_context"),
+          model: Model.Ref.make({
+            providerID: Model.Ref.parse("provider/model").providerID,
+            id: Model.ID.make("m".repeat(150)),
+          }),
+        },
+      )
+
+      expect(requests[0]?.body).toMatchObject({
+        params: {
+          arguments: {
+            session_id: "ses_context",
+            model_name: "m".repeat(100),
+          },
+        },
+      })
+    }),
+  )
+
+  it.effect("lets the legacy provider environment override the stored selection", () =>
+    Effect.gen(function* () {
+      const integrations = yield* Integration.Service
+      const websearch = yield* WebSearch.Service
+      yield* WebSearchExa.Plugin.effect(
+        host({ integration: integrationHost(integrations), websearch: webSearchHost(websearch) }),
+      )
+      yield* WebSearchParallel.Plugin.effect(
+        host({ integration: integrationHost(integrations), websearch: webSearchHost(websearch) }),
+      )
+      yield* websearch.select(WebSearch.ID.make("exa"))
+      resetWebSearchFixture(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          result: {
+            content: [{ type: "text", text: "search results" }],
+            structuredContent: {
+              search_id: "search_1",
+              results: [],
+              session_id: "ses_context",
+            },
+          },
+        }),
+      )
+
+      yield* withEnv({ OPENCODE_WEBSEARCH_PROVIDER: "parallel" }, () => websearch.query({ query: "effect layers" }))
+
+      expect(requests[0]?.body).toMatchObject({
+        params: { name: "web_search" },
+      })
     }),
   )
 

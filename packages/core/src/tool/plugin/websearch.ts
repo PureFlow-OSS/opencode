@@ -56,14 +56,20 @@ export const Plugin = {
                 source: { type: "tool", messageID: context.messageID, id: context.id },
               })
               const search = (providerID?: WebSearch.ID) =>
-                websearch.query(
-                  { ...input, providerID },
-                  {
-                    sessionID: context.sessionID,
-                    onProvider: (provider) => context.progress({ provider: provider.id }),
-                  },
-                )
-              const result = yield* search().pipe(
+                Effect.gen(function* () {
+                  const session = yield* ctx.session
+                    .get({ sessionID: context.sessionID })
+                    .pipe(Effect.orElseSucceed(() => undefined))
+                  return yield* websearch.query(
+                    { ...input, providerID },
+                    {
+                      sessionID: context.sessionID,
+                      model: session?.model,
+                      onProvider: (provider) => context.progress({ provider: provider.id }),
+                    },
+                  )
+                })
+              const result = yield* search(undefined).pipe(
                 Effect.catchTag("WebSearch.ProviderRequired", () => {
                   return providerSelectionLock
                     .withPermit(
@@ -142,7 +148,9 @@ export const Plugin = {
                         duration: "1 minute",
                         orElse: () => Effect.fail(new Error("Web search cancelled")),
                       }),
-                      Effect.flatMap(search),
+                      Effect.flatMap((providerID) =>
+                        search(providerID === undefined ? undefined : WebSearch.ID.make(providerID)),
+                      ),
                     )
                 }),
               )

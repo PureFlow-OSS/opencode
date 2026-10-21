@@ -2,6 +2,7 @@ export * as WebSearch from "./websearch.js"
 
 import { WebSearch } from "@opencode/schema/websearch"
 import type { Session } from "@opencode/schema/session"
+import type { Model } from "@opencode/schema/model"
 import { SessionEvent } from "@opencode/schema/session-event"
 import { Clock, Context, Effect, Layer, Option, Schema, Stream } from "effect"
 import { HttpClientError } from "effect/http"
@@ -32,8 +33,16 @@ export const ProviderKey = "websearch:provider"
 export const Selection = Schema.Union([ID, Schema.Literal("random"), Schema.Literal(false)])
 export type Selection = typeof Selection.Type
 
+export function legacySelection(): ID | undefined {
+  const value = process.env.OPENCODE_WEBSEARCH_PROVIDER
+  return value === "exa" || value === "parallel" ? ID.make(value) : undefined
+}
+
 export interface ProviderImplementation extends Provider {
-  readonly execute: (input: ProviderInput) => Effect.Effect<readonly Result[], unknown>
+  readonly execute: (
+    input: ProviderInput,
+    context: WebSearch.ProviderContext,
+  ) => Effect.Effect<readonly Result[], unknown>
 }
 
 export class ProviderRequiredError extends Schema.TaggedError<ProviderRequiredError>()(
@@ -62,6 +71,7 @@ export interface Interface extends State.Transformable<Editor> {
     input: Input,
     options?: {
       readonly sessionID?: Session.ID
+      readonly model?: Model.Ref
       readonly onProvider?: (provider: Provider) => Effect.Effect<void>
     },
   ) => Effect.Effect<Response, Error>
@@ -175,7 +185,9 @@ const layer = Layer.effect(
         yield* kv.set(ProviderKey, selection)
       }),
       query: Effect.fn("WebSearch.query")(function* (input, options) {
-        const choice = input.providerID ? undefined : yield* selection()
+        const storedChoice = input.providerID ? undefined : yield* selection()
+        const override = legacySelection()
+        const choice = override !== undefined && state.get().providers.has(override) ? override : storedChoice
         let provider = input.providerID
           ? yield* requireProvider(state.get().providers, input.providerID)
           : yield* defaultProvider(choice)
@@ -193,7 +205,7 @@ const layer = Layer.effect(
           if (!cooldown || cooldown.until <= (yield* Clock.currentTimeMillis)) {
             attempted.add(provider.id)
             const result = yield* provider
-              .execute({ query: input.query })
+              .execute({ query: input.query }, { sessionID: options?.sessionID, model: options?.model })
               .pipe(Effect.flatMap(decodeResults), Effect.result)
             if (result._tag === "Success") return new Response({ providerID: provider.id, results: result.success })
             const cause = result.failure

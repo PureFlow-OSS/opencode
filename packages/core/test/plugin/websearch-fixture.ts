@@ -6,6 +6,7 @@ import { Credential } from "@opencode/core/credential"
 import { Config } from "@opencode/core/config"
 import { Bus } from "@opencode/core/bus"
 import { Form } from "@opencode/core/form"
+import { AppProcess } from "@opencode/util/process"
 import { Integration } from "@opencode/core/integration"
 import { WebSearch } from "@opencode/core/websearch"
 import { testEffect } from "../lib/effect"
@@ -55,9 +56,10 @@ const http = Layer.succeed(
 
 export const webSearchIntegrationTest = testEffect(
   Layer.merge(
-    AppNodeBuilder.build(LayerNode.group([Integration.node, Credential.node, Bus.node, Form.node, WebSearch.node]), [
-      Config.node.replace(Config.testLayer()),
-    ]),
+    AppNodeBuilder.build(
+      LayerNode.group([Integration.node, Credential.node, Bus.node, Form.node, WebSearch.node, AppProcess.node]),
+      [Config.node.replace(Config.testLayer())],
+    ),
     http,
   ),
 )
