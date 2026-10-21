@@ -92,6 +92,95 @@ const provider = {
 }
 
 describe("Config", () => {
+  test("preserves corporate provider, proxy and updater configuration during normalization", () => {
+    const corporate = {
+      aifactory_host: "https://factory.example/v1",
+      aifactory: { model_limits: [{ pattern: "*", context: 64000 }] },
+      use_http_proxy: false,
+      http_proxy: "http://proxy.example:8080",
+      updater: "https://updates.example/opencode",
+    }
+    expect(migrateV1(corporate)).toEqual(corporate)
+  })
+
+  it.live("authenticates central defaults without overriding local or system configuration", () =>
+    Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
+      Effect.flatMap((tmp) =>
+        Effect.gen(function* () {
+          const requests: (string | null)[] = []
+          const server = Bun.serve({
+            hostname: "127.0.0.1",
+            port: 0,
+            fetch: (request) => {
+              requests.push(request.headers.get("X-OpenCode-AiFactory-Api-Key"))
+              return Response.json({
+                Updater: {
+                  ProviderConfig: {
+                    model: "central-model",
+                    small_model: "central-title",
+                    aifactory_host: "https://central.example/v1",
+                    mcp: { docs: { type: "remote", url: "https://docs.example/mcp" } },
+                  },
+                },
+              })
+            },
+          })
+          yield* Effect.addFinalizer(() => Effect.sync(() => server.stop(true)))
+          const untrusted = Bun.serve({
+            hostname: "127.0.0.1",
+            port: 0,
+            fetch: () => {
+              requests.push("project endpoint received credentials")
+              return Response.json({})
+            },
+          })
+          yield* Effect.addFinalizer(() => Effect.sync(() => untrusted.stop(true)))
+          const global = path.join(tmp.path, "global")
+          const system = path.join(tmp.path, "system")
+          yield* Effect.promise(() => Promise.all([fs.mkdir(global), fs.mkdir(system)]))
+          yield* Effect.promise(() =>
+            Promise.all([
+              fs.writeFile(path.join(tmp.path, "opencode.json"), JSON.stringify({ updater: untrusted.url.toString() })),
+              fs.writeFile(
+                path.join(global, "opencode.json"),
+                JSON.stringify({
+                  updater: `${server.url}opencode`,
+                  use_http_proxy: false,
+                  model: "aifactory/local-model",
+                  providers: { aifactory: { settings: { apiKey: "managed-config-test-key" } } },
+                }),
+              ),
+              fs.writeFile(
+                path.join(system, "opencode.json"),
+                JSON.stringify({
+                  aifactory_host: "https://system.example/v1",
+                  providers: { aifactory: { settings: { timeout: 3000 } } },
+                }),
+              ),
+            ]),
+          )
+          yield* Effect.gen(function* () {
+            const config = yield* Config.Service
+            const entries = yield* config.entries()
+            expect(Config.latest(entries, "model")).toEqual(selection("aifactory/local-model"))
+            expect(Config.latest(entries, "aifactory_host")).toBe("https://system.example/v1")
+            expect(Config.latest(entries, "agents")?.title?.model).toEqual(selection("aifactory/central-title"))
+            expect(Config.latest(entries, "mcp")?.servers?.docs?.type).toBe("remote")
+            expect(requests).toEqual(["managed-config-test-key"])
+            expect((yield* config.corporate!()).updater).toBe(`${server.url}opencode`)
+          }).pipe(
+            Effect.provide(
+              testLayer(tmp.path, global, tmp.path, undefined, undefined, undefined, undefined, {
+                project: true,
+                system,
+              }),
+            ),
+          )
+        }),
+      ),
+    ),
+  )
+
   it.live("excludes home-level claude and agents directories when global is disabled", () =>
     Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
       Effect.flatMap((tmp) => {
@@ -110,7 +199,9 @@ describe("Config", () => {
               // The fixture is real: with global enabled the walk finds both.
               const config = yield* Config.Service
               const compatibility = yield* config.compatibility!()
-              expect([...compatibility.claude, ...compatibility.agents]).toHaveLength(2)
+              expect(
+                [...compatibility.claude, ...compatibility.agents].filter((item) => inFixture(tmp.path, item)),
+              ).toHaveLength(2)
             }).pipe(Effect.provide(testLayer(project, global))),
           ),
           Effect.andThen(
@@ -119,7 +210,11 @@ describe("Config", () => {
             // project walk enabled.
             Effect.gen(function* () {
               const config = yield* Config.Service
-              expect(yield* config.compatibility!()).toEqual({ claude: [], agents: [] })
+              const compatibility = yield* config.compatibility!()
+              expect({
+                claude: compatibility.claude.filter((item) => inFixture(tmp.path, item)),
+                agents: compatibility.agents.filter((item) => inFixture(tmp.path, item)),
+              }).toEqual({ claude: [], agents: [] })
               const watcher = yield* Watcher.Test
               expect(
                 (yield* watcher.subscriptions()).filter((watch) => watch.type === "entries" && watch.path === home),
@@ -215,37 +310,35 @@ describe("Config", () => {
 
   // Filesystem sandboxes deny reads outside the project. Simulate a denied discovery root with a
   // symlink into an unsearchable directory, which makes realpath fail with EACCES.
-  itWithPermissions(
-    "treats unreadable discovery roots as absent",
-    () =>
-      Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
-        Effect.flatMap((tmp) => {
-          const global = path.join(tmp.path, "global")
-          const home = path.join(global, "home")
-          const project = path.join(home, "project")
-          const locked = path.join(tmp.path, "locked")
-          return Effect.promise(async () => {
-            await fs.mkdir(path.join(locked, "agents"), { recursive: true })
-            await fs.mkdir(project, { recursive: true })
-            await fs.writeFile(path.join(project, "opencode.json"), JSON.stringify({ shell: "project" }))
-            await fs.symlink(path.join(locked, "agents"), path.join(home, ".agents"))
-            await fs.symlink(path.join(locked, "agents"), path.join(project, ".opencode"))
-            await fs.chmod(locked, 0o000)
-          }).pipe(
-            Effect.andThen(Effect.addFinalizer(() => Effect.promise(() => fs.chmod(locked, 0o755)))),
-            Effect.andThen(
-              Effect.gen(function* () {
-                const config = yield* Config.Service
-                const entries = yield* config.entries()
-                expect(entries.flatMap((entry) => (entry.type === "document" ? [entry.info.shell] : []))).toEqual([
-                  "project",
-                ])
-              }).pipe(Effect.provide(testLayer(project, global))),
-            ),
-            Effect.scoped,
-          )
-        }),
-      ),
+  itWithPermissions("treats unreadable discovery roots as absent", () =>
+    Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
+      Effect.flatMap((tmp) => {
+        const global = path.join(tmp.path, "global")
+        const home = path.join(global, "home")
+        const project = path.join(home, "project")
+        const locked = path.join(tmp.path, "locked")
+        return Effect.promise(async () => {
+          await fs.mkdir(path.join(locked, "agents"), { recursive: true })
+          await fs.mkdir(project, { recursive: true })
+          await fs.writeFile(path.join(project, "opencode.json"), JSON.stringify({ shell: "project" }))
+          await fs.symlink(path.join(locked, "agents"), path.join(home, ".agents"))
+          await fs.symlink(path.join(locked, "agents"), path.join(project, ".opencode"))
+          await fs.chmod(locked, 0o000)
+        }).pipe(
+          Effect.andThen(Effect.addFinalizer(() => Effect.promise(() => fs.chmod(locked, 0o755)))),
+          Effect.andThen(
+            Effect.gen(function* () {
+              const config = yield* Config.Service
+              const entries = yield* config.entries()
+              expect(entries.flatMap((entry) => (entry.type === "document" ? [entry.info.shell] : []))).toEqual([
+                "project",
+              ])
+            }).pipe(Effect.provide(testLayer(project, global))),
+          ),
+          Effect.scoped,
+        )
+      }),
+    ),
   )
 
   it.live("discovers the global config directory once when the project walk reaches it", () =>
@@ -662,15 +755,17 @@ describe("Config", () => {
               Credential.Service,
               Credential.Service.of({
                 all: () => Effect.die("unused Credential.all"),
-                list: () =>
-                  Effect.succeed([
-                    new Credential.Info({
-                      id: Credential.ID.create(),
-                      integrationID,
-                      label: "default",
-                      value: Credential.Key.make({ type: "key", key }),
-                    }),
-                  ]),
+                list: (id) =>
+                  id !== integrationID
+                    ? Effect.succeed([])
+                    : Effect.succeed([
+                        new Credential.Info({
+                          id: Credential.ID.create(),
+                          integrationID,
+                          label: "default",
+                          value: Credential.Key.make({ type: "key", key }),
+                        }),
+                      ]),
                 get: () => Effect.die("unused Credential.get"),
                 create: () => Effect.die("unused Credential.create"),
                 activate: () => Effect.die("unused Credential.activate"),
@@ -772,9 +867,9 @@ describe("Config", () => {
         const credentialNode = makeGlobalNode({
           service: Credential.Service,
           layer: Layer.mock(Credential.Service)({
-            list: () =>
+            list: (id) =>
               Effect.succeed(
-                key === undefined
+                key === undefined || id !== integrationID
                   ? []
                   : [
                       new Credential.Info({
@@ -911,15 +1006,17 @@ describe("Config", () => {
               Credential.Service,
               Credential.Service.of({
                 all: () => Effect.die("unused Credential.all"),
-                list: () =>
-                  Effect.succeed([
-                    new Credential.Info({
-                      id: Credential.ID.create(),
-                      integrationID,
-                      label: "default",
-                      value: Credential.Key.make({ type: "key", key: "wellknown-secret" }),
-                    }),
-                  ]),
+                list: (id) =>
+                  id !== integrationID
+                    ? Effect.succeed([])
+                    : Effect.succeed([
+                        new Credential.Info({
+                          id: Credential.ID.create(),
+                          integrationID,
+                          label: "default",
+                          value: Credential.Key.make({ type: "key", key: "wellknown-secret" }),
+                        }),
+                      ]),
                 get: () => Effect.die("unused Credential.get"),
                 create: () => Effect.die("unused Credential.create"),
                 activate: () => Effect.die("unused Credential.activate"),
@@ -1282,8 +1379,12 @@ describe("Config", () => {
             Effect.provide(testLayer(project, global)),
           )
 
-          expect(compatibility.claude).toEqual([AbsolutePath.make(path.join(home, ".claude"))])
-          expect(compatibility.agents).toEqual([AbsolutePath.make(path.join(home, ".agents"))])
+          expect(compatibility.claude.filter((item) => inFixture(tmp.path, item))).toEqual([
+            AbsolutePath.make(path.join(home, ".claude")),
+          ])
+          expect(compatibility.agents.filter((item) => inFixture(tmp.path, item))).toEqual([
+            AbsolutePath.make(path.join(home, ".agents")),
+          ])
         }),
       ),
     ),

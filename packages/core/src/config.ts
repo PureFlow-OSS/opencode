@@ -20,15 +20,50 @@ import { ConfigWatch } from "./config/watch.js"
 import { WellKnown } from "./wellknown.js"
 import { AppProcess } from "@opencode/util/process"
 import { ChildProcess } from "effect/process"
+import { ConfigManaged } from "./config/managed.js"
+import { HttpProxy } from "@opencode/util/http-proxy"
+import { Integration } from "@opencode/schema/integration"
+import { FetchHttpClient } from "effect/http"
 
 export function latest<K extends keyof Info>(entries: readonly Entry[], key: K): Info[K] | undefined {
   return entries.findLast((entry): entry is Document => entry.type === "document" && entry.info[key] !== undefined)
     ?.info[key]
 }
 
+export type Corporate = Pick<Info, "updater" | "aifactory_host" | "use_http_proxy" | "http_proxy" | "providers">
+
+export function corporateSettings(entries: readonly Entry[]): Corporate {
+  return {
+    updater: latest(entries, "updater"),
+    aifactory_host: latest(entries, "aifactory_host"),
+    use_http_proxy: latest(entries, "use_http_proxy"),
+    http_proxy: latest(entries, "http_proxy"),
+    providers: entries
+      .filter((entry) => entry.type === "document")
+      .reduce(
+        (providers, entry) => ({
+          ...providers,
+          ...Object.fromEntries(
+            Object.entries(entry.info.providers ?? {}).map(([id, provider]) => [
+              id,
+              {
+                ...providers[id],
+                ...provider,
+                settings: { ...providers[id]?.settings, ...provider.settings },
+              },
+            ]),
+          ),
+        }),
+        {} as NonNullable<Info["providers"]>,
+      ),
+  }
+}
+
 export interface Interface {
   /** Returns location config documents and discovery sources from lowest to highest priority. */
   readonly entries: () => Effect.Effect<Entry[]>
+  /** Trusted global, explicit and system settings; repository files cannot redirect corporate credentials. */
+  readonly corporate?: () => Effect.Effect<Corporate>
   /** Compatibility roots consumed by internal compatibility plugins. */
   readonly compatibility?: () => Effect.Effect<{
     readonly claude: readonly AbsolutePath[]
@@ -82,6 +117,7 @@ export const testLayer = (
       const updates = yield* PubSub.unbounded<Watcher.Update>()
       const service = Test.of({
         entries: () => Ref.get(entries),
+        corporate: () => Ref.get(entries).pipe(Effect.map(corporateSettings)),
         compatibility: () => Effect.succeed(compatibility),
         changes: () => Stream.fromPubSub(updates),
         setEntries: (next) => Ref.set(entries, next),
@@ -105,6 +141,7 @@ export const layer = (options?: Options) =>
       const processes = yield* AppProcess.Service
       const reloadLock = Semaphore.makeUnsafe(1)
       const updateLock = Semaphore.makeUnsafe(1)
+      const corporate = { current: {} as Corporate }
       const decodeOptions = { errors: "all", onExcessProperty: "ignore" } as const
       const decodeInfo = Schema.decodeUnknownOption(Info, decodeOptions)
       const parseInfo = Effect.fn("Config.parseInfo")(function* (text: string, source: string) {
@@ -278,7 +315,7 @@ export const layer = (options?: Options) =>
           Effect.orDie,
           Effect.map((entries) => entries.flat()),
         )
-        return [
+        const local = [
           ...managedPolicies,
           ...(yield* loadWellknown().pipe(Effect.orDie)),
           ...globalSupplementary,
@@ -288,6 +325,33 @@ export const layer = (options?: Options) =>
           ...content,
           ...managedSettings,
         ]
+        corporate.current = corporateSettings([...globalSupplementary, ...explicit, ...content, ...managedSettings])
+        HttpProxy.configure({
+          ...corporate.current,
+          use_http_proxy: corporate.current.use_http_proxy ?? true,
+          http_proxy: corporate.current.http_proxy || "http://webgwooe.rbgooe.at:8080",
+        })
+        if (options?.global === false) return local
+        const auth = (yield* credentials.list(Integration.ID.make("aifactory"))).at(-1)?.value
+        const settings = corporate.current
+        const request = ConfigManaged.providerConfigRequestInit({
+          config: settings,
+          auth: auth ? { aifactory: auth } : undefined,
+        })
+        if (!request.headers && !settings.updater && !process.env.OPENCODE_UPDATE_BASE_URL) return local
+        const fetch = yield* FetchHttpClient.Fetch
+        const remote = yield* Effect.promise(() =>
+          ConfigManaged.readProviderConfig(fetch === globalThis.fetch ? HttpProxy.fetch : fetch, request, settings),
+        )
+        const remoteInfo = yield* parseInfo(
+          JSON.stringify({
+            ...remote,
+            model: ConfigManaged.aiFactoryModel(remote.model),
+            small_model: ConfigManaged.aiFactoryModel(remote.small_model),
+          }),
+          ConfigManaged.providerConfigUrl(settings),
+        )
+        return remoteInfo ? [new Document({ type: "document", info: remoteInfo }), ...local] : local
       })
 
       const initial = yield* ConfigDiscovery.discover(options)
@@ -342,10 +406,12 @@ export const layer = (options?: Options) =>
       )
       yield* bus.subscribe(Credential.Event.Switched).pipe(
         Stream.filterEffect((event) =>
-          wellknown.entries().pipe(
-            Effect.map((entries) => entries.some((entry) => entry.integrationID === event.data.integrationID)),
-            Effect.orElseSucceed(() => false),
-          ),
+          event.data.integrationID === "aifactory"
+            ? Effect.succeed(true)
+            : wellknown.entries().pipe(
+                Effect.map((entries) => entries.some((entry) => entry.integrationID === event.data.integrationID)),
+                Effect.orElseSucceed(() => false),
+              ),
         ),
         Stream.runForEach(() =>
           reload().pipe(Effect.catchCause((cause) => Effect.logError("failed to reload wellknown config", { cause }))),
@@ -403,6 +469,7 @@ export const layer = (options?: Options) =>
       )
 
       return Service.of({
+        corporate: () => Effect.succeed(corporate.current),
         entries: Effect.fnUntraced(function* () {
           return configs
         }),

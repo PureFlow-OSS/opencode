@@ -110,6 +110,13 @@ export class Info extends Schema.Class<Info>("Config.Info")({
     description: "Keep recently active sessions warm with transient model requests (default: false)",
   }),
   providers: Schema.Record(Schema.String, ConfigProvider.Info).pipe(optional),
+  aifactory_host: Schema.String.pipe(optional),
+  aifactory: Schema.Record(Schema.String, Schema.Unknown).pipe(optional),
+  use_http_proxy: Schema.Boolean.pipe(optional).annotate({
+    description: "Use the corporate HTTP proxy (defaults to true); AI Factory and the updater connect directly.",
+  }),
+  http_proxy: Schema.String.pipe(optional),
+  updater: Schema.String.pipe(optional),
   experimental: ConfigExperimental.Info.pipe(optional),
 }) {}
 

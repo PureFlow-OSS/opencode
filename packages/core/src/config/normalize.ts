@@ -204,6 +204,11 @@ export function normalize(input: unknown): Result {
   if (model) encoded.model = { ...model, providerID: ConfigMigrateV1.providerID(model.providerID) }
 
   const nativeAtomic = {
+    aifactory_host: Info.fields.aifactory_host,
+    aifactory: Info.fields.aifactory,
+    use_http_proxy: Info.fields.use_http_proxy,
+    http_proxy: Info.fields.http_proxy,
+    updater: Info.fields.updater,
     $schema: Info.fields.$schema,
     shell: Info.fields.shell,
     default_agent: Info.fields.default_agent,
