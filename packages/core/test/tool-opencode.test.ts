@@ -37,6 +37,22 @@ const gammaOld = {
   status: "active",
 }
 
+const renameApprovals = {
+  assertions: [] as Permission.AssertInput[],
+  asks: [] as Parameters<Permission.Interface["ask"]>[0][],
+}
+const renameIt = testEffect(
+  makePluginTestLayer(
+    permissionLayer({
+      assert: (input) => Effect.sync(() => renameApprovals.assertions.push(input)),
+      ask: (input) =>
+        Effect.sync(() => renameApprovals.asks.push(input)).pipe(
+          Effect.as({ id: Permission.ID.create(), effect: "ask" }),
+        ),
+    }),
+  ),
+)
+
 it.effect("groups available models by provider with paging", () =>
   Effect.gen(function* () {
     const catalog = yield* Provider.Service
@@ -141,6 +157,34 @@ it.effect("groups available models by provider with paging", () =>
     })
     expect(yield* run({ query: "old" })).toMatchObject({ total: 1, providers: [{ models: [gammaOld] }] })
     expect(yield* run({ provider: "other", query: "alpha" })).toEqual({ providers: [], total: 0, next: null })
+  }),
+)
+
+renameIt.effect("renames the current session without requesting permission", () =>
+  Effect.gen(function* () {
+    const plugins = yield* Plugin.Service
+    const sessions = yield* Session.Service
+    const location = yield* Location.Service
+    yield* OpenCodeTools.Plugin.effect(yield* PluginHost.make(plugins))
+    const session = yield* sessions.create({ location: Location.Ref.make({ directory: location.directory }) })
+    const registry = yield* Tool.Service
+    const result = yield* executeTool(registry, {
+      sessionID: session.id,
+      ...toolIdentity,
+      call: {
+        type: "tool-call",
+        id: "call-session-rename",
+        name: "execute",
+        input: { code: 'return await tools.opencode.session_rename({ title: "  Upstream rename  " })' },
+      },
+    })
+
+    expect(JSON.parse(result.content?.[0]?.type === "text" ? result.content[0].text : "{}")).toEqual({
+      sessionID: session.id,
+      title: "Upstream rename",
+    })
+    expect((yield* sessions.get(session.id)).title).toBe("Upstream rename")
+    expect(renameApprovals).toEqual({ assertions: [], asks: [] })
   }),
 )
 
