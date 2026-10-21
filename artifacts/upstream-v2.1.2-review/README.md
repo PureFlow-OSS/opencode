@@ -1,5 +1,8 @@
 # Upstream-Prüfung v2.1.2
 
+Dies ist die ursprüngliche Merge-Einschätzung vor Beginn des Ports. Den aktuellen
+Migrationsumfang und Prüfstand dokumentiert [PORT.md](PORT.md).
+
 Stand: 21. Oktober 2026. Ergebnis: **Kein problemloser Gesamtmerge auf 2.1.2. Gezielte Übernahmen sind möglich.**
 
 ## Grundlage
