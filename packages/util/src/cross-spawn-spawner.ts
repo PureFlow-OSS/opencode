@@ -18,6 +18,7 @@ import { PassThrough } from "node:stream"
 import launch from "cross-spawn"
 import { makeGlobalNode } from "./effect/app-node.js"
 import { filesystem, path } from "./effect/app-node-platform.js"
+import { HttpProxy } from "./http-proxy.js"
 
 const toError = (err: unknown): Error => (err instanceof globalThis.Error ? err : new globalThis.Error(String(err)))
 
@@ -108,7 +109,9 @@ const makeCrossSpawnSpawner = Effect.gen(function* () {
   })
 
   const env = (opts: ChildProcess.CommandOptions) =>
-    opts.extendEnv ? { ...globalThis.process.env, ...opts.env } : opts.env
+    opts.extendEnv || opts.env === undefined
+      ? { ...globalThis.process.env, ...HttpProxy.environment(), ...opts.env }
+      : opts.env
 
   const input = (x: ChildProcess.CommandInput | undefined): NodeChildProcess.IOType | undefined =>
     Stream.isStream(x) ? "pipe" : x

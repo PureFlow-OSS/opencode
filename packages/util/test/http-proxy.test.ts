@@ -5,10 +5,52 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
 import { HttpProxy } from "../src/http-proxy.js"
+import { AppProcess } from "../src/process.js"
+import { LayerNode } from "../src/effect/layer-node.js"
+import { Effect } from "effect"
+import { ChildProcess } from "effect/process"
+import { NpmConfig } from "../src/npm-config.js"
 
 afterEach(() => HttpProxy.configure({}))
 
 describe("corporate HTTP proxy", () => {
+  test("exports configuration to subprocesses without changing the host environment", async () => {
+    const names = [
+      "HTTP_PROXY",
+      "HTTPS_PROXY",
+      "http_proxy",
+      "https_proxy",
+      "ALL_PROXY",
+      "all_proxy",
+      "NO_PROXY",
+      "no_proxy",
+    ]
+    const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]))
+    HttpProxy.configure({
+      use_http_proxy: true,
+      http_proxy: "http://proxy.example:8080",
+      aifactory_host: "https://factory.example",
+    })
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        "-e",
+        "console.log(JSON.stringify({ proxy: process.env.HTTPS_PROXY, bypass: process.env.NO_PROXY }))",
+      ],
+      { env: { ...process.env, ...HttpProxy.environment() }, stdout: "pipe", stderr: "pipe" },
+    )
+    const [text, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
+    expect(code).toBe(0)
+    expect(JSON.parse(text)).toMatchObject({ proxy: "http://proxy.example:8080" })
+    expect(JSON.parse(text).bypass.split(",")).toContain("factory.example")
+    HttpProxy.configure({ use_http_proxy: false })
+    expect(HttpProxy.environment().HTTP_PROXY).toBeUndefined()
+    expect(HttpProxy.environment().HTTPS_PROXY).toBeUndefined()
+    expect(HttpProxy.environment().NO_PROXY).toBe("*")
+    HttpProxy.configure({})
+    expect(Object.fromEntries(names.map((name) => [name, process.env[name]]))).toEqual(previous)
+  })
+
   test("routes external requests while bypassing AI Factory and local services", () => {
     HttpProxy.configure({
       use_http_proxy: true,
@@ -21,6 +63,69 @@ describe("corporate HTTP proxy", () => {
     expect(HttpProxy.proxyFor("http://127.0.0.1:4096/api")).toBeUndefined()
     HttpProxy.configure({ use_http_proxy: false, http_proxy: "http://proxy.example:8080" })
     expect(HttpProxy.proxyFor("https://external.example/chat")).toBeUndefined()
+  })
+
+  test("passes the corporate proxy through the real process spawner", async () => {
+    HttpProxy.configure({ use_http_proxy: true, http_proxy: "http://proxy.example:8080" })
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const processes = yield* AppProcess.Service
+        return yield* processes.run(ChildProcess.make(process.execPath, ["-e", "console.log(process.env.HTTPS_PROXY)"]))
+      }).pipe(Effect.provide(LayerNode.compile(AppProcess.node))),
+    )
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout.toString().trim()).toBe("http://proxy.example:8080")
+  })
+
+  test("applies proxy enablement to npm configuration without mutating process.env", async () => {
+    HttpProxy.configure({ use_http_proxy: true, http_proxy: "http://proxy.example:8080" })
+    const enabled = await Effect.runPromise(NpmConfig.load(import.meta.dir))
+    expect(enabled.proxy).toBe("http://proxy.example:8080")
+    expect(enabled.httpsProxy).toBe("http://proxy.example:8080")
+    HttpProxy.configure({ use_http_proxy: false })
+    expect((await Effect.runPromise(NpmConfig.load(import.meta.dir))).noProxy).toBe("*")
+  })
+
+  test("bypassed requests ignore inherited proxy environment variables", async () => {
+    const inherited = {
+      HTTP_PROXY: "http://inherited-proxy.example:8080",
+      HTTPS_PROXY: "http://inherited-proxy.example:8080",
+      http_proxy: "http://inherited-proxy.example:8080",
+      https_proxy: "http://inherited-proxy.example:8080",
+      ALL_PROXY: "http://inherited-proxy.example:8080",
+      all_proxy: "http://inherited-proxy.example:8080",
+    }
+    const requests: string[] = []
+    const origin = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: (request) => {
+        requests.push(request.url)
+        return Response.json({ direct: true })
+      },
+    })
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        "-e",
+        `
+        const { HttpProxy } = await import(${JSON.stringify(pathToFileURL(path.join(import.meta.dir, "../src/http-proxy.ts")).href)})
+        HttpProxy.configure({ use_http_proxy: true, http_proxy: "http://proxy.example:8080", updater: ${JSON.stringify(origin.url.toString())} })
+        const response = await HttpProxy.fetch(${JSON.stringify(origin.url.toString())} + "provider-config.json")
+        console.log(JSON.stringify(await response.json()))
+      `,
+      ],
+      { env: { ...process.env, ...inherited }, stdout: "pipe", stderr: "pipe" },
+    )
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ])
+    expect(code, stderr).toBe(0)
+    expect(JSON.parse(stdout)).toEqual({ direct: true })
+    expect(requests).toEqual([`${origin.url}provider-config.json`])
+    origin.stop(true)
   })
 
   test.each(["bun", "node"] as const)("performs a real %s request through the configured proxy", async (runtime) => {
