@@ -4,16 +4,41 @@ import { access } from "node:fs/promises"
 import { copyFile, mkdtemp } from "node:fs/promises"
 import path from "node:path"
 import { HttpProxy } from "@opencode/util/http-proxy"
-import pkg from "electron-updater"
+import electronUpdater, { NsisUpdater } from "electron-updater"
 import { Effect } from "effect"
 import { fetchCorporateUpdate, isUpdateNewer, type CorporateSettings } from "./corporate"
+import { updateAppAdapter, updateCacheDirectory } from "./cache"
 import type { Platform } from "./machine"
-
-const updateClient = pkg.autoUpdater
 
 const restartTimeout = 10_000
 
 const windowsInstallDirectory = "C:/Entwicklung/OpenCode"
+const updateClient = process.platform === "win32" ? windowsUpdateClient() : electronUpdater.autoUpdater
+
+function windowsUpdateClient() {
+  const cacheDirectory = updateCacheDirectory({
+    platform: process.platform,
+    installDirectory: windowsInstallDirectory,
+  })
+  if (!cacheDirectory) return electronUpdater.autoUpdater
+
+  return new NsisUpdater(
+    null,
+    updateAppAdapter({
+      cacheDirectory,
+      resourcesPath: process.resourcesPath,
+      appPath: app.getAppPath(),
+      version: app.getVersion(),
+      name: app.getName(),
+      isPackaged: app.isPackaged,
+      userDataPath: app.getPath("userData"),
+      whenReady: () => app.whenReady(),
+      relaunch: () => app.relaunch(),
+      quit: () => app.quit(),
+      onQuit: (handler) => app.once("quit", (_event, exitCode) => handler(exitCode)),
+    }),
+  )
+}
 
 export const make = Effect.fn("Updater.platform")(function* (input: {
   readonly channel: string
@@ -141,34 +166,38 @@ function installAndRestart(windowsInstaller: { current?: string }) {
     if (process.platform === "win32") {
       const installer = windowsInstaller.current
       if (!installer) resume(Effect.fail(new Error("Windows update is not staged")))
-      else startWindowsHelper(installer).then(() => resume(Effect.void), (error) => resume(Effect.fail(error)))
+      else
+        startWindowsHelper(installer).then(
+          () => resume(Effect.void),
+          (error) => resume(Effect.fail(error)),
+        )
 
       return Effect.sync(() => {})
     }
 
     const cleanup = () => {
-    autoUpdater.removeListener("before-quit-for-update", started)
-    updateClient.removeListener("error", fail)
-  }
+      autoUpdater.removeListener("before-quit-for-update", started)
+      updateClient.removeListener("error", fail)
+    }
 
     const started = () => {
-    cleanup()
-    resume(Effect.void)
-  }
+      cleanup()
+      resume(Effect.void)
+    }
 
     const fail = (error: Error) => {
-    cleanup()
-    resume(Effect.fail(error))
-  }
+      cleanup()
+      resume(Effect.fail(error))
+    }
 
-  autoUpdater.once("before-quit-for-update", started)
-  updateClient.once("error", fail)
+    autoUpdater.once("before-quit-for-update", started)
+    updateClient.once("error", fail)
 
-  try {
-    updateClient.quitAndInstall()
-  } catch (error) {
-    fail(error instanceof Error ? error : new Error(String(error)))
-  }
+    try {
+      updateClient.quitAndInstall()
+    } catch (error) {
+      fail(error instanceof Error ? error : new Error(String(error)))
+    }
 
     return Effect.sync(cleanup)
   }).pipe(
@@ -191,14 +220,7 @@ async function startWindowsHelper(installer: string) {
   await copyFile(helper, stagedHelper)
   const child = spawn(
     stagedHelper,
-    [
-      "--parent-pid",
-      String(process.pid),
-      "--installer-path",
-      installer,
-      "--install-dir",
-      windowsInstallDirectory,
-    ],
+    ["--parent-pid", String(process.pid), "--installer-path", installer, "--install-dir", windowsInstallDirectory],
     { detached: true, stdio: "ignore", windowsHide: true },
   )
   await new Promise<void>((resolve, reject) => {

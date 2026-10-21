@@ -65,6 +65,9 @@ export default defineConfig(({ command }) => {
         OPENCODE_UPDATE_BASE_URL: process.env.OPENCODE_UPDATE_BASE_URL
           ? JSON.stringify(process.env.OPENCODE_UPDATE_BASE_URL)
           : "undefined",
+        OPENCODE_UPDATE_CACHE_DIR: process.env.OPENCODE_UPDATE_CACHE_DIR
+          ? JSON.stringify(process.env.OPENCODE_UPDATE_CACHE_DIR)
+          : "undefined",
       },
       build: {
         minify: command === "build",

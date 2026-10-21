@@ -85,6 +85,33 @@ keine Abhängigkeitsversionen oder globalen Git-Einstellungen geändert.
 
 ## Verbleibende Prüfung und Grenzen
 
+### Lokaler Windows-Build
+
+Der Einstieg `script/package-desktop-electron-win.ps1 -WorkingDirectory ./packages/desktop`
+ist auf V2 portiert. Ohne explizites `OPENCODE_CLI_DIST` baut er die lokale Windows-x64-Baseline-CLI;
+bei Wiederverwendung müssen CLI- und Desktop-Version übereinstimmen. Er verwendet Bun 1.4.2,
+baut Desktop und Helfer und paketiert ohne Veröffentlichung. Selbst gesetzte Versions- und
+CLI-Variablen werden danach wiederhergestellt.
+
+Key-Vault-Aliase (`KEYVAULT_URL`, `CERT_ALIAS`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`,
+`AZURE_TENANT_ID`) funktionieren auch lokal. Signierung erfolgt vor dem Erzeugen der
+Update-Metadaten mit SHA-256. Unvollständige Signierkonfiguration und Werkzeugfehler brechen ab.
+`OPENCODE_ELECTRON_OUTPUT_DIR` steuert die Ausgabe; Update-URL und Windows-Cachepfad werden
+in den Desktop eingebettet. Der Cachepfad kann `C:/Entwicklung` sein und bleibt außerhalb
+des vom Helfer bereinigten Installationsverzeichnisses.
+
+Verifiziert: vollständiger unsignierter PowerShell-Build mit vorhandener lokaler V2-CLI,
+NSIS-Installer (281.369.216 Bytes), Blockmap und `latest.yml`; SHA-512 und Größe stimmen
+mit den Metadaten überein. Alle 646 Main-Prozess-Chunks im App-Archiv stimmen mit der
+Build-Ausgabe überein; lokale Update-URL und Cachepfad sind enthalten. Zusätzlich bestehen
+13 Desktop-Konfigurationstests, vier Cachetests, vier Signierszenarien mit lokalem Testwerkzeug,
+beide PowerShell-Parserprüfungen und der Fehlerfall zur Wiederherstellung der Shell-Umgebung.
+Der vollständige Repository-Check besteht mit 34 erfolgreichen Typprüfungen.
+
+Eine echte Key-Vault-Signierung und ein Installationslauf wurden nicht ausgeführt.
+
+### Weitere Grenzen
+
 - Die Provider-, Proxy- und Store-Netzwerktests verwenden lokale Test-Server.
   Ein produktiver Aufruf im Unternehmensnetz wurde nicht ausgeführt.
 - Desktop und Helfer wurden gebaut; der NSIS-Installer wurde nicht ausgeführt und

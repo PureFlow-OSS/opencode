@@ -28,6 +28,25 @@ test("embeds the corporate updater URL only when the build supplies it", async (
   }
 })
 
+test("embeds the corporate updater cache directory only when the build supplies it", async () => {
+  const previous = process.env.OPENCODE_UPDATE_CACHE_DIR
+
+  try {
+    process.env.OPENCODE_UPDATE_CACHE_DIR = "C:/Entwicklung"
+    expect((await load("build")).config.main?.define).toMatchObject({
+      OPENCODE_UPDATE_CACHE_DIR: JSON.stringify("C:/Entwicklung"),
+    })
+
+    delete process.env.OPENCODE_UPDATE_CACHE_DIR
+    expect((await load("build")).config.main?.define).toMatchObject({
+      OPENCODE_UPDATE_CACHE_DIR: "undefined",
+    })
+  } finally {
+    if (previous === undefined) delete process.env.OPENCODE_UPDATE_CACHE_DIR
+    else process.env.OPENCODE_UPDATE_CACHE_DIR = previous
+  }
+})
+
 test("embeds the corporate updater URL in the packaged main bundle", async () => {
   const previous = process.env.OPENCODE_UPDATE_BASE_URL
 

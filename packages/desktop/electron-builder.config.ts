@@ -30,7 +30,25 @@ const metainfoFpm = (appId: string) =>
 async function signWindows(configuration: { path: string }) {
   if (process.platform !== "win32") return
 
-  if (process.env.GITHUB_ACTIONS !== "true") return
+  // Any signing-specific variable opts local builds into the signer. sign-windows then
+  // rejects a partial Key Vault or Trusted Signing credential set.
+  const keyVault = [
+    process.env.AZURE_KEYVAULT_URL,
+    process.env.KEYVAULT_URL,
+    process.env.AZURE_KEYVAULT_CLIENT_ID,
+    process.env.AZURE_KEYVAULT_CLIENT_SECRET,
+    process.env.AZURE_KEYVAULT_TENANT_ID,
+    process.env.AZURE_KEYVAULT_CERT,
+    process.env.CERT_ALIAS,
+    process.env.CertificateName,
+  ].some(Boolean)
+  const trustedSigning = [
+    process.env.AZURE_TRUSTED_SIGNING_ENDPOINT,
+    process.env.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME,
+    process.env.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE,
+  ].some(Boolean)
+
+  if (process.env.GITHUB_ACTIONS !== "true" && !keyVault && !trustedSigning) return
 
   await execFileAsync(
     "pwsh",
@@ -75,7 +93,7 @@ const getBase = (appId: string): Configuration => {
   return {
     artifactName: "opencode-desktop-${os}-${arch}.${ext}",
     directories: {
-      output: "dist",
+      output: process.env.OPENCODE_ELECTRON_OUTPUT_DIR?.trim() || "dist",
       buildResources: "resources",
     },
     // Linux launchers are .desktop files, so this is the desktop file name,
@@ -192,6 +210,9 @@ const getBase = (appId: string): Configuration => {
     win: {
       icon: `resources/icons/icon.ico`,
       signtoolOptions: {
+        // The default digest list invokes the custom signer once for SHA-1 and once for
+        // SHA-256; Key Vault and Trusted Signing both produce SHA-256 signatures.
+        signingHashAlgorithms: ["sha256"],
         sign: signWindows,
       },
       target: ["nsis"],

@@ -38,6 +38,27 @@ function load(channel: string, target?: string): Configuration {
   }
 }
 
+function withEnvironment(values: Record<string, string | undefined>, run: () => void) {
+  const names = Object.keys(values)
+  const previous = names.map((name) => process.env[name])
+
+  for (const [name, value] of Object.entries(values)) {
+    if (value === undefined) delete process.env[name]
+    else process.env[name] = value
+  }
+
+  try {
+    run()
+  } finally {
+    names.forEach((name, index) => {
+      const value = previous[index]
+
+      if (value === undefined) delete process.env[name]
+      else process.env[name] = value
+    })
+  }
+}
+
 function trimFilter(dir: string, config: Configuration) {
   const patterns = Array.isArray(config.files) ? config.files.flatMap((value) => (value ? [String(value)] : [])) : []
 
@@ -74,6 +95,7 @@ test("shared packaging defaults", async () => {
   const config = load("dev", "x86_64-pc-windows-msvc")
   expect(config.mac?.sign).toBeFunction()
   expect(config.dmg?.sign).not.toBe(true)
+  expect(config.win?.signtoolOptions?.signingHashAlgorithms).toEqual(["sha256"])
   expect(config.mac?.extendInfo?.NSAutoFillRequiresTextContentTypeForOneTimeCodeOnMac).toBe(true)
   const include = path.join(import.meta.dirname, "resources/windows/installer.nsh")
   expect(config.nsis?.include).toBe(include)
@@ -93,6 +115,20 @@ test("shared packaging defaults", async () => {
   expect(load("dev", "aarch64-apple-darwin").extraResources).toEqual([
     { from: "resources/", to: "", filter: ["opencode-cli", "opencode-cli.exe", "opencode-cli.version"] },
   ])
+})
+
+test("the output directory can be overridden for local builds", () => {
+  withEnvironment({ OPENCODE_ELECTRON_OUTPUT_DIR: "dist-v2.1.2-local-signed" }, () => {
+    expect(load("dev").directories?.output).toBe("dist-v2.1.2-local-signed")
+  })
+
+  withEnvironment({ OPENCODE_ELECTRON_OUTPUT_DIR: "  " }, () => {
+    expect(load("dev").directories?.output).toBe("dist")
+  })
+
+  withEnvironment({ OPENCODE_ELECTRON_OUTPUT_DIR: "other/dist" }, () => {
+    expect(load("prod").directories?.output).toBe("other/dist")
+  })
 })
 
 test("trims external dependencies without excluding runtime files", () => {

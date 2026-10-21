@@ -40,6 +40,39 @@ CLI preparation uses these channel rules:
 default. `bun dev --download-server <version>` instead downloads that CLI version for local development. Neither path
 requires `OPENCODE_CLI_DIST` or runs the production prebuild.
 
+## Local Windows installer
+
+From the repository root, use PowerShell 7 with Bun, Node.js, and the .NET 10 SDK installed.
+Install the workspace dependencies with `bunx --bun bun@1.4.2 install --frozen-lockfile` before the first build:
+
+```powershell
+$env:KEYVAULT_URL="https://kv-pfh-codesigning.vault.azure.net/"
+$env:CERT_ALIAS="digiCert-CodeSigning"
+$env:AZURE_CLIENT_ID="<client-id>"
+$env:AZURE_CLIENT_SECRET="<client-secret>"
+$env:AZURE_TENANT_ID="<tenant-id>"
+
+$env:OPENCODE_CHANNEL="prod"
+$env:OPENCODE_UPDATE_BASE_URL="http://localhost/opencode"
+$env:OPENCODE_UPDATE_CACHE_DIR="C:/Entwicklung"
+$env:OPENCODE_ELECTRON_OUTPUT_DIR="dist-v2.1.2-local-signed"
+
+.\script\package-desktop-electron-win.ps1 -WorkingDirectory .\packages\desktop
+```
+
+Install AzureSignTool once with `dotnet tool install --global AzureSignTool` for Key Vault signing.
+The script builds the local V2 CLI and desktop, then packages the Windows x64 NSIS installer without publishing.
+Signing runs during packaging, before update metadata and checksums are generated. Without signing credentials,
+the same command produces an unsigned local package. Incomplete signing credentials fail the build.
+
+The output directory is relative to `packages/desktop` unless an absolute path is supplied. `OPENCODE_VERSION`
+can override the package version; the output directory name does not determine it. To reuse an existing local CLI
+build, set `OPENCODE_CLI_DIST` to its absolute distribution directory before running the script.
+
+The update base URL and Windows update cache root are embedded in the desktop build. `localhost` refers to the
+machine running the installed app; use the reachable corporate update server URL for other machines.
+The installer targets `C:\Entwicklung\OpenCode`; keep the update cache outside that installation directory.
+
 ## Beta channel
 
 Every push to the `beta` branch publishes OpenCode Beta (`ai.opencode.desktop.beta`) as version `0.0.0-beta-<run>` to
