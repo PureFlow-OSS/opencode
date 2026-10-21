@@ -1,0 +1,449 @@
+4289fac0a4146cc53d1495b4e5c19dd96764acb6
+.gitignore
+.husky/pre-push
+bun.lock
+package.json
+packages/app/e2e/performance/timeline/session-timeline-benchmark.fixture.ts
+packages/app/public/site.webmanifest
+packages/app/src/app.tsx
+packages/app/src/components/dialog-connect-provider.tsx
+packages/app/src/components/dialog-manage-models.tsx
+packages/app/src/components/dialog-select-directory.tsx
+packages/app/src/components/dialog-select-model-unpaid.tsx
+packages/app/src/components/dialog-select-model.tsx
+packages/app/src/components/dialog-settings.tsx
+packages/app/src/components/prompt-input.tsx
+packages/app/src/components/prompt-input/attachments.test.ts
+packages/app/src/components/prompt-input/attachments.ts
+packages/app/src/components/prompt-input/files.ts
+packages/app/src/components/prompt-input/history.test.ts
+packages/app/src/components/prompt-input/history.ts
+packages/app/src/components/prompt-input/submit.ts
+packages/app/src/components/prompt-workspace-selector.tsx
+packages/app/src/components/session/session-context-metrics.test.ts
+packages/app/src/components/session/session-context-metrics.ts
+packages/app/src/components/session/session-header.tsx
+packages/app/src/components/settings-general.tsx
+packages/app/src/components/settings-models.tsx
+packages/app/src/components/settings-providers.tsx
+packages/app/src/components/settings-v2/dialog-settings-v2.tsx
+packages/app/src/components/settings-v2/models.tsx
+packages/app/src/components/settings-v2/providers.tsx
+packages/app/src/components/settings-v2/settings-v2.css
+packages/app/src/components/status-popover-body.tsx
+packages/app/src/components/updater-action.ts
+packages/app/src/constants/file-picker.ts
+packages/app/src/context/global-sync/bootstrap.ts
+packages/app/src/context/global-sync/event-reducer.test.ts
+packages/app/src/context/global-sync/event-reducer.ts
+packages/app/src/context/global-sync/session-trim.ts
+packages/app/src/context/global.tsx
+packages/app/src/context/models.tsx
+packages/app/src/context/permission.tsx
+packages/app/src/context/server-sdk.tsx
+packages/app/src/context/server-sync.tsx
+packages/app/src/context/settings.test.ts
+packages/app/src/context/settings.tsx
+packages/app/src/hooks/use-providers.ts
+packages/app/src/i18n/bs.ts
+packages/app/src/i18n/da.ts
+packages/app/src/i18n/de.ts
+packages/app/src/i18n/en.ts
+packages/app/src/i18n/es.ts
+packages/app/src/i18n/ko.ts
+packages/app/src/i18n/no.ts
+packages/app/src/i18n/ru.ts
+packages/app/src/i18n/th.ts
+packages/app/src/i18n/tr.ts
+packages/app/src/i18n/zh.ts
+packages/app/src/i18n/zht.ts
+packages/app/src/index.ts
+packages/app/src/pages/layout.tsx
+packages/app/src/pages/layout/sidebar-items.tsx
+packages/app/src/pages/layout/sidebar-workspace.tsx
+packages/app/src/pages/session.tsx
+packages/app/src/pages/session/composer/session-composer-controls.ts
+packages/app/src/pages/session/composer/session-composer-region-controller.ts
+packages/app/src/pages/session/composer/session-composer-region.tsx
+packages/app/src/pages/session/composer/session-composer-state.test.ts
+packages/app/src/pages/session/composer/session-followup-dock.tsx
+packages/app/src/pages/session/timeline/message-timeline.tsx
+packages/app/src/providers/models/unpaid.tsx
+packages/app/src/runtime/persistence/storage.ts
+packages/app/src/runtime/platform/platform.tsx
+packages/app/src/runtime/server/beta-status.ts
+packages/app/src/runtime/server/errors.ts
+packages/app/src/runtime/server/global-sdk.ts
+packages/app/src/runtime/server/global-sdk.tsx
+packages/app/src/runtime/server/global-sync.ts
+packages/app/src/runtime/server/global-sync.tsx
+packages/app/src/runtime/server/model-selection.test.ts
+packages/app/src/runtime/server/model-selection.ts
+packages/app/src/runtime/server/model-switch-compaction.test.ts
+packages/app/src/runtime/server/model-switch-compaction.ts
+packages/app/src/runtime/server/model-visibility.test.ts
+packages/app/src/runtime/server/model-visibility.ts
+packages/app/src/runtime/server/session-resume.test.ts
+packages/app/src/runtime/server/session-resume.ts
+packages/app/src/runtime/server/session-working.test.ts
+packages/app/src/runtime/server/session-working.ts
+packages/app/src/session/compaction-visibility.test.ts
+packages/app/src/session/compaction-visibility.ts
+packages/app/src/utils/server-errors.test.ts
+packages/app/src/wsl/context.tsx
+packages/app/src/wsl/settings.tsx
+packages/core/src/config.ts
+packages/core/src/models-dev.ts
+packages/core/src/plugin/system-prompt/trinity.txt
+packages/core/src/ripgrep/binary.ts
+packages/core/src/session/compaction.ts
+packages/core/src/tool/bash-process.ts
+packages/core/src/tool/bash_read.ts
+packages/core/src/tool/bash_read.txt
+packages/core/src/tool/bash_stop.ts
+packages/core/src/tool/bash_stop.txt
+packages/core/src/tool/mcp-exa.ts
+packages/core/src/tool/playwright.ts
+packages/core/src/tool/playwright.txt
+packages/core/src/tool/session_rename.ts
+packages/core/src/tool/shell.txt
+packages/desktop/electron-builder.config.test.ts
+packages/desktop/electron-builder.config.ts
+packages/desktop/electron.vite.config.ts
+packages/desktop/package.json
+packages/desktop/scripts/prebuild.ts
+packages/desktop/scripts/utils.ts
+packages/desktop/src/main/env.d.ts
+packages/desktop/src/main/index.ts
+packages/desktop/src/main/ipc.ts
+packages/desktop/src/main/storage/keys.ts
+packages/desktop/src/main/store.ts
+packages/desktop/src/main/updater-controller.ts
+packages/desktop/src/main/updater.ts
+packages/desktop/src/main/windows.ts
+packages/desktop/src/preload/index.ts
+packages/desktop/src/preload/types.ts
+packages/desktop/src/renderer/index.tsx
+packages/desktop/src/renderer/onboarding.tsx
+packages/desktop/src/renderer/wsl/connections.ts
+packages/enterprise/src/custom-elements.d.ts
+packages/gui-extensions/src/wsl/dialog.tsx
+packages/gui-extensions/src/wsl/model.ts
+packages/llm/src/protocols/openai-chat.ts
+packages/llm/test/provider/openai-chat.test.ts
+packages/opencode/package.json
+packages/opencode/script/build-node.ts
+packages/opencode/script/build.ts
+packages/opencode/src/agent/agent.ts
+packages/opencode/src/config/config.ts
+packages/opencode/src/config/managed.ts
+packages/opencode/src/config/tui.ts
+packages/opencode/src/effect/app-runtime.ts
+packages/opencode/src/mcp/index.ts
+packages/opencode/src/project/project.ts
+packages/opencode/src/provider/provider.ts
+packages/opencode/src/provider/transform.ts
+packages/opencode/src/server/routes/instance/httpapi/groups/mcp.ts
+packages/opencode/src/server/routes/instance/httpapi/handlers/mcp.ts
+packages/opencode/src/server/routes/instance/httpapi/middleware/instance-context.ts
+packages/opencode/src/server/routes/instance/httpapi/middleware/workspace-routing.ts
+packages/opencode/src/server/routes/instance/httpapi/server.ts
+packages/opencode/src/session/llm.ts
+packages/opencode/src/session/llm/request.ts
+packages/opencode/src/session/message-v2.ts
+packages/opencode/src/session/prompt.ts
+packages/opencode/src/session/prompt/gpt.txt
+packages/opencode/src/session/session.ts
+packages/opencode/src/session/system.ts
+packages/opencode/src/tool/apply_patch.ts
+packages/opencode/src/tool/edit.ts
+packages/opencode/src/tool/mcp-websearch.ts
+packages/opencode/src/tool/read.ts
+packages/opencode/src/tool/registry.ts
+packages/opencode/src/tool/shell.ts
+packages/opencode/src/tool/shell/prompt.ts
+packages/opencode/src/tool/webfetch.ts
+packages/opencode/src/tool/webfetch.txt
+packages/opencode/src/tool/websearch.ts
+packages/opencode/src/tool/websearch.txt
+packages/opencode/src/tool/write.ts
+packages/opencode/src/util/archive.ts
+packages/opencode/src/util/bom.ts
+packages/opencode/src/util/data-url.ts
+packages/opencode/test/config/config.test.ts
+packages/opencode/test/fixture/config.ts
+packages/opencode/test/mcp/headers.test.ts
+packages/opencode/test/plugin/trigger.test.ts
+packages/opencode/test/project/migrate-global.test.ts
+packages/opencode/test/provider/provider.test.ts
+packages/opencode/test/provider/transform.test.ts
+packages/opencode/test/server/httpapi-mcp-oauth.test.ts
+packages/opencode/test/server/httpapi-mcp.test.ts
+packages/opencode/test/session/message-v2.test.ts
+packages/opencode/test/session/prompt.test.ts
+packages/opencode/test/session/snapshot-tool-race.test.ts
+packages/opencode/test/session/system.test.ts
+packages/opencode/test/tool/edit.test.ts
+packages/opencode/test/tool/read.test.ts
+packages/opencode/test/tool/registry.test.ts
+packages/opencode/test/tool/webfetch.test.ts
+packages/opencode/test/tool/websearch.test.ts
+packages/opencode/test/tool/write.test.ts
+packages/opencode/test/util/data-url.test.ts
+packages/opencode/tsconfig.json
+packages/sdk/js/src/gen/types.gen.ts
+packages/session-ui/src/components/message-file.test.ts
+packages/session-ui/src/components/message-file.ts
+packages/session-ui/src/components/message-part.tsx
+packages/tui/package.json
+packages/tui/src/component/dialog-model.tsx
+packages/tui/src/feature-plugins/sidebar/context.tsx
+packages/ui/src/components/dialog.css
+
+Auto-merging .github/workflows/publish.yml
+Auto-merging .gitignore
+CONFLICT (content): Merge conflict in .gitignore
+CONFLICT (modify/delete): .husky/pre-push deleted in 7bf0d56aa0 and modified in v2.1.2.  Version v2.1.2 of .husky/pre-push left in tree.
+Auto-merging bun.lock
+CONFLICT (content): Merge conflict in bun.lock
+Auto-merging package.json
+CONFLICT (content): Merge conflict in package.json
+Auto-merging packages/app/e2e/performance/timeline/session-timeline-benchmark.fixture.ts
+CONFLICT (content): Merge conflict in packages/app/e2e/performance/timeline/session-timeline-benchmark.fixture.ts
+CONFLICT (modify/delete): packages/app/public/site.webmanifest deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/public/site.webmanifest left in tree.
+Auto-merging packages/app/src/app.tsx
+CONFLICT (content): Merge conflict in packages/app/src/app.tsx
+CONFLICT (directory rename split): Unclear where to rename packages/app/src/components to; it was renamed to multiple other directories, with no destination getting a majority of the files.
+CONFLICT (modify/delete): packages/app/src/components/dialog-connect-provider.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/dialog-connect-provider.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/components/dialog-manage-models.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/dialog-manage-models.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/components/dialog-select-directory.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/dialog-select-directory.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/components/dialog-select-model-unpaid.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/dialog-select-model-unpaid.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/components/dialog-select-model.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/dialog-select-model.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/components/dialog-settings.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/dialog-settings.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/components/prompt-input.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/prompt-input.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/components/prompt-input/attachments.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/prompt-input/attachments.test.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/components/prompt-input/attachments.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/prompt-input/attachments.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/components/prompt-input/files.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/prompt-input/files.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/components/prompt-input/history.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/prompt-input/history.test.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/components/prompt-input/history.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/prompt-input/history.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/components/prompt-input/submit.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/prompt-input/submit.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/components/prompt-workspace-selector.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/prompt-workspace-selector.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/components/session/session-context-metrics.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/session/session-context-metrics.test.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/components/session/session-context-metrics.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/session/session-context-metrics.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/components/session/session-header.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/session/session-header.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/components/settings-general.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/settings-general.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/components/settings-models.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/settings-models.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/components/settings-providers.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/settings-providers.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/components/settings-v2/dialog-settings-v2.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/settings-v2/dialog-settings-v2.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/components/settings-v2/models.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/settings-v2/models.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/components/settings-v2/providers.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/settings-v2/providers.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/components/settings-v2/settings-v2.css deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/settings-v2/settings-v2.css left in tree.
+CONFLICT (modify/delete): packages/app/src/components/status-popover-body.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/status-popover-body.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/components/updater-action.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/components/updater-action.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/constants/file-picker.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/constants/file-picker.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/context/global-sync/bootstrap.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/context/global-sync/bootstrap.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/context/global-sync/event-reducer.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/context/global-sync/event-reducer.test.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/context/global-sync/event-reducer.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/context/global-sync/event-reducer.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/context/global-sync/session-trim.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/context/global-sync/session-trim.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/context/global.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/context/global.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/context/models.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/context/models.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/context/permission.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/context/permission.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/context/server-sdk.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/context/server-sdk.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/context/server-sync.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/context/server-sync.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/context/settings.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/context/settings.test.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/context/settings.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/context/settings.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/hooks/use-providers.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/hooks/use-providers.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/i18n/bs.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/i18n/bs.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/i18n/da.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/i18n/da.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/i18n/de.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/i18n/de.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/i18n/en.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/i18n/en.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/i18n/es.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/i18n/es.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/i18n/ko.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/i18n/ko.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/i18n/no.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/i18n/no.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/i18n/ru.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/i18n/ru.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/i18n/th.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/i18n/th.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/i18n/tr.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/i18n/tr.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/i18n/zh.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/i18n/zh.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/i18n/zht.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/i18n/zht.ts left in tree.
+Auto-merging packages/app/src/index.ts
+CONFLICT (content): Merge conflict in packages/app/src/index.ts
+CONFLICT (modify/delete): packages/app/src/pages/layout.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/pages/layout.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/pages/layout/sidebar-items.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/pages/layout/sidebar-items.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/pages/layout/sidebar-workspace.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/pages/layout/sidebar-workspace.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/pages/session.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/pages/session.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/pages/session/composer/session-composer-controls.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/pages/session/composer/session-composer-controls.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/pages/session/composer/session-composer-region-controller.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/pages/session/composer/session-composer-region-controller.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/pages/session/composer/session-composer-region.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/pages/session/composer/session-composer-region.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/pages/session/composer/session-composer-state.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/pages/session/composer/session-composer-state.test.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/pages/session/composer/session-followup-dock.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/pages/session/composer/session-followup-dock.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/pages/session/timeline/message-timeline.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/pages/session/timeline/message-timeline.tsx left in tree.
+Auto-merging packages/app/src/providers/models/unpaid.tsx
+CONFLICT (content): Merge conflict in packages/app/src/providers/models/unpaid.tsx
+Auto-merging packages/app/src/runtime/persistence/storage.ts
+CONFLICT (content): Merge conflict in packages/app/src/runtime/persistence/storage.ts
+Auto-merging packages/app/src/runtime/platform/platform.tsx
+CONFLICT (content): Merge conflict in packages/app/src/runtime/platform/platform.tsx
+CONFLICT (file location): packages/app/src/context/beta-status.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/app/src/runtime/server/beta-status.ts.
+Auto-merging packages/app/src/runtime/server/errors.ts
+CONFLICT (content): Merge conflict in packages/app/src/runtime/server/errors.ts
+CONFLICT (file location): packages/app/src/context/global-sdk.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/app/src/runtime/server/global-sdk.ts.
+CONFLICT (file location): packages/app/src/context/global-sdk.tsx added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/app/src/runtime/server/global-sdk.tsx.
+CONFLICT (file location): packages/app/src/context/global-sync.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/app/src/runtime/server/global-sync.ts.
+CONFLICT (file location): packages/app/src/context/global-sync.tsx added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/app/src/runtime/server/global-sync.tsx.
+CONFLICT (file location): packages/app/src/context/model-selection.test.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/app/src/runtime/server/model-selection.test.ts.
+CONFLICT (file location): packages/app/src/context/model-selection.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/app/src/runtime/server/model-selection.ts.
+CONFLICT (file location): packages/app/src/context/model-switch-compaction.test.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/app/src/runtime/server/model-switch-compaction.test.ts.
+CONFLICT (file location): packages/app/src/context/model-switch-compaction.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/app/src/runtime/server/model-switch-compaction.ts.
+CONFLICT (file location): packages/app/src/context/model-visibility.test.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/app/src/runtime/server/model-visibility.test.ts.
+CONFLICT (file location): packages/app/src/context/model-visibility.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/app/src/runtime/server/model-visibility.ts.
+CONFLICT (file location): packages/app/src/utils/session-resume.test.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/app/src/runtime/server/session-resume.test.ts.
+CONFLICT (file location): packages/app/src/utils/session-resume.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/app/src/runtime/server/session-resume.ts.
+CONFLICT (file location): packages/app/src/utils/session-working.test.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/app/src/runtime/server/session-working.test.ts.
+CONFLICT (file location): packages/app/src/utils/session-working.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/app/src/runtime/server/session-working.ts.
+CONFLICT (file location): packages/app/src/pages/session/compaction-visibility.test.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/app/src/session/compaction-visibility.test.ts.
+CONFLICT (file location): packages/app/src/pages/session/compaction-visibility.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/app/src/session/compaction-visibility.ts.
+Auto-merging packages/app/src/session/requests/session-permission-dock.tsx
+CONFLICT (modify/delete): packages/app/src/utils/server-errors.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/utils/server-errors.test.ts left in tree.
+CONFLICT (modify/delete): packages/app/src/wsl/context.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/wsl/context.tsx left in tree.
+CONFLICT (modify/delete): packages/app/src/wsl/settings.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/app/src/wsl/settings.tsx left in tree.
+Auto-merging packages/app/vite.js
+Auto-merging packages/core/src/config.ts
+CONFLICT (content): Merge conflict in packages/core/src/config.ts
+Auto-merging packages/core/src/models-dev.ts
+CONFLICT (content): Merge conflict in packages/core/src/models-dev.ts
+Auto-merging packages/core/src/plugin/system-prompt/trinity.txt
+CONFLICT (content): Merge conflict in packages/core/src/plugin/system-prompt/trinity.txt
+Auto-merging packages/core/src/ripgrep/binary.ts
+CONFLICT (content): Merge conflict in packages/core/src/ripgrep/binary.ts
+Auto-merging packages/core/src/session/compaction.ts
+CONFLICT (content): Merge conflict in packages/core/src/session/compaction.ts
+CONFLICT (file location): packages/opencode/src/tool/bash-process.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/core/src/tool/bash-process.ts.
+CONFLICT (file location): packages/opencode/src/tool/bash_read.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/core/src/tool/bash_read.ts.
+CONFLICT (file location): packages/opencode/src/tool/bash_read.txt added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/core/src/tool/bash_read.txt.
+CONFLICT (file location): packages/opencode/src/tool/bash_stop.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/core/src/tool/bash_stop.ts.
+CONFLICT (file location): packages/opencode/src/tool/bash_stop.txt added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/core/src/tool/bash_stop.txt.
+CONFLICT (file location): packages/opencode/src/tool/mcp-exa.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/core/src/tool/mcp-exa.ts.
+CONFLICT (file location): packages/opencode/src/tool/playwright.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/core/src/tool/playwright.ts.
+CONFLICT (file location): packages/opencode/src/tool/playwright.txt added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/core/src/tool/playwright.txt.
+CONFLICT (file location): packages/opencode/src/tool/session_rename.ts added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/core/src/tool/session_rename.ts.
+CONFLICT (file location): packages/opencode/src/tool/shell.txt added in 7bf0d56aa0 inside a directory that was renamed in v2.1.2, suggesting it should perhaps be moved to packages/core/src/tool/shell.txt.
+Auto-merging packages/core/test/fixture/v1-config/config.ts
+Auto-merging packages/desktop/electron-builder.config.test.ts
+CONFLICT (content): Merge conflict in packages/desktop/electron-builder.config.test.ts
+Auto-merging packages/desktop/electron-builder.config.ts
+CONFLICT (content): Merge conflict in packages/desktop/electron-builder.config.ts
+Auto-merging packages/desktop/electron.vite.config.ts
+CONFLICT (content): Merge conflict in packages/desktop/electron.vite.config.ts
+Auto-merging packages/desktop/package.json
+CONFLICT (content): Merge conflict in packages/desktop/package.json
+Auto-merging packages/desktop/scripts/prebuild.ts
+CONFLICT (content): Merge conflict in packages/desktop/scripts/prebuild.ts
+Auto-merging packages/desktop/scripts/utils.ts
+CONFLICT (content): Merge conflict in packages/desktop/scripts/utils.ts
+Auto-merging packages/desktop/src/main/env.d.ts
+CONFLICT (content): Merge conflict in packages/desktop/src/main/env.d.ts
+Auto-merging packages/desktop/src/main/index.ts
+CONFLICT (content): Merge conflict in packages/desktop/src/main/index.ts
+Auto-merging packages/desktop/src/main/ipc.ts
+CONFLICT (content): Merge conflict in packages/desktop/src/main/ipc.ts
+Auto-merging packages/desktop/src/main/storage/keys.ts
+CONFLICT (content): Merge conflict in packages/desktop/src/main/storage/keys.ts
+CONFLICT (modify/delete): packages/desktop/src/main/store.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/desktop/src/main/store.ts left in tree.
+CONFLICT (modify/delete): packages/desktop/src/main/updater-controller.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/desktop/src/main/updater-controller.ts left in tree.
+CONFLICT (modify/delete): packages/desktop/src/main/updater.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/desktop/src/main/updater.ts left in tree.
+CONFLICT (modify/delete): packages/desktop/src/main/windows.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/desktop/src/main/windows.ts left in tree.
+Auto-merging packages/desktop/src/preload/index.ts
+CONFLICT (content): Merge conflict in packages/desktop/src/preload/index.ts
+Auto-merging packages/desktop/src/preload/types.ts
+CONFLICT (content): Merge conflict in packages/desktop/src/preload/types.ts
+Auto-merging packages/desktop/src/renderer/env.d.ts
+Auto-merging packages/desktop/src/renderer/index.tsx
+CONFLICT (content): Merge conflict in packages/desktop/src/renderer/index.tsx
+CONFLICT (modify/delete): packages/desktop/src/renderer/onboarding.tsx deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/desktop/src/renderer/onboarding.tsx left in tree.
+CONFLICT (modify/delete): packages/desktop/src/renderer/wsl/connections.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/desktop/src/renderer/wsl/connections.ts left in tree.
+Auto-merging packages/desktop/tsconfig.json
+CONFLICT (modify/delete): packages/enterprise/src/custom-elements.d.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/enterprise/src/custom-elements.d.ts left in tree.
+Auto-merging packages/gui-extensions/src/wsl/dialog.tsx
+CONFLICT (content): Merge conflict in packages/gui-extensions/src/wsl/dialog.tsx
+Auto-merging packages/gui-extensions/src/wsl/model.ts
+CONFLICT (content): Merge conflict in packages/gui-extensions/src/wsl/model.ts
+CONFLICT (modify/delete): packages/llm/src/protocols/openai-chat.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/llm/src/protocols/openai-chat.ts left in tree.
+CONFLICT (modify/delete): packages/llm/test/provider/openai-chat.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/llm/test/provider/openai-chat.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/package.json deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/package.json left in tree.
+CONFLICT (modify/delete): packages/opencode/script/build-node.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/script/build-node.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/script/build.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/script/build.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/agent/agent.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/agent/agent.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/config/config.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/config/config.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/config/managed.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/config/managed.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/config/tui.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/config/tui.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/effect/app-runtime.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/effect/app-runtime.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/mcp/index.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/mcp/index.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/project/project.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/project/project.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/provider/provider.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/provider/provider.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/provider/transform.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/provider/transform.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/server/routes/instance/httpapi/groups/mcp.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/server/routes/instance/httpapi/groups/mcp.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/server/routes/instance/httpapi/handlers/mcp.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/server/routes/instance/httpapi/handlers/mcp.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/server/routes/instance/httpapi/middleware/instance-context.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/server/routes/instance/httpapi/middleware/instance-context.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/server/routes/instance/httpapi/middleware/workspace-routing.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/server/routes/instance/httpapi/middleware/workspace-routing.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/server/routes/instance/httpapi/server.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/server/routes/instance/httpapi/server.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/session/llm.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/session/llm.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/session/llm/request.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/session/llm/request.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/session/message-v2.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/session/message-v2.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/session/prompt.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/session/prompt.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/session/prompt/gpt.txt deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/session/prompt/gpt.txt left in tree.
+CONFLICT (modify/delete): packages/opencode/src/session/session.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/session/session.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/session/system.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/session/system.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/tool/apply_patch.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/tool/apply_patch.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/tool/edit.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/tool/edit.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/tool/mcp-websearch.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/tool/mcp-websearch.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/tool/read.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/tool/read.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/tool/registry.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/tool/registry.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/tool/shell.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/tool/shell.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/tool/shell/prompt.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/tool/shell/prompt.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/tool/webfetch.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/tool/webfetch.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/tool/webfetch.txt deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/tool/webfetch.txt left in tree.
+CONFLICT (modify/delete): packages/opencode/src/tool/websearch.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/tool/websearch.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/tool/websearch.txt deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/tool/websearch.txt left in tree.
+CONFLICT (modify/delete): packages/opencode/src/tool/write.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/tool/write.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/util/archive.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/util/archive.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/util/bom.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/util/bom.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/util/data-url.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/src/util/data-url.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/config/config.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/config/config.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/fixture/config.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/fixture/config.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/mcp/headers.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/mcp/headers.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/plugin/trigger.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/plugin/trigger.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/project/migrate-global.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/project/migrate-global.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/provider/provider.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/provider/provider.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/provider/transform.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/provider/transform.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/server/httpapi-mcp-oauth.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/server/httpapi-mcp-oauth.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/server/httpapi-mcp.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/server/httpapi-mcp.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/session/message-v2.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/session/message-v2.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/session/prompt.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/session/prompt.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/session/snapshot-tool-race.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/session/snapshot-tool-race.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/session/system.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/session/system.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/tool/edit.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/tool/edit.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/tool/read.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/tool/read.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/tool/registry.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/tool/registry.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/tool/webfetch.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/tool/webfetch.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/tool/websearch.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/tool/websearch.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/tool/write.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/tool/write.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/util/data-url.test.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/test/util/data-url.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/tsconfig.json deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/opencode/tsconfig.json left in tree.
+CONFLICT (modify/delete): packages/sdk/js/src/gen/types.gen.ts deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/sdk/js/src/gen/types.gen.ts left in tree.
+Auto-merging packages/session-ui/src/components/message-file.test.ts
+CONFLICT (content): Merge conflict in packages/session-ui/src/components/message-file.test.ts
+Auto-merging packages/session-ui/src/components/message-file.ts
+CONFLICT (content): Merge conflict in packages/session-ui/src/components/message-file.ts
+Auto-merging packages/session-ui/src/components/message-part.tsx
+CONFLICT (content): Merge conflict in packages/session-ui/src/components/message-part.tsx
+Auto-merging packages/tui/package.json
+CONFLICT (content): Merge conflict in packages/tui/package.json
+Auto-merging packages/tui/src/component/dialog-model.tsx
+CONFLICT (content): Merge conflict in packages/tui/src/component/dialog-model.tsx
+Auto-merging packages/tui/src/feature-plugins/sidebar/context.tsx
+CONFLICT (content): Merge conflict in packages/tui/src/feature-plugins/sidebar/context.tsx
+Auto-merging packages/tui/tsconfig.json
+CONFLICT (modify/delete): packages/ui/src/components/dialog.css deleted in v2.1.2 and modified in 7bf0d56aa0.  Version 7bf0d56aa0 of packages/ui/src/components/dialog.css left in tree.
+Auto-merging packages/ui/src/components/provider-icon.tsx
+Auto-merging packages/ui/src/i18n/de.ts
+Auto-merging packages/ui/src/i18n/en.ts

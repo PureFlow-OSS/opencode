@@ -1,0 +1,120 @@
+[
+  {
+    "sha": "7b39a338a0446a7670f43911a6d59eb1826f0203",
+    "subject": "refactor(server): align pty connect preflight order",
+    "clean": true,
+    "changes": "6\t7\tpackages/opencode/src/server/routes/instance/httpapi/handlers/pty.ts\n8\t8\tpackages/server/src/handlers/pty.ts\n",
+    "conflicts": []
+  },
+  {
+    "sha": "b2a3926e87e35fc7f6308521c4418067cddd5d0e",
+    "subject": "fix(core): accept interleaved Copilot reasoning_opaque values (#54207)",
+    "clean": true,
+    "changes": "5\t3\tpackages/core/src/github-copilot/chat/convert-to-openai-compatible-chat-messages.ts\n3\t11\tpackages/core/src/github-copilot/chat/openai-compatible-chat-language-model.ts\n42\t0\tpackages/core/test/github-copilot/convert-to-copilot-messages.test.ts\n46\t0\tpackages/core/test/github-copilot/copilot-chat-model.test.ts\n",
+    "conflicts": []
+  },
+  {
+    "sha": "5e2df97a8945faa59064682c1160aadaee1b8ded",
+    "subject": "fix(provider): accept OpenAI ultrafast service tier (#53875)",
+    "clean": true,
+    "changes": "32\t0\tpackages/opencode/test/provider/openai.test.ts\n172\t4\tpatches/@ai-sdk%2Fopenai@3.0.88.patch\n",
+    "conflicts": []
+  },
+  {
+    "sha": "e9f8a210b9e2b1e13d375b84906069886eb3b767",
+    "subject": "fix(opencode): add namespaced session identity headers (#52370)",
+    "clean": true,
+    "changes": "2\t0\tpackages/core/src/session/runner/llm.ts\n10\t1\tpackages/core/test/session-runner.test.ts\n2\t0\tpackages/opencode/src/session/llm/request.ts\n80\t63\tpackages/opencode/test/session/llm.test.ts\n",
+    "conflicts": []
+  },
+  {
+    "sha": "9b4882db54627f2656a6990daafa412f9f3c7c82",
+    "subject": "fix(opencode): ad-hoc re-sign darwin binaries after local compile (#52183)",
+    "clean": false,
+    "changes": "",
+    "conflicts": [
+      "packages/opencode/script/build.ts"
+    ]
+  },
+  {
+    "sha": "35fc7a776cddb72d334ee60590c3cce41154be05",
+    "subject": "fix(opencode): apply provider timeouts to Cloudflare AI Gateway models (#51549)",
+    "clean": false,
+    "changes": "",
+    "conflicts": [
+      "packages/opencode/src/provider/provider.ts"
+    ]
+  },
+  {
+    "sha": "b471c2b4495747353af768fbf2e0790c9d820ce2",
+    "subject": "fix(opencode): catch completed MCP browser launcher failures (#51538)",
+    "clean": true,
+    "changes": "5\t2\tpackages/opencode/src/mcp/browser.ts\n36\t0\tpackages/opencode/test/mcp/browser.test.ts\n",
+    "conflicts": []
+  },
+  {
+    "sha": "82d4c89031ed30da1cf22ba62419fec520df8d27",
+    "subject": "fix(opencode): redact credentials in debug config (#50956)",
+    "clean": true,
+    "changes": "2\t2\tpackages/opencode/src/cli/cmd/debug/config.ts\n20\t0\tpackages/opencode/src/cli/cmd/debug/redact.ts\n62\t0\tpackages/opencode/test/cli/debug-config.test.ts\n",
+    "conflicts": []
+  },
+  {
+    "sha": "610df0b56674fa0ebcae89093ada08b98731bea6",
+    "subject": "fix(gemini): switch thinking default logic (#50841)",
+    "clean": false,
+    "changes": "",
+    "conflicts": [
+      "packages/opencode/src/provider/transform.ts"
+    ]
+  },
+  {
+    "sha": "f5ce4f881e477c7b75421cea2d20939f0ddd71fb",
+    "subject": "fix(core): break filesystem search import cycle (#50439)",
+    "clean": true,
+    "changes": "10\t9\tpackages/core/src/filesystem/search.ts\n",
+    "conflicts": []
+  },
+  {
+    "sha": "ba341c6cac5ed1ef867ef127245a42b5e33d4946",
+    "subject": "fix(core): resolve npm package entrypoint to a file under Node (#50413)",
+    "clean": true,
+    "changes": "9\t1\tpackages/core/src/npm.ts\n70\t0\tpackages/core/test/npm.test.ts\n",
+    "conflicts": []
+  },
+  {
+    "sha": "c10134729dd2ce00beb18604ec91f10319f59a78",
+    "subject": "fix(opencode): hoist Bedrock tool images except Claude, Nova, and Llama 4 (#50272)",
+    "clean": true,
+    "changes": "5\t1\tpackages/opencode/src/session/message-v2.ts\n",
+    "conflicts": []
+  },
+  {
+    "sha": "a97622c801f4ca571530ddc51076af659a9c32cd",
+    "subject": "fix(tui): surface remote auth startup errors (#49016)",
+    "clean": true,
+    "changes": "1\t1\tpackages/opencode/src/cli/cmd/tui.ts\n2\t1\tpackages/opencode/src/server/routes/instance/httpapi/middleware/error.ts\n21\t0\tpackages/opencode/test/server/httpapi-error-middleware.test.ts\n3\t1\tpackages/tui/src/app.tsx\n11\t0\tpackages/tui/src/util/error.ts\n62\t0\tpackages/tui/test/app-lifecycle.test.tsx\n",
+    "conflicts": []
+  },
+  {
+    "sha": "95daf90670b7c039c436c85537da5fbfe2205b41",
+    "subject": "fix(acp): restore session options and reasoning boundaries (#48225)",
+    "clean": true,
+    "changes": "5\t2\tpackages/opencode/src/acp/config-option.ts\n2\t2\tpackages/opencode/src/acp/event.ts\n157\t36\tpackages/opencode/src/acp/service.ts\n11\t0\tpackages/opencode/test/acp/config-option.test.ts\n34\t0\tpackages/opencode/test/acp/event.test.ts\n285\t5\tpackages/opencode/test/acp/service-session.test.ts\n1\t1\tpackages/opencode/test/cli/acp/config-options.test.ts\n",
+    "conflicts": []
+  },
+  {
+    "sha": "a9a6fad0fae42af99b9f4b1d4ff519a979f16c90",
+    "subject": "fix(opencode): request summarized adaptive thinking (#48269)",
+    "clean": true,
+    "changes": "1\t1\tpackages/opencode/src/plugin/github-copilot/models.ts\n",
+    "conflicts": []
+  },
+  {
+    "sha": "ac1758c0e6b8e7368be133e87e8e27a5f60dec04",
+    "subject": "fix: preserve Bedrock DeepSeek model ids (#34441)",
+    "clean": true,
+    "changes": "3\t1\tpackages/core/src/plugin/provider/amazon-bedrock.ts\n7\t0\tpackages/core/test/plugin/provider-amazon-bedrock.test.ts\n5\t1\tpackages/opencode/src/provider/provider.ts\n43\t0\tpackages/opencode/test/provider/amazon-bedrock.test.ts\n",
+    "conflicts": []
+  }
+]

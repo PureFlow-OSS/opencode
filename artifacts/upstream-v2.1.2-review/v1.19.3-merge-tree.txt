@@ -1,0 +1,32 @@
+d89e8143898fce886c60b489859c63c40a16c776
+.gitignore
+bun.lock
+packages/opencode/script/build.ts
+packages/opencode/src/provider/provider.ts
+packages/opencode/src/provider/transform.ts
+
+Auto-merging .github/workflows/publish.yml
+Auto-merging .gitignore
+CONFLICT (content): Merge conflict in .gitignore
+Auto-merging bun.lock
+CONFLICT (content): Merge conflict in bun.lock
+Auto-merging package.json
+Auto-merging packages/app/src/pages/session/timeline/message-timeline.tsx
+Auto-merging packages/core/src/v1/config/config.ts
+Auto-merging packages/desktop/package.json
+Auto-merging packages/opencode/package.json
+Auto-merging packages/opencode/script/build.ts
+CONFLICT (content): Merge conflict in packages/opencode/script/build.ts
+Auto-merging packages/opencode/src/effect/app-runtime.ts
+Auto-merging packages/opencode/src/provider/provider.ts
+CONFLICT (content): Merge conflict in packages/opencode/src/provider/provider.ts
+Auto-merging packages/opencode/src/provider/transform.ts
+CONFLICT (content): Merge conflict in packages/opencode/src/provider/transform.ts
+Auto-merging packages/opencode/src/server/routes/instance/httpapi/server.ts
+Auto-merging packages/opencode/src/session/llm/request.ts
+Auto-merging packages/opencode/src/session/message-v2.ts
+Auto-merging packages/opencode/src/session/system.ts
+Auto-merging packages/opencode/test/provider/provider.test.ts
+Auto-merging packages/opencode/test/provider/transform.test.ts
+Auto-merging packages/opencode/test/session/message-v2.test.ts
+Auto-merging packages/tui/package.json

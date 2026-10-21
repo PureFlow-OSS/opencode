@@ -1,0 +1,16 @@
+{
+  "base": "7bf0d56aa0fe73246fd429c504bae0bd8afdbdfa",
+  "commits": [
+    "d5154fb74e",
+    "39e1ce55bc",
+    "b471c2b449",
+    "e50d845451",
+    "41f70bfbb1",
+    "4aca1be945",
+    "c5e58b38a8",
+    "ba341c6cac",
+    "bd0dffd781"
+  ],
+  "tree": "6b68b618a1e7d2a20750551b681ffc34b4a65240",
+  "stat": " packages/app/src/entry.tsx                         |  4 +-\n packages/app/src/utils/draft-store.ts              |  5 +-\n packages/core/src/config/markdown.ts               |  8 ++-\n packages/core/src/npm.ts                           | 10 +++-\n packages/core/src/repository.ts                    |  3 +-\n packages/core/test/config/markdown.test.ts         | 35 +++++++++++\n packages/core/test/npm.test.ts                     | 70 ++++++++++++++++++++++\n packages/core/test/repository.test.ts              | 18 ++++++\n packages/desktop/src/main/wsl/runtime.test.ts      | 35 +++++++++++\n packages/desktop/src/main/wsl/runtime.ts           |  4 +-\n packages/llm/src/protocols/openai-responses.ts     | 19 +++---\n .../llm/test/provider/openai-responses.test.ts     | 61 ++++++++++++++++++-\n packages/opencode/src/mcp/browser.ts               |  7 ++-\n packages/opencode/test/mcp/browser.test.ts         | 36 +++++++++++\n .../session-ui/src/components/message-part.css     |  4 ++\n .../session-ui/src/components/message-part.tsx     | 13 ++--\n 16 files changed, 309 insertions(+), 23 deletions(-)\n"
+}

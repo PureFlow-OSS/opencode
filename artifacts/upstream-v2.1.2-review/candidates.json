@@ -1,0 +1,4992 @@
+[
+  {
+    "sha": "7d3752c14ce8dd03cfaac03ee4062a877808a69c",
+    "subject": "fix(core): send legacy console.opencode.ai credentials to opencode.ai/console (#57588)",
+    "files": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "lines": 24,
+    "clean": false,
+    "tree": "c31c99ab4857b2703a514c29f8d7d9741d2b3c9d",
+    "conflicts": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "c8e2e1e4fb83a7663d1a6dbcf15ea77d01b106c0",
+    "subject": "fix(core): reuse recent Console config checks for rejected inference (#57465)",
+    "files": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "lines": 70,
+    "clean": false,
+    "tree": "fcfd075385d40db9819329646378925d0aa4cc6f",
+    "conflicts": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "e9ac459c2e62e3e5b04c13e2322ded2dc2680f65",
+    "subject": "fix(core): build provider variants after package normalization (#57075)",
+    "files": [
+      "packages/core/src/config/plugin/provider.ts",
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/config/provider.test.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "lines": 100,
+    "clean": false,
+    "tree": "af2df4d6088a1686ddff5f153415aa1428f35e4c",
+    "conflicts": [
+      "packages/core/src/config/plugin/provider.ts",
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/config/provider.test.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "5a36ee78e7344dc848b607247cc23628eeb551a9",
+    "subject": "fix(core): broadcast models.dev catalog refreshes server-wide (#57148)",
+    "files": [
+      "packages/core/src/models-dev.ts",
+      "packages/core/test/models.test.ts"
+    ],
+    "lines": 48,
+    "clean": false,
+    "tree": "4c42ca046c1df3ed02fdc2f0995decfa2ee5e771",
+    "conflicts": [
+      "packages/core/src/models-dev.ts",
+      "packages/core/test/models.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "d2c4c38bbefb97d03d94fb6544844b2e04695a69",
+    "subject": "fix(core): only poll Console config while connected (#57201)",
+    "files": [
+      "packages/core/src/plugin/provider/opencode.ts"
+    ],
+    "lines": 20,
+    "clean": false,
+    "tree": "8fa0c38eed6246e04e76bb354ddf35a93323631a",
+    "conflicts": [
+      "packages/core/src/plugin/provider/opencode.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "1b2c720cbac2ec8d5587395abe59dba698ccdb24",
+    "subject": "fix(core): drop undefined permission metadata values before publishing requests (#54090)",
+    "files": [
+      "packages/core/src/permission.ts",
+      "packages/core/test/permission.test.ts"
+    ],
+    "lines": 35,
+    "clean": false,
+    "tree": "d0c6a1c9557fe4b77b89202fb65f0b0c19b0a8ad",
+    "conflicts": [
+      "packages/core/test/permission.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "ce15cd8821a23950b44a1db8eb2902bad217f31d",
+    "subject": "fix(core): report removed running shells as killed (#56982)",
+    "files": [
+      "packages/core/src/shell.ts"
+    ],
+    "lines": 4,
+    "clean": false,
+    "tree": "f5eb469131c0940c03f372d304b157a9173e19fc",
+    "conflicts": [
+      "packages/core/src/shell.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "3bdab634eb9bebc097dffb8a506c6f095997cd1b",
+    "subject": "fix(core): report shell exit only after output is captured (#56321)",
+    "files": [
+      "packages/core/src/shell.ts"
+    ],
+    "lines": 114,
+    "clean": false,
+    "tree": "5209265e250eb8812ce723103f7101d3acbcd7c4",
+    "conflicts": [
+      "packages/core/src/shell.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "bc5ebf00a4c169ece10f276e6ce02eaf18c326e6",
+    "subject": "fix(core): retry snapshot capture when concurrent Git writes collide on Windows (#56190)",
+    "files": [
+      "packages/core/src/git.ts"
+    ],
+    "lines": 32,
+    "clean": false,
+    "tree": "8459ec84fcce21bf5f05ca039f7af19f85cc5b30",
+    "conflicts": [
+      "packages/core/src/git.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "538f8b1da624a4c0b343562af79a85c4c95f88a4",
+    "subject": "fix(core): respell variants when config changes a catalog model's package (#55962)",
+    "files": [
+      "packages/core/src/config/plugin/provider.ts",
+      "packages/core/test/config/provider.test.ts"
+    ],
+    "lines": 76,
+    "clean": false,
+    "tree": "51f77b3cb5675803efb484507e53567e5da9e7d0",
+    "conflicts": [
+      "packages/core/src/config/plugin/provider.ts",
+      "packages/core/test/config/provider.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "4cce6aef4e6578a2f72afd82b7fdadc9a5733df1",
+    "subject": "fix(core): prioritize preferred free OpenCode models when signed out (#55972)",
+    "files": [
+      "packages/core/src/model.ts",
+      "packages/core/test/catalog.test.ts"
+    ],
+    "lines": 36,
+    "clean": false,
+    "tree": "5fc71ac6163b85d0250b14ee9a130c1a983a44ab",
+    "conflicts": [
+      "packages/core/src/model.ts",
+      "packages/core/test/catalog.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "e3d5a3bdd3ba601497d3e08a18107e252a0b3414",
+    "subject": "fix(core): hide newer Bedrock bare IDs that require inference profiles (#54486)",
+    "files": [
+      "packages/core/src/plugin/models-dev.ts"
+    ],
+    "lines": 8,
+    "clean": false,
+    "tree": "d3aeabfb893d8e794ee40a7bc25bc07390c6e1f7",
+    "conflicts": [
+      "packages/core/src/plugin/models-dev.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "7a4a03212e29301b08286f9f0ae2cc6a5315e621",
+    "subject": "fix(core): seed configured limits before model transforms (#55778)",
+    "files": [
+      "packages/core/src/config/plugin/provider.ts",
+      "packages/core/test/config/provider.test.ts"
+    ],
+    "lines": 16,
+    "clean": false,
+    "tree": "14bf70434b0ac8773746f16f59ea2c5f2c3383ce",
+    "conflicts": [
+      "packages/core/src/config/plugin/provider.ts",
+      "packages/core/test/config/provider.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "8db638c53ca568028c915e593277b1a14a1e03fe",
+    "subject": "fix(core): default to big-pickle when only free OpenCode models are available (#55852)",
+    "files": [
+      "packages/core/src/model.ts",
+      "packages/core/test/catalog.test.ts"
+    ],
+    "lines": 64,
+    "clean": false,
+    "tree": "9c9f72cd319db48ea22b4885e8e96a181c0ca2cd",
+    "conflicts": [
+      "packages/core/src/model.ts",
+      "packages/core/test/catalog.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "35bb8e44ef30b12a338b589ea9c37c8faeb1d496",
+    "subject": "fix(core): treat empty configured provider and model names as omitted (#55465)",
+    "files": [
+      "packages/core/src/config/plugin/provider.ts"
+    ],
+    "lines": 6,
+    "clean": false,
+    "tree": "21c08bc1e94f518dbbeca6af7198f7a62f00880b",
+    "conflicts": [
+      "packages/core/src/config/plugin/provider.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "43bb7ba3a2855c26ff0e7db261cd3098efce6b61",
+    "subject": "fix(core): let v1 npm config target built-in provider routes (#55254)",
+    "files": [
+      "packages/core/src/v1/config/migrate.ts",
+      "packages/core/test/config/provider.test.ts"
+    ],
+    "lines": 25,
+    "clean": false,
+    "tree": "c98f9a73187b4e489a07dc814ea270e79e2e2aaa",
+    "conflicts": [
+      "packages/core/src/v1/config/migrate.ts",
+      "packages/core/test/config/provider.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "460c626acd9e3de8fdffc27bde99bb5f070bb70f",
+    "subject": "fix(core): disable Bun's fetch idle timeout for provider requests (#55007)",
+    "files": [
+      "packages/core/src/effect/app-node-platform.ts"
+    ],
+    "lines": 16,
+    "clean": false,
+    "tree": "2201c52eb7ad8817e93ed7a75707d8d8d4ae8b67",
+    "conflicts": [
+      "packages/core/src/effect/app-node-platform.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "bd23808adfdbd7f0fe693b8f0d3afd59ee214e81",
+    "subject": "fix(tui): report x64 emulation on Windows ARM64 (#54984)",
+    "files": [
+      "packages/core/src/plugin/skill.ts",
+      "packages/tui/src/util/system.ts"
+    ],
+    "lines": 10,
+    "clean": false,
+    "tree": "c1ebd08b314223be1d94a253f8201356fd39dcd4",
+    "conflicts": [
+      "packages/core/src/plugin/skill.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "126b7b633b369a50e11002c7a02784848f8d8c19",
+    "subject": "fix(core): extract ripgrep on Windows without PowerShell (#54981)",
+    "files": [
+      "packages/core/src/ripgrep/binary.ts"
+    ],
+    "lines": 40,
+    "clean": false,
+    "tree": "302fa759ad28f49601cc06174fb5954778557dc0",
+    "conflicts": [
+      "packages/core/src/ripgrep/binary.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "7bac892c734a70515ebd36bed298278458458b7c",
+    "subject": "fix(core): stop listing Azure resources at startup (#54870)",
+    "files": [
+      "packages/core/src/plugin/provider/azure.ts",
+      "packages/core/test/plugin/provider-azure.test.ts"
+    ],
+    "lines": 136,
+    "clean": false,
+    "tree": "8a2586b9e07f75ba3fca1300f50255089882307a",
+    "conflicts": [
+      "packages/core/src/plugin/provider/azure.ts",
+      "packages/core/test/plugin/provider-azure.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "5683367e27130fabcd1b5705115eaa5d9f9966e8",
+    "subject": "fix(core): send unknown v1 openai-compatible model options in the request body (#54694)",
+    "files": [
+      "packages/core/src/v1/config/migrate.ts",
+      "packages/core/src/v1/config/provider-options.ts",
+      "packages/core/test/config/config.test.ts",
+      "packages/core/test/config/provider-options.test.ts"
+    ],
+    "lines": 81,
+    "clean": false,
+    "tree": "0d3578b56af40a1e4ceee9a676fe0147afec5424",
+    "conflicts": [
+      "packages/core/src/v1/config/migrate.ts",
+      "packages/core/src/v1/config/provider-options.ts",
+      "packages/core/test/config/provider-options.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "823ac87f583336c39449444920144d346a1e3d6c",
+    "subject": "fix(core): follow models.dev packages for Copilot fallback routing (#54210)",
+    "files": [
+      "packages/core/src/plugin/provider/github-copilot.ts"
+    ],
+    "lines": 14,
+    "clean": false,
+    "tree": "41f2ed56e775430dea5907c22cf8120134815b8f",
+    "conflicts": [
+      "packages/core/src/plugin/provider/github-copilot.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "1a9e29a0b991c953a33c42d29a9e10eecf8eacb0",
+    "subject": "fix(core): route Copilot Gemini fallback to chat completions (#54208)",
+    "files": [
+      "packages/core/src/plugin/provider/github-copilot.ts",
+      "packages/core/test/plugin/provider-github-copilot.test.ts"
+    ],
+    "lines": 14,
+    "clean": false,
+    "tree": "4bccd32b996736fa73b1289bd73676f730ab57bf",
+    "conflicts": [
+      "packages/core/src/plugin/provider/github-copilot.ts",
+      "packages/core/test/plugin/provider-github-copilot.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "b2a3926e87e35fc7f6308521c4418067cddd5d0e",
+    "subject": "fix(core): accept interleaved Copilot reasoning_opaque values (#54207)",
+    "files": [
+      "packages/core/src/github-copilot/chat/convert-to-openai-compatible-chat-messages.ts",
+      "packages/core/src/github-copilot/chat/openai-compatible-chat-language-model.ts",
+      "packages/core/test/github-copilot/convert-to-copilot-messages.test.ts",
+      "packages/core/test/github-copilot/copilot-chat-model.test.ts"
+    ],
+    "lines": 110,
+    "clean": true,
+    "tree": "adde370e6a490f0875cd5cdac4da919ad8cff59b",
+    "conflicts": [],
+    "error": "",
+    "changes": "5\t3\tpackages/core/src/github-copilot/chat/convert-to-openai-compatible-chat-messages.ts\n3\t11\tpackages/core/src/github-copilot/chat/openai-compatible-chat-language-model.ts\n42\t0\tpackages/core/test/github-copilot/convert-to-copilot-messages.test.ts\n46\t0\tpackages/core/test/github-copilot/copilot-chat-model.test.ts"
+  },
+  {
+    "sha": "9f282f8c2c3285c34b2be5a75921d588765c13fc",
+    "subject": "fix(core): accept interleaved Copilot reasoning_opaque values (#54201)",
+    "files": [
+      "packages/core/src/github-copilot/chat/convert-to-openai-compatible-chat-messages.ts",
+      "packages/core/src/github-copilot/chat/openai-compatible-chat-language-model.ts",
+      "packages/core/test/github-copilot/convert-to-copilot-messages.test.ts",
+      "packages/core/test/github-copilot/copilot-chat-model.test.ts"
+    ],
+    "lines": 110,
+    "clean": true,
+    "tree": "db6378ce297e87edd7ab7cd7ec77e1bf3b1979f4",
+    "conflicts": [],
+    "error": "",
+    "changes": "5\t3\tpackages/core/src/github-copilot/chat/convert-to-openai-compatible-chat-messages.ts\n3\t11\tpackages/core/src/github-copilot/chat/openai-compatible-chat-language-model.ts\n42\t0\tpackages/core/test/github-copilot/convert-to-copilot-messages.test.ts\n46\t0\tpackages/core/test/github-copilot/copilot-chat-model.test.ts"
+  },
+  {
+    "sha": "d2d50aaae1012b952166d093fdd56dd99beef23f",
+    "subject": "fix(core): shorten Bedrock profile picker copy (#54055)",
+    "files": [
+      "packages/core/src/plugin/provider/amazon-bedrock.ts"
+    ],
+    "lines": 7,
+    "clean": false,
+    "tree": "290e0bba2893ddbb45180c3fbd6619a3049f9b27",
+    "conflicts": [
+      "packages/core/src/plugin/provider/amazon-bedrock.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "1a8988efe0f077f24d26d32c48ad8d44fafe8d0f",
+    "subject": "fix(session-ui): reuse complete patch diffs instead of re-diffing (#54017)",
+    "files": [
+      "packages/session-ui/src/components/session-diff.test.ts",
+      "packages/session-ui/src/components/session-diff.ts"
+    ],
+    "lines": 177,
+    "clean": false,
+    "tree": "fa2879cb8611fe22a73ffd0b854547a6ab5baa2c",
+    "conflicts": [
+      "packages/session-ui/src/components/session-diff.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "56ab74328961e374858d85cdef558604ea91352a",
+    "subject": "fix(core): batch tree diff selections on every platform (#53956)",
+    "files": [
+      "packages/core/src/git.ts",
+      "packages/core/test/git.test.ts"
+    ],
+    "lines": 76,
+    "clean": false,
+    "tree": "4e04954d080a9dbc750f299fd4e815595d290978",
+    "conflicts": [
+      "packages/core/src/git.ts",
+      "packages/core/test/git.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "5e2df97a8945faa59064682c1160aadaee1b8ded",
+    "subject": "fix(provider): accept OpenAI ultrafast service tier (#53875)",
+    "files": [
+      "packages/opencode/test/provider/openai.test.ts",
+      "patches/@ai-sdk%2Fopenai@3.0.88.patch"
+    ],
+    "lines": 208,
+    "clean": true,
+    "tree": "37513954eaf37b0f83c0926be6c5ac4c71c53853",
+    "conflicts": [],
+    "error": "",
+    "changes": "32\t0\tpackages/opencode/test/provider/openai.test.ts\n172\t4\tpatches/@ai-sdk%2Fopenai@3.0.88.patch"
+  },
+  {
+    "sha": "9e100f4f886aebea79ac269b6a0a18056c34979e",
+    "subject": "fix(ui): render dollar math next to punctuation without matching prices (#53860)",
+    "files": [
+      "bun.lock",
+      "packages/session-ui/src/components/markdown-stream.ts",
+      "packages/ui/package.json",
+      "packages/ui/src/context/marked-parser.test.ts",
+      "packages/ui/src/context/marked-parser.tsx"
+    ],
+    "lines": 183,
+    "clean": false,
+    "tree": "5214836acc8d1d5c1976ac7a33a57ff803f120e2",
+    "conflicts": [
+      "bun.lock",
+      "packages/session-ui/src/components/markdown-stream.ts",
+      "packages/ui/src/context/marked-parser.test.ts",
+      "packages/ui/src/context/marked-parser.tsx"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "a19285d10dc23dfe0f9e22ee6812b9966bea03d2",
+    "subject": "fix(core): bundle compatible provider entrypoints (#53854)",
+    "files": [
+      "packages/core/src/provider.ts"
+    ],
+    "lines": 9,
+    "clean": false,
+    "tree": "d2d1ac8d692b8c86260edc3c88c95118368e0343",
+    "conflicts": [
+      "packages/core/src/provider.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "d5154fb74ea65542624c3345bd5a243a2369922e",
+    "subject": "fix(core): bypass gray-matter content cache when parsing frontmatter (#51245)",
+    "files": [
+      "packages/core/src/config/markdown.ts",
+      "packages/core/test/config/markdown.test.ts"
+    ],
+    "lines": 43,
+    "clean": true,
+    "tree": "ab07d615e172be064c7d7dc744633962e11b2d4c",
+    "conflicts": [],
+    "error": "",
+    "changes": "6\t2\tpackages/core/src/config/markdown.ts\n35\t0\tpackages/core/test/config/markdown.test.ts"
+  },
+  {
+    "sha": "e2979039f114a47848fb9edfaf63337b91b57539",
+    "subject": "fix(core): bump session time_updated on step lifecycle events (#49105)",
+    "files": [
+      "packages/core/src/session/projector.ts",
+      "packages/core/test/session-projector.test.ts"
+    ],
+    "lines": 78,
+    "clean": false,
+    "tree": "eb89669dfff45cb578f99011d0ac77d0359edb85",
+    "conflicts": [
+      "packages/core/src/session/projector.ts",
+      "packages/core/test/session-projector.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "0b6b00764fb18223cca4ae07850434a1bdd791f5",
+    "subject": "fix(ui): soften markdown bold weight to 670 (#52714)",
+    "files": [
+      "packages/ui/src/styles/theme.css"
+    ],
+    "lines": 2,
+    "clean": false,
+    "tree": "12b808cbe28fae166c25af8926269f89a11cabcb",
+    "conflicts": [
+      "packages/ui/src/styles/theme.css"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "a701129184b179df76473cdc2816f39ce7364ec4",
+    "subject": "fix(core): release unread Console config responses (#53409)",
+    "files": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "lines": 28,
+    "clean": false,
+    "tree": "5efe828caecf31380abbe405ff374252c8e2f58f",
+    "conflicts": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "cb389aa679bbba0c2d64f3c17082b9f39c4f0512",
+    "subject": "fix(core): honor compaction agent model for summaries (#53276)",
+    "files": [
+      "packages/core/src/session/compaction.ts",
+      "packages/core/test/config/compaction.test.ts",
+      "packages/core/test/session-compaction.test.ts",
+      "packages/core/test/session-native-compaction.test.ts"
+    ],
+    "lines": 49,
+    "clean": false,
+    "tree": "c18a564b6497fdbe84707ab1780b754d02993bc9",
+    "conflicts": [
+      "packages/core/src/session/compaction.ts",
+      "packages/core/test/config/compaction.test.ts",
+      "packages/core/test/session-compaction.test.ts",
+      "packages/core/test/session-native-compaction.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "334f7a3510dc6a77b75b17c21a06030a3ba3d3db",
+    "subject": "fix(core): keep the first PTY output after spawn (#52960)",
+    "files": [
+      "bun.lock",
+      "packages/core/package.json"
+    ],
+    "lines": 6,
+    "clean": false,
+    "tree": "87d3f3905de3b9ea044a3fda423235e241e68776",
+    "conflicts": [
+      "bun.lock",
+      "packages/core/package.json"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "149acd71413d5921ad509a3786a6c9dbc89a5f6e",
+    "subject": "fix(plugin): forward session update metadata (#52434)",
+    "files": [
+      "packages/core/src/plugin/host.ts"
+    ],
+    "lines": 2,
+    "clean": false,
+    "tree": "5adc8dfc8ad78fc5db3b7eb9fa5c2009114e06ce",
+    "conflicts": [
+      "packages/core/src/plugin/host.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "629e7aaa31ea7b9957cfd92ca285191392413983",
+    "subject": "fix(session-ui): increase markdown bold weight (#52389)",
+    "files": [
+      "packages/session-ui/src/components/markdown.css",
+      "packages/ui/src/styles/theme.css"
+    ],
+    "lines": 3,
+    "clean": true,
+    "tree": "4cbb30006cd0b7c55fe8188fdb86b3b2d58043a4",
+    "conflicts": [],
+    "error": "",
+    "changes": "1\t1\tpackages/session-ui/src/components/markdown.css\n1\t0\tpackages/ui/src/styles/theme.css"
+  },
+  {
+    "sha": "e9f8a210b9e2b1e13d375b84906069886eb3b767",
+    "subject": "fix(opencode): add namespaced session identity headers (#52370)",
+    "files": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts",
+      "packages/opencode/src/session/llm/request.ts",
+      "packages/opencode/test/session/llm.test.ts"
+    ],
+    "lines": 158,
+    "clean": true,
+    "tree": "3cfc4729442cadf9f772832c142828512d3df3ce",
+    "conflicts": [],
+    "error": "",
+    "changes": "2\t0\tpackages/core/src/session/runner/llm.ts\n10\t1\tpackages/core/test/session-runner.test.ts\n2\t0\tpackages/opencode/src/session/llm/request.ts\n80\t63\tpackages/opencode/test/session/llm.test.ts"
+  },
+  {
+    "sha": "9b4882db54627f2656a6990daafa412f9f3c7c82",
+    "subject": "fix(opencode): ad-hoc re-sign darwin binaries after local compile (#52183)",
+    "files": [
+      "packages/opencode/script/build.ts"
+    ],
+    "lines": 6,
+    "clean": false,
+    "tree": "f543d2773a4127998c7178c5777852010ab582d3",
+    "conflicts": [
+      "packages/opencode/script/build.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "760f87fab1842170c70f43ad7fa38f8bf0aa19e4",
+    "subject": "fix(core): pass through Copilot Responses settings (#52182)",
+    "files": [
+      "packages/core/src/github-copilot/responses/openai-responses-language-model.ts"
+    ],
+    "lines": 150,
+    "clean": false,
+    "tree": "f11e9f083d40d5ee32ee0aac168226a7963d7607",
+    "conflicts": [
+      "packages/core/src/github-copilot/responses/openai-responses-language-model.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "89d37a0f6de691979f65e52ba35913b5f0b957bf",
+    "subject": "fix(core): restrict database files to their owner (#52150)",
+    "files": [
+      "packages/core/src/database/database.ts",
+      "packages/core/test/database.test.ts"
+    ],
+    "lines": 65,
+    "clean": false,
+    "tree": "40fa58310c34cc2547297a434094d3340910aa38",
+    "conflicts": [
+      "packages/core/src/database/database.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "b29dab3231d40e9c13b6d3732b4af5e7705cbf03",
+    "subject": "fix(core): drop SSO link from Console sign-in error (#52062)",
+    "files": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "lines": 6,
+    "clean": false,
+    "tree": "60f3441014602959d3d163cc6cec01e5016da6df",
+    "conflicts": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "3babae35c0c4b88a1c799ccebb8f8be13fbd9c01",
+    "subject": "fix(core): fall back to Cloudflare environment IDs when not configured (#51963)",
+    "files": [
+      "packages/core/src/plugin/provider/cloudflare-ai-gateway.ts",
+      "packages/core/src/plugin/provider/cloudflare-workers-ai.ts",
+      "packages/core/test/plugin/provider-cloudflare-ai-gateway.test.ts",
+      "packages/core/test/plugin/provider-cloudflare-workers-ai.test.ts"
+    ],
+    "lines": 136,
+    "clean": false,
+    "tree": "b129e717cbf09bd1fdd23468f56dc79c969e9303",
+    "conflicts": [
+      "packages/core/src/plugin/provider/cloudflare-ai-gateway.ts",
+      "packages/core/test/plugin/provider-cloudflare-ai-gateway.test.ts",
+      "packages/core/test/plugin/provider-cloudflare-workers-ai.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "39e1ce55bccb4ab1761c1edee7a5bfbefe6c1a49",
+    "subject": "fix(core): reject relative path segments in repository hosts (#51577)",
+    "files": [
+      "packages/core/src/repository.ts",
+      "packages/core/test/repository.test.ts"
+    ],
+    "lines": 21,
+    "clean": true,
+    "tree": "8aadeaac84addb25b1c906d70faa96ea73c85dff",
+    "conflicts": [],
+    "error": "",
+    "changes": "2\t1\tpackages/core/src/repository.ts\n18\t0\tpackages/core/test/repository.test.ts"
+  },
+  {
+    "sha": "35fc7a776cddb72d334ee60590c3cce41154be05",
+    "subject": "fix(opencode): apply provider timeouts to Cloudflare AI Gateway models (#51549)",
+    "files": [
+      "packages/opencode/src/provider/provider.ts",
+      "packages/opencode/test/provider/header-timeout.test.ts"
+    ],
+    "lines": 204,
+    "clean": false,
+    "tree": "55dd43c2114909b05a351a5af0937bb84f5899a0",
+    "conflicts": [
+      "packages/opencode/src/provider/provider.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "b471c2b4495747353af768fbf2e0790c9d820ce2",
+    "subject": "fix(opencode): catch completed MCP browser launcher failures (#51538)",
+    "files": [
+      "packages/opencode/src/mcp/browser.ts",
+      "packages/opencode/test/mcp/browser.test.ts"
+    ],
+    "lines": 43,
+    "clean": true,
+    "tree": "6f1eab3ead17e4027908b987c47abdd1e11693e8",
+    "conflicts": [],
+    "error": "",
+    "changes": "5\t2\tpackages/opencode/src/mcp/browser.ts\n36\t0\tpackages/opencode/test/mcp/browser.test.ts"
+  },
+  {
+    "sha": "03af821aa5c2c351a566528af565539097f48011",
+    "subject": "fix(core): restore the shell no-output placeholder (#51187)",
+    "files": [
+      "packages/core/src/shell.ts",
+      "packages/core/test/tool-shell.test.ts"
+    ],
+    "lines": 8,
+    "clean": false,
+    "tree": "c7b48af1bc377cb9d6571061113ce2b0b53defae",
+    "conflicts": [
+      "packages/core/src/shell.ts",
+      "packages/core/test/tool-shell.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "32d3535f66843733472aeb119bdd1192d6bc7aa0",
+    "subject": "fix(core): publish batched deltas before the next block starts (#51105)",
+    "files": [
+      "packages/core/src/session/runner/publish-llm-event.ts",
+      "packages/core/test/session-runner-tool-events.test.ts"
+    ],
+    "lines": 59,
+    "clean": false,
+    "tree": "9f38d6b463c5c8c4e4bcfb6a8e3d1b4475e6b857",
+    "conflicts": [
+      "packages/core/src/session/runner/publish-llm-event.ts",
+      "packages/core/test/session-runner-tool-events.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "7d1e212fb5afacce58865acb48b2f08cad4bb339",
+    "subject": "fix(core): route responses-only Copilot models to the Responses API (#51024)",
+    "files": [
+      "packages/core/src/plugin/provider/github-copilot.ts",
+      "packages/core/test/plugin/provider-github-copilot.test.ts"
+    ],
+    "lines": 72,
+    "clean": false,
+    "tree": "95788984b81b3c7092b0ee34e4c6146be1fef448",
+    "conflicts": [
+      "packages/core/src/plugin/provider/github-copilot.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "610df0b56674fa0ebcae89093ada08b98731bea6",
+    "subject": "fix(gemini): switch thinking default logic (#50841)",
+    "files": [
+      "packages/opencode/src/provider/transform.ts",
+      "packages/opencode/test/provider/transform.test.ts"
+    ],
+    "lines": 143,
+    "clean": false,
+    "tree": "bfa7c25ca193d8a237b936ba61bea3af8b27550e",
+    "conflicts": [
+      "packages/opencode/src/provider/transform.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "f0381e5da381c85a14fc8269265d21e5e5b1320d",
+    "subject": "fix(core): normalize AI SDK fragment boundaries (#50685)",
+    "files": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "lines": 137,
+    "clean": false,
+    "tree": "ed9c646e0c82aa78c56ffb71cf83aee6c541242c",
+    "conflicts": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "51d2b667600386684822ef6a9eff64f59542bdc5",
+    "subject": "fix(app): hide cached panel divider (#50437)",
+    "files": [
+      "packages/app/src/index.css"
+    ],
+    "lines": 2,
+    "clean": false,
+    "tree": "e1e38b539de48c71011ad25b24cbd3809419a3f5",
+    "conflicts": [
+      "packages/app/src/index.css"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "60673aaef38f395811c9616fdde80e53b8660bd3",
+    "subject": "fix(core): run session HTTP hooks on the AI SDK route (#50487)",
+    "files": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/src/plugin/provider/github-copilot.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "lines": 174,
+    "clean": false,
+    "tree": "dce1cd8ce15ef59802b99f1687b87519191e8204",
+    "conflicts": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/src/plugin/provider/github-copilot.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "9d531435b4138f0658abc4b80da1e47bd00ea6de",
+    "subject": "fix(desktop): stop signing macOS DMGs (#50469)",
+    "files": [
+      "packages/desktop/electron-builder.config.test.ts",
+      "packages/desktop/electron-builder.config.ts"
+    ],
+    "lines": 9,
+    "clean": true,
+    "tree": "b3418e2d7b2544b734d67921e25386bcec071213",
+    "conflicts": [],
+    "error": "",
+    "changes": "6\t0\tpackages/desktop/electron-builder.config.test.ts\n0\t3\tpackages/desktop/electron-builder.config.ts"
+  },
+  {
+    "sha": "f5ce4f881e477c7b75421cea2d20939f0ddd71fb",
+    "subject": "fix(core): break filesystem search import cycle (#50439)",
+    "files": [
+      "packages/core/src/filesystem/search.ts"
+    ],
+    "lines": 19,
+    "clean": true,
+    "tree": "e67a9e49ef375b27c15e792aaca0f67b1289fa23",
+    "conflicts": [],
+    "error": "",
+    "changes": "10\t9\tpackages/core/src/filesystem/search.ts"
+  },
+  {
+    "sha": "ba341c6cac5ed1ef867ef127245a42b5e33d4946",
+    "subject": "fix(core): resolve npm package entrypoint to a file under Node (#50413)",
+    "files": [
+      "packages/core/src/npm.ts",
+      "packages/core/test/npm.test.ts"
+    ],
+    "lines": 80,
+    "clean": true,
+    "tree": "3a9642975e3d983ea258d55f36fe51d90014ac6a",
+    "conflicts": [],
+    "error": "",
+    "changes": "9\t1\tpackages/core/src/npm.ts\n70\t0\tpackages/core/test/npm.test.ts"
+  },
+  {
+    "sha": "c10134729dd2ce00beb18604ec91f10319f59a78",
+    "subject": "fix(opencode): hoist Bedrock tool images except Claude, Nova, and Llama 4 (#50272)",
+    "files": [
+      "packages/opencode/src/session/message-v2.ts"
+    ],
+    "lines": 6,
+    "clean": true,
+    "tree": "411eeee2b6f21126ca7e477ea494d908829acfd9",
+    "conflicts": [],
+    "error": "",
+    "changes": "5\t1\tpackages/opencode/src/session/message-v2.ts"
+  },
+  {
+    "sha": "8bf288ecb15263f6a6bf4a82fa806975c6261046",
+    "subject": "fix(opencode): bump togetherai so streams report usage (#50264)",
+    "files": [
+      "bun.lock",
+      "packages/core/package.json",
+      "packages/opencode/package.json"
+    ],
+    "lines": 52,
+    "clean": false,
+    "tree": "f1434bf9c1273f3b6418bb24106e613e5d82fd31",
+    "conflicts": [
+      "bun.lock",
+      "packages/core/package.json",
+      "packages/opencode/package.json"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "1464545665ba892c2d2886f4456acc9a584aa156",
+    "subject": "fix(app): center timeline beside summary (#49620)",
+    "files": [
+      "packages/app/src/index.css"
+    ],
+    "lines": 8,
+    "clean": false,
+    "tree": "c7e2cffebaf0c8ad17a0a2358eda0efe1016224e",
+    "conflicts": [
+      "packages/app/src/index.css"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "7e88f6bb18072a60c746e0f4752eef0a580a3af4",
+    "subject": "perf(desktop): bundle the renderer's initial module graph as one chunk (#50110)",
+    "files": [
+      "packages/desktop/electron.vite.config.ts"
+    ],
+    "lines": 28,
+    "clean": false,
+    "tree": "2bb124ef94c92221e1b335917b72e0da002e79ee",
+    "conflicts": [
+      "packages/desktop/electron.vite.config.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "b81e10a461c7e14425dace720d3fb9ebd67b92f6",
+    "subject": "fix(core): re-read models.dev catalog after subscribing to Refreshed (#50012)",
+    "files": [
+      "packages/core/src/plugin/models-dev.ts",
+      "packages/core/test/plugin/models-dev.test.ts"
+    ],
+    "lines": 48,
+    "clean": false,
+    "tree": "79dcce0d7e3d64188b410e0e0aae5e8c90d1e5e5",
+    "conflicts": [
+      "packages/core/src/plugin/models-dev.ts",
+      "packages/core/test/plugin/models-dev.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "e50d845451afd5f584e6bf38300657e39bbaa25a",
+    "subject": "fix(desktop): run WSL commands with --exec so inline scripts are not pre-expanded (#49902)",
+    "files": [
+      "packages/desktop/src/main/wsl/runtime.test.ts",
+      "packages/desktop/src/main/wsl/runtime.ts"
+    ],
+    "lines": 39,
+    "clean": true,
+    "tree": "4a45d6515da0cb3d01a72934655ec85ddfdc5735",
+    "conflicts": [],
+    "error": "",
+    "changes": "35\t0\tpackages/desktop/src/main/wsl/runtime.test.ts\n3\t1\tpackages/desktop/src/main/wsl/runtime.ts"
+  },
+  {
+    "sha": "e9201ce93382f5b4ff9626c5ce71f7b2af333c56",
+    "subject": "fix(core): retain console config after refresh errors (#49873)",
+    "files": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "lines": 24,
+    "clean": false,
+    "tree": "513c6f1c60b64ba60c77b0d3eb9c5ff14cb266a6",
+    "conflicts": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "c3bf8864b9d4c82506c01bf9f47f8977bfbc197b",
+    "subject": "perf(ui): let the resize observer take the first scrollbar measurement (#49778)",
+    "files": [
+      "packages/ui/src/components/scroll-view.tsx"
+    ],
+    "lines": 18,
+    "clean": false,
+    "tree": "376da068b7809565cb54b4b4d79248cde4010716",
+    "conflicts": [
+      "packages/ui/src/components/scroll-view.tsx"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "971f4e558ef046382f882fb9014c9e1e958fd2c1",
+    "subject": "perf(desktop): load node-pty when an interactive WSL install starts (#49789)",
+    "files": [
+      "packages/desktop/src/main/wsl/runtime.ts"
+    ],
+    "lines": 10,
+    "clean": false,
+    "tree": "df440fc06254591b6e7fb12e729ef6c100b96c57",
+    "conflicts": [
+      "packages/desktop/src/main/wsl/runtime.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "e755fce13dbd394b504bc29bd7d4a766c5912f91",
+    "subject": "perf(desktop): leave declarations and source maps out of the asar (#49772)",
+    "files": [
+      "packages/desktop/electron-builder.config.test.ts",
+      "packages/desktop/electron-builder.config.ts"
+    ],
+    "lines": 19,
+    "clean": false,
+    "tree": "07942ce127f3d8e94137d844a672691fbf4eb710",
+    "conflicts": [
+      "packages/desktop/electron-builder.config.test.ts",
+      "packages/desktop/electron-builder.config.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "5eaed68c2bdf7a7fdde4ed086fff89f1e4bcbe9a",
+    "subject": "fix(core): refresh Console config every minute (#49233)",
+    "files": [
+      "packages/core/src/plugin/provider/opencode.ts"
+    ],
+    "lines": 2,
+    "clean": false,
+    "tree": "37a834a826641efa63ec679efc83da27e64c61a1",
+    "conflicts": [
+      "packages/core/src/plugin/provider/opencode.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "9bf5faa9785922c497b5453f76b84482bed01509",
+    "subject": "fix(core): reuse model catalog across credential changes (#49255)",
+    "files": [
+      "packages/core/src/model.ts",
+      "packages/core/src/provider.ts",
+      "packages/core/test/catalog.test.ts"
+    ],
+    "lines": 329,
+    "clean": false,
+    "tree": "8e55a5503a6e03b2d414ac1cef900cd54be843cb",
+    "conflicts": [
+      "packages/core/src/model.ts",
+      "packages/core/src/provider.ts",
+      "packages/core/test/catalog.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "fa3721fad604257ad44d851a016db9751b047396",
+    "subject": "fix(codemode): treat tools.search as the built-in search (#49249)",
+    "files": [
+      "packages/codemode/src/tool-runtime.ts",
+      "packages/codemode/test/tool-paths.test.ts"
+    ],
+    "lines": 22,
+    "clean": false,
+    "tree": "16c3500a00c1247a7820b8a762be35af96efac59",
+    "conflicts": [
+      "packages/codemode/src/tool-runtime.ts",
+      "packages/codemode/test/tool-paths.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "e31ad14c1d393d9199d7663a56e0329d068787df",
+    "subject": "fix(core): surface authorization cause in error message (#49214)",
+    "files": [
+      "packages/core/src/integration.ts",
+      "packages/core/test/integration.test.ts"
+    ],
+    "lines": 23,
+    "clean": false,
+    "tree": "a1889b769cef26a65164ec2a652c815e94d12f5d",
+    "conflicts": [
+      "packages/core/test/integration.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "a9a6fad0fae42af99b9f4b1d4ff519a979f16c90",
+    "subject": "fix(opencode): request summarized adaptive thinking (#48269)",
+    "files": [
+      "packages/opencode/src/plugin/github-copilot/models.ts"
+    ],
+    "lines": 2,
+    "clean": true,
+    "tree": "11711e42be9e0cac08038fd458c7104e7f999dd1",
+    "conflicts": [],
+    "error": "",
+    "changes": "1\t1\tpackages/opencode/src/plugin/github-copilot/models.ts"
+  },
+  {
+    "sha": "85dff53a1f2fc35d82e75f6e7bb3767dfe8c7e2a",
+    "subject": "fix(codemode): label supported and unsupported syntax in the hint (#48200)",
+    "files": [
+      "packages/codemode/src/interpreter/model.ts",
+      "packages/codemode/test/new-expression.test.ts"
+    ],
+    "lines": 10,
+    "clean": false,
+    "tree": "690ab5f515c5274937e94470a6ac53627b602ab4",
+    "conflicts": [
+      "packages/codemode/src/interpreter/model.ts",
+      "packages/codemode/test/new-expression.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "ba1448325a5c2713b20287fd9e41a911902c7b06",
+    "subject": "fix(core): exclude invalid Bedrock entries from models.dev imports (#48081)",
+    "files": [
+      "packages/core/src/plugin/models-dev.ts",
+      "packages/core/src/plugin/provider/amazon-bedrock.ts",
+      "packages/core/test/plugin/fixtures/models-dev-reasoning.json",
+      "packages/core/test/plugin/models-dev.test.ts",
+      "packages/core/test/plugin/provider-amazon-bedrock.test.ts"
+    ],
+    "lines": 105,
+    "clean": false,
+    "tree": "71f5847007ec9baeda78d84d76b79d05651d7a97",
+    "conflicts": [
+      "packages/core/src/plugin/models-dev.ts",
+      "packages/core/src/plugin/provider/amazon-bedrock.ts",
+      "packages/core/test/plugin/fixtures/models-dev-reasoning.json",
+      "packages/core/test/plugin/models-dev.test.ts",
+      "packages/core/test/plugin/provider-amazon-bedrock.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "d52380024de136d430823a9cd572cbdd1e15ee85",
+    "subject": "fix(core): drop gpt-5.4 models from the Codex allowlist (#48141)",
+    "files": [
+      "packages/core/src/plugin/provider/openai.ts",
+      "packages/core/test/plugin/provider-openai.test.ts"
+    ],
+    "lines": 9,
+    "clean": false,
+    "tree": "638307c5bc44fe04f46fe18aa66c7f29b8d1dcac",
+    "conflicts": [
+      "packages/core/src/plugin/provider/openai.ts",
+      "packages/core/test/plugin/provider-openai.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "f1eed8bf11c04d63b01d8bfd5b583fe2563635ea",
+    "subject": "fix(core): preserve legacy markdown agent variants",
+    "files": [
+      "packages/core/src/config/plugin/agent.ts",
+      "packages/core/test/config/agent.test.ts"
+    ],
+    "lines": 106,
+    "clean": false,
+    "tree": "f11968f68e300e272cf2fc4ef6e9ab0324e9dad6",
+    "conflicts": [
+      "packages/core/src/config/plugin/agent.ts",
+      "packages/core/test/config/agent.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "4ea368e09eeeefccde5bf3d7044f09678e8434fd",
+    "subject": "fix(core): exclude hidden glob matches before limiting results",
+    "files": [
+      "packages/core/src/ripgrep.ts",
+      "packages/core/test/ripgrep.test.ts",
+      "packages/core/test/tool-search.test.ts"
+    ],
+    "lines": 75,
+    "clean": false,
+    "tree": "fa5fd2b49f115344db69fdadca1490aca854ac80",
+    "conflicts": [
+      "packages/core/test/ripgrep.test.ts",
+      "packages/core/test/tool-search.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "1dcc6551d9428638984639bde2c7c14aea91d664",
+    "subject": "fix(core): preserve literal command arguments",
+    "files": [
+      "packages/core/src/config/plugin/command.ts",
+      "packages/core/test/config/command.test.ts"
+    ],
+    "lines": 69,
+    "clean": false,
+    "tree": "dc3e3ed825f25b397474bb68fdb26f109f51aafc",
+    "conflicts": [
+      "packages/core/src/config/plugin/command.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "cebd25022f2b5f9671c3f562ad430c34502ead7d",
+    "subject": "fix(core): honor device token organization (#46570)",
+    "files": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "lines": 187,
+    "clean": false,
+    "tree": "52dee4860dbefe14ad455865493964681efb7fd1",
+    "conflicts": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "f4dd76913f87187d0469467986a3ef118f98f62b",
+    "subject": "fix(session-ui): simplify file search styling (#48063)",
+    "files": [
+      "packages/session-ui/src/v2/components/session-review-v2.css"
+    ],
+    "lines": 8,
+    "clean": true,
+    "tree": "06339cb747c1ae8cbadcff9fb97928168170827d",
+    "conflicts": [],
+    "error": "",
+    "changes": "8\t0\tpackages/session-ui/src/v2/components/session-review-v2.css"
+  },
+  {
+    "sha": "fcafe82cdcbfbe555e9c71cb83f9e81fb538c0a5",
+    "subject": "fix(core): hide Bedrock bare IDs that require inference profiles (#48078)",
+    "files": [
+      "packages/core/src/plugin/provider/amazon-bedrock.ts",
+      "packages/core/test/plugin/provider-amazon-bedrock.test.ts"
+    ],
+    "lines": 76,
+    "clean": false,
+    "tree": "708939ca664cd923e3a6b1a2bab9b8e8e9a1b8bc",
+    "conflicts": [
+      "packages/core/src/plugin/provider/amazon-bedrock.ts",
+      "packages/core/test/plugin/provider-amazon-bedrock.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "e628143448512f97b2341fb0958064e150d84849",
+    "subject": "fix(core): drop retained-tail reference from compaction rules (#48074)",
+    "files": [
+      "packages/core/src/session/compaction.ts"
+    ],
+    "lines": 8,
+    "clean": false,
+    "tree": "257893ac6f4953cd9498f16920554d7ed6d898d6",
+    "conflicts": [
+      "packages/core/src/session/compaction.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "148042ab814a936572e856c34a0ba05dbd6798f3",
+    "subject": "fix(core): trim compaction summary prompt (#48058)",
+    "files": [
+      "packages/core/src/session/compaction.ts",
+      "packages/core/test/session-compaction.test.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 71,
+    "clean": false,
+    "tree": "f2ac72c789bba3e6f1e23ec5193fa4fc300938fb",
+    "conflicts": [
+      "packages/core/src/session/compaction.ts",
+      "packages/core/test/session-compaction.test.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "1ead17547b27c167d0838a40b5ea8b9a3ca96c38",
+    "subject": "fix(core): name hosted provider opencode web search (#48001)",
+    "files": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "lines": 22,
+    "clean": false,
+    "tree": "34ea6f8734c4496b0913f7c4aa501296fdda8545",
+    "conflicts": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "ac1758c0e6b8e7368be133e87e8e27a5f60dec04",
+    "subject": "fix: preserve Bedrock DeepSeek model ids (#34441)",
+    "files": [
+      "packages/core/src/plugin/provider/amazon-bedrock.ts",
+      "packages/core/test/plugin/provider-amazon-bedrock.test.ts",
+      "packages/opencode/src/provider/provider.ts",
+      "packages/opencode/test/provider/amazon-bedrock.test.ts"
+    ],
+    "lines": 60,
+    "clean": true,
+    "tree": "aae9e177c3a402bb671e81016dd47e0c059bddb5",
+    "conflicts": [],
+    "error": "",
+    "changes": "3\t1\tpackages/core/src/plugin/provider/amazon-bedrock.ts\n7\t0\tpackages/core/test/plugin/provider-amazon-bedrock.test.ts\n5\t1\tpackages/opencode/src/provider/provider.ts\n43\t0\tpackages/opencode/test/provider/amazon-bedrock.test.ts"
+  },
+  {
+    "sha": "50e17b7f95a27243bafa02e88c9ea108d92b3816",
+    "subject": "fix(desktop): use OpenCode-hosted update releases",
+    "files": [
+      "packages/desktop/electron-builder.config.ts"
+    ],
+    "lines": 4,
+    "clean": false,
+    "tree": "4857e29fa663007c86ed9a7d081befa9bda23dee",
+    "conflicts": [
+      "packages/desktop/electron-builder.config.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "fcddc84225b73a6b55769b3ab0f6b78a9bdb9931",
+    "subject": "fix(codemode): render empty tools as () and accept zero args (#47833)",
+    "files": [
+      "packages/codemode/src/tool-runtime.ts",
+      "packages/codemode/src/tool-schema.ts",
+      "packages/codemode/test/tool-paths.test.ts",
+      "packages/core/test/session-generate.test.ts"
+    ],
+    "lines": 31,
+    "clean": false,
+    "tree": "400544b19592b9aca2504e22deda2849c081fc6d",
+    "conflicts": [
+      "packages/codemode/src/tool-runtime.ts",
+      "packages/codemode/src/tool-schema.ts",
+      "packages/codemode/test/tool-paths.test.ts",
+      "packages/core/test/session-generate.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "9c65a69937ee43197121deea45af512662ead9c9",
+    "subject": "fix(core): support granular webfetch permissions (#46611)",
+    "files": [
+      "packages/core/src/v1/config/permission.ts",
+      "packages/core/test/config/config.test.ts",
+      "packages/web/src/content/docs/permissions.mdx"
+    ],
+    "lines": 11,
+    "clean": true,
+    "tree": "cee3f2697fbc702d00806fc7d192f63b86ed2efa",
+    "conflicts": [],
+    "error": "",
+    "changes": "1\t1\tpackages/core/src/v1/config/permission.ts\n3\t0\tpackages/core/test/config/config.test.ts\n5\t1\tpackages/web/src/content/docs/permissions.mdx"
+  },
+  {
+    "sha": "aa48433fa0cabad3fa33729663361ed93b10ea47",
+    "subject": "fix(core): send session ID with Copilot requests (#47213)",
+    "files": [
+      "packages/core/src/plugin/provider/github-copilot.ts",
+      "packages/core/test/plugin/provider-github-copilot.test.ts"
+    ],
+    "lines": 25,
+    "clean": false,
+    "tree": "398c563effd8f6163b55bb7b1da04c21590a8586",
+    "conflicts": [
+      "packages/core/src/plugin/provider/github-copilot.ts",
+      "packages/core/test/plugin/provider-github-copilot.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "baab05727d56678df1a34e263c8f757c55ffc01b",
+    "subject": "fix(core): compare Codex GPT versions by major and minor (#47404)",
+    "files": [
+      "packages/core/src/plugin/provider/openai.ts",
+      "packages/core/test/plugin/provider-openai.test.ts"
+    ],
+    "lines": 20,
+    "clean": false,
+    "tree": "7c79baa40a8220bc5e779e88ba8a77441e2f8ed4",
+    "conflicts": [
+      "packages/core/src/plugin/provider/openai.ts",
+      "packages/core/test/plugin/provider-openai.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "ffac1c5b11729befce8289ec6ce743ca648ac10c",
+    "subject": "fix(core): classify GitHub Copilot requests on every route (#47160)",
+    "files": [
+      "packages/core/src/plugin/provider/github-copilot.ts",
+      "packages/core/test/plugin/provider-github-copilot.test.ts"
+    ],
+    "lines": 122,
+    "clean": false,
+    "tree": "36538abf4de0aee043df6eeb08a343308b8623fa",
+    "conflicts": [
+      "packages/core/src/plugin/provider/github-copilot.ts",
+      "packages/core/test/plugin/provider-github-copilot.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "8889447f5a65a31205b13d4fa4ad1f0b55115f66",
+    "subject": "fix(core): scope compaction Completed section to finished work (#47203)",
+    "files": [
+      "packages/core/src/session/compaction.ts"
+    ],
+    "lines": 2,
+    "clean": true,
+    "tree": "386ef4ba85d55ab0e4ddbd9041098c350e85ac26",
+    "conflicts": [],
+    "error": "",
+    "changes": "1\t1\tpackages/core/src/session/compaction.ts"
+  },
+  {
+    "sha": "c9d240704d6eefc88b63a1eca2cb933b3eb70ed3",
+    "subject": "fix(core): settle abandoned compactions before resuming sessions (#47178)",
+    "files": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 110,
+    "clean": false,
+    "tree": "d36b17c4973da028b1840a6cef4da1daa0b38bb1",
+    "conflicts": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "7ba5f3e5b220adec95bbcea7bc7c6dd90acfc0b8",
+    "subject": "fix(core): restore Ctrl+C in Windows terminals (#47163)",
+    "files": [
+      "packages/core/src/pty/pty.bun.ts",
+      "packages/core/test/fixture/pty-windows.ts",
+      "packages/core/test/pty/pty-windows.test.ts"
+    ],
+    "lines": 126,
+    "clean": false,
+    "tree": "27291a8552d264647dc4e5cc300a42734be2cdb3",
+    "conflicts": [
+      "packages/core/src/pty/pty.bun.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "fa6e7e179d12a209cdae0bf96abb7fe1177e99be",
+    "subject": "fix(desktop): render before telemetry (#47102)",
+    "files": [
+      "packages/desktop/src/renderer/html.test.ts",
+      "packages/desktop/src/renderer/index.tsx"
+    ],
+    "lines": 9,
+    "clean": false,
+    "tree": "549f69ccca89f861bbdbf83516f2f25a2b8ded73",
+    "conflicts": [
+      "packages/desktop/src/renderer/index.tsx"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "36da0d5c77b58bca73ed0776d6f628723a9b8813",
+    "subject": "fix(core): retry failed location initialization (#46957)",
+    "files": [
+      "packages/core/src/location-services.ts",
+      "packages/core/test/location-layer.test.ts"
+    ],
+    "lines": 246,
+    "clean": false,
+    "tree": "94e735e4e6f1e64f2e038c9f6de9d0795e6b2d1e",
+    "conflicts": [
+      "packages/core/src/location-services.ts",
+      "packages/core/test/location-layer.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "206f51547cb273c6b206ca9a3a6bf2012d9ee56b",
+    "subject": "fix(core): reject GitHub Copilot login without chat entitlement (#46959)",
+    "files": [
+      "packages/core/src/plugin/provider/github-copilot.ts",
+      "packages/core/test/plugin/provider-github-copilot.test.ts"
+    ],
+    "lines": 69,
+    "clean": false,
+    "tree": "ce34f5c5de7f2854bea68a076af23f7bba418ab1",
+    "conflicts": [
+      "packages/core/src/plugin/provider/github-copilot.ts",
+      "packages/core/test/plugin/provider-github-copilot.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "cfe9f13963e62b6b29030d86f349decdde5bfa44",
+    "subject": "fix(ui): capitalize notices in used group (#46992)",
+    "files": [
+      "packages/ui/src/i18n/en.ts"
+    ],
+    "lines": 4,
+    "clean": false,
+    "tree": "b7ad283a62015353eebdac84959802ac6c032c76",
+    "conflicts": [
+      "packages/ui/src/i18n/en.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "050398f51f5581fb1b1cc2679eeb68cbe201b894",
+    "subject": "fix(core): preserve provider identity in catalog updates",
+    "files": [
+      "packages/core/src/catalog.ts",
+      "packages/core/test/catalog.test.ts"
+    ],
+    "lines": 27,
+    "clean": false,
+    "tree": "fd2f4b1b905d98027405cdf0a21b9da23966d0bc",
+    "conflicts": [
+      "packages/core/src/catalog.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "dea1f9cb7bf637fafa7ddb74b9424a87563deb02",
+    "subject": "fix(core): update plugin reload npm fixture (#46918)",
+    "files": [
+      "packages/core/test/plugin/supervisor-reload.test.ts"
+    ],
+    "lines": 24,
+    "clean": false,
+    "tree": "ec31fe0c7e40ea3aacbcfb85563763a04368e8c7",
+    "conflicts": [
+      "packages/core/test/plugin/supervisor-reload.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "44e0b353034ebed413cfe95e0c1938d68563ea48",
+    "subject": "fix(core): narrow compaction additional context guidance (#46889)",
+    "files": [
+      "packages/core/src/session/compaction.ts"
+    ],
+    "lines": 2,
+    "clean": false,
+    "tree": "e0062d5f220c0bde9df7a22075b5e9459f25b109",
+    "conflicts": [
+      "packages/core/src/session/compaction.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "4b6e879ba83fbc168fc2e3dcfc0beee49b4dd5ea",
+    "subject": "fix(core): subscribe before debouncing config plugin updates (#46874)",
+    "files": [
+      "packages/core/src/config/plugin/agent.ts",
+      "packages/core/src/config/plugin/command.ts",
+      "packages/core/test/config/agent.test.ts",
+      "packages/core/test/config/command.test.ts"
+    ],
+    "lines": 115,
+    "clean": false,
+    "tree": "356e65a1b9ee9dc16b58a746abcaa65f514700c0",
+    "conflicts": [
+      "packages/core/src/config/plugin/agent.ts",
+      "packages/core/src/config/plugin/command.ts",
+      "packages/core/test/config/agent.test.ts",
+      "packages/core/test/config/command.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "bbc44310dccb00e1fd60f081347a75ab6aa24600",
+    "subject": "fix(core): scope the migration lock to each database (#46866)",
+    "files": [
+      "packages/core/src/database/database.ts",
+      "packages/core/src/database/migration.ts",
+      "packages/core/test/database-migration.test.ts"
+    ],
+    "lines": 189,
+    "clean": false,
+    "tree": "181aa826ce0c95631fe6e2557b82c890ef10b6e0",
+    "conflicts": [
+      "packages/core/src/database/database.ts",
+      "packages/core/src/database/migration.ts",
+      "packages/core/test/database-migration.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "473c292521811f86bdc5af1fa374d5d3cbf8d96e",
+    "subject": "fix(core): discover project config once under symlinked paths (#46841)",
+    "files": [
+      "packages/core/src/config.ts",
+      "packages/core/test/config/config.test.ts"
+    ],
+    "lines": 71,
+    "clean": false,
+    "tree": "39922a558a9b8acff4c1996c4e06e30d908fdf36",
+    "conflicts": [
+      "packages/core/src/config.ts",
+      "packages/core/test/config/config.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "36095decd7457f4da1635fed80f3b1d25c8bddd1",
+    "subject": "fix(core): preserve unchanged plugin prefix (#46857)",
+    "files": [
+      "packages/core/src/plugin.ts",
+      "packages/core/test/plugin.test.ts"
+    ],
+    "lines": 125,
+    "clean": false,
+    "tree": "26312e996f6812e9a08e23d44e4a657f8a4da897",
+    "conflicts": [
+      "packages/core/src/plugin.ts",
+      "packages/core/test/plugin.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "e327f93711807cd2e17cf71f77da1daaa8ba7101",
+    "subject": "fix(core): copy models.dev snapshot without structuredClone (#46710)",
+    "files": [
+      "packages/core/src/plugin/models-dev.ts",
+      "packages/core/test/plugin/models-dev.test.ts"
+    ],
+    "lines": 77,
+    "clean": false,
+    "tree": "096e678c19e1e03d7dc2c6eca6a529149f160211",
+    "conflicts": [
+      "packages/core/src/plugin/models-dev.ts",
+      "packages/core/test/plugin/models-dev.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "2de99a28856f281a278111ab9e125d5b5c5f9bb4",
+    "subject": "fix(app): apply safe-area sizing to iOS home-screen apps (#46703)",
+    "files": [
+      "packages/app/src/entry.tsx",
+      "packages/app/src/index.css",
+      "packages/app/test-browser/pwa-route.test.ts"
+    ],
+    "lines": 18,
+    "clean": false,
+    "tree": "90a97ea9acaefc0da3db8a6032bf3b67a731bd40",
+    "conflicts": [
+      "packages/app/src/entry.tsx",
+      "packages/app/test-browser/pwa-route.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "ce6247bd2f2823242194346b02db068742608b80",
+    "subject": "fix(core): estimate context growth before compaction (#46543)",
+    "files": [
+      "packages/core/src/session/compaction.ts",
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/config/compaction.test.ts",
+      "packages/core/test/session-compaction.test.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 226,
+    "clean": false,
+    "tree": "bd948adc7e56b404ebaa670f86d3de06c5eac789",
+    "conflicts": [
+      "packages/core/src/session/compaction.ts",
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/config/compaction.test.ts",
+      "packages/core/test/session-compaction.test.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "cff1d0fe01e2d4c4af9786529edad645a5d5770e",
+    "subject": "fix(core): preserve legacy Console reasoning variants (#46586)",
+    "files": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "lines": 163,
+    "clean": false,
+    "tree": "8f1d9667ecafe2721b95462f73e142d98cf7fb6d",
+    "conflicts": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "6dd1733bbfb79319cde73c8fdd4bfdc626cc31c8",
+    "subject": "fix(core): preserve continuation across chained moves",
+    "files": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 67,
+    "clean": false,
+    "tree": "285a2bc2ca5d4d65fa87ba77d4c9dedde092c054",
+    "conflicts": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "9517ff1054bfbc185a8f8240ef7389ad388cfe16",
+    "subject": "fix(core): preserve active session continuation when moving",
+    "files": [
+      "packages/core/src/session.ts",
+      "packages/core/test/session-move.test.ts"
+    ],
+    "lines": 67,
+    "clean": false,
+    "tree": "4764299af313ef395bc91029883ef3efea9a9011",
+    "conflicts": [
+      "packages/core/src/session.ts",
+      "packages/core/test/session-move.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "51a082cea39821bab75eb2a810067ba4e73d9858",
+    "subject": "fix(core): release exited shell execution state (#46058)",
+    "files": [
+      "packages/core/src/shell.ts"
+    ],
+    "lines": 8,
+    "clean": false,
+    "tree": "f69d7c683b1d062e25c20cf2e9b2f38ff0290079",
+    "conflicts": [
+      "packages/core/src/shell.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "6809be2d0af6a6bfa20eddb65b107a26eeac1214",
+    "subject": "fix(core): reuse permission policy for pending approvals (#46050)",
+    "files": [
+      "packages/core/src/permission.ts",
+      "packages/core/test/permission.test.ts"
+    ],
+    "lines": 130,
+    "clean": false,
+    "tree": "649154cdecabf58bf6579f2b416e54dc18ea1b30",
+    "conflicts": [
+      "packages/core/src/permission.ts",
+      "packages/core/test/permission.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "d0baff184b61df1e7c90295b71fbe89b7da977e2",
+    "subject": "fix(core): make provider publication cancellation-safe (#46026)",
+    "files": [
+      "packages/core/src/session/runner/publish-llm-event.ts",
+      "packages/core/test/session-runner-tool-events.test.ts"
+    ],
+    "lines": 103,
+    "clean": false,
+    "tree": "2d793044b1d5ff52be44d3e076e4b64ec1f96f59",
+    "conflicts": [
+      "packages/core/src/session/runner/publish-llm-event.ts",
+      "packages/core/test/session-runner-tool-events.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "ee42eb3ca3c6c7763d21c5dfd0bbd9792cfe2eca",
+    "subject": "fix(core): render built-in command arguments (#45697)",
+    "files": [
+      "packages/core/src/plugin/command.ts",
+      "packages/core/test/plugin/command.test.ts"
+    ],
+    "lines": 55,
+    "clean": false,
+    "tree": "e49916698791441067f6a4439f1b0a1fd1299d2d",
+    "conflicts": [
+      "packages/core/src/plugin/command.ts",
+      "packages/core/test/plugin/command.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "a35f96f427e93cdfbfa7882d0c5ff1de7402f8b5",
+    "subject": "fix(core): preserve late opaque reasoning (#45694)",
+    "files": [
+      "packages/core/src/github-copilot/chat/openai-compatible-chat-language-model.ts",
+      "packages/core/test/github-copilot/copilot-chat-model.test.ts"
+    ],
+    "lines": 32,
+    "clean": true,
+    "tree": "59b547ba1d693af18495ae745bb9928f971036be",
+    "conflicts": [],
+    "error": "",
+    "changes": "5\t1\tpackages/core/src/github-copilot/chat/openai-compatible-chat-language-model.ts\n24\t2\tpackages/core/test/github-copilot/copilot-chat-model.test.ts"
+  },
+  {
+    "sha": "0593a6b8eb327c8c835c987dedec7a89cec7e0fb",
+    "subject": "fix(core): isolate models seed replay (#45686)",
+    "files": [
+      "packages/core/src/plugin/models-dev.ts",
+      "packages/core/test/plugin/models-dev.test.ts"
+    ],
+    "lines": 65,
+    "clean": false,
+    "tree": "feb0751ff40e610385537c9d5e5c7071c6142dc2",
+    "conflicts": [
+      "packages/core/src/plugin/models-dev.ts",
+      "packages/core/test/plugin/models-dev.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "134cdda333de5f23c59bbc18f79296409e5c1ebd",
+    "subject": "fix(core): normalize SDK file data (#45679)",
+    "files": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "lines": 139,
+    "clean": false,
+    "tree": "3c5b93f4146aec8fa5cfe6ee4de502a4e270800d",
+    "conflicts": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "d2ee536c16f7b5c6a678e4144d8a512bda19adb8",
+    "subject": "fix(core): classify AISDK network failures as transport errors (#45840)",
+    "files": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "lines": 112,
+    "clean": false,
+    "tree": "f1408dd3684767c7095219426965290b15d70cdf",
+    "conflicts": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "88988b8c12a169c9ecadbb44205207b95b756713",
+    "subject": "fix(core): preserve typed config test-layer errors (#45778)",
+    "files": [
+      "packages/core/src/config.ts",
+      "packages/core/test/config/config.test.ts"
+    ],
+    "lines": 51,
+    "clean": false,
+    "tree": "2e2c3a870cd6fad9da7d7500cce573c8519e0fe8",
+    "conflicts": [
+      "packages/core/src/config.ts",
+      "packages/core/test/config/config.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "d5be4cf88882c34304c7007c5cc2b1b63a42dbcc",
+    "subject": "fix(core): share native model defaults with v1 config migration (#45760)",
+    "files": [
+      "packages/core/src/v1/config/migrate.ts",
+      "packages/core/test/config/provider.test.ts",
+      "packages/schema/src/model.ts"
+    ],
+    "lines": 183,
+    "clean": false,
+    "tree": "89db22a2217b3079ac77ecb3c49c60f540864012",
+    "conflicts": [
+      "packages/core/test/config/provider.test.ts",
+      "packages/schema/src/model.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "4681c734b26fc6b138c17fd59cc1844caaf1c948",
+    "subject": "fix(desktop): bundle selected main-process dependencies (#45774)",
+    "files": [
+      "bun.lock",
+      "packages/desktop/electron.vite.config.test.ts",
+      "packages/desktop/electron.vite.config.ts",
+      "packages/desktop/package.json"
+    ],
+    "lines": 76,
+    "clean": false,
+    "tree": "062d86c414237d2d8caa2389d8d5a09045576067",
+    "conflicts": [
+      "bun.lock",
+      "packages/desktop/electron.vite.config.test.ts",
+      "packages/desktop/package.json"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "d432823515c3df6f3869309a6ad386d12c5c844f",
+    "subject": "fix(deps): upgrade diff to 8.0.4 (#45772)",
+    "files": [
+      "bun.lock",
+      "package.json",
+      "packages/session-ui/src/components/session-diff.test.ts"
+    ],
+    "lines": 43,
+    "clean": true,
+    "tree": "0078e4bfba0fe1b89753fc5c6eff4a29a7dfbc1b",
+    "conflicts": [],
+    "error": "",
+    "changes": "2\t2\tbun.lock\n1\t1\tpackage.json\n37\t0\tpackages/session-ui/src/components/session-diff.test.ts"
+  },
+  {
+    "sha": "454ed815567946d62db95f3571a082654c6d0869",
+    "subject": "fix(desktop): minify production bundles (#45770)",
+    "files": [
+      "packages/desktop/electron.vite.config.test.ts",
+      "packages/desktop/electron.vite.config.ts"
+    ],
+    "lines": 21,
+    "clean": false,
+    "tree": "249b079a5e2c10dc9388bbeb63fea09a54d735d8",
+    "conflicts": [
+      "packages/desktop/electron.vite.config.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "5d4ce14dc476123032ecbcff31bbd51f03831530",
+    "subject": "fix(core): skip tracing streamed LLM deltas (#45761)",
+    "files": [
+      "packages/core/src/session/runner/publish-llm-event.ts"
+    ],
+    "lines": 10,
+    "clean": false,
+    "tree": "25676e4b7a90c43856f533f14dd8dcb0bd8ad325",
+    "conflicts": [
+      "packages/core/src/session/runner/publish-llm-event.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "c3378f2d340625200f1f445a1f1b62e048f53e0f",
+    "subject": "fix(pty): upgrade opencode-pty to 0.1.12 (#45420)",
+    "files": [
+      "bun.lock",
+      "packages/cli/package.json",
+      "packages/core/package.json"
+    ],
+    "lines": 22,
+    "clean": false,
+    "tree": "da367c7db8466a0f09b688b4e990719a35107999",
+    "conflicts": [
+      "bun.lock",
+      "packages/cli/package.json",
+      "packages/core/package.json"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "5ac4156eb2803dbc6eb52e8b89a4914a701c124a",
+    "subject": "fix(core): preserve reasoning across model switches (#45401)",
+    "files": [
+      "packages/core/src/session/runner/to-llm-message.ts",
+      "packages/core/test/session-runner-message.test.ts"
+    ],
+    "lines": 5,
+    "clean": false,
+    "tree": "6f7b948413d939ab88c6363a77dca7c597e61f7f",
+    "conflicts": [
+      "packages/core/src/session/runner/to-llm-message.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "6170221e21891f21c6c1c3c7ea03066742b72ff6",
+    "subject": "fix(pty): upgrade opencode-pty to 0.1.11 (#45380)",
+    "files": [
+      "bun.lock",
+      "packages/cli/package.json",
+      "packages/core/package.json"
+    ],
+    "lines": 22,
+    "clean": false,
+    "tree": "2bb8ea86acc0fb6896a776a68eb66345c24f32c1",
+    "conflicts": [
+      "bun.lock",
+      "packages/cli/package.json",
+      "packages/core/package.json"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "018b4c40f3d63a6782d0975866b52678f5a925eb",
+    "subject": "fix(pty): upgrade opencode-pty to 0.1.10 (#45352)",
+    "files": [
+      "bun.lock",
+      "packages/cli/package.json",
+      "packages/core/package.json"
+    ],
+    "lines": 22,
+    "clean": false,
+    "tree": "2c2de98bc475497d36896690748899eeb1dcd0c9",
+    "conflicts": [
+      "bun.lock",
+      "packages/cli/package.json",
+      "packages/core/package.json"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "d562f6df1efc46fdd2bc18d3dfd41ceb88f02e66",
+    "subject": "fix(core): recover legacy database migration history (#45062)",
+    "files": [
+      "packages/core/src/database/migration.ts",
+      "packages/core/src/database/migration/20260410174513_workspace-name.ts",
+      "packages/core/test/database-migration.test.ts"
+    ],
+    "lines": 107,
+    "clean": false,
+    "tree": "d51bbabb0b5c9d313087827f73827e1ba90788c2",
+    "conflicts": [
+      "packages/core/test/database-migration.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "82947af8e375acbb86d726c65d57556296776909",
+    "subject": "fix(core): ignore SSE comment heartbeats (#43626)",
+    "files": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "lines": 70,
+    "clean": false,
+    "tree": "4f4db5f6f4c968721b7ae8df6847f41cb2d438f8",
+    "conflicts": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "5963a30621421af36567c6851001df75b092f6a1",
+    "subject": "fix(ui): restore stacked dialog focus (#44941)",
+    "files": [
+      "packages/ui/src/context/dialog.tsx"
+    ],
+    "lines": 4,
+    "clean": true,
+    "tree": "8a5dea6956f92593411251ea1aa964c8736d4f18",
+    "conflicts": [],
+    "error": "",
+    "changes": ""
+  },
+  {
+    "sha": "8be467de8d13fe80e02aba18d2c5674b344a94d6",
+    "subject": "fix(core): respect disabled Plan agent config (#44761)",
+    "files": [
+      "packages/core/src/plugin/internal.ts",
+      "packages/core/test/config/plugin.test.ts"
+    ],
+    "lines": 13,
+    "clean": false,
+    "tree": "6b57ed2b54b56599830af01a4dd6cc028749797a",
+    "conflicts": [
+      "packages/core/src/plugin/internal.ts",
+      "packages/core/test/config/plugin.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "0a410e404b6f240dca8e3a071b514b20c852ece9",
+    "subject": "fix(session-ui): show tool errors inline (#44632)",
+    "files": [
+      "packages/session-ui/src/components/tool-error-card.css",
+      "packages/session-ui/src/components/tool-error-card.tsx"
+    ],
+    "lines": 29,
+    "clean": false,
+    "tree": "42a7fdc701f45afc1a48ed2b88a12ad731763b70",
+    "conflicts": [
+      "packages/session-ui/src/components/tool-error-card.css",
+      "packages/session-ui/src/components/tool-error-card.tsx"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "971681c56786ead182ff2f01de89f24143959353",
+    "subject": "fix(image): degrade photon resizer load failure to typed error on workerd (#43894)",
+    "files": [
+      "packages/core/src/image/photon.ts"
+    ],
+    "lines": 26,
+    "clean": true,
+    "tree": "37541e0be28065952ea4f1dd4c1d548fb18d2ff3",
+    "conflicts": [],
+    "error": "",
+    "changes": "20\t6\tpackages/core/src/image/photon.ts"
+  },
+  {
+    "sha": "c6f4fa0d1fb1def613a61ccef590fa7e9b328c41",
+    "subject": "fix(core): never build fff index for workspace locations (#44563)",
+    "files": [
+      "packages/core/src/filesystem/search.ts",
+      "packages/core/test/filesystem/search.test.ts"
+    ],
+    "lines": 78,
+    "clean": false,
+    "tree": "7e72128e93abd8650fb5c916f7ded025b38acceb",
+    "conflicts": [
+      "packages/core/src/filesystem/search.ts",
+      "packages/core/test/filesystem/search.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "8887c2ffa922b056a7b3d26d061f9eb755a3492f",
+    "subject": "fix(core): skip host realpath canonicalization for workspace locations (#44564)",
+    "files": [
+      "packages/core/src/filesystem.ts",
+      "packages/core/test/location-filesystem.test.ts",
+      "packages/core/test/location-layer.test.ts"
+    ],
+    "lines": 66,
+    "clean": false,
+    "tree": "f6a9bfab3d2b72bcef1acb01a279f475a85044bf",
+    "conflicts": [
+      "packages/core/test/location-layer.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "f9bc94891200b1c89318d85e26b92ab2de15839e",
+    "subject": "fix(core): skip local liveness check for workspace locations (#44560)",
+    "files": [
+      "packages/core/src/location-services.ts",
+      "packages/core/test/location-layer.test.ts"
+    ],
+    "lines": 61,
+    "clean": false,
+    "tree": "268c1b01f110f71174c5563efff73b3887797b47",
+    "conflicts": [
+      "packages/core/src/location-services.ts",
+      "packages/core/test/location-layer.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "9e50d76416730b4e5c87856787d29f0bf6a2ed70",
+    "subject": "fix(codegen): write prettier-stable schema snapshot (#43985)",
+    "files": [
+      "packages/core/script/migration.ts"
+    ],
+    "lines": 15,
+    "clean": true,
+    "tree": "49701c976b7d468f196556bd1331ff353d3db7f2",
+    "conflicts": [],
+    "error": "",
+    "changes": "14\t1\tpackages/core/script/migration.ts"
+  },
+  {
+    "sha": "750f3384ffb051a730dffca0c0ab0e2ff5dd7273",
+    "subject": "fix(app): defer service worker takeover (#44374)",
+    "files": [
+      "packages/app/vite.config.ts"
+    ],
+    "lines": 4,
+    "clean": false,
+    "tree": "9939731cb576895021f4fe03785d6e85311f6eff",
+    "conflicts": [
+      "packages/app/vite.config.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "0fda7d1b33bdfa4fe41aad7b700dcdcd16837901",
+    "subject": "fix(session-ui): reduce tool error spacing (#44318)",
+    "files": [
+      "packages/session-ui/src/components/tool-error-card.css"
+    ],
+    "lines": 4,
+    "clean": true,
+    "tree": "be396446ba6806ea19d1ccc85f943645252960af",
+    "conflicts": [],
+    "error": "",
+    "changes": "2\t2\tpackages/session-ui/src/components/tool-error-card.css"
+  },
+  {
+    "sha": "a82318019f0b4ecbb73f93fed0873b7c2880ff04",
+    "subject": "fix(app): skip service worker in development (#44302)",
+    "files": [
+      "packages/app/src/entry.tsx"
+    ],
+    "lines": 2,
+    "clean": false,
+    "tree": "dd9dc066271316923038d38c2eb1e03188e744da",
+    "conflicts": [
+      "packages/app/src/entry.tsx"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "1ce7e90d3ef0109a7b9a1585cebc98f053398d18",
+    "subject": "fix(app): register service worker after load (#44294)",
+    "files": [
+      "packages/app/src/entry.tsx",
+      "packages/app/vite.config.ts"
+    ],
+    "lines": 5,
+    "clean": false,
+    "tree": "7a503679b32535c216064e02ac69bac6aa9f26f0",
+    "conflicts": [
+      "packages/app/vite.config.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "358a53cb1fd651efd4758a88c1ffdfbc183e6af2",
+    "subject": "fix(core): skip models.dev refresh event when the catalog is unchanged (#44282)",
+    "files": [
+      "packages/core/src/models-dev.ts",
+      "packages/core/test/models.test.ts"
+    ],
+    "lines": 142,
+    "clean": false,
+    "tree": "566e893d3ed23f69edc4ecdf41daf9291501f89d",
+    "conflicts": [
+      "packages/core/src/models-dev.ts",
+      "packages/core/test/models.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "93e1f383dd79683af4fc5ad139cea0516603c838",
+    "subject": "fix(app): allow selecting diff text (#44140)",
+    "files": [
+      "packages/session-ui/src/components/file.tsx"
+    ],
+    "lines": 2,
+    "clean": true,
+    "tree": "6726f0d65e1aeed7f656d3e3b89bb92e45a533d6",
+    "conflicts": [],
+    "error": "",
+    "changes": "1\t1\tpackages/session-ui/src/components/file.tsx"
+  },
+  {
+    "sha": "4aca1be9453097f0014df4f0d1083a028e24906a",
+    "subject": "fix(app): prevent duplicate web mounts (#44119)",
+    "files": [
+      "packages/app/src/entry.tsx"
+    ],
+    "lines": 4,
+    "clean": true,
+    "tree": "841f28a94d929eeac4eb430b0048beb7cdf80692",
+    "conflicts": [],
+    "error": "",
+    "changes": "3\t1\tpackages/app/src/entry.tsx"
+  },
+  {
+    "sha": "fa4c5b26dce42a2515ba1f02cc4af6fede581e9e",
+    "subject": "fix(core): stabilize forked message IDs (#44011)",
+    "files": [
+      "packages/core/src/session/projector.ts",
+      "packages/core/test/session-create.test.ts"
+    ],
+    "lines": 37,
+    "clean": false,
+    "tree": "b1d7349d47df61b6ba8479e1fa654235e0b11ec7",
+    "conflicts": [
+      "packages/core/src/session/projector.ts",
+      "packages/core/test/session-create.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "2937f0e635861a3e443c9c19b400fa26b13ecb1b",
+    "subject": "fix(core): omit running shells from forks (#44001)",
+    "files": [
+      "packages/core/src/session/projector.ts",
+      "packages/core/test/session-create.test.ts"
+    ],
+    "lines": 45,
+    "clean": false,
+    "tree": "e8609ad69bd1273ff6643a788eecf9be412c1b51",
+    "conflicts": [
+      "packages/core/src/session/projector.ts",
+      "packages/core/test/session-create.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "2c8e2a2b28e15cf74f217bf24084f5ad5e933088",
+    "subject": "fix(core): retry recreated locations (#44005)",
+    "files": [
+      "packages/core/src/location-services.ts",
+      "packages/core/src/session.ts",
+      "packages/core/test/location-layer.test.ts",
+      "packages/core/test/session-move.test.ts",
+      "packages/server/src/handlers/session.ts"
+    ],
+    "lines": 95,
+    "clean": false,
+    "tree": "a9986f798a7a4c0cf6b33a646cd0c8ded5f0b06d",
+    "conflicts": [
+      "packages/core/src/location-services.ts",
+      "packages/core/src/session.ts",
+      "packages/core/test/location-layer.test.ts",
+      "packages/core/test/session-move.test.ts",
+      "packages/server/src/handlers/session.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "59f0e3a378938bf31e69ac44db2b52006dde1193",
+    "subject": "fix(core): omit active assistants from forks (#43994)",
+    "files": [
+      "packages/core/src/session/projector.ts",
+      "packages/core/test/session-create.test.ts"
+    ],
+    "lines": 57,
+    "clean": false,
+    "tree": "ee87eaea6599c25c8dd7665844b4e85e38f38e06",
+    "conflicts": [
+      "packages/core/src/session/projector.ts",
+      "packages/core/test/session-create.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "b731b11184a4b03922150ccab3334c51afd53277",
+    "subject": "fix(core): recover unknown finish responses (#43900)",
+    "files": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 72,
+    "clean": false,
+    "tree": "4c6c19dbc301a319b6ccb122cb917af5828ac418",
+    "conflicts": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "b0ab1e2992f3d9f54a690eceb56412205dde85e4",
+    "subject": "fix(core): forward PDF prompt attachments (#43799)",
+    "files": [
+      "packages/core/src/session/runner/to-llm-message.ts",
+      "packages/core/test/session-model-request.test.ts",
+      "packages/core/test/session-runner-message.test.ts"
+    ],
+    "lines": 11,
+    "clean": false,
+    "tree": "e9581510d4f471f7619f92797c3306b169496a6b",
+    "conflicts": [
+      "packages/core/src/session/runner/to-llm-message.ts",
+      "packages/core/test/session-model-request.test.ts",
+      "packages/core/test/session-runner-message.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "b7343edaf3f47a903ca4e8da3c8bc7fb2b08737d",
+    "subject": "fix(core): skip equal snapshot comparisons (#43781)",
+    "files": [
+      "packages/core/src/session/runner/llm.ts"
+    ],
+    "lines": 8,
+    "clean": false,
+    "tree": "837d8d6e77c2211d07ab0813c6a600485b48b324",
+    "conflicts": [
+      "packages/core/src/session/runner/llm.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "5c4f6ef1e383f132fd89505073ed98f08ded1704",
+    "subject": "fix(core): continue interrupted model streams (#43757)",
+    "files": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 79,
+    "clean": false,
+    "tree": "ea9750404e0eda1bf728867fe45513cc8e279530",
+    "conflicts": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "4db272ff646e62f90353e177430b5cd620b40168",
+    "subject": "fix(core): steer manual compaction by default (#43724)",
+    "files": [
+      "packages/core/src/session.ts",
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-compact.test.ts",
+      "packages/core/test/session-runner.test.ts",
+      "packages/protocol/src/groups/session.ts"
+    ],
+    "lines": 96,
+    "clean": false,
+    "tree": "cc01c15c82add5ec56256870dcac61113db329bb",
+    "conflicts": [
+      "packages/core/src/session.ts",
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-compact.test.ts",
+      "packages/core/test/session-runner.test.ts",
+      "packages/protocol/src/groups/session.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "2938ac329803b09e9f719a9532a20db6f4e03a7d",
+    "subject": "fix(core): prevent shell eviction loop (#43650)",
+    "files": [
+      "packages/core/src/shell.ts",
+      "packages/core/test/tool-shell.test.ts"
+    ],
+    "lines": 28,
+    "clean": false,
+    "tree": "001ec1f8dfc34b315acd1a5b01327460eda5533a",
+    "conflicts": [
+      "packages/core/src/shell.ts",
+      "packages/core/test/tool-shell.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "22f2604ffa8222263a1f743838640afecf10fdde",
+    "subject": "fix(core): preserve unicode in compaction truncation",
+    "files": [
+      "packages/core/src/session/compaction.ts",
+      "packages/core/test/session-compaction.test.ts"
+    ],
+    "lines": 27,
+    "clean": false,
+    "tree": "f7d55881d077e54c6797a59b03f499926b8b385f",
+    "conflicts": [
+      "packages/core/src/session/compaction.ts",
+      "packages/core/test/session-compaction.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "838d74751412e0f9a38a2e3283fd867a36d76900",
+    "subject": "fix(core): revert SSE heartbeat handling (#43625)",
+    "files": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "lines": 70,
+    "clean": false,
+    "tree": "92cee4d5efef3232e8e35ede15598adeeb0c0330",
+    "conflicts": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "879766aee78d50d6aeed29e5381ac73c56d429be",
+    "subject": "fix(core): ignore SSE comment heartbeats (#43618)",
+    "files": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "lines": 70,
+    "clean": false,
+    "tree": "38f520e9a55a86302204071bb3851e4d186ddc34",
+    "conflicts": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "e37c7be434df039ff2e6c91be3870b6ed5cf1304",
+    "subject": "fix(app): resolve branch from active directory (#43579)",
+    "files": [
+      "packages/app/src/pages/new-session/new-session-workspace-controller.test.ts",
+      "packages/app/src/pages/new-session/new-session-workspace-controller.ts"
+    ],
+    "lines": 25,
+    "clean": false,
+    "tree": "1cd84eb7863543110197bd2ea9f1bce70b8f030f",
+    "conflicts": [
+      "packages/app/src/pages/new-session/new-session-workspace-controller.test.ts",
+      "packages/app/src/pages/new-session/new-session-workspace-controller.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "bfe9917ee795264545ec05c14c6ae17b7b9e6c93",
+    "subject": "fix(core): lower AI SDK system updates (#43440)",
+    "files": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "lines": 52,
+    "clean": false,
+    "tree": "b887e7028aa6f98105743a6995990bd95c4f15fd",
+    "conflicts": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "a2072532422f399ca0773b9fe90ac431db519a6d",
+    "subject": "fix(core): await snapshot state readiness (#43435)",
+    "files": [
+      "packages/core/src/session.ts",
+      "packages/core/test/session-prompt.test.ts"
+    ],
+    "lines": 56,
+    "clean": false,
+    "tree": "77dc34181eb77393b0670675969218410883342b",
+    "conflicts": [
+      "packages/core/src/session.ts",
+      "packages/core/test/session-prompt.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "510591356803e7fe6b56d77a30c0e028bb2580d5",
+    "subject": "perf(app): keep home session index query-local (#43191)",
+    "files": [
+      "packages/app/src/context/global-sync/home-session-index.ts",
+      "packages/app/src/pages/home/home-sessions-controller.tsx"
+    ],
+    "lines": 30,
+    "clean": false,
+    "tree": "57fd6c0b37c245d12d033c9a1f9dace851b5d90d",
+    "conflicts": [
+      "packages/app/src/context/global-sync/home-session-index.ts",
+      "packages/app/src/pages/home/home-sessions-controller.tsx"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "ea1ff90e42b5a36108d4c17c1743620c35ebfaa8",
+    "subject": "perf(fs): use augmented rope for text pagination (#42972)",
+    "files": [
+      "packages/core/src/tool/read-filesystem.ts",
+      "packages/core/test/tool-read-filesystem.test.ts"
+    ],
+    "lines": 134,
+    "clean": false,
+    "tree": "617ab86e2b96761242a02d7ed45302a163f2096b",
+    "conflicts": [
+      "packages/core/src/tool/read-filesystem.ts",
+      "packages/core/test/tool-read-filesystem.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "401a154ec3d75c0ea0ed0239623465752f7ce573",
+    "subject": "fix(app): keep server details editable (#43170)",
+    "files": [
+      "packages/app/src/components/dialog-select-server.tsx"
+    ],
+    "lines": 6,
+    "clean": true,
+    "tree": "8a5dea6956f92593411251ea1aa964c8736d4f18",
+    "conflicts": [],
+    "error": "",
+    "changes": ""
+  },
+  {
+    "sha": "1430a460f168249caedd2cd6c98a1d573c753576",
+    "subject": "fix(ui): smooth shimmer loop (#43144)",
+    "files": [
+      "packages/ui/src/components/text-shimmer.css",
+      "packages/ui/src/v2/components/text-shimmer-v2.css"
+    ],
+    "lines": 6,
+    "clean": true,
+    "tree": "26e7a27ac5d34bd009cbfd031a0a97438fc23b99",
+    "conflicts": [],
+    "error": "",
+    "changes": "2\t1\tpackages/ui/src/components/text-shimmer.css\n2\t1\tpackages/ui/src/v2/components/text-shimmer-v2.css"
+  },
+  {
+    "sha": "cf606660fb0f762d00ceceea8dc878d95d1ff002",
+    "subject": "fix(core): settle externally signaled shells (#43086)",
+    "files": [
+      "packages/core/src/shell.ts",
+      "packages/core/test/tool-shell.test.ts"
+    ],
+    "lines": 36,
+    "clean": false,
+    "tree": "6c5abf633892793e69961d52f5647775f4c22037",
+    "conflicts": [
+      "packages/core/src/shell.ts",
+      "packages/core/test/tool-shell.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "6359623e244a5e843aebf8027412bc83cbb6cc72",
+    "subject": "fix(ui): align settled animated numbers (#42998)",
+    "files": [
+      "packages/ui/src/components/animated-number.css",
+      "packages/ui/src/components/animated-number.tsx"
+    ],
+    "lines": 44,
+    "clean": true,
+    "tree": "907cca9d6edb9047d1841361b89264784f68d0b2",
+    "conflicts": [],
+    "error": "",
+    "changes": "29\t11\tpackages/ui/src/components/animated-number.css\n2\t2\tpackages/ui/src/components/animated-number.tsx"
+  },
+  {
+    "sha": "e26473f0bc7c1384bd39b0b2ddbc23487a7907e9",
+    "subject": "fix(app): show search result counts (#42992)",
+    "files": [
+      "packages/app/e2e/regression/session-timeline-tool-projection.spec.ts",
+      "packages/session-ui/src/components/message-part.tsx",
+      "packages/ui/src/i18n/en.ts"
+    ],
+    "lines": 31,
+    "clean": false,
+    "tree": "c5f860a70bb010b1a077d7bdeeefdff873545bcb",
+    "conflicts": [
+      "packages/app/e2e/regression/session-timeline-tool-projection.spec.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "c400746dd5bf5525469e773df5f54d5e35fea6d9",
+    "subject": "fix(app): render code mode executions (#42949)",
+    "files": [
+      "packages/session-ui/src/components/message-part.tsx",
+      "packages/session-ui/src/components/part-default-open.test.ts",
+      "packages/session-ui/src/components/part-default-open.ts",
+      "packages/session-ui/src/components/tool-error-card.tsx",
+      "packages/ui/src/i18n/en.ts"
+    ],
+    "lines": 161,
+    "clean": false,
+    "tree": "8a4649bdfa49846d06ff9795c2c1b29e54b13a71",
+    "conflicts": [
+      "packages/session-ui/src/components/message-part.tsx",
+      "packages/session-ui/src/components/part-default-open.test.ts",
+      "packages/session-ui/src/components/part-default-open.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "c5e58b38a80c3d3d65dc2da09657c80c2c5b16c0",
+    "subject": "fix(app): omit shell prompts when copying commands (#42958)",
+    "files": [
+      "packages/session-ui/src/components/message-part.css",
+      "packages/session-ui/src/components/message-part.tsx"
+    ],
+    "lines": 17,
+    "clean": true,
+    "tree": "51a5095658e9fb2f1c3cfafe96f04c6967555a02",
+    "conflicts": [],
+    "error": "",
+    "changes": "4\t0\tpackages/session-ui/src/components/message-part.css\n9\t4\tpackages/session-ui/src/components/message-part.tsx"
+  },
+  {
+    "sha": "1f86a6d3f05417d48ba756803ff6e29b61fecf50",
+    "subject": "fix(core): restore OpenAI request headers (#42959)",
+    "files": [
+      "packages/core/src/plugin/provider/openai.ts",
+      "packages/core/test/plugin/provider-openai.test.ts"
+    ],
+    "lines": 39,
+    "clean": false,
+    "tree": "d0f4d2913614af3d95154aac58f9d1e609b96fe8",
+    "conflicts": [
+      "packages/core/src/plugin/provider/openai.ts",
+      "packages/core/test/plugin/provider-openai.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "ca589273c7d6bf1dadbbe21189b52e4f3c9632bf",
+    "subject": "fix(core): preserve tool-result images for AI SDK providers (#42849)",
+    "files": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "lines": 148,
+    "clean": false,
+    "tree": "30fb388c5f8984d926f868e4fa2039819787e340",
+    "conflicts": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "08dd3f51ed5cba6ead719177c0fc68f5f17efac4",
+    "subject": "fix(app): space no git status (#42868)",
+    "files": [
+      "packages/app/src/pages/new-session/new-session-view.tsx"
+    ],
+    "lines": 6,
+    "clean": true,
+    "tree": "23d2bfff2e3d9f558d5e333288bf7cfe5027d730",
+    "conflicts": [],
+    "error": "",
+    "changes": "5\t1\tpackages/app/src/pages/new-session/new-session-view.tsx"
+  },
+  {
+    "sha": "825193400773cceab9b92f6bc63247d6dde3d580",
+    "subject": "fix(core): batch initial streamed delta",
+    "files": [
+      "packages/core/src/session/runner/publish-llm-event.ts",
+      "packages/core/test/session-runner-tool-events.test.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 19,
+    "clean": false,
+    "tree": "729e7a68f147cbfdc84ed8e715483e34b1ea90c3",
+    "conflicts": [
+      "packages/core/src/session/runner/publish-llm-event.ts",
+      "packages/core/test/session-runner-tool-events.test.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "467722c2f9d0ed2f0478b19066ea8a6eb47a66a6",
+    "subject": "fix(app): use tree directory picker everywhere (#42820)",
+    "files": [
+      "packages/app/e2e/regression/project-picker-recent-search.spec.ts",
+      "packages/app/e2e/user-story/model-selection-flow.spec.ts",
+      "packages/app/src/components/dialog-select-directory.tsx",
+      "packages/app/src/components/directory-picker.tsx"
+    ],
+    "lines": 281,
+    "clean": false,
+    "tree": "b7d46733bfff3633fc2bed28762ef17a5737a965",
+    "conflicts": [
+      "packages/app/src/components/dialog-select-directory.tsx"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "d9dfceddf82168d38ab8086577372184cb837c50",
+    "subject": "fix(app): release virtualized timeline elements (#42825)",
+    "files": [
+      "packages/app/src/pages/session/timeline/message-timeline.tsx"
+    ],
+    "lines": 2,
+    "clean": true,
+    "tree": "a8285debae7296260882c44b86b7c29d7174792b",
+    "conflicts": [],
+    "error": "",
+    "changes": "2\t0\tpackages/app/src/pages/session/timeline/message-timeline.tsx"
+  },
+  {
+    "sha": "4fee4d7d86820b3c812421dbcc6ec3a05de52550",
+    "subject": "fix(core): batch streamed session deltas",
+    "files": [
+      "packages/core/src/session/runner/publish-llm-event.ts",
+      "packages/core/test/session-runner-tool-events.test.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 220,
+    "clean": false,
+    "tree": "365e8cd5a6741470bfbcaf2ce3a1a7159d8c951c",
+    "conflicts": [
+      "packages/core/src/session/runner/publish-llm-event.ts",
+      "packages/core/test/session-runner-tool-events.test.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "f4baba28246045ed1ed2ce1491c73afbcc55c6e4",
+    "subject": "fix(app): use fixed message page size (#42743)",
+    "files": [
+      "packages/app/e2e/regression/session-timeline-history-root.spec.ts",
+      "packages/app/e2e/smoke/session-timeline.fixture.ts",
+      "packages/app/e2e/smoke/session-timeline.spec.ts",
+      "packages/app/src/context/server-session.test.ts",
+      "packages/app/src/context/server-session.ts"
+    ],
+    "lines": 125,
+    "clean": false,
+    "tree": "bee64d840e44f761af3fc1a3650e89e111cf44d0",
+    "conflicts": [
+      "packages/app/e2e/regression/session-timeline-history-root.spec.ts",
+      "packages/app/src/context/server-session.test.ts",
+      "packages/app/src/context/server-session.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "79fc74afbfeb5a1f47ec4bf0a3d36986ef4a1384",
+    "subject": "fix(app): show skill names (#42749)",
+    "files": [
+      "packages/app/e2e/regression/session-timeline-tool-projection.spec.ts",
+      "packages/session-ui/src/components/message-part.tsx"
+    ],
+    "lines": 33,
+    "clean": false,
+    "tree": "7bad9839b663e2b1b0259fa0da767e2a88995ba7",
+    "conflicts": [
+      "packages/app/e2e/regression/session-timeline-tool-projection.spec.ts",
+      "packages/session-ui/src/components/message-part.tsx"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "30dfe5352c0dd93b2a9c50ac9e898e2c94ec3292",
+    "subject": "fix(app): show read tool filenames (#42740)",
+    "files": [
+      "packages/app/e2e/regression/session-timeline-tool-projection.spec.ts",
+      "packages/session-ui/src/components/message-part.tsx"
+    ],
+    "lines": 26,
+    "clean": true,
+    "tree": "73ff878b3df3ad1c4f79294b90705c39a3c2d94c",
+    "conflicts": [],
+    "error": "",
+    "changes": "11\t0\tpackages/app/e2e/regression/session-timeline-tool-projection.spec.ts\n11\t4\tpackages/session-ui/src/components/message-part.tsx"
+  },
+  {
+    "sha": "f725443e30a211c345dd6ea741ad1825e7ffc70c",
+    "subject": "fix(core): normalize Windows location keys (#42745)",
+    "files": [
+      "packages/core/src/location-services.ts",
+      "packages/core/test/location-layer.test.ts"
+    ],
+    "lines": 24,
+    "clean": false,
+    "tree": "70e84e667904484328c7c71c9f1d9b72abeb9c8c",
+    "conflicts": [
+      "packages/core/src/location-services.ts",
+      "packages/core/test/location-layer.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "cae205a3d9304c19b7ee3fc4bda550c8564f4df6",
+    "subject": "fix(core): bound fuzzy search memory (#42741)",
+    "files": [
+      "packages/core/src/filesystem/search.ts",
+      "packages/core/test/filesystem/search.test.ts"
+    ],
+    "lines": 113,
+    "clean": false,
+    "tree": "3118b23ad46b82a928c58cc6fc6d4d8988e789f8",
+    "conflicts": [
+      "packages/core/src/filesystem/search.ts",
+      "packages/core/test/filesystem/search.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "d35c6f04edc5778cd720396ccb86e43cf1681b7f",
+    "subject": "fix(ui): add keybind label padding (#42726)",
+    "files": [
+      "packages/ui/src/v2/components/keybind-v2.css",
+      "packages/ui/src/v2/components/keybind-v2.stories.tsx"
+    ],
+    "lines": 6,
+    "clean": true,
+    "tree": "8b0b311b6124b992459c09fa36d4c4e77dd333b4",
+    "conflicts": [],
+    "error": "",
+    "changes": "1\t1\tpackages/ui/src/v2/components/keybind-v2.css\n4\t0\tpackages/ui/src/v2/components/keybind-v2.stories.tsx"
+  },
+  {
+    "sha": "4d021b4660a000e10134017614658586a8863838",
+    "subject": "fix(app): fade tab titles beneath close button (#42730)",
+    "files": [
+      "packages/app/src/components/titlebar-tab-nav.css"
+    ],
+    "lines": 9,
+    "clean": true,
+    "tree": "ce71afd38ca60bcf5545308f243974a8cff63024",
+    "conflicts": [],
+    "error": "",
+    "changes": "5\t4\tpackages/app/src/components/titlebar-tab-nav.css"
+  },
+  {
+    "sha": "a5f3e9e735c0d0a67d6900245affc27c24388ae3",
+    "subject": "fix(app): preserve assistant content order (#42721)",
+    "files": [
+      "packages/app/e2e/performance/timeline/session-timeline-stress.fixture.ts",
+      "packages/app/e2e/regression/session-timeline-reducer-projection.spec.ts",
+      "packages/app/e2e/smoke/session-timeline.fixture.ts",
+      "packages/app/src/context/server-session.test.ts",
+      "packages/app/src/context/server-session.ts"
+    ],
+    "lines": 131,
+    "clean": false,
+    "tree": "c249d854fe8f6bba2546423bf69a8477d6af6b3f",
+    "conflicts": [
+      "packages/app/e2e/smoke/session-timeline.fixture.ts",
+      "packages/app/src/context/server-session.test.ts",
+      "packages/app/src/context/server-session.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "57b050e9fc073ed76b745ce05ad67f074249a2cc",
+    "subject": "fix(desktop): render v2 patch metadata (#42716)",
+    "files": [
+      "packages/session-ui/src/components/apply-patch-file.test.ts",
+      "packages/session-ui/src/components/apply-patch-file.ts",
+      "packages/session-ui/src/components/part-default-open.test.ts",
+      "packages/session-ui/src/components/part-default-open.ts"
+    ],
+    "lines": 105,
+    "clean": true,
+    "tree": "3ba788b31824841929134a4e1ce7e4f1ed9c44ab",
+    "conflicts": [],
+    "error": "",
+    "changes": "41\t5\tpackages/session-ui/src/components/apply-patch-file.test.ts\n12\t5\tpackages/session-ui/src/components/apply-patch-file.ts\n30\t0\tpackages/session-ui/src/components/part-default-open.test.ts\n9\t3\tpackages/session-ui/src/components/part-default-open.ts"
+  },
+  {
+    "sha": "51091be7e4ce7940671040a29ab713b51e59c02c",
+    "subject": "fix(desktop): verify updates before install (#42715)",
+    "files": [
+      "packages/desktop/src/main/updater-controller.test.ts",
+      "packages/desktop/src/main/updater-controller.ts"
+    ],
+    "lines": 51,
+    "clean": false,
+    "tree": "b62140e7bcdd647554c10568dc93a0f6ecd20946",
+    "conflicts": [
+      "packages/desktop/src/main/updater-controller.test.ts",
+      "packages/desktop/src/main/updater-controller.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "41f70bfbb1ffde70bc48b21aa5b953fd0f4f233a",
+    "subject": "fix(app): generate blob ids without crypto.subtle in non-secure contexts (#42706)",
+    "files": [
+      "packages/app/src/utils/draft-store.ts"
+    ],
+    "lines": 5,
+    "clean": true,
+    "tree": "f87e3de79eafe31a159b5e64bee194b15b8fe95c",
+    "conflicts": [],
+    "error": "",
+    "changes": "4\t1\tpackages/app/src/utils/draft-store.ts"
+  },
+  {
+    "sha": "a45b12cfa46a5210f336a0395c68038f53a6f5be",
+    "subject": "fix(app): use location VCS state (#42666)",
+    "files": [
+      "packages/app/src/pages/new-session/new-session-workspace-controller.test.ts",
+      "packages/app/src/pages/new-session/new-session-workspace-controller.ts"
+    ],
+    "lines": 18,
+    "clean": false,
+    "tree": "7b5c2d9c8649e1a7c91866318c12574424c929bc",
+    "conflicts": [
+      "packages/app/src/pages/new-session/new-session-workspace-controller.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "40cd6989d2912df545536950eb58a090045e683f",
+    "subject": "fix(core): update console server URL",
+    "files": [
+      "packages/core/src/plugin/provider/opencode.ts"
+    ],
+    "lines": 2,
+    "clean": true,
+    "tree": "8a5dea6956f92593411251ea1aa964c8736d4f18",
+    "conflicts": [],
+    "error": "",
+    "changes": ""
+  },
+  {
+    "sha": "20929b3081c440cbcf8c8b9cb65ccebca2b7b353",
+    "subject": "fix(core): refresh fallback file search (#42348)",
+    "files": [
+      "packages/core/src/filesystem/search.ts",
+      "packages/core/test/filesystem/search.test.ts"
+    ],
+    "lines": 115,
+    "clean": false,
+    "tree": "9764fa7a15bb73b1f757d20e08399332142a2e79",
+    "conflicts": [
+      "packages/core/src/filesystem/search.ts",
+      "packages/core/test/filesystem/search.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "8bcc24514288140e4a0fdad56cacba287c83e247",
+    "subject": "fix(core): list default agent first (#42243)",
+    "files": [
+      "packages/core/src/agent.ts",
+      "packages/core/test/agent.test.ts"
+    ],
+    "lines": 25,
+    "clean": false,
+    "tree": "05c27f3458318b07ad0557cfb7974b7ca0cb1443",
+    "conflicts": [
+      "packages/core/src/agent.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "c7bee0963280d62c82445a6c9015b4a92597f3e3",
+    "subject": "fix(core): preserve Copilot fallback provider (#42099)",
+    "files": [
+      "packages/core/src/plugin/provider/github-copilot.ts",
+      "packages/core/test/plugin/provider-github-copilot.test.ts"
+    ],
+    "lines": 21,
+    "clean": false,
+    "tree": "dadaab33081638db50abb976da7de0aa1d546832",
+    "conflicts": [
+      "packages/core/src/plugin/provider/github-copilot.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "930b0751b191ae0d8676e18b1cdd0d2729995aef",
+    "subject": "fix(core): generate session titles before model execution (#42067)",
+    "files": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 48,
+    "clean": false,
+    "tree": "edb28f0869f08beb9f369d9829eea2664f94420e",
+    "conflicts": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "90b6fa0eab6ef4bd031950d86c502ed1c144e9aa",
+    "subject": "fix(core): expose local attachment paths (#41789)",
+    "files": [
+      "packages/core/src/session/runner/to-llm-message.ts",
+      "packages/core/test/session-runner-message.test.ts"
+    ],
+    "lines": 148,
+    "clean": false,
+    "tree": "306373a293bea51f7f36c05161074426b25789d6",
+    "conflicts": [
+      "packages/core/src/session/runner/to-llm-message.ts",
+      "packages/core/test/session-runner-message.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "3d23c907eb75022ee8711222a9fff19b09a19ce9",
+    "subject": "fix(core): restore bundler resolution for source-imported deps (#41885)",
+    "files": [
+      "packages/core/script/migration.ts",
+      "packages/core/tsconfig.json"
+    ],
+    "lines": 11,
+    "clean": false,
+    "tree": "e99e9bf62c4928471923b474d8fbdac988722671",
+    "conflicts": [
+      "packages/core/script/migration.ts",
+      "packages/core/tsconfig.json"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "c4bea9d558ffae1a090878f32bac591b05cddaf0",
+    "subject": "fix(app): stabilize markdown worker startup (#41487)",
+    "files": [
+      "packages/app/vite.js",
+      "packages/session-ui/src/components/markdown-worker.ts"
+    ],
+    "lines": 6,
+    "clean": true,
+    "tree": "1c8e097306544c0102f2dc60802be91aeb32629d",
+    "conflicts": [],
+    "error": "",
+    "changes": "3\t0\tpackages/app/vite.js\n1\t2\tpackages/session-ui/src/components/markdown-worker.ts"
+  },
+  {
+    "sha": "f1366d80c805d6545339910d4a0dbe05388eb817",
+    "subject": "fix(core): default #sqlite resolution to the node driver (#41834)",
+    "files": [
+      "packages/core/package.json",
+      "packages/core/test/sqlite-bundle.test.ts"
+    ],
+    "lines": 51,
+    "clean": true,
+    "tree": "9dce004490b8f9a1f32a76dcae0814ed15e6e615",
+    "conflicts": [],
+    "error": "",
+    "changes": "1\t1\tpackages/core/package.json\n49\t0\tpackages/core/test/sqlite-bundle.test.ts"
+  },
+  {
+    "sha": "2b6dd2559c72996d652b15c284c54e30acdbbcd1",
+    "subject": "fix(core): prefer nearest skill source (#41788)",
+    "files": [
+      "packages/core/src/config.ts",
+      "packages/core/test/config/config.test.ts",
+      "packages/core/test/config/skill.test.ts"
+    ],
+    "lines": 65,
+    "clean": false,
+    "tree": "4d6273cf193ed8e8827b2cf43ce18a8fe41d3e2a",
+    "conflicts": [
+      "packages/core/src/config.ts",
+      "packages/core/test/config/config.test.ts",
+      "packages/core/test/config/skill.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "6721ff532817f5f4da01f35254cd4db437b9c8bc",
+    "subject": "fix(core): omit deprecated models.dev models (#41769)",
+    "files": [
+      "packages/core/src/plugin/models-dev.ts",
+      "packages/core/test/plugin/models-dev.test.ts"
+    ],
+    "lines": 61,
+    "clean": false,
+    "tree": "fe254cf110fd80e0ac2867247e790afddfbd1df7",
+    "conflicts": [
+      "packages/core/src/plugin/models-dev.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "3441b95afcba8cf695ce081571eb01fdd65dfb83",
+    "subject": "fix(core): models.dev catalog population must survive KV cache write failures (#41735)",
+    "files": [
+      "packages/core/src/models-dev.ts",
+      "packages/core/test/models.test.ts"
+    ],
+    "lines": 41,
+    "clean": false,
+    "tree": "8b8e41c1ae4ffea7090d31831af1496176abf20c",
+    "conflicts": [
+      "packages/core/src/models-dev.ts",
+      "packages/core/test/models.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "306204bad8c7738219b4592087fb36f13d02d8c0",
+    "subject": "fix(app): handle untitled session tab info (#41700)",
+    "files": [
+      "packages/app/src/context/tabs.tsx"
+    ],
+    "lines": 4,
+    "clean": false,
+    "tree": "651a854df3233189d24bec519e96c1b83362914a",
+    "conflicts": [
+      "packages/app/src/context/tabs.tsx"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "c401076b6fe78e93e81e9d40f37aefa5080dabd4",
+    "subject": "fix(core): preserve AI SDK tool media (#41672)",
+    "files": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "lines": 84,
+    "clean": false,
+    "tree": "0fd81001653d13ae45e22680343dba1d387d6267",
+    "conflicts": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "753fa4cd60a803a7b2893ae8619ce0cc5f20f29e",
+    "subject": "fix(core): isolate config plugin tests from ambient user config (#41631)",
+    "files": [
+      "packages/core/test/config/plugin.test.ts",
+      "packages/core/test/fixture/global.ts",
+      "packages/core/test/location-layer.test.ts",
+      "packages/core/test/tool-shell.test.ts",
+      "packages/core/test/tool-subagent.test.ts"
+    ],
+    "lines": 55,
+    "clean": false,
+    "tree": "facebc4981115b07ce8701dd3fb858fef19a2c2e",
+    "conflicts": [
+      "packages/core/test/config/plugin.test.ts",
+      "packages/core/test/location-layer.test.ts",
+      "packages/core/test/tool-shell.test.ts",
+      "packages/core/test/tool-subagent.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "c22942c1f38f25b268fc2ff198163243a06177ae",
+    "subject": "fix(core): tolerate unavailable wellknown config",
+    "files": [
+      "packages/core/src/config.ts",
+      "packages/core/test/config/config.test.ts"
+    ],
+    "lines": 19,
+    "clean": false,
+    "tree": "f2579d3f41e138c6d25578c39b7efed9ff5afbb3",
+    "conflicts": [
+      "packages/core/src/config.ts",
+      "packages/core/test/config/config.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "f64b024f463f76b52d3b22b319a37defc60307cc",
+    "subject": "fix(core): resolve models.dev URL env vars (#41474)",
+    "files": [
+      "packages/core/src/plugin/models-dev.ts",
+      "packages/core/test/plugin/models-dev.test.ts"
+    ],
+    "lines": 119,
+    "clean": false,
+    "tree": "87374c11b0654f6c8012a227256fc01e123b3390",
+    "conflicts": [
+      "packages/core/src/plugin/models-dev.ts",
+      "packages/core/test/plugin/models-dev.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "cc0061f88b7ca90c56b616ffcad1adf215694ce5",
+    "subject": "fix(core): update recorded prompt cache key (#41307)",
+    "files": [
+      "packages/core/test/fixtures/recordings/session-runner/openai-chat-streams-text.json"
+    ],
+    "lines": 2,
+    "clean": false,
+    "tree": "899f2ea43b2d2d0b8e7ed818c8e7eea867c0b94e",
+    "conflicts": [
+      "packages/core/test/fixtures/recordings/session-runner/openai-chat-streams-text.json"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "c79ced174e9df6e799b3332b438e7754edaba405",
+    "subject": "fix(core): reload changed skill sources (#40954)",
+    "files": [
+      "packages/core/src/skill.ts",
+      "packages/core/test/skill.test.ts"
+    ],
+    "lines": 254,
+    "clean": false,
+    "tree": "15221803b167311fa07af9540bf543233e7d05f5",
+    "conflicts": [
+      "packages/core/src/skill.ts",
+      "packages/core/test/skill.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "6e82f5d3b94661df7b0ad76a31c05074b5a3165b",
+    "subject": "fix(core): connect custom providers (#40761)",
+    "files": [
+      "packages/core/src/config/plugin/provider.ts",
+      "packages/core/test/config/provider.test.ts"
+    ],
+    "lines": 37,
+    "clean": false,
+    "tree": "101597a29509692dcf6820913f1532313b0305c2",
+    "conflicts": [
+      "packages/core/src/config/plugin/provider.ts",
+      "packages/core/test/config/provider.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "ec95b27308e915aca18127ab8748a8e785481dcd",
+    "subject": "fix(core): align ChatGPT context limits (#40902)",
+    "files": [
+      "packages/core/src/plugin/provider/openai.ts",
+      "packages/core/test/model-resolver.test.ts",
+      "packages/core/test/plugin/provider-openai.test.ts"
+    ],
+    "lines": 11,
+    "clean": false,
+    "tree": "cbfa722b8ede3c2e8cf88351c066f885b8c2b0dd",
+    "conflicts": [
+      "packages/core/src/plugin/provider/openai.ts",
+      "packages/core/test/model-resolver.test.ts",
+      "packages/core/test/plugin/provider-openai.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "0215498f637c8b85e1a72c54b7f945d387ff9123",
+    "subject": "fix(core): load well-known config first (#40897)",
+    "files": [
+      "packages/core/src/config.ts"
+    ],
+    "lines": 2,
+    "clean": false,
+    "tree": "e1d72081cc880afcc4de0c71aa06ea4fa5f0cab4",
+    "conflicts": [
+      "packages/core/src/config.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "a38d44265b687619109f91a17e1934e334612248",
+    "subject": "fix(core): continue interrupted responses (#40576)",
+    "files": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 219,
+    "clean": false,
+    "tree": "7f367df4df9004171085d7d435ea3c7109a96e4e",
+    "conflicts": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "3b0195e0455616c714006b781667a0a22c209d58",
+    "subject": "fix(core): avoid eager directory snapshots (#40552)",
+    "files": [
+      "packages/core/src/filesystem/search.ts"
+    ],
+    "lines": 14,
+    "clean": true,
+    "tree": "f1c08b5aec0035e8665b51efe71604e1df210612",
+    "conflicts": [],
+    "error": "",
+    "changes": "5\t9\tpackages/core/src/filesystem/search.ts"
+  },
+  {
+    "sha": "c0ab35c3c23453ac93825080bac1b11fc28b62c7",
+    "subject": "fix(app): show active search details (#40597)",
+    "files": [
+      "packages/session-ui/src/components/message-part.tsx"
+    ],
+    "lines": 7,
+    "clean": false,
+    "tree": "7f1a0b418745fe69dbaf20cad642e7888c7b5b08",
+    "conflicts": [
+      "packages/session-ui/src/components/message-part.tsx"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "94fcb119a38c8e8536ae18c324c1e795f5958441",
+    "subject": "fix(core): avoid implicit output limits (#40488)",
+    "files": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "lines": 19,
+    "clean": false,
+    "tree": "be6292417bc3edac7da7c0fd447cfeffb169b696",
+    "conflicts": [
+      "packages/core/src/aisdk.ts",
+      "packages/core/test/aisdk.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "8df03aa1bc6cad194da6774e12edb72db9ab44c8",
+    "subject": "fix(core): ignore empty agent files (#40302)",
+    "files": [
+      "packages/core/src/config/plugin/agent.ts",
+      "packages/core/test/config/agent.test.ts"
+    ],
+    "lines": 4,
+    "clean": false,
+    "tree": "9944c7e2e73551817843de16fef8263c8477af7a",
+    "conflicts": [
+      "packages/core/src/config/plugin/agent.ts",
+      "packages/core/test/config/agent.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "db9e942398a210fb02d3ce9d1d8a2f8ae231cdd6",
+    "subject": "fix(core): resize large image attachments (#39919)",
+    "files": [
+      "packages/core/src/session.ts",
+      "packages/core/test/session-prompt.test.ts"
+    ],
+    "lines": 42,
+    "clean": false,
+    "tree": "8a3db4aaf4b3ccf7155597aaf805c10045071a0c",
+    "conflicts": [
+      "packages/core/src/session.ts",
+      "packages/core/test/session-prompt.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "d6371f2fcdcc01eff925fb55cb75b68f756644b6",
+    "subject": "fix(session): update activity on prompt (#39539)",
+    "files": [
+      "packages/core/src/session/projector.ts",
+      "packages/core/test/session-create.test.ts"
+    ],
+    "lines": 30,
+    "clean": false,
+    "tree": "7081ba17a04c895402f3b89c0932d8781c0f71e3",
+    "conflicts": [
+      "packages/core/src/session/projector.ts",
+      "packages/core/test/session-create.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "dcb0df4ac195271b9d34027cb63964fc6dcf4bee",
+    "subject": "fix(core): stop MCP SSE error reconnect loops (#39671)",
+    "files": [
+      "packages/core/test/mcp.test.ts",
+      "patches/@modelcontextprotocol%2Fsdk@1.29.0.patch"
+    ],
+    "lines": 57,
+    "clean": false,
+    "tree": "4c9ff934c7aaf251d06e812a29b541123136fbdc",
+    "conflicts": [
+      "packages/core/test/mcp.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "73bd8a264b171e4cc4d2bef6fb6face322e1bc19",
+    "subject": "fix(app): keep new tab button visible (#39366)",
+    "files": [
+      "packages/app/src/components/titlebar.tsx"
+    ],
+    "lines": 40,
+    "clean": true,
+    "tree": "8a5dea6956f92593411251ea1aa964c8736d4f18",
+    "conflicts": [],
+    "error": "",
+    "changes": ""
+  },
+  {
+    "sha": "5bd3da40a511dd2f922bbc8c157db21c3958bfc3",
+    "subject": "fix(core): keep config root watches alive and ignore vendored trees (#39239)",
+    "files": [
+      "packages/core/src/config.ts",
+      "packages/core/test/config/config.test.ts"
+    ],
+    "lines": 91,
+    "clean": false,
+    "tree": "eedc1ce3c9062aa21269eea3c462fde061ac1c1a",
+    "conflicts": [
+      "packages/core/src/config.ts",
+      "packages/core/test/config/config.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "1b39d364bda2a5a09f54025dcecd8880750b5ebe",
+    "subject": "fix(core): align command reload pipeline and repair plugin fixture (#39171)",
+    "files": [
+      "packages/core/src/config/plugin/command.ts",
+      "packages/core/test/config/command.test.ts",
+      "packages/core/test/config/plugin.test.ts"
+    ],
+    "lines": 92,
+    "clean": false,
+    "tree": "a22c56439c635c2db3dfd3da2a14b611bba6113f",
+    "conflicts": [
+      "packages/core/src/config/plugin/command.ts",
+      "packages/core/test/config/command.test.ts",
+      "packages/core/test/config/plugin.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "1f2c59a1b6370cf03be54705fb5322325dfea40a",
+    "subject": "fix(core): commit state before finalize publishes (#38983)",
+    "files": [
+      "packages/core/src/state.ts",
+      "packages/core/test/state.test.ts"
+    ],
+    "lines": 28,
+    "clean": false,
+    "tree": "02e55d525a8f5f3a60115bac5c6de57ae8a4bde5",
+    "conflicts": [
+      "packages/core/test/state.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "0261f04b90e10902ddb6275bc50ef2acb0d4e174",
+    "subject": "fix(core): handle oversized ripgrep matches",
+    "files": [
+      "packages/core/src/ripgrep.ts",
+      "packages/core/test/ripgrep.test.ts"
+    ],
+    "lines": 30,
+    "clean": false,
+    "tree": "3d886adbbc97c2fd8223f0921588c7e784846d7a",
+    "conflicts": [
+      "packages/core/src/ripgrep.ts",
+      "packages/core/test/ripgrep.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "0fd73a29760536bfcf9ead0832a1cf3c29612022",
+    "subject": "fix(core): align grep behavior and guidance (#38999)",
+    "files": [
+      "packages/core/src/tool/grep.ts",
+      "packages/core/test/tool-search.test.ts"
+    ],
+    "lines": 153,
+    "clean": false,
+    "tree": "d3b3ce26a0f04ad1d83cc6c4a17e1627988ed008",
+    "conflicts": [
+      "packages/core/src/tool/grep.ts",
+      "packages/core/test/tool-search.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "7affee529b9fe0cadfd83bd4f64597d58cd1c256",
+    "subject": "fix(core): harden grep search behavior (#38922)",
+    "files": [
+      "packages/core/src/tool/grep.ts",
+      "packages/core/test/tool-search.test.ts"
+    ],
+    "lines": 90,
+    "clean": false,
+    "tree": "5e015253306bc378ff962bed719e6f9fcef8f9e3",
+    "conflicts": [
+      "packages/core/src/tool/grep.ts",
+      "packages/core/test/tool-search.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "79c7e9446ee1e8bed0aefff404163754addeb485",
+    "subject": "fix(core): clarify custom question answers (#38919)",
+    "files": [
+      "packages/core/src/tool/question.ts"
+    ],
+    "lines": 4,
+    "clean": true,
+    "tree": "0a3659619e2fb61a08ed66df9f490b43f6be2731",
+    "conflicts": [],
+    "error": "",
+    "changes": "2\t2\tpackages/core/src/tool/question.ts"
+  },
+  {
+    "sha": "9eea5bc925e5f9e8867d76fa9f31359351468db0",
+    "subject": "fix(core): tweak glob tool description/parameters (#38899)",
+    "files": [
+      "packages/core/src/tool/glob.ts"
+    ],
+    "lines": 19,
+    "clean": false,
+    "tree": "d659f81527e2d42169837d1bc4d84c34017ba774",
+    "conflicts": [
+      "packages/core/src/tool/glob.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "f753103e82abc1bc8b740c9b3878dacac6a2de1d",
+    "subject": "fix(core): reject file glob roots (#38890)",
+    "files": [
+      "packages/core/src/tool/glob.ts",
+      "packages/core/test/tool-search.test.ts"
+    ],
+    "lines": 29,
+    "clean": false,
+    "tree": "a3d231268b1303b00874fd6b3370c1fa1f87cb8e",
+    "conflicts": [
+      "packages/core/src/tool/glob.ts",
+      "packages/core/test/tool-search.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "1e35d33ecba56d218620d887518ad1d0a0d1a6f1",
+    "subject": "fix(codemode): search nested namespaces (#38887)",
+    "files": [
+      "packages/codemode/src/tool-runtime.ts",
+      "packages/codemode/test/tool-paths.test.ts"
+    ],
+    "lines": 29,
+    "clean": false,
+    "tree": "f76aaaf4c00a0a0c9da4715f8ff81c0aefc9afd5",
+    "conflicts": [
+      "packages/codemode/src/tool-runtime.ts",
+      "packages/codemode/test/tool-paths.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "ee5460a152405b01fd61df3bd85c991ff57c1781",
+    "subject": "fix(codemode): report interrupted tool calls (#38741)",
+    "files": [
+      "packages/codemode/src/codemode.ts",
+      "packages/codemode/src/tool-runtime.ts",
+      "packages/codemode/test/codemode.test.ts"
+    ],
+    "lines": 127,
+    "clean": false,
+    "tree": "fd48314661def432c8df91a8dc8b9c8adb8c5d6c",
+    "conflicts": [
+      "packages/codemode/src/codemode.ts",
+      "packages/codemode/src/tool-runtime.ts",
+      "packages/codemode/test/codemode.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "423fad730c99333fd3cdc1b00a7369f687494227",
+    "subject": "fix(core): authorize external glob paths (#38714)",
+    "files": [
+      "packages/core/src/tool/glob.ts",
+      "packages/core/test/tool-search.test.ts"
+    ],
+    "lines": 134,
+    "clean": false,
+    "tree": "f21cc51eda31af6d422ce2732ef5055b2ddf7916",
+    "conflicts": [
+      "packages/core/src/tool/glob.ts",
+      "packages/core/test/tool-search.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "c64d8133472dabea41491595bb5fb436ae18c859",
+    "subject": "fix(core): report truncated glob results (#38631)",
+    "files": [
+      "packages/core/src/tool/glob.ts",
+      "packages/core/test/tool-search.test.ts"
+    ],
+    "lines": 35,
+    "clean": false,
+    "tree": "c65c269a60b8a63a8a5b290a06a5449f171692bc",
+    "conflicts": [
+      "packages/core/src/tool/glob.ts",
+      "packages/core/test/tool-search.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "c228fc48866f06af74d6c7f579181d03fa74b325",
+    "subject": "fix(core): stabilize tool definition ordering (#38590)",
+    "files": [
+      "packages/core/src/tool/registry.ts",
+      "packages/core/test/plugin.test.ts",
+      "packages/core/test/session-runner-tool-registry.test.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 40,
+    "clean": false,
+    "tree": "bd92be387a779f200c75bbe8d68251060c50691c",
+    "conflicts": [
+      "packages/core/src/tool/registry.ts",
+      "packages/core/test/plugin.test.ts",
+      "packages/core/test/session-runner-tool-registry.test.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "f1f0f47ee22ae2972a7acef1b5d6dbb7e0578d1e",
+    "subject": "fix(core): migrate named agent colors (#38414)",
+    "files": [
+      "packages/core/src/v1/config/agent.ts",
+      "packages/core/src/v1/config/migrate.ts"
+    ],
+    "lines": 9,
+    "clean": true,
+    "tree": "8cbefeae87d7dcd5e805a2697c10f977437600ef",
+    "conflicts": [],
+    "error": "",
+    "changes": "1\t1\tpackages/core/src/v1/config/migrate.ts"
+  },
+  {
+    "sha": "59ad593d9c7502bffdbd4579cc11b5aaa6e59e72",
+    "subject": "fix(core): reduce snapshot repository setup (#38162)",
+    "files": [
+      "packages/core/src/git.ts",
+      "packages/core/test/git.test.ts"
+    ],
+    "lines": 65,
+    "clean": true,
+    "tree": "f5f24869aa8481e9acb5cece7408f3f047f7e76f",
+    "conflicts": [],
+    "error": "",
+    "changes": "37\t13\tpackages/core/src/git.ts\n14\t1\tpackages/core/test/git.test.ts"
+  },
+  {
+    "sha": "a0a6963beb7bc9b613380cb3a608ee887dfdbe1e",
+    "subject": "fix(core): discover Copilot API endpoint (#38184)",
+    "files": [
+      "packages/core/src/plugin/provider/github-copilot.ts",
+      "packages/core/test/plugin/provider-github-copilot.test.ts"
+    ],
+    "lines": 70,
+    "clean": false,
+    "tree": "ef072e3e60b1a2f81d0e3b0f91b7536582fd8ac1",
+    "conflicts": [
+      "packages/core/src/plugin/provider/github-copilot.ts",
+      "packages/core/test/plugin/provider-github-copilot.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "e6607fb58d606779fe49fed6f16e9ffbabbb03cd",
+    "subject": "fix(core): authorize symlinks by lexical path (#38180)",
+    "files": [
+      "packages/core/src/location-mutation.ts",
+      "packages/core/test/location-mutation.test.ts",
+      "packages/core/test/tool-edit.test.ts",
+      "packages/core/test/tool-write.test.ts"
+    ],
+    "lines": 93,
+    "clean": false,
+    "tree": "94cd3a14849fb0784be41854fe428d77a443ef99",
+    "conflicts": [
+      "packages/core/src/location-mutation.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "023f76f6fc5fea9e1ae8442d4c0e0bbb0e92f0e5",
+    "subject": "fix(core): refresh model catalog every five minutes (#38142)",
+    "files": [
+      "packages/core/src/models-dev.ts"
+    ],
+    "lines": 2,
+    "clean": true,
+    "tree": "912ae1f16b00c6ed333d75cbc11b6831198695b0",
+    "conflicts": [],
+    "error": "",
+    "changes": "1\t1\tpackages/core/src/models-dev.ts"
+  },
+  {
+    "sha": "3ea8895299790bff5d4ba6c53a3308209c7ea029",
+    "subject": "fix(core): enforce patch EOF anchors (#38039)",
+    "files": [
+      "packages/core/src/patch.ts",
+      "packages/core/test/patch.test.ts",
+      "packages/core/test/tool-patch.test.ts"
+    ],
+    "lines": 65,
+    "clean": false,
+    "tree": "e51fed6cea0daea32ea526e1f3ece2be5a832825",
+    "conflicts": [
+      "packages/core/test/patch.test.ts",
+      "packages/core/test/tool-patch.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "e770415fd52e502f354f35ed760ce1d3b2df082f",
+    "subject": "fix(core): normalize CRLF patch lines (#38038)",
+    "files": [
+      "packages/core/src/patch.ts",
+      "packages/core/test/patch.test.ts"
+    ],
+    "lines": 26,
+    "clean": false,
+    "tree": "73822852edaedc44a03b8174437f3d90fc4c3ca8",
+    "conflicts": [
+      "packages/core/src/patch.ts",
+      "packages/core/test/patch.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "96dc560833724b6f0ee0c7187eec1bfac2a12cf8",
+    "subject": "fix(core): accept padded patch markers (#38036)",
+    "files": [
+      "packages/core/src/patch.ts",
+      "packages/core/test/patch.test.ts"
+    ],
+    "lines": 60,
+    "clean": false,
+    "tree": "3eb45a99d771089daeec02ecc95716e131877171",
+    "conflicts": [
+      "packages/core/src/patch.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "39fdd67123aba5afa6bd07f13b6e03660cfb4479",
+    "subject": "fix: remove legacy sdk from ci builds",
+    "files": [
+      "bun.lock",
+      "packages/core/package.json",
+      "packages/sdk/js/package.json"
+    ],
+    "lines": 7,
+    "clean": false,
+    "tree": "9bd858fbb404da69ce16804846344afa784f0399",
+    "conflicts": [
+      "bun.lock"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "0b2e2cbab0666ce050800a054f63db5594c6b60f",
+    "subject": "fix(core): ignore empty provider api keys",
+    "files": [
+      "packages/core/src/session/runner/model.ts",
+      "packages/core/test/session-runner-model.test.ts"
+    ],
+    "lines": 53,
+    "clean": false,
+    "tree": "4daf3afcebb4234759df382c3d8253ab34f1582d",
+    "conflicts": [
+      "packages/core/src/session/runner/model.ts",
+      "packages/core/test/session-runner-model.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "a288cb5a0c9e6f22b13dfd8506edc46a3bb77f3b",
+    "subject": "fix(core): continue after malformed tool input (#37701)",
+    "files": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/src/session/runner/publish-llm-event.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 97,
+    "clean": false,
+    "tree": "8b9b7465b50aadc92457cac418aa0bdb09c992e4",
+    "conflicts": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/src/session/runner/publish-llm-event.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "c310ef82f4688225d06e84d682a1871f5b6a2600",
+    "subject": "fix(core): authorize relative external paths (#37689)",
+    "files": [
+      "packages/core/src/location-mutation.ts",
+      "packages/core/test/location-mutation.test.ts",
+      "packages/core/test/tool-patch.test.ts",
+      "specs/v2/schema-changelog.md"
+    ],
+    "lines": 69,
+    "clean": false,
+    "tree": "b7cd99d5e59e46474f53a08f925ad517cb100188",
+    "conflicts": [
+      "packages/core/src/location-mutation.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "0d68b0bb20e528f7e457170e62b0ef1b94bddf38",
+    "subject": "fix(tui): style interrupted compaction neutrally (#37655)",
+    "files": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts",
+      "packages/tui/src/routes/session/index.tsx"
+    ],
+    "lines": 43,
+    "clean": false,
+    "tree": "33b253d8fff30599765410000daccf885e83508f",
+    "conflicts": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts",
+      "packages/tui/src/routes/session/index.tsx"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "c4830c147d1c82ede47d4bd7bdbe783e066becba",
+    "subject": "fix(core): defer cyclic layer dependencies",
+    "files": [
+      "packages/core/src/effect/layer-node.ts",
+      "packages/core/src/session.ts",
+      "packages/core/test/effect/layer-node/layer-node-types.test.ts",
+      "packages/core/test/effect/layer-node/layer-node.test.ts"
+    ],
+    "lines": 19,
+    "clean": false,
+    "tree": "f80f5b174efee35456d5e7aea1e0953fa65c7e8d",
+    "conflicts": [
+      "packages/core/src/session.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "987242b3e83ff7ed870b376b94394d068c7d8790",
+    "subject": "fix(core): honor OAuth attempt expiration (#37557)",
+    "files": [
+      "packages/core/src/integration.ts",
+      "packages/core/src/plugin/provider/xai.ts",
+      "packages/core/test/integration.test.ts",
+      "packages/plugin/src/v2/effect/integration.ts"
+    ],
+    "lines": 61,
+    "clean": false,
+    "tree": "e5badbe69a1a93f5948a90cbe31acf168a0cc128",
+    "conflicts": [
+      "packages/core/src/integration.ts",
+      "packages/core/src/plugin/provider/xai.ts",
+      "packages/core/test/integration.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "9b3a4655f1e79fbf28a8124cb2ab629e28c203c1",
+    "subject": "fix(core): clarify user-executed shell history (#37515)",
+    "files": [
+      "packages/core/src/session/runner/to-llm-message.ts",
+      "packages/core/test/session-runner-message.test.ts"
+    ],
+    "lines": 9,
+    "clean": false,
+    "tree": "b85ff0419f98fd84b4ae69c8755e84a15cb084db",
+    "conflicts": [
+      "packages/core/src/session/runner/to-llm-message.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "27e169284873d95b87e31dbf71c64600a968d414",
+    "subject": "fix: rm used config",
+    "files": [
+      "packages/core/src/config/compaction.ts",
+      "packages/core/test/config/config.test.ts"
+    ],
+    "lines": 3,
+    "clean": true,
+    "tree": "4ad38cb9d3034db5142a4fe451ee3a9ffadf2ed8",
+    "conflicts": [],
+    "error": "",
+    "changes": "0\t1\tpackages/core/src/config/compaction.ts\n0\t2\tpackages/core/test/config/config.test.ts"
+  },
+  {
+    "sha": "faf964691b253315302e21d8ec7613dc01dde713",
+    "subject": "fix(core): initialize provider state before catalog transforms (#37419)",
+    "files": [
+      "packages/core/src/plugin/provider/openai.ts",
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-openai.test.ts"
+    ],
+    "lines": 30,
+    "clean": false,
+    "tree": "d3eca2e3198fa38b57f0727ad8a5756526bce500",
+    "conflicts": [
+      "packages/core/src/plugin/provider/openai.ts",
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-openai.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "65a42fd5490b318724c811bb0f412804d1da9d1e",
+    "subject": "fix(core): debounce state reloads",
+    "files": [
+      "packages/core/src/state.ts",
+      "packages/core/test/agent.test.ts",
+      "packages/core/test/catalog.test.ts",
+      "packages/core/test/state.test.ts"
+    ],
+    "lines": 88,
+    "clean": false,
+    "tree": "818d08d571e5f26a246c1c4dbd5063351364a836",
+    "conflicts": [
+      "packages/core/src/state.ts",
+      "packages/core/test/agent.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "4829308f2d1392ba67bd53962428743f86e3c273",
+    "subject": "fix(core): preserve logical step across retries (#37316)",
+    "files": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 44,
+    "clean": false,
+    "tree": "75f8acb60fd1261afdfc034d580a4c5faaaec87b",
+    "conflicts": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "b6ccb66610a7d5acb71d1322cbb54387bcf0ff70",
+    "subject": "fix(core): bound default search results (#37154)",
+    "files": [
+      "packages/core/src/filesystem.ts",
+      "packages/core/src/filesystem/search.ts",
+      "packages/core/src/tool/glob.ts",
+      "packages/core/src/tool/grep.ts",
+      "packages/core/test/tool-search.test.ts"
+    ],
+    "lines": 49,
+    "clean": false,
+    "tree": "eda7da202b848b07ddf5494794749121e1035f71",
+    "conflicts": [
+      "packages/core/src/tool/glob.ts",
+      "packages/core/src/tool/grep.ts",
+      "packages/core/test/tool-search.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "ba1f3d3d32690879fbed156d53570b8652e254ed",
+    "subject": "perf(codemode): batch OpenAPI query parameters (#36978)",
+    "files": [
+      "packages/codemode/src/openapi/runtime.ts",
+      "packages/codemode/test/openapi.test.ts"
+    ],
+    "lines": 88,
+    "clean": true,
+    "tree": "a570bba7ae6a824070b0159e5cc4ad054c7ca26d",
+    "conflicts": [],
+    "error": "",
+    "changes": "27\t19\tpackages/codemode/src/openapi/runtime.ts\n42\t0\tpackages/codemode/test/openapi.test.ts"
+  },
+  {
+    "sha": "5c5579e90c127ea3a48dd75e5c5876ed8109da02",
+    "subject": "fix(llm): reject unterminated provider streams (#36881)",
+    "files": [
+      "packages/llm/src/route/client.ts",
+      "packages/llm/test/adapter.test.ts",
+      "packages/llm/test/provider/openai-chat.test.ts"
+    ],
+    "lines": 49,
+    "clean": true,
+    "tree": "b228cf4a712b1a390cf2f3ddf222a4bdec7c0260",
+    "conflicts": [],
+    "error": "",
+    "changes": "25\t1\tpackages/llm/src/route/client.ts\n12\t0\tpackages/llm/test/adapter.test.ts\n8\t3\tpackages/llm/test/provider/openai-chat.test.ts"
+  },
+  {
+    "sha": "aa8fc4234da087fbbbc29d26f06e35f795298ec3",
+    "subject": "fix(core): add session correlation header (#36842)",
+    "files": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts",
+      "packages/tui/src/context/data.tsx"
+    ],
+    "lines": 28,
+    "clean": false,
+    "tree": "aa6b7bd0e3c1fec3f5c1247e3e73a82884388bef",
+    "conflicts": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/tui/src/context/data.tsx"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "fbe7f26e7159e5885e58b56563e4fbccbd965b85",
+    "subject": "fix(core): clamp compaction output budget (#36745)",
+    "files": [
+      "packages/core/src/session/compaction.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 27,
+    "clean": false,
+    "tree": "97f02bce3312f26ac71275adf39a754d2d482123",
+    "conflicts": [
+      "packages/core/src/session/compaction.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "a2f5a0df5dc9b73296177bba3733629c2f6efe23",
+    "subject": "fix(core): compact after tool settlement (#36718)",
+    "files": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 7,
+    "clean": false,
+    "tree": "d4c74066ba14b98ef6bb1c088754353a47baabfb",
+    "conflicts": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "58201a32c11976244911bf6e050a93717f2fb604",
+    "subject": "fix: standardize MCP server copy (#36598)",
+    "files": [
+      "packages/app/src/i18n/en.ts",
+      "packages/tui/src/app.tsx",
+      "packages/tui/src/component/dialog-mcp.tsx",
+      "packages/tui/src/component/dialog-status.tsx",
+      "packages/web/src/content/docs/mcp-servers.mdx"
+    ],
+    "lines": 28,
+    "clean": false,
+    "tree": "4e3d518cc80d546ccc6e520a3643bf09150b8f57",
+    "conflicts": [
+      "packages/tui/src/app.tsx",
+      "packages/tui/src/component/dialog-mcp.tsx",
+      "packages/tui/src/component/dialog-status.tsx"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "6e55ddd078c38f0ede90716bb1555c3d8f72af25",
+    "subject": "fix(config): load configs across git boundaries (#36568)",
+    "files": [
+      "packages/opencode/src/config/config.ts",
+      "packages/opencode/src/config/paths.ts",
+      "packages/opencode/test/config/config.test.ts",
+      "packages/web/src/content/docs/config.mdx"
+    ],
+    "lines": 51,
+    "clean": true,
+    "tree": "04e926c93dbc386e9774aa58bbddc35067110b0b",
+    "conflicts": [],
+    "error": "",
+    "changes": "2\t2\tpackages/opencode/src/config/config.ts\n4\t10\tpackages/opencode/src/config/paths.ts\n31\t0\tpackages/opencode/test/config/config.test.ts\n1\t1\tpackages/web/src/content/docs/config.mdx"
+  },
+  {
+    "sha": "8e657c7db59d64014832e7bc1a08001f6864abb8",
+    "subject": "fix(core): settle malformed tool input on failure (#36477)",
+    "files": [
+      "packages/core/src/session/runner/publish-llm-event.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 91,
+    "clean": false,
+    "tree": "8a15fb6d34adcd3b36b27542d623a7ccf5caab99",
+    "conflicts": [
+      "packages/core/src/session/runner/publish-llm-event.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "b9f39dd7517f12a566ac7b2e199d1fa0277b0a2a",
+    "subject": "fix(core): disable unused fff content caches (#36452)",
+    "files": [
+      "packages/core/src/filesystem/search.ts"
+    ],
+    "lines": 2,
+    "clean": true,
+    "tree": "8a5dea6956f92593411251ea1aa964c8736d4f18",
+    "conflicts": [],
+    "error": "",
+    "changes": ""
+  },
+  {
+    "sha": "c7ceccf869e7121f2dbd3b8480917995d523ee42",
+    "subject": "fix(core): skip fff for aggregate locations (#36437)",
+    "files": [
+      "packages/core/src/filesystem/search.ts"
+    ],
+    "lines": 9,
+    "clean": true,
+    "tree": "04101638dc01c479e192a778be3ff119d79165e2",
+    "conflicts": [],
+    "error": "",
+    "changes": "8\t1\tpackages/core/src/filesystem/search.ts"
+  },
+  {
+    "sha": "aca3b7813d3946efb728b8e7f90b836f6d9d3b4b",
+    "subject": "fix(core): publish skill source updates",
+    "files": [
+      "packages/core/src/skill.ts",
+      "packages/core/test/skill.test.ts"
+    ],
+    "lines": 18,
+    "clean": true,
+    "tree": "d3db0b9002c97ac55c9990c8870625db52699301",
+    "conflicts": [],
+    "error": "",
+    "changes": "1\t0\tpackages/core/src/skill.ts\n17\t0\tpackages/core/test/skill.test.ts"
+  },
+  {
+    "sha": "0bb24a46c180dcb7e5573441e4234405edd15ad4",
+    "subject": "fix(core): defer snapshot repository discovery (#36290)",
+    "files": [
+      "packages/core/src/snapshot.ts",
+      "packages/core/test/snapshot.test.ts"
+    ],
+    "lines": 182,
+    "clean": true,
+    "tree": "6737537f2f66b5bcb4e14197dcf399c0cd6994a8",
+    "conflicts": [],
+    "error": "",
+    "changes": "56\t51\tpackages/core/src/snapshot.ts\n76\t1\tpackages/core/test/snapshot.test.ts"
+  },
+  {
+    "sha": "feaec7a6be90be409b201b580cafa467785b96d2",
+    "subject": "fix overloaded models issue",
+    "files": [
+      "packages/core/src/plugin/models-dev.ts"
+    ],
+    "lines": 5,
+    "clean": false,
+    "tree": "400a272cc36b81e2245ba72159b255ac88c3683a",
+    "conflicts": [
+      "packages/core/src/plugin/models-dev.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "2db7ccb453a2673af32637054fa679102e6cbeb6",
+    "subject": "fix(core): restore resilient compaction (#36163)",
+    "files": [
+      "packages/core/src/session/compaction.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 244,
+    "clean": false,
+    "tree": "122d593d8c4e8d8c51f07ee15b3ebf66e79db60c",
+    "conflicts": [
+      "packages/core/src/session/compaction.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "629b304c48169cf140cf443394d25858c4a9df3f",
+    "subject": "fix(core): continue after configured permission denial (#36155)",
+    "files": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 145,
+    "clean": false,
+    "tree": "861c4ad0c5ae78729c6d3e166396cc4446466c39",
+    "conflicts": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "bd0dffd7815b850389555ffe833bec1862af6717",
+    "subject": "fix(llm): preserve nested OpenAI stream errors (#36130)",
+    "files": [
+      "packages/llm/src/protocols/openai-responses.ts",
+      "packages/llm/test/provider/openai-responses.test.ts"
+    ],
+    "lines": 80,
+    "clean": true,
+    "tree": "73bbe24a83f8656169046197e4e041dcc8d700bd",
+    "conflicts": [],
+    "error": "",
+    "changes": "10\t9\tpackages/llm/src/protocols/openai-responses.ts\n60\t1\tpackages/llm/test/provider/openai-responses.test.ts"
+  },
+  {
+    "sha": "0ac8f91ed6d8005cd6748f8e2978d2b7b851e09a",
+    "subject": "fix(core): restore catalog status schema export",
+    "files": [
+      "packages/core/src/models-dev.ts",
+      "packages/opencode/src/provider/model-status.ts",
+      "packages/opencode/test/provider/model-status.test.ts"
+    ],
+    "lines": 9,
+    "clean": false,
+    "tree": "68f8815c476cf315fa033c359a4e199432a3d04d",
+    "conflicts": [
+      "packages/core/src/models-dev.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "33c0cc2bb62557dea897289b5d18de8dec377594",
+    "subject": "fix: synchronize remote data refreshes",
+    "files": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts",
+      "packages/tui/src/context/data.tsx",
+      "packages/tui/test/cli/tui/data.test.tsx"
+    ],
+    "lines": 56,
+    "clean": false,
+    "tree": "39f649f148aeebc16f1f9bdf5e13b28b57065029",
+    "conflicts": [
+      "packages/tui/src/context/data.tsx",
+      "packages/tui/test/cli/tui/data.test.tsx"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "aa0e626b12883a325cf0ad17b8a3cd0213fa4c3e",
+    "subject": "fix(core): defer permission rejection cleanup (#36067)",
+    "files": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 155,
+    "clean": false,
+    "tree": "9faa24e9f9627fc51d087674c11a4057ce090e7e",
+    "conflicts": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "05e8d5be7330290eba65d53a9d371d31a8002f4a",
+    "subject": "fix(core): preserve prompt attachment order (#35921)",
+    "files": [
+      "packages/core/src/session/runner/to-llm-message.ts",
+      "packages/core/test/session-runner-message.test.ts"
+    ],
+    "lines": 184,
+    "clean": false,
+    "tree": "2f38d9a2b1540c9f484e8f884f0ba7432fd7af17",
+    "conflicts": [
+      "packages/core/src/session/runner/to-llm-message.ts",
+      "packages/core/test/session-runner-message.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "eb661e6e6dfb6a824e3758205b4b981332b7cf3e",
+    "subject": "fix(core): settle unadvertised tool calls and repair session hook test contexts",
+    "files": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/lib/tool.ts",
+      "packages/core/test/location-layer.test.ts",
+      "packages/core/test/plugin/host.ts",
+      "packages/core/test/tool-subagent.test.ts"
+    ],
+    "lines": 35,
+    "clean": false,
+    "tree": "c47ce76ac8ec342d11b8f52c4adbfde6a01a4fef",
+    "conflicts": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/lib/tool.ts",
+      "packages/core/test/plugin/host.ts",
+      "packages/core/test/tool-subagent.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "e1abf59c596668c7824a2eb4fad6f148c1ea7318",
+    "subject": "fix(core): provide PluginHooks in plugin test layer (#35811)",
+    "files": [
+      "packages/core/test/plugin/fixture.ts"
+    ],
+    "lines": 1,
+    "clean": false,
+    "tree": "ec20acc45d19cd9eafbd2d8e6e67e36319f42851",
+    "conflicts": [
+      "packages/core/test/plugin/fixture.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "521ea87192a9af3cf38cc54fdeb5d5d2f830f1ea",
+    "subject": "fix(core): retain reasoning delta state (#35758)",
+    "files": [
+      "packages/core/src/session/runner/publish-llm-event.ts",
+      "packages/core/test/session-runner-tool-events.test.ts"
+    ],
+    "lines": 46,
+    "clean": false,
+    "tree": "4abead5a20a78ec3c156fba96e2c6cf462f8d706",
+    "conflicts": [
+      "packages/core/src/session/runner/publish-llm-event.ts",
+      "packages/core/test/session-runner-tool-events.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "f86e1cc1ff5c4f3fd475635975e0713fcb5c3761",
+    "subject": "fix(codemode): preserve collection value identity (#35776)",
+    "files": [
+      "packages/codemode/src/interpreter/runtime.ts",
+      "packages/codemode/src/stdlib/object.ts",
+      "packages/codemode/test/promise.test.ts",
+      "packages/codemode/test/stdlib.test.ts"
+    ],
+    "lines": 142,
+    "clean": false,
+    "tree": "2633e48a9c4f22f17db8611d70c371cc2e3e915a",
+    "conflicts": [
+      "packages/codemode/src/stdlib/object.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "d0733f83bf9128de5d0bc0c464b185d8eaa22286",
+    "subject": "fix(codemode): return final top-level expression (#35759)",
+    "files": [
+      "packages/codemode/README.md",
+      "packages/codemode/src/interpreter/model.ts",
+      "packages/codemode/src/interpreter/runtime.ts",
+      "packages/codemode/test/codemode.test.ts"
+    ],
+    "lines": 63,
+    "clean": false,
+    "tree": "038ca936b8d74a05cad3f041a6970904b5499807",
+    "conflicts": [
+      "packages/codemode/src/interpreter/runtime.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "b2ce195bdac023845342053d666f5cd2f5d66aad",
+    "subject": "fix(core): normalize Location.Ref keys in LocationServiceMap (#35757)",
+    "files": [
+      "packages/core/src/location-services.ts",
+      "packages/core/test/location-layer.test.ts"
+    ],
+    "lines": 89,
+    "clean": false,
+    "tree": "874495c90a6f03e5618c16e0818d89c116182d49",
+    "conflicts": [
+      "packages/core/src/location-services.ts",
+      "packages/core/test/location-layer.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "f488089179f4584b4f1b97eca19da585b557fefe",
+    "subject": "fix: preserve compaction files and classify Z.AI overflow (#35747)",
+    "files": [
+      "packages/core/src/session/compaction.ts",
+      "packages/core/test/session-compaction.test.ts",
+      "packages/llm/src/provider-error.ts",
+      "packages/llm/test/provider-error.test.ts",
+      "packages/opencode/test/session/message-v2.test.ts"
+    ],
+    "lines": 41,
+    "clean": false,
+    "tree": "813106a505a567f9b96c23ea054099a9e3f0342b",
+    "conflicts": [
+      "packages/core/src/session/compaction.ts",
+      "packages/core/test/session-compaction.test.ts",
+      "packages/llm/test/provider-error.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "e3a39b214f366c1e4957809699d3438c2158f28e",
+    "subject": "fix(core): lower failed reasoning to text (#35735)",
+    "files": [
+      "packages/core/src/session/runner/to-llm-message.ts",
+      "packages/core/test/session-runner-message.test.ts"
+    ],
+    "lines": 8,
+    "clean": false,
+    "tree": "16b797ee38821ea67db3dabb5435816b28abbc48",
+    "conflicts": [
+      "packages/core/src/session/runner/to-llm-message.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "df471872dee53233307cda0adea121a5b2597a1f",
+    "subject": "fix(codemode): reject Promise.all immediately (#35604)",
+    "files": [
+      "packages/codemode/src/interpreter/runtime.ts",
+      "packages/codemode/test/promise.test.ts"
+    ],
+    "lines": 64,
+    "clean": true,
+    "tree": "79e0d3d5f6f361933317f91ffbf650572eb3b9ce",
+    "conflicts": [],
+    "error": "",
+    "changes": "27\t5\tpackages/codemode/src/interpreter/runtime.ts\n31\t1\tpackages/codemode/test/promise.test.ts"
+  },
+  {
+    "sha": "754dd57177105142ccc1b954aba60206c52beb9d",
+    "subject": "fix(codemode): preserve async callback semantics (#35603)",
+    "files": [
+      "packages/codemode/src/interpreter/model.ts",
+      "packages/codemode/src/interpreter/runtime.ts",
+      "packages/codemode/test/promise.test.ts"
+    ],
+    "lines": 189,
+    "clean": true,
+    "tree": "1565611ad74b6236a420fe6ae6164a97e04183a7",
+    "conflicts": [],
+    "error": "",
+    "changes": "1\t0\tpackages/codemode/src/interpreter/model.ts\n58\t50\tpackages/codemode/src/interpreter/runtime.ts\n75\t2\tpackages/codemode/test/promise.test.ts"
+  },
+  {
+    "sha": "0e1c0414c2f375161bbd948d76367917cb4d5f74",
+    "subject": "fix(codemode): align mutable JavaScript semantics (#35598)",
+    "files": [
+      "packages/codemode/src/interpreter/runtime.ts",
+      "packages/codemode/src/stdlib/object.ts",
+      "packages/codemode/test/parity.test.ts",
+      "packages/codemode/test/stdlib.test.ts"
+    ],
+    "lines": 185,
+    "clean": true,
+    "tree": "426cb01c50200d9360ddbd1f6c8a13ea440aef7a",
+    "conflicts": [],
+    "error": "",
+    "changes": "71\t44\tpackages/codemode/src/interpreter/runtime.ts\n7\t3\tpackages/codemode/src/stdlib/object.ts\n40\t0\tpackages/codemode/test/parity.test.ts\n20\t0\tpackages/codemode/test/stdlib.test.ts"
+  },
+  {
+    "sha": "06dcf3f221466b239ca272ee6ab342941ace5fad",
+    "subject": "fix(tui): remove committed undo messages",
+    "files": [
+      "packages/core/src/session/projector.ts",
+      "packages/core/test/session-projector.test.ts",
+      "packages/core/test/session-prompt.test.ts",
+      "packages/tui/src/context/data.tsx",
+      "packages/tui/test/cli/tui/data.test.tsx"
+    ],
+    "lines": 80,
+    "clean": false,
+    "tree": "8e7b0f83576eb2a8eb424aff2ca93643d47cf4a6",
+    "conflicts": [
+      "packages/core/src/session/projector.ts",
+      "packages/core/test/session-projector.test.ts",
+      "packages/core/test/session-prompt.test.ts",
+      "packages/tui/src/context/data.tsx",
+      "packages/tui/test/cli/tui/data.test.tsx"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "50a762e7b98d5e73a05e7539f70f97a614cf7057",
+    "subject": "fix(mcp): preserve metadata across paginated tools (#35500)",
+    "files": [
+      "packages/core/test/mcp.test.ts",
+      "packages/opencode/test/mcp/catalog.test.ts",
+      "patches/@modelcontextprotocol%2Fsdk@1.29.0.patch"
+    ],
+    "lines": 173,
+    "clean": false,
+    "tree": "a7b7c755ed80fef3226bd2e14c504582b4ebc205",
+    "conflicts": [
+      "packages/core/test/mcp.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "baacb2e7769cb849790ee435e048672e7e771448",
+    "subject": "fix(core): tolerate invalid OTLP configuration",
+    "files": [
+      "packages/core/src/observability.ts",
+      "packages/core/test/effect/observability.test.ts"
+    ],
+    "lines": 44,
+    "clean": true,
+    "tree": "fb8a868b06887b0a33de6cf1505012e0f9f2e059",
+    "conflicts": [],
+    "error": "",
+    "changes": "7\t1\tpackages/core/src/observability.ts\n36\t0\tpackages/core/test/effect/observability.test.ts"
+  },
+  {
+    "sha": "44b182fe23f12bc802f02625cb5e485405c6b3e8",
+    "subject": "fix(core): validate scalar newtypes (#35381)",
+    "files": [
+      "packages/core/src/schema.ts",
+      "packages/core/test/newtype.test.ts"
+    ],
+    "lines": 103,
+    "clean": true,
+    "tree": "ac8a918601f5c6eeb0c5a3c1e7756bad1d604733",
+    "conflicts": [],
+    "error": "",
+    "changes": "33\t23\tpackages/core/src/schema.ts\n47\t0\tpackages/core/test/newtype.test.ts"
+  },
+  {
+    "sha": "ba07481b59d012c9c708d092e169ec97f75309b0",
+    "subject": "fix(run): restore subprocess output contracts",
+    "files": [
+      "packages/opencode/src/server/routes/instance/httpapi/server.ts",
+      "packages/opencode/test/cli/run/session-data.test.ts",
+      "packages/opencode/test/lib/llm-server.ts"
+    ],
+    "lines": 99,
+    "clean": false,
+    "tree": "f1568d6f62253f49dab54be9c7df92c93fe74577",
+    "conflicts": [
+      "packages/opencode/src/server/routes/instance/httpapi/server.ts",
+      "packages/opencode/test/cli/run/session-data.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "8f4b62eb49d52d6930f24895a2ccecac955a2125",
+    "subject": "fix(core): report missing search paths (#35337)",
+    "files": [
+      "packages/core/src/tool/glob.ts",
+      "packages/core/src/tool/grep.ts",
+      "packages/core/test/tool-search.test.ts"
+    ],
+    "lines": 118,
+    "clean": false,
+    "tree": "cab8f415da19bf79fd0a1275ae90fed89ed4d063",
+    "conflicts": [
+      "packages/core/src/tool/glob.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "945d1c8cb28b66732dfaefffc9631af78f83a8a0",
+    "subject": "fix(core): bound recursive file watching (#35323)",
+    "files": [
+      "packages/core/src/filesystem/ignore.ts",
+      "packages/core/test/filesystem/ignore.test.ts",
+      "packages/core/test/filesystem/watcher.test.ts",
+      "packages/web/src/content/docs/config.mdx"
+    ],
+    "lines": 65,
+    "clean": false,
+    "tree": "d3e50c0a511123cdb4bed6246f90ca7ab942d133",
+    "conflicts": [
+      "packages/core/test/filesystem/watcher.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "8e0856c43bf7143cc646cccd8e3c512f49e6c8bc",
+    "subject": "fix(core): disable external plugin hot reload",
+    "files": [
+      "packages/core/src/config/plugin/external.ts",
+      "packages/core/test/config/reload.test.ts"
+    ],
+    "lines": 31,
+    "clean": false,
+    "tree": "7b0547abaa24cade85471397cbe07540a7364e23",
+    "conflicts": [
+      "packages/core/src/config/plugin/external.ts",
+      "packages/core/test/config/reload.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "afe3ebbc35731131893b98893e8fadfbcf4562dd",
+    "subject": "fix(core): bust external plugin import cache",
+    "files": [
+      "packages/core/src/config/plugin/external.ts",
+      "packages/core/test/config/plugin.test.ts"
+    ],
+    "lines": 92,
+    "clean": false,
+    "tree": "b7e1f81f31dbafd338580685d4301da8ff28b168",
+    "conflicts": [
+      "packages/core/src/config/plugin/external.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "e2faeb84e528514c4ff4c5848deff0541568f3c2",
+    "subject": "fix(core): tolerate minimal FSWatcher typings (#35264)",
+    "files": [
+      "packages/core/src/filesystem/watcher.ts"
+    ],
+    "lines": 8,
+    "clean": false,
+    "tree": "0268fc843acdb0b402092d1db8a2c20fce644a89",
+    "conflicts": [
+      "packages/core/src/filesystem/watcher.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "438654768c767d3d81b21d0c0181cf039e9d43d4",
+    "subject": "fix(codemode): require exact tool paths in guidance (#35224)",
+    "files": [
+      "packages/codemode/src/tool-runtime.ts",
+      "packages/codemode/test/codemode.test.ts",
+      "packages/codemode/test/signature.test.ts"
+    ],
+    "lines": 63,
+    "clean": false,
+    "tree": "ee825408018cdae47a0f3da01bfdf3ed3be8825f",
+    "conflicts": [
+      "packages/codemode/src/tool-runtime.ts",
+      "packages/codemode/test/codemode.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "e66cbf36e97d02b25ca8794b4313e679ca411967",
+    "subject": "fix(core): constrain location services (#35228)",
+    "files": [
+      "packages/cli/src/commands/handlers/serve.ts",
+      "packages/core/src/location-services.ts",
+      "packages/sdk-next/src/opencode.ts",
+      "packages/server/src/routes.ts"
+    ],
+    "lines": 18,
+    "clean": false,
+    "tree": "311bf8a45431134d99dee93e07eec02fb159521b",
+    "conflicts": [
+      "packages/cli/src/commands/handlers/serve.ts",
+      "packages/core/src/location-services.ts",
+      "packages/sdk-next/src/opencode.ts",
+      "packages/server/src/routes.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "34a08cbdb807a3e3bcdd43ac7f570a75df0a899d",
+    "subject": "fix(core): tolerate missing models.dev temperature",
+    "files": [
+      "packages/core/src/models-dev.ts",
+      "packages/core/test/models.test.ts"
+    ],
+    "lines": 18,
+    "clean": false,
+    "tree": "0a890f2a0004c517e4ef3d8e6e875257b6f3d603",
+    "conflicts": [
+      "packages/core/src/models-dev.ts",
+      "packages/core/test/models.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "a2769b5ade6cbb544de05ba402eb1b6bbddcd368",
+    "subject": "fix(core): rewrite replacements while hoisting layers (#35176)",
+    "files": [
+      "packages/core/src/effect/layer-node.ts",
+      "packages/core/src/location-services.ts"
+    ],
+    "lines": 6,
+    "clean": true,
+    "tree": "8a5dea6956f92593411251ea1aa964c8736d4f18",
+    "conflicts": [],
+    "error": "",
+    "changes": ""
+  },
+  {
+    "sha": "b3650e23165cb157c729a94b42647e340d45bc35",
+    "subject": "fix(core): provide job service in session default layer",
+    "files": [
+      "packages/core/src/session.ts"
+    ],
+    "lines": 1,
+    "clean": false,
+    "tree": "a28833c29004cc5a1a1268e1903ea5c2341111e7",
+    "conflicts": [
+      "packages/core/src/session.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "ae49b2137658464241dcac88ef35d06b0f77f142",
+    "subject": "fix(core): save external permissions at project root",
+    "files": [
+      "packages/core/src/location-mutation.ts",
+      "packages/core/src/project.ts",
+      "packages/core/test/tool-write.test.ts"
+    ],
+    "lines": 54,
+    "clean": true,
+    "tree": "e90a69f54431c4795def521c3442909999f10c60",
+    "conflicts": [],
+    "error": "",
+    "changes": "8\t1\tpackages/core/src/location-mutation.ts\n11\t0\tpackages/core/src/project.ts\n34\t0\tpackages/core/test/tool-write.test.ts"
+  },
+  {
+    "sha": "4617b03ca963a60ab65f9edcb7d286d75193f789",
+    "subject": "fix: surface shell stderr output (#34761)",
+    "files": [
+      "packages/core/test/tool-shell.test.ts",
+      "packages/tui/src/routes/session/index.tsx"
+    ],
+    "lines": 30,
+    "clean": false,
+    "tree": "9046266223b2126b5109e39ca1201cafffd60ee4",
+    "conflicts": [
+      "packages/core/test/tool-shell.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "f8626865b9f2e0f289aa8b2822ac5cf0c1d8fde8",
+    "subject": "fix(core): expose models.dev modes as models (#34714)",
+    "files": [
+      "packages/core/src/plugin/models-dev.ts",
+      "packages/core/test/plugin/models-dev.test.ts"
+    ],
+    "lines": 257,
+    "clean": false,
+    "tree": "6b7907b688a3c3bbbb2d70be6d4ed00892f7c44c",
+    "conflicts": [
+      "packages/core/src/plugin/models-dev.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "c26f6f95f74e16b2e5a8780e275f096ce8404bfc",
+    "subject": "fix(core): deny subagent tool for default subagents",
+    "files": [
+      "packages/core/src/plugin/agent.ts",
+      "packages/core/test/agent.test.ts"
+    ],
+    "lines": 35,
+    "clean": true,
+    "tree": "04a7e7a0628f686fef5e335178c22bf66cbd5f51",
+    "conflicts": [],
+    "error": "",
+    "changes": "7\t1\tpackages/core/src/plugin/agent.ts\n27\t0\tpackages/core/test/agent.test.ts"
+  },
+  {
+    "sha": "6ca6566bd38a7603c381f5c52cd602cd0463444c",
+    "subject": "fix(core): derive reasoning variants from models.dev",
+    "files": [
+      "packages/core/src/plugin/models-dev.ts",
+      "packages/core/test/plugin/fixtures/models-dev.json",
+      "packages/core/test/plugin/models-dev.test.ts"
+    ],
+    "lines": 125,
+    "clean": false,
+    "tree": "fbd472d51c64368f8218de2f9ce81ac9059d39c1",
+    "conflicts": [
+      "packages/core/src/plugin/models-dev.ts",
+      "packages/core/test/plugin/fixtures/models-dev.json",
+      "packages/core/test/plugin/models-dev.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "a5c51e11d058c5c4ba874dd7245b40c92c99fdf1",
+    "subject": "fix(core): drop legacy config filename (#34650)",
+    "files": [
+      "packages/core/src/config.ts",
+      "packages/core/test/config/config.test.ts",
+      "packages/core/test/config/plugin.test.ts",
+      "specs/v2/config.md"
+    ],
+    "lines": 61,
+    "clean": true,
+    "tree": "8a5dea6956f92593411251ea1aa964c8736d4f18",
+    "conflicts": [],
+    "error": "",
+    "changes": ""
+  },
+  {
+    "sha": "12887e572e01c81472e117dbf3078978067f2441",
+    "subject": "fix(core): align agent tests with universal default permissions (#34561)",
+    "files": [
+      "packages/core/src/config/plugin/agent.ts",
+      "packages/core/test/config/agent.test.ts"
+    ],
+    "lines": 19,
+    "clean": false,
+    "tree": "560344fa5220e36cd20ffec8b683659daa0a175d",
+    "conflicts": [
+      "packages/core/src/config/plugin/agent.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "75715e21155ae233af3d1f5e890ebda83f280d9b",
+    "subject": "fix(core): parse models.dev reasoning options (#34618)",
+    "files": [
+      "packages/core/src/models-dev.ts",
+      "packages/core/test/models.test.ts"
+    ],
+    "lines": 40,
+    "clean": false,
+    "tree": "6ac6eac831c942dfc5575cb31492955f8ade8914",
+    "conflicts": [
+      "packages/core/src/models-dev.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "f928b5be07087e667c2fa479a82bbcb2b4949aae",
+    "subject": "fix(core): sanitize registered tool names (#34512)",
+    "files": [
+      "packages/core/src/tool/application-tools.ts",
+      "packages/core/src/tool/registry.ts",
+      "packages/core/src/tool/tool.ts",
+      "packages/core/test/application-tools.test.ts"
+    ],
+    "lines": 20,
+    "clean": true,
+    "tree": "d77a7d2baf938b6e914997a7ac34f8ec007fafeb",
+    "conflicts": [],
+    "error": "",
+    "changes": "1\t2\tpackages/core/src/tool/application-tools.ts\n2\t3\tpackages/core/src/tool/registry.ts\n3\t0\tpackages/core/src/tool/tool.ts\n3\t6\tpackages/core/test/application-tools.test.ts"
+  },
+  {
+    "sha": "fe59174c23eb87dac1364ad2d7cd56bef1fd4741",
+    "subject": "fix(core): resume after synthetic session message",
+    "files": [
+      "packages/core/src/session.ts"
+    ],
+    "lines": 5,
+    "clean": false,
+    "tree": "198a7d1b9b9d639cf722be71281d9bb26b1cbbfd",
+    "conflicts": [
+      "packages/core/src/session.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "42a3cf964597c3b4aa9226d4a5f0b2465c769cf2",
+    "subject": "fix(core): commit staged revert before admitting new prompt (#34338)",
+    "files": [
+      "packages/core/src/session.ts",
+      "packages/core/test/session-prompt.test.ts"
+    ],
+    "lines": 58,
+    "clean": false,
+    "tree": "f0063a82e8481a886f4ee955592988593e52e9b2",
+    "conflicts": [
+      "packages/core/test/session-prompt.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "b6553d14e179e4f03f6b3d952d297ad5b44affa1",
+    "subject": "fix(core): fail interrupted session steps",
+    "files": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts",
+      "packages/tui/test/cli/tui/data.test.tsx"
+    ],
+    "lines": 60,
+    "clean": false,
+    "tree": "9d85d42a5f135d679fc2444732fa0396714fa5d2",
+    "conflicts": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/tui/test/cli/tui/data.test.tsx"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "6a16c41e8f5726c8bd5fab068c104fb6cb4402a3",
+    "subject": "fix(core): continue after tool defects",
+    "files": [
+      "packages/core/src/session/runner/llm.ts",
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "lines": 19,
+    "clean": false,
+    "tree": "696f86c07023b151c9325582b5f174f8410e2b89",
+    "conflicts": [
+      "packages/core/test/session-runner.test.ts"
+    ],
+    "error": ""
+  },
+  {
+    "sha": "658cbe9caf7cb0c9f1f6e6cd0e9fea5ffc0322f1",
+    "subject": "fix(core): load OpenCode provider config asynchronously",
+    "files": [
+      "packages/core/src/plugin/provider/opencode.ts",
+      "packages/core/test/plugin/provider-opencode.test.ts"
+    ],
+    "lines": 39,
+    "clean": true,
+    "tree": "8a5dea6956f92593411251ea1aa964c8736d4f18",
+    "conflicts": [],
+    "error": "",
+    "changes": ""
+  }
+]
