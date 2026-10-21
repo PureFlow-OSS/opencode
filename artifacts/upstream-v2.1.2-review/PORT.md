@@ -235,3 +235,29 @@ unveränderte Modell-Discovery bei fehlgeschlagenem Kartenabruf und nichtleere K
 durch die echte `SessionUsage.record`-Berechnung. Neun App-Adaptertests und die
 Typechecks in Core und App bestehen. Keine Gesamtbuilds, Paketierung, Neuberechnung
 historischer Sitzungen oder Neustarts wurden ausgeführt.
+
+### MCP-Änderungen während laufender Agent-Aktionen
+
+MCP-Speichern schreibt die Konfiguration und verbindet den Server über `mcp.add`
+zur Laufzeit. `ToolsChanged` aktualisiert die Tool-Registry; die Sitzung liest
+den Katalog vor jedem Provider-Turn neu. Eine schon laufende Modellantwort
+behält ihren bisherigen Snapshot, die nächste Anfrage übernimmt den neuen.
+Ein Neuladen der App oder Neustart der Unterhaltung ist dafür nicht erforderlich.
+
+Das Ändern oder Entfernen einer bestehenden MCP-Verbindung kann dagegen einen
+laufenden MCP-Tool-Aufruf beeinträchtigen. Solche Änderungen sollen bei aktiven
+Sessions erst nach Bestätigung angewendet werden. Abbrechen lässt sowohl die
+Konfiguration als auch die Verbindung unangetastet und erhält die Formulareingaben.
+Neue MCPs können ohne Unterbrechung zusätzlich verbunden werden. Die Bestätigung
+verwendet alle laufenden Sessions des Servers (`session.active()`), einschließlich
+Hintergrund-Sessions. Sie wird vor dem Konfigurationsschreiben geöffnet. Auch Escape,
+Schließen und Abbrechen verwerfen die Aktion; nach Zustimmung wird nur die
+betroffene MCP-Verbindung geändert, nicht die Unterhaltung neu gestartet.
+
+Verifiziert: zwei gezielte Backend-Tests zu laufender MCP-Rekonfiguration und
+Tool-Katalogänderungen, drei Operationstests, App-Typecheck und vier Browserfälle.
+Der Browser prüft insbesondere fehlende API-Schreibzugriffe vor Zustimmung sowie
+bei Ablehnung, erhaltene Eingaben, erfolgreiche Zustimmung, abgebrochenes Löschen
+und Trennen, Hinzufügen während einer aktiven Session und bestehende Editierfälle.
+Die Korrektur wurde nicht gebaut oder paketiert; App und Server bleiben unverändert
+in Betrieb, bis der Nutzer einen neuen Desktop-/CLI-Build verwendet.

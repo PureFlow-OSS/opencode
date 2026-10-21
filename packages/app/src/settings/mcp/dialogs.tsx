@@ -92,7 +92,7 @@ export const DialogMcpForm: Component<{
   headerPlaceholder?: string
   existingNames?: ReadonlySet<string>
   saving?: boolean
-  onSave: (name: string, config: Mcp.ServerConfig) => Promise<void>
+  onSave: (name: string, config: Mcp.ServerConfig) => Promise<void | boolean>
 }> = (props) => {
   const dialog = useDialog()
   const language = useLanguage()
@@ -182,8 +182,9 @@ export const DialogMcpForm: Component<{
     if (props.saving) return
     const config = validate()
     if (!config) return
-    await props.onSave(form.name.trim(), config)
-    dialog.close()
+    const dialogID = dialog.active?.id
+    if ((await props.onSave(form.name.trim(), config)) === false) return
+    dialog.close(dialogID)
   }
 
   return (
@@ -358,7 +359,7 @@ export const DialogMcpForm: Component<{
 export const DialogMcpPat: Component<{
   row: { name: string; auth: Mcp.PatAuth; current: string }
   saving?: boolean
-  onSave: (token: string) => Promise<void>
+  onSave: (token: string) => Promise<void | boolean>
 }> = (props) => {
   const dialog = useDialog()
   const language = useLanguage()
@@ -379,8 +380,9 @@ export const DialogMcpPat: Component<{
             event.preventDefault()
             const value = token.value.trim()
             if (!value || props.saving) return
-            await props.onSave(value)
-            dialog.close()
+            const dialogID = dialog.active?.id
+            if ((await props.onSave(value)) === false) return
+            dialog.close(dialogID)
           }}
         >
           <TextField
@@ -401,3 +403,28 @@ export const DialogMcpPat: Component<{
 }
 
 export const renderMcpError = (error: unknown) => (error instanceof Error ? error.message : String(error))
+
+export const DialogMcpDisruption: Component<{
+  onDecision: (approved: boolean) => void
+}> = (props) => {
+  const language = useLanguage()
+
+  return (
+    <Dialog fit>
+      <DialogHeader>
+        <DialogTitleGroup
+          title={language.t("settings.mcp.disruption.title")}
+          description={language.t("settings.mcp.disruption.description")}
+        />
+      </DialogHeader>
+      <DialogFooter>
+        <Button type="button" variant="neutral" onClick={() => props.onDecision(false)}>
+          {language.t("common.cancel")}
+        </Button>
+        <Button type="button" variant="contrast" onClick={() => props.onDecision(true)}>
+          {language.t("settings.mcp.disruption.continue")}
+        </Button>
+      </DialogFooter>
+    </Dialog>
+  )
+}

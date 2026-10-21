@@ -1,7 +1,11 @@
 import { unwrap } from "solid-js/store"
 import { mcpStoryState } from "./server-sdk"
+import { mcpActivity } from "@/settings/mcp/mcp.fixture"
 
 const data = {
+  session: {
+    active: () => (mcpActivity.running ? ["session-active"] : []),
+  },
   location: {
     default: () => ({ directory: "/tmp/story" }),
     syncInfo: async () => {},

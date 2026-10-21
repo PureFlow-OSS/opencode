@@ -12,7 +12,7 @@ import { useData } from "@/runtime/server/current"
 import { useMcpToggle } from "@/providers/connect/mcp"
 import { showToast } from "@/shell/notifications/toast"
 import { SettingsList } from "@/settings/list"
-import { DialogMcpForm, DialogMcpPat, renderMcpError } from "./dialogs"
+import { DialogMcpDisruption, DialogMcpForm, DialogMcpPat, renderMcpError } from "./dialogs"
 import { createMcpOperations } from "./operations"
 import { patConfig, patValue, serverRows, storeConfig, subtitle } from "./model"
 import "@/settings/settings.css"
@@ -34,6 +34,7 @@ export const SettingsMcp: Component = () => {
   const serverSdk = useServerSDK()
   const data = useData()
   const toggle = useMcpToggle()
+  let dialogID = 0
 
   const connected = () => serverSdk.connection.status() === "connected"
   const directory = () => data.location.default().directory
@@ -45,12 +46,32 @@ export const SettingsMcp: Component = () => {
     data.location.mcp.resource.invalidate(ref())
     await data.location.mcp.resource.sync(ref()).catch(() => undefined)
   }
+  const sessionRunning = () => data.session.active().length > 0
+  const confirmDisruption = () => {
+    if (!sessionRunning()) return Promise.resolve(true)
+    const id = `mcp-disruption-${++dialogID}`
+    return new Promise<boolean>((resolve) => {
+      void dialog.push(
+        () => (
+          <DialogMcpDisruption
+            onDecision={(approved) => {
+              resolve(approved)
+              dialog.close(id)
+            }}
+          />
+        ),
+        () => resolve(false),
+        id,
+      )
+    })
+  }
 
   const operations = createMcpOperations({
     configUpdate: (patch) => serverSdk.api.config.update(patch),
     mcpAdd: (input) => serverSdk.api.mcp.add({ server: input.name, config: input.config, location: ref() }),
     mcpRemove: (input) => serverSdk.api.mcp.remove({ server: input.name, location: ref() }),
     refresh,
+    confirmDisruption,
   })
 
   const config = useQuery(() => ({
@@ -66,12 +87,11 @@ export const SettingsMcp: Component = () => {
   }))
 
   const persist = useMutation(() => ({
-    mutationFn: async (input: { name: string; config: Mcp.ServerConfig | null }) => {
+    mutationFn: async (input: { name: string; config: Mcp.ServerConfig | null; disrupts?: boolean }) => {
       if (input.config) {
-        await operations.save(input.name, input.config)
-        return
+        return await operations.save(input.name, input.config, { disrupts: input.disrupts })
       }
-      await operations.remove(input.name)
+      return await operations.remove(input.name)
     },
     onError: (error: unknown) =>
       showToast({
@@ -91,14 +111,20 @@ export const SettingsMcp: Component = () => {
     }),
   )
   const status = (name: string) => data.location.mcp.server.list(ref())?.find((server) => server.name === name)?.status
+  const changeConnection = async (name: string, enabled: boolean) => {
+    if (toggle.isPending || persist.isPending) return
+    if (status(name)?.status === "connected" && !(await confirmDisruption())) return
+    toggle.mutate({ name, enabled })
+  }
   const rowsByName = createMemo(() => new Map(rows().map((row) => [row.name, row])))
   const catalogUnavailable = () => catalog.isPending || catalog.isError
   const storeItems = createMemo(() =>
     catalogUnavailable() ? [] : (catalog.data?.data.store ?? []).toSorted((a, b) => a.name.localeCompare(b.name)),
   )
 
-  const saveForm = async (name: string, configValue: Mcp.ServerConfig) => {
-    await persist.mutateAsync({ name, config: configValue })
+  const saveForm = async (name: string, configValue: Mcp.ServerConfig, disrupts = false) => {
+    const saved = await persist.mutateAsync({ name, config: configValue, disrupts })
+    if (!saved) return false
     showToast({
       variant: "success",
       title: language.t("settings.mcp.toast.saved.title"),
@@ -108,8 +134,9 @@ export const SettingsMcp: Component = () => {
 
   const savePat = async (row: ReturnType<typeof rows>[number], token: string) => {
     const configValue = patConfig(row, token)
-    if (!configValue) return
-    await persist.mutateAsync({ name: row.name, config: configValue })
+    if (!configValue) return false
+    const saved = await persist.mutateAsync({ name: row.name, config: configValue, disrupts: true })
+    if (!saved) return false
     const runtimeStatus = status(row.name)
     if (runtimeStatus?.status === "connected") {
       showToast({
@@ -117,7 +144,7 @@ export const SettingsMcp: Component = () => {
         title: language.t("settings.mcp.toast.connected.title"),
         description: language.t("settings.mcp.toast.connected.description", { name: row.name }),
       })
-      return
+      return true
     }
     if (runtimeStatus?.status === "failed" || runtimeStatus?.status === "needs_auth") {
       showToast({
@@ -125,7 +152,7 @@ export const SettingsMcp: Component = () => {
         title: language.t("common.requestFailed"),
         description: runtimeStatus.error,
       })
-      return
+      return true
     }
     showToast({
       variant: "success",
@@ -135,8 +162,9 @@ export const SettingsMcp: Component = () => {
   }
 
   const remove = async (row: ReturnType<typeof rows>[number]) => {
-    if (row.source !== "local") return
-    await persist.mutateAsync({ name: row.name, config: null })
+    if (row.source !== "local") return false
+    const removed = await persist.mutateAsync({ name: row.name, config: null })
+    if (!removed) return false
     showToast({
       variant: "success",
       title: language.t("settings.mcp.toast.removed.title"),
@@ -153,12 +181,12 @@ export const SettingsMcp: Component = () => {
       headerPlaceholder?: string
     } = {},
   ) =>
-    void dialog.show(() => (
+    void dialog.push(() => (
       <DialogMcpForm
         {...propsInput}
         existingNames={new Set(rows().map((row) => row.name))}
         saving={persist.isPending}
-        onSave={saveForm}
+        onSave={(name, config) => saveForm(name, config, sessionRunning() && rowsByName().get(name) !== undefined)}
       />
     ))
 
@@ -226,10 +254,7 @@ export const SettingsMcp: Component = () => {
                     checked={status(row.name)?.status === "connected"}
                     disabled={toggle.isPending || persist.isPending}
                     hideLabel
-                    onChange={(checked) => {
-                      if (toggle.isPending || persist.isPending) return
-                      toggle.mutate({ name: row.name, enabled: checked })
-                    }}
+                    onChange={(checked) => void changeConnection(row.name, checked)}
                   >
                     {row.name}
                   </Switch>
@@ -238,7 +263,7 @@ export const SettingsMcp: Component = () => {
                       variant="ghost"
                       disabled={persist.isPending}
                       onClick={() =>
-                        void dialog.show(() => (
+                        void dialog.push(() => (
                           <DialogMcpPat
                             row={{ name: row.name, auth: row.auth!, current: patValue(row) }}
                             saving={persist.isPending}
@@ -254,7 +279,7 @@ export const SettingsMcp: Component = () => {
                     <Button
                       variant="ghost"
                       disabled={toggle.isPending}
-                      onClick={() => toggle.mutate({ name: row.name, enabled: true })}
+                      onClick={() => void changeConnection(row.name, true)}
                     >
                       {language.t("common.connect")}
                     </Button>

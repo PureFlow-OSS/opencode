@@ -384,6 +384,10 @@ export const dict = {
   "settings.mcp.toast.connected.description": "{{name}} is ready to use.",
   "settings.mcp.toast.removed.title": "MCP server removed",
   "settings.mcp.toast.removed.description": "{{name}} was removed.",
+  "settings.mcp.disruption.title": "Apply MCP change?",
+  "settings.mcp.disruption.description":
+    "A session is running. Reconfiguring this MCP server may interrupt an in-flight tool call.",
+  "settings.mcp.disruption.continue": "Continue",
 
   "dialog.fork.empty": "No messages to fork from",
 

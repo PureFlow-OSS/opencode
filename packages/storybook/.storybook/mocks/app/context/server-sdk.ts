@@ -1,7 +1,7 @@
 import { createStore, unwrap } from "solid-js/store"
 import { ServerScope } from "@/runtime/server/scope"
 
-import { mcpCatalogReady } from "@/settings/mcp/mcp.fixture"
+import { mcpCatalogReady, recordMcpWrite } from "@/settings/mcp/mcp.fixture"
 
 const providers = [
   "opencode-go",
@@ -80,6 +80,7 @@ const api = {
   config: {
     get: async () => snapshot().configEntries,
     update: async (input: { mcp?: { servers?: Record<string, unknown> } }) => {
+      recordMcpWrite("config.update")
       const entries = snapshot().configEntries
       const servers: Record<string, unknown> = entries[0].info.mcp.servers
       for (const [name, config] of Object.entries(input.mcp?.servers ?? {})) {
@@ -93,6 +94,7 @@ const api = {
   mcp: {
     list: async () => ({ data: snapshot().runtime }),
     add: async (input: { server: string }) => {
+      recordMcpWrite(`mcp.add:${input.server}`)
       setMcpStoryState(
         "runtime",
         mcpStoryState.runtime
@@ -105,6 +107,7 @@ const api = {
       return { data: true }
     },
     remove: async (input: { server: string }) => {
+      recordMcpWrite(`mcp.remove:${input.server}`)
       setMcpStoryState(
         "runtime",
         mcpStoryState.runtime.filter((server) => server.name !== input.server),
@@ -139,6 +142,7 @@ const api = {
       }
     },
     connect: async (input: { server: string }) => {
+      recordMcpWrite(`mcp.connect:${input.server}`)
       setMcpStoryState(
         "runtime",
         mcpStoryState.runtime.map((server) =>
@@ -148,6 +152,7 @@ const api = {
       return { data: true }
     },
     disconnect: async (input: { server: string }) => {
+      recordMcpWrite(`mcp.disconnect:${input.server}`)
       setMcpStoryState(
         "runtime",
         mcpStoryState.runtime.map((server) =>
