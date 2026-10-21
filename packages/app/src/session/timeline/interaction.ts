@@ -15,6 +15,7 @@ export function createSessionTimelineInteraction(session: SessionModel) {
 
   const [state, setState] = createStore<{
     messageID: string | undefined
+    navMessageID: string | undefined
     pendingMessage: string | undefined
     scroll: { overflow: boolean; jump: boolean }
     follow: { sessionKey: string; pinned: boolean }
@@ -25,6 +26,7 @@ export function createSessionTimelineInteraction(session: SessionModel) {
     }
   }>({
     messageID: undefined,
+    navMessageID: undefined,
     pendingMessage: undefined,
     scroll: {
       overflow: false,
@@ -107,11 +109,13 @@ export function createSessionTimelineInteraction(session: SessionModel) {
   const setActiveMessage = (message: SessionMessageUser | undefined) => {
     messageMark = scrollMark
     setState("messageID", message?.id)
+    setState("navMessageID", message?.id)
   }
 
   const jumpThreshold = (element: HTMLDivElement) => Math.max(400, element.clientHeight)
 
   const updateScrollState = (element: HTMLDivElement) => {
+    if (!pinned()) setState("navMessageID", cursor())
     const max = element.scrollHeight - element.clientHeight
     const distance = max - element.scrollTop
     const overflow = max > 1
@@ -279,6 +283,7 @@ export function createSessionTimelineInteraction(session: SessionModel) {
       () => {
         pin()
         setState("messageID", undefined)
+        setState("navMessageID", undefined)
         setState("pendingMessage", undefined)
         setState("scroll", { overflow: false, jump: false })
       },
@@ -361,11 +366,19 @@ export function createSessionTimelineInteraction(session: SessionModel) {
   return {
     actions: {
       navigateMessage,
+      selectMessage: (message: SessionMessageUser) => {
+        unpin()
+        scrollToMessage(message, "auto")
+      },
       revealMessage: (id: string, partID?: string) => revealMessage(id, partID),
       resume,
       setActiveMessage,
     },
     lastUserMessage: timeline.lastUserMessage,
+    currentMessage: () =>
+      pinned()
+        ? timeline.lastUserMessage()
+        : visibleUserMessages().find((message) => message.id === (state.navMessageID ?? state.messageID)),
     resource: timeline.resource,
     ready: timeline.ready,
     scroll: state.scroll,

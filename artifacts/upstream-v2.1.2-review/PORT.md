@@ -280,3 +280,24 @@ fünf Browser-Komponententests und die Typechecks von Schema, Core und App.
 Der Browser prüft beide Store-Vorgaben, die OAuth-freie Bearbeitung eines PAT-MCPs
 mit erhaltenem Header und die vorherige Bestätigungslogik bei laufenden Sessions.
 Kein Gesamtbuild, keine Paketierung und kein Neustart wurden ausgeführt.
+
+### Sprungpunkte im Nachrichtenverlauf
+
+Die vorhandene MessageNav-Komponente ist wieder in die Desktop-Sitzungsansicht
+eingebunden: schmale Leiste links, Prompt-Vorschau beim Darüberfahren und Sprünge
+per Maus oder Tastatur über die bestehende Hash-/Virtualizer-Navigation. Sie zeigt
+den aktuellen Abschnitt, wächst mit nachgeladenen Nachrichten und berücksichtigt
+die bestehende Revert-Filterung. Unter 768 px bleibt sie ausgeblendet. Die Leiste
+reserviert eigenen Platz, statt Nachrichten zu überdecken. Im angehefteten Verlauf
+ist keine zusätzliche DOM-Abfrage pro Streaming-Frame notwendig.
+
+Verifiziert: App- und Session-UI-Typecheck, gezieltes Linting ohne Befunde sowie ein
+Browser-Regressionstest mit langem, paginiertem Verlauf, Hover-Vorschau, Klick,
+Enter, sichtbarem Sprungziel und mobiler Ausblendung. Der Test schlägt gegen den
+bisherigen Produktionsbuild wegen der fehlenden Leiste erwartungsgemäß fehl.
+Produktionsbaseline aus vorhandenem dist: Cold-Session-Einstieg 349 ms erste
+korrekte Darstellung / 376 ms stabil. Nachher im Dev-Server: 877 / 905 ms, jeweils
+ohne falsche Zielnachrichten und mit 0 px unterem Ankerfehler. Wegen unterschiedlicher
+Build-Modi ist daraus keine belastbare Performance-Differenz ableitbar; ein neuer
+Produktionsvergleich bleibt bis zum nächsten vom Nutzer gestarteten Build offen.
+Gemäß Nutzervorgabe kein Gesamtbuild, keine Paketierung und kein App-/Serverneustart.

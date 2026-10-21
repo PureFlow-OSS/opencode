@@ -14,6 +14,8 @@ import { createStore } from "solid-js/store"
 import { ResizeHandle } from "@opencode/ui/resize-handle"
 import { Slot, type BackgroundTask, type MountedSession, type SessionScreen } from "@opencode/gui-extensions/sdk"
 import { MessageTimeline } from "@/session/timeline/message-timeline"
+import { MessageNav } from "@opencode/session-ui/message-nav"
+import { readPromptPresentation } from "@/composer/comment-note"
 import { ComposerDropzone } from "@/composer/dropzone"
 import { useSettings } from "@/settings/model"
 import type { SessionModel } from "@/session/model"
@@ -356,7 +358,25 @@ function SessionScreenContent(props: {
                 />
               </SessionIdentityHeader>
             </Show>
-            <Show when={messagesReady() && session.identity.params.id}>{timelineView()}</Show>
+            <Show when={messagesReady() && session.identity.params.id}>
+              <div
+                class="h-full min-h-0"
+                classList={{ "md:ps-8": session.history.visibleUserMessages().length > 1 }}
+              >
+                {timelineView()}
+              </div>
+              <Show when={isDesktop() && session.history.visibleUserMessages().length > 1}>
+                <div class="absolute start-1 top-1/2 -translate-y-1/2 z-20 max-h-[calc(100%-6rem)] overflow-y-auto">
+                  <MessageNav
+                    size="compact"
+                    messages={session.history.visibleUserMessages()}
+                    current={timeline.currentMessage()}
+                    getLabel={(message) => readPromptPresentation(message.metadata)?.displayText ?? message.text}
+                    onMessageSelect={timeline.actions.selectMessage}
+                  />
+                </div>
+              </Show>
+            </Show>
           </Match>
         </Switch>
       </div>

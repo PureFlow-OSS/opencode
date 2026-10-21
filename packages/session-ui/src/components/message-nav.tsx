@@ -51,6 +51,8 @@ export function MessageNav(
                   <div
                     data-slot="message-nav-tick-button"
                     data-active={message.id === local.current?.id || undefined}
+                    aria-label={local.getLabel?.(message) || i18n.t("ui.messageNav.newMessage")}
+                    aria-current={message.id === local.current?.id || undefined}
                     role="button"
                     tabindex={0}
                     onClick={handleClick}
@@ -60,7 +62,12 @@ export function MessageNav(
                   </div>
                 </Match>
                 <Match when={local.size === "normal"}>
-                  <button data-slot="message-nav-message-button" onClick={handleClick} onKeyDown={handleKeyPress}>
+                  <button
+                    data-slot="message-nav-message-button"
+                    aria-current={message.id === local.current?.id || undefined}
+                    onClick={handleClick}
+                    onKeyDown={handleKeyPress}
+                  >
                     <MessageDiffBars changes={local.getChanges?.(message) ?? []} />
                     <div
                       data-slot="message-nav-title-preview"
