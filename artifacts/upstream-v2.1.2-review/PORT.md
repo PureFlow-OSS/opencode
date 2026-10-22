@@ -664,3 +664,19 @@ Verifikation: Ribbon-E2E-Keeper erfolgreich, App- und Session-UI-Typechecks,
 Lint und Diff-Prüfung erfolgreich. Der zusätzliche gesamte E2E-Typecheck
 scheitert in unveränderten Testdateien (Terminal-/Timeline-Probes, Composer,
 Review und Timeline-Stream); keine Meldung betrifft den Ribbon-Keeper.
+
+### Summary-Ausgabelimit aus der Modellkonfiguration
+
+Auf Nutzerwunsch entfällt die zusätzliche feste Summary-Grenze von 8.192 Tokens.
+Jeder Summary-Chunk und die Zusammenführung verwenden das Ausgabe-Limit des
+tatsächlich gewählten Modells. Bei fehlendem Modelllimit wird kein künstliches
+Tool-Limit gesetzt; dann gelten die Provider-Vorgaben. Die separaten bestehenden
+Vision-/OCR-Limits werden durch diese gezielte Änderung nicht angepasst.
+
+Die tatsächlichen lokalen HTTP-Anfragen werden auf 32.000 Tokens bei entsprechend
+konfiguriertem Modell, auf 4.096 bei niedrigerem Limit und auf fehlende explizite
+Begrenzung bei unbekanntem Limit geprüft. Die Regressionen scheitern mit dem
+vorherigen festen Tool-Limit.
+
+Verifiziert: elf Dokumenttests, Core-Typecheck, Lint und Diff-Prüfung erfolgreich.
+Kein vollständiger Build und kein Neustart.

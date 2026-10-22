@@ -110,7 +110,10 @@ export const Plugin = define({
               http: { headers: request.headers },
               system: untrusted,
               messages: [Message.make({ role: "user", content: [Message.text(prompt), ...media] })],
-              generation: { maxTokens: Math.min(worker.limit.output || 4096, maxTokens) },
+              generation: {
+                maxTokens:
+                  kind === "summary" ? worker.limit.output || undefined : Math.min(worker.limit.output || 4096, maxTokens),
+              },
             }),
           )
           .pipe(Effect.timeout("2 minutes"))
@@ -456,9 +459,6 @@ export const Plugin = define({
                         context,
                         undefined,
                         `${question}\n\nSummarize the following source chunk concisely, preserving document names, page references, and facts. Never invent missing information:\n${chunk}`,
-                        [],
-                        // Reasoning and answer text share the provider's output budget.
-                        8192,
                       ),
                     { concurrency: 1 },
                   )

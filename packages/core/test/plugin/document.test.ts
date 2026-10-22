@@ -160,10 +160,29 @@ describe("document tools", () => {
         expect(output).toContain(mode === "reasoning-length" ? "output token budget was exhausted" : "returned no text")
         expect(output).not.toContain("Internal reasoning without an answer")
         expect(input.requests).toHaveLength(1)
-        expect(input.requests[0].max_tokens ?? input.requests[0].max_completion_tokens).toBe(8192)
+        expect(input.requests[0].max_tokens ?? input.requests[0].max_completion_tokens).toBe(32000)
       }),
     )
   }
+
+  it.effect("leaves summary output to the provider when the model has no configured limit", () =>
+    Effect.gen(function* () {
+      const input = yield* fixture(false)
+      const context = yield* setup(input)
+      const models = yield* Model.Service
+      yield* models.transform((editor) =>
+        editor.update(context.model.providerID, context.model.id, (model) => {
+          model.limit.output = 0
+        }),
+      )
+      yield* cacheText(context.session.id, "## Sheet 1\nWork package 1")
+      const result = yield* context.run("document_summary", {})
+      expect(result.status).toBe("completed")
+      expect(input.requests).toHaveLength(1)
+      expect(input.requests[0].max_tokens).toBeUndefined()
+      expect(input.requests[0].max_completion_tokens).toBeUndefined()
+    }),
+  )
 
   it.effect("summarizes all cached workbook text beyond the attachment preview and respects the model limit", () =>
     Effect.gen(function* () {
