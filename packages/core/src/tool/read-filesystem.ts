@@ -180,7 +180,10 @@ export const read = Effect.fn("ReadTool.read")(function* (
   }
 
   const paged = first.info.size > MAX_READ_BYTES || page.offset !== undefined || page.limit !== undefined
-  const encoding = Bom.detect(first.bytes, first.bytes.length < first.info.size)
+  const encoding = yield* Effect.try({
+    try: () => Bom.detect(first.bytes, first.bytes.length < first.info.size),
+    catch: (cause) => new Environment.Failed({ path: input, cause }),
+  })
   const bomLength = first.bytes.length > 2 && Bom.has(first.bytes) ? 3 : 0
   if (!paged) {
     if (first.bytes.includes(0)) return yield* new BinaryFileError({ resource })

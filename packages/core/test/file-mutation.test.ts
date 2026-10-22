@@ -31,6 +31,24 @@ function provide(directory: string, transformFiles: EnvironmentFilesTransform = 
 }
 
 describe("FileMutation", () => {
+  it.live("rejects UTF-16 BOM text writes even with an explicit output encoding", () =>
+    withTempDir(({ path: directory }) =>
+      Effect.gen(function* () {
+        const targetPath = path.join(directory, "utf16.txt")
+        const original = Uint8Array.from([0xff, 0xfe, 0x61, 0])
+        yield* Effect.promise(() => fs.writeFile(targetPath, original))
+        const access = yield* FileAccess.Service
+        const files = yield* FileMutation.Service
+        const target = yield* access.resolve({ path: "utf16.txt" })
+        const error = yield* files
+          .writeTextPreservingBom({ target, content: "replacement", encoding: "utf-8" })
+          .pipe(Effect.flip)
+        expect(error).toBeInstanceOf(Environment.Failed)
+        expect(Uint8Array.from(yield* Effect.promise(() => fs.readFile(targetPath)))).toEqual(original)
+      }).pipe(provide(directory)),
+    ),
+  )
+
   it.live("writes an existing internal file and returns a stable result", () =>
     withTempDir(({ path: directory }) =>
       Effect.gen(function* () {

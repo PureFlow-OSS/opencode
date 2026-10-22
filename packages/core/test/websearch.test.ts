@@ -7,6 +7,8 @@ import { WebSearch } from "@opencode/core/websearch"
 import { Session } from "@opencode/schema/session"
 import { SessionEvent } from "@opencode/schema/session-event"
 import { Project } from "@opencode/schema/project"
+import { Model } from "@opencode/schema/model"
+import { Provider } from "@opencode/schema/provider"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { testEffect } from "./lib/effect"
 import { TestWebSearch } from "./lib/websearch"
@@ -62,7 +64,7 @@ describe("WebSearch", () => {
 
   it.effect("executes an explicit provider without changing the default", () =>
     Effect.gen(function* () {
-      yield* register("exa")
+      const exa = yield* register("exa")
       const parallel = yield* register("parallel")
       const websearch = yield* WebSearch.Service
       const test = yield* TestWebSearch.Service
@@ -80,19 +82,29 @@ describe("WebSearch", () => {
           ],
         }),
       )
-      expect((yield* websearch.query({ query: "default" }).pipe(Effect.flip))._tag).toBe("WebSearch.ProviderRequired")
+      expect((yield* websearch.query({ query: "default" })).providerID).toBe(exa.providerID)
       expect(parallel.calls).toEqual([{ query: "effect" }])
       expect(test.queries).toEqual([{ query: "effect", providerID: parallel.providerID }, { query: "default" }])
     }),
   )
 
-  it.effect("requires a provider when no default is set", () =>
+  it.effect("uses Exa by default for AI Factory without persisting a selection", () =>
     Effect.gen(function* () {
-      yield* register("exa")
-      yield* register("parallel")
+      const exa = yield* register("exa")
+      const parallel = yield* register("parallel")
       const websearch = yield* WebSearch.Service
+      const kv = yield* KV.Service
 
-      expect((yield* websearch.query({ query: "layers" }).pipe(Effect.flip))._tag).toBe("WebSearch.ProviderRequired")
+      expect((yield* websearch.default())?.id).toBe(exa.providerID)
+      expect(
+        (yield* websearch.query(
+          { query: "layers" },
+          { model: Model.Ref.make({ providerID: Provider.ID.make("aifactory"), id: Model.ID.make("local-model") }) },
+        )).providerID,
+      ).toBe(exa.providerID)
+      expect(exa.calls).toEqual([{ query: "layers" }])
+      expect(parallel.calls).toEqual([])
+      expect(yield* kv.get(WebSearch.ProviderKey)).toBeUndefined()
     }),
   )
 
@@ -602,7 +614,7 @@ describe("WebSearch", () => {
       const websearch = yield* WebSearch.Service
       yield* websearch.transform((editor) => editor.default.set(WebSearch.ID.make("missing")))
 
-      expect((yield* websearch.query({ query: "fallback" }).pipe(Effect.flip))._tag).toBe("WebSearch.ProviderRequired")
+      expect((yield* websearch.query({ query: "fallback" })).providerID).toBe(WebSearch.ID.make("exa"))
     }),
   )
 

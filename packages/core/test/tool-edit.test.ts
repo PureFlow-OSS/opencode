@@ -121,6 +121,27 @@ const call = (input: typeof EditTool.Input.Type, id = "call-edit") => ({
 const it = testEffect(Layer.empty)
 
 describe("EditTool", () => {
+  it.live("rejects an existing UTF-16 BOM file without changing bytes", () =>
+    withTempDir((tmp) => {
+      const edit = makeEditFixture()
+      const target = path.join(tmp.path, "utf16.txt")
+      const original = Uint8Array.from([0xff, 0xfe, 0x61, 0])
+      return Effect.promise(() => fs.writeFile(target, original)).pipe(
+        Effect.andThen(
+          withTool(tmp.path, edit, (registry) =>
+            executeTool(registry, call({ path: "utf16.txt", oldString: "a", newString: "b" })),
+          ),
+        ),
+        Effect.andThen((result) =>
+          Effect.gen(function* () {
+            expect(result).toMatchObject({ status: "error", error: { message: "Unable to edit utf16.txt" } })
+            expect(Uint8Array.from(yield* Effect.promise(() => fs.readFile(target)))).toEqual(original)
+          }),
+        ),
+      )
+    }),
+  )
+
   it.live("registers and replaces relative exact text through FileMutation once", () =>
     withTempDir((tmp) => {
       const edit = makeEditFixture()
@@ -591,18 +612,20 @@ describe("EditTool", () => {
       const edit = makeEditFixture()
       const target = path.join(tmp.path, "legacy.txt")
       const failed = path.join(tmp.path, "failed.txt")
-      const original = Uint8Array.from([0x47, 0x72, 0xfc, 0xdf, 0x65, 0x0d, 0x0a, 0x72, 0x65, 0x73, 0x74])
+      const original = Uint8Array.from([
+        0x47, 0x72, 0xfc, 0xdf, 0x65, 0x20, 0x80, 0x0d, 0x0a, 0x72, 0x65, 0x73, 0x74,
+      ])
       return Effect.promise(() => Promise.all([fs.writeFile(target, original), fs.writeFile(failed, original)])).pipe(
         Effect.andThen(
           withTool(tmp.path, edit, (registry) =>
             Effect.gen(function* () {
               yield* executeTool(
                 registry,
-                call({ path: "legacy.txt", oldString: "Grüße\nrest", newString: "Grüße\nGeändert" }),
+                call({ path: "legacy.txt", oldString: "Grüße €\nrest", newString: "Grüße €\nGeändert" }),
               )
               const result = yield* executeTool(
                 registry,
-                call({ path: "failed.txt", oldString: "Grüße\nrest", newString: "Grüße\nchecked ✓" }),
+                call({ path: "failed.txt", oldString: "Grüße €\nrest", newString: "Grüße €\nchecked ✓" }),
               )
               expect(result).toMatchObject({
                 status: "error",
@@ -618,7 +641,7 @@ describe("EditTool", () => {
           Effect.sync(() => {
             expect(Uint8Array.from(targetBytes)).toEqual(
               Uint8Array.from([
-                0x47, 0x72, 0xfc, 0xdf, 0x65, 0x0d, 0x0a, 0x47, 0x65, 0xe4, 0x6e, 0x64, 0x65, 0x72, 0x74,
+                0x47, 0x72, 0xfc, 0xdf, 0x65, 0x20, 0x80, 0x0d, 0x0a, 0x47, 0x65, 0xe4, 0x6e, 0x64, 0x65, 0x72, 0x74,
               ]),
             )
             expect(Uint8Array.from(failedBytes)).toEqual(original)

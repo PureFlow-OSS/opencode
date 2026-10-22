@@ -167,6 +167,28 @@ const withTempTool = <A, E, R>(body: (directory: string, registry: Tool.Interfac
   )
 
 describe("PatchTool", () => {
+  it.live("rejects a UTF-16 BOM before applying any patch operations", () =>
+    withTempTool((directory, registry) =>
+      Effect.gen(function* () {
+        const target = path.join(directory, "utf16.txt")
+        const original = Uint8Array.from([0xff, 0xfe, 0x61, 0])
+        yield* Effect.promise(() => fs.writeFile(target, original))
+        const result = yield* executeTool(
+          registry,
+          call(
+            "*** Begin Patch\n*** Add File: first.txt\n+first\n*** Update File: utf16.txt\n@@\n-a\n+b\n*** End Patch",
+          ),
+        )
+        expect(result).toMatchObject({
+          status: "error",
+          error: { message: expect.stringContaining("Unsupported text encoding: UTF-16LE BOM.") },
+        })
+        expect(yield* exists(path.join(directory, "first.txt"))).toBe(false)
+        expect(Uint8Array.from(yield* Effect.promise(() => fs.readFile(target)))).toEqual(original)
+      }),
+    ),
+  )
+
   it.live("selects the same edit tools for compaction and generate requests as the agent loop", () =>
     withTempTool(() =>
       Effect.gen(function* () {
@@ -716,7 +738,7 @@ describe("PatchTool", () => {
         const move = path.join(directory, "old.txt")
         const failed = path.join(directory, "failed.txt")
         const updateBytes = Uint8Array.from([
-          0x47, 0x72, 0xfc, 0xdf, 0x65, 0x0d, 0x0a, 0x72, 0x65, 0x73, 0x74, 0x0d, 0x0a,
+          0x47, 0x72, 0xfc, 0xdf, 0x65, 0x20, 0x80, 0x0d, 0x0a, 0x72, 0x65, 0x73, 0x74, 0x0d, 0x0a,
         ])
         const moveBytes = Uint8Array.from([0x62, 0x65, 0x66, 0x6f, 0x72, 0x65, 0x0a])
         yield* Effect.promise(() =>
@@ -730,13 +752,13 @@ describe("PatchTool", () => {
         const settled = yield* executeTool(
           registry,
           call(
-            "*** Begin Patch\n*** Update File: update.txt\n@@\n-Grüße\n-rest\n+Grüße\n+Geändert\n*** Update File: old.txt\n*** Move to: moved.txt\n@@\n-before\n+after\n*** End Patch",
+            "*** Begin Patch\n*** Update File: update.txt\n@@\n-Grüße €\n-rest\n+Grüße €\n+Geändert\n*** Update File: old.txt\n*** Move to: moved.txt\n@@\n-before\n+after\n*** End Patch",
           ),
         )
         const failedResult = yield* executeTool(
           registry,
           call(
-            "*** Begin Patch\n*** Add File: first.txt\n+first\n*** Update File: failed.txt\n@@\n-Grüße\n-rest\n+Grüße\n+checked ✓\n*** End Patch",
+            "*** Begin Patch\n*** Add File: first.txt\n+first\n*** Update File: failed.txt\n@@\n-Grüße €\n-rest\n+Grüße €\n+checked ✓\n*** End Patch",
           ),
         )
 
@@ -750,7 +772,7 @@ describe("PatchTool", () => {
         })
         expect(Uint8Array.from(yield* Effect.promise(() => fs.readFile(update)))).toEqual(
           Uint8Array.from([
-            0x47, 0x72, 0xfc, 0xdf, 0x65, 0x0d, 0x0a, 0x47, 0x65, 0xe4, 0x6e, 0x64, 0x65, 0x72, 0x74, 0x0d, 0x0a,
+            0x47, 0x72, 0xfc, 0xdf, 0x65, 0x20, 0x80, 0x0d, 0x0a, 0x47, 0x65, 0xe4, 0x6e, 0x64, 0x65, 0x72, 0x74, 0x0d, 0x0a,
           ]),
         )
         expect(Uint8Array.from(yield* Effect.promise(() => fs.readFile(path.join(directory, "moved.txt"))))).toEqual(

@@ -59,6 +59,7 @@ export function has(content: Uint8Array) {
 }
 
 export function detect(content: Uint8Array, partial = false): Encoding {
+  requireSupportedBom(content)
   try {
     decode(content, "utf-8", partial)
     return "utf-8"
@@ -83,7 +84,22 @@ export function encode(text: string, encoding: Encoding = "utf-8") {
 }
 
 export function decodeBytes(content: Uint8Array, encoding: Encoding = detect(content)) {
+  requireSupportedBom(content)
   return { ...split(decode(content, encoding)), encoding }
+}
+
+function requireSupportedBom(content: Uint8Array) {
+  const encoding =
+    content[0] === 0xff && content[1] === 0xfe
+      ? content[2] === 0 && content[3] === 0
+        ? "UTF-32LE"
+        : "UTF-16LE"
+      : content[0] === 0xfe && content[1] === 0xff
+        ? "UTF-16BE"
+        : content[0] === 0 && content[1] === 0 && content[2] === 0xfe && content[3] === 0xff
+          ? "UTF-32BE"
+          : undefined
+  if (encoding) throw new Error(`Unsupported text encoding: ${encoding} BOM. File must remain unchanged.`)
 }
 
 export function syncBytes(content: Uint8Array, bom: boolean, encoding: Encoding = detect(content)) {

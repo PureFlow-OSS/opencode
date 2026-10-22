@@ -158,6 +158,18 @@ describe("ReadToolFileSystem", () => {
     }),
   )
 
+  it.effect("reports unsupported BOM encodings as read errors instead of defects", () =>
+    Effect.gen(function* () {
+      const { environment, files, directory } = yield* fixture
+      const file = path.join(directory, "utf16.txt")
+      yield* files.writeFile(file, Uint8Array.of(0xff, 0xfe, 0x61, 0))
+      const error = yield* ReadToolFileSystem.read(environment, absolute(file), "utf16.txt").pipe(Effect.flip)
+      expect(error).toBeInstanceOf(Environment.Failed)
+      if (!(error instanceof Environment.Failed)) throw new Error("Expected a typed read error")
+      expect(String(error.cause)).toContain("Unsupported text encoding: UTF-16LE BOM.")
+    }),
+  )
+
   it.effect("pages Windows-1252 text and strips a leading BOM only on the first page", () =>
     Effect.gen(function* () {
       const { environment, files, directory } = yield* fixture

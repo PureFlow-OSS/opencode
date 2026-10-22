@@ -533,3 +533,42 @@ Zwei kleine NSIS-Vertragstests bestanden, einschließlich vorgegebenem früherem
 Pfad und `/D`-Aufruf; die Testprogramme schreiben ausschließlich in temporäre
 Verzeichnisse und installieren keine Desktop-Anwendung. Kein vollständiger
 Build, keine Ausführung des tatsächlichen Produktinstallers.
+
+### Legacy-Encodings und internes AI-Factory-Routing
+
+Edit, Write und Patch behalten bei bestehenden Windows-1252-Dateien das
+erkannte Encoding und die Zeilenenden. Die Tests decken Umlaute, ß und das
+Eurozeichen als einzelne Legacy-Bytes ab. Nicht darstellbare Zeichen werden
+vor dem Schreiben abgewiesen; neue Dateien verwenden weiterhin UTF-8.
+Erkannte UTF-16-/UTF-32-BOMs werden ausdrücklich zurückgewiesen, da diese
+Encodings derzeit nicht unterstützt werden. Sie dürfen nicht als Windows-1252
+interpretiert und überschrieben werden. Read und FileMutation übersetzen diese
+Dekodierungsfehler in reguläre Tool-Fehler. Der Patch-Test prüft auch, dass in
+diesem Fall keine früheren Patch-Operationen geschrieben werden.
+
+Die interne Gateway-IP 10.53.7.23 und ihr Alias ai.proxy01.ksq.at bleiben jetzt
+unabhängig vom aktuell konfigurierten Host und NO_PROXY direkt geroutet. Die
+Bypass-Einträge werden auch an Kindprozesse weitergereicht. Der konfigurierte
+AI-Factory-Host bleibt zusätzlich freigestellt. Die vorhandenen Parameter
+`aifactory_host` und `use_http_proxy` bleiben erhalten: false deaktiviert den
+Proxy global, einschließlich Websearch/Webfetch; true aktiviert ihn für
+externe Ziele, während AI Factory weiterhin direkt angesprochen wird.
+
+Websearch verwendet ohne explizite Auswahl jetzt wieder Exa statt des
+Upstream-Dialogs mit anschließend zufälliger Anbieterwahl. Explizite Auswahl
+eines anderen Anbieters oder eine Abschaltung bleiben wirksam. Der Service-Test
+prüft die Standardwahl auch mit einem tatsächlichen AI-Factory-Modellkontext;
+der Tool-Test prüft den vollständigen Aufruf ohne zusätzlichen Auswahl-Dialog.
+Die bisherigen Dialog-Tests gelten weiter für Installationen ohne Exa.
+Der Windows-PowerShell-Transport erhält seine Proxy-Umgebung jetzt pro Aufruf.
+Webfetch verwendet bereits den gemeinsamen HTTP-Client; zusätzlich nutzt nun
+auch der ältere AI-SDK-Transport denselben proxybewussten Fetch-Adapter.
+
+Verifiziert: 370 Core-Tests und 16 Utility-Tests bestanden, ein bestehender Test
+übersprungen; Typechecks für Core, CLI und Utilities sowie Lint erfolgreich.
+Reale lokale HTTP-/Proxy-Tests decken Bun, Node und den Windows-PowerShell-Pfad
+ab. Bewusstes Entfernen des Gateway-Bypasses bzw. des Exa-Defaults lässt die
+zugehörigen Regressionstests scheitern; die Änderungen wurden anschließend
+wiederhergestellt und die Tests erneut erfolgreich ausgeführt. Kein externer
+Such-/Modellaufruf, keine persönliche Konfigurationsänderung, kein vollständiger
+Build und kein Neustart der Anwendung.

@@ -25,15 +25,20 @@ const webSearchToolNode = makeLocationNode({
   layer: Layer.effectDiscard(
     Effect.gen(function* () {
       const websearch = yield* WebSearch.Service
-      yield* registerToolPlugin(WebSearchTool.Plugin, { websearch: webSearchHost(websearch) })
+      yield* registerToolPlugin(WebSearchTool.Plugin, { websearch: webSearchHost(websearch), session: sessions })
     }),
   ),
   deps: [Tool.node, Permission.node, WebSearch.node, Form.node],
 })
 
 const sessionID = Session.ID.make("ses_websearch_test")
+const sessions = { get: () => Effect.fail(new Error("missing session")) }
 const providers = [
   { id: WebSearch.ID.make("exa"), name: "Exa" },
+  { id: WebSearch.ID.make("parallel"), name: "Parallel" },
+]
+const consentProviders = [
+  { id: WebSearch.ID.make("other"), name: "Other" },
   { id: WebSearch.ID.make("parallel"), name: "Parallel" },
 ]
 
@@ -51,12 +56,12 @@ class Fixture {
 }
 
 const it = testEffect(TestWebSearch.layer)
-const setup = Effect.gen(function* () {
+const setup = Effect.fn(function* (available: readonly WebSearch.Provider[] = providers) {
   const fixture = new Fixture()
   const websearch = yield* TestWebSearch.Service
   const kv = yield* KV.Service
   yield* websearch.transform((editor) =>
-    providers.forEach((provider) =>
+    available.forEach((provider) =>
       editor.add({
         ...provider,
         execute: () =>
@@ -97,11 +102,10 @@ const setup = Effect.gen(function* () {
 })
 
 describe("WebSearchTool registration", () => {
-  it.effect("asserts permission before delegating to WebSearch", () =>
+  it.effect("defaults immediately to Exa after permission without a form or saved selection", () =>
     Effect.gen(function* () {
-      const fixture = yield* setup
+      const fixture = yield* setup()
       const registry = fixture.registry
-      yield* fixture.websearch.select(WebSearch.ID.make("exa"))
 
       expect((yield* toolDefinitions(registry)).map((tool) => tool.name)).toEqual(["websearch", "execute"])
       expect(
@@ -117,6 +121,7 @@ describe("WebSearchTool registration", () => {
         }),
       ).toMatchObject({
         status: "completed",
+        metadata: { provider: "exa" },
         content: [{ type: "text", text: "## [Search results](https://example.com)\n\nsearch results" }],
       })
       expect(fixture.assertions).toMatchObject([
@@ -136,12 +141,14 @@ describe("WebSearchTool registration", () => {
       ])
       expect(fixture.events).toEqual(["permission", "query"])
       expect(fixture.websearch.sessionIDs).toEqual([sessionID])
+      expect(fixture.formRequests).toEqual([])
+      expect(yield* fixture.kv.get(WebSearch.ProviderKey)).toBeUndefined()
     }),
   )
 
   it.effect("keeps normalized results in structured output", () =>
     Effect.gen(function* () {
-      const fixture = yield* setup
+      const fixture = yield* setup()
       yield* fixture.websearch.select(WebSearch.ID.make("parallel"))
       fixture.results = [
         {
@@ -185,7 +192,7 @@ describe("WebSearchTool registration", () => {
 
   it.effect("uses the concise no-results fallback", () =>
     Effect.gen(function* () {
-      const fixture = yield* setup
+      const fixture = yield* setup()
       yield* fixture.websearch.select(WebSearch.ID.make("exa"))
       fixture.results = []
       const registry = fixture.registry
@@ -203,9 +210,9 @@ describe("WebSearchTool registration", () => {
     }),
   )
 
-  it.effect("asks once and uses the default provider when web search is first enabled", () =>
+  it.effect("asks once and uses automatic selection when Exa is absent", () =>
     Effect.gen(function* () {
-      const fixture = yield* setup
+      const fixture = yield* setup(consentProviders)
       fixture.formResponse = { status: "answered", answer: { choice: "allow" } }
       const registry = fixture.registry
 
@@ -215,7 +222,7 @@ describe("WebSearchTool registration", () => {
         call: { type: "tool-call", id: "call-enable", name: "websearch", input: { query: "effect" } },
       })
       expect(first.status).toBe("completed")
-      expect(["exa", "parallel"]).toContain(first.metadata?.provider)
+      expect(["other", "parallel"]).toContain(first.metadata?.provider)
       expect(fixture.websearch.sessionIDs).toEqual([sessionID, sessionID])
       expect(yield* fixture.kv.get(WebSearch.ProviderKey)).toBe("random")
       expect(fixture.websearch.queries).toHaveLength(2)
@@ -234,7 +241,7 @@ describe("WebSearchTool registration", () => {
               options: [
                 {
                   value: "allow",
-                  label: "Allow search via Exa, Parallel",
+                  label: "Allow search via Other, Parallel",
                 },
                 {
                   value: "choose",
@@ -253,7 +260,7 @@ describe("WebSearchTool registration", () => {
         call: { type: "tool-call", id: "call-enabled", name: "websearch", input: { query: "effect schema" } },
       })
       expect(second.status).toBe("completed")
-      expect(["exa", "parallel"]).toContain(second.metadata?.provider)
+      expect(["other", "parallel"]).toContain(second.metadata?.provider)
       expect(second.metadata?.provider).toBe(first.metadata?.provider)
       expect(fixture.formRequests).toHaveLength(1)
       expect(fixture.websearch.queries).toHaveLength(3)
@@ -262,7 +269,7 @@ describe("WebSearchTool registration", () => {
 
   it.effect("honors automatic consent when the configured provider is unavailable", () =>
     Effect.gen(function* () {
-      const fixture = yield* setup
+      const fixture = yield* setup(consentProviders)
       yield* fixture.websearch.transform((editor) => editor.default.set(WebSearch.ID.make("missing")))
       fixture.formResponse = { status: "answered", answer: { choice: "allow" } }
       const result = yield* executeTool(fixture.registry, {
@@ -281,7 +288,7 @@ describe("WebSearchTool registration", () => {
 
   it.effect("asks a second form when choosing another provider", () =>
     Effect.gen(function* () {
-      const fixture = yield* setup
+      const fixture = yield* setup(consentProviders)
       fixture.formResponses.push(
         { status: "answered", answer: { choice: "choose" } },
         { status: "answered", answer: { provider: "parallel" } },
@@ -310,7 +317,7 @@ describe("WebSearchTool registration", () => {
             required: true,
             custom: false,
             options: [
-              { value: "exa", label: "Exa" },
+              { value: "other", label: "Other" },
               { value: "parallel", label: "Parallel" },
             ],
           },
@@ -321,7 +328,7 @@ describe("WebSearchTool registration", () => {
 
   it.effect("shares provider consent across concurrent searches", () =>
     Effect.gen(function* () {
-      const fixture = yield* setup
+      const fixture = yield* setup(consentProviders)
       fixture.formResponse = { status: "answered", answer: { choice: "allow" } }
       fixture.formWait = fixture.websearch.wait(5)
       const registry = fixture.registry
@@ -350,7 +357,7 @@ describe("WebSearchTool registration", () => {
 
   it.effect("persists the choice to disable web search", () =>
     Effect.gen(function* () {
-      const fixture = yield* setup
+      const fixture = yield* setup(consentProviders)
       fixture.formResponse = { status: "answered", answer: { choice: "disable" } }
       const registry = fixture.registry
 
@@ -369,7 +376,7 @@ describe("WebSearchTool registration", () => {
 
   it.effect("keeps provider progress, output, and metadata accurate across automatic failover", () =>
     Effect.gen(function* () {
-      const fixture = yield* setup
+      const fixture = yield* setup()
       yield* fixture.websearch.select("random")
       const first = (yield* fixture.websearch.query({ query: "seed" }, { sessionID })).providerID
       yield* fixture.websearch.transform((editor) =>
@@ -403,7 +410,7 @@ describe("WebSearchTool registration", () => {
 
   it.effect("does not reopen consent when all automatic providers are cooling down", () =>
     Effect.gen(function* () {
-      const fixture = yield* setup
+      const fixture = yield* setup()
       yield* fixture.websearch.select("random")
       fixture.error = TestWebSearch.httpError()
       const tools = yield* fixture.registry.snapshot()
@@ -430,7 +437,7 @@ describe("WebSearchTool registration", () => {
 
   it.effect("reports safe HTTP failures with the attempted provider", () =>
     Effect.gen(function* () {
-      const fixture = yield* setup
+      const fixture = yield* setup()
       const registry = fixture.registry
       const tools = yield* registry.snapshot()
       yield* fixture.websearch.select(WebSearch.ID.make("exa"))

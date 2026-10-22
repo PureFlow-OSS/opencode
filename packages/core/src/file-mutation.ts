@@ -45,7 +45,11 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()("@opencode/FileMutation") {}
 
 export const readText = Effect.fn("FileMutation.readText")(function* (files: Files, target: string) {
-  return Bom.decodeBytes((yield* files.read(target)).bytes)
+  const content = yield* files.read(target)
+  return yield* Effect.try({
+    try: () => Bom.decodeBytes(content.bytes),
+    catch: (cause) => new Environment.Failed({ path: target, cause }),
+  })
 })
 
 export const syncTextBom = Effect.fn("FileMutation.syncTextBom")(function* (
@@ -54,7 +58,11 @@ export const syncTextBom = Effect.fn("FileMutation.syncTextBom")(function* (
   bom: boolean,
   encoding?: Bom.Encoding,
 ) {
-  const synced = Bom.syncBytes((yield* files.read(target)).bytes, bom, encoding)
+  const content = yield* files.read(target)
+  const synced = yield* Effect.try({
+    try: () => Bom.syncBytes(content.bytes, bom, encoding),
+    catch: (cause) => new Environment.Failed({ path: target, cause }),
+  })
   if (synced.bytes) yield* files.write(target, synced.bytes)
   return synced.text
 })
@@ -107,8 +115,7 @@ const layer = Layer.effect(
       withTargetLock(input.target)(
         Effect.gen(function* () {
           const next = Bom.split(input.content)
-          const current = yield* environment.files.read(input.target.absolute).pipe(
-            Effect.map((result) => Bom.decodeBytes(result.bytes)),
+          const current = yield* readText(environment.files, input.target.absolute).pipe(
             Effect.catchTag("Environment.NotFound", () => Effect.succeed(undefined)),
           )
           const encoding = input.encoding ?? current?.encoding ?? "utf-8"

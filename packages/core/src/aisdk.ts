@@ -32,6 +32,7 @@ import {
 } from "@opencode/ai"
 import { Auth, Endpoint, RequestExecutor, type AnyRoute, type HttpMiddleware } from "@opencode/ai/route"
 import { ProviderShared } from "@opencode/ai/protocols/shared"
+import { HttpProxy } from "@opencode/util/http-proxy"
 import { Cause, Context, Effect, Layer, Option, Schema, Scope, Stream } from "effect"
 import { makeParser } from "effect/encoding/Sse"
 import { HttpClientRequest, HttpClientResponse } from "effect/http"
@@ -159,7 +160,7 @@ function prepareOptions(model: RuntimeInfo, pkg: string) {
       }
     }
 
-    const send: Fetch = typeof customFetch === "function" ? customFetch : fetch
+    const send: Fetch = typeof customFetch === "function" ? customFetch : HttpProxy.fetch
     const middleware = httpMiddleware.getStore()
     const res = await (
       middleware

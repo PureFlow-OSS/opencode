@@ -2,6 +2,21 @@ import { describe, expect, test } from "bun:test"
 import { Bom } from "./bom.js"
 
 describe("Bom", () => {
+  test.each([
+    ["UTF-16LE", [0xff, 0xfe, 0x61, 0]],
+    ["UTF-16BE", [0xfe, 0xff, 0, 0x61]],
+    ["UTF-32LE", [0xff, 0xfe, 0, 0, 0x61, 0, 0, 0]],
+    ["UTF-32BE", [0, 0, 0xfe, 0xff, 0, 0, 0, 0x61]],
+  ] as const)("rejects a recognized %s BOM", (encoding, bytes) => {
+    const content = Uint8Array.from(bytes)
+    const message = `Unsupported text encoding: ${encoding} BOM.`
+    expect(() => Bom.detect(content)).toThrow(message)
+    expect(() => Bom.decodeBytes(content)).toThrow(message)
+    expect(() => Bom.decodeBytes(content, "windows-1252")).toThrow(message)
+    expect(() => Bom.syncBytes(content, false, "windows-1252")).toThrow(message)
+    expect(content).toEqual(Uint8Array.from(bytes))
+  })
+
   test("keeps UTF-8 and BOM bytes unchanged", () => {
     const bytes = new TextEncoder().encode("﻿hello")
 

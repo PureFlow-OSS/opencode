@@ -56,13 +56,41 @@ describe("corporate HTTP proxy", () => {
       use_http_proxy: true,
       http_proxy: "http://proxy.example:8080",
       aifactory_host: "https://factory.example/v1",
+      updater: "https://updater.example/opencode",
     })
     expect(HttpProxy.proxyFor("https://external.example/chat")).toBe("http://proxy.example:8080")
     expect(HttpProxy.proxyFor("https://factory.example/v1/models")).toBeUndefined()
     expect(HttpProxy.proxyFor("http://localhost:4096/api")).toBeUndefined()
     expect(HttpProxy.proxyFor("http://127.0.0.1:4096/api")).toBeUndefined()
+    for (const url of ["http://10.53.7.23/v1/models", "http://ai.proxy01.ksq.at/v1/chat/completions"])
+      expect(HttpProxy.proxyFor(url)).toBeUndefined()
+    expect(HttpProxy.environment().NO_PROXY?.split(",")).toEqual(
+      expect.arrayContaining(["10.53.7.23", "ai.proxy01.ksq.at", "factory.example"]),
+    )
     HttpProxy.configure({ use_http_proxy: false, http_proxy: "http://proxy.example:8080" })
     expect(HttpProxy.proxyFor("https://external.example/chat")).toBeUndefined()
+  })
+
+  test("keeps the internal gateway direct without NO_PROXY even before configuration", () => {
+    const previous = { NO_PROXY: process.env.NO_PROXY, no_proxy: process.env.no_proxy }
+    delete process.env.NO_PROXY
+    delete process.env.no_proxy
+    try {
+      for (const config of [
+        {},
+        { use_http_proxy: true, http_proxy: "http://proxy.example:8080", updater: "https://updater.example" },
+      ]) {
+        HttpProxy.configure(config)
+        for (const host of ["10.53.7.23", "ai.proxy01.ksq.at"])
+          expect(HttpProxy.proxyFor(`http://${host}/v1/chat/completions`)).toBeUndefined()
+      }
+      expect(HttpProxy.proxyFor("http://ai.proxy01.ksq.at.external.example/v1")).toBe("http://proxy.example:8080")
+    } finally {
+      for (const [name, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[name]
+        else process.env[name] = value
+      }
+    }
   })
 
   test("passes the corporate proxy through the real process spawner", async () => {

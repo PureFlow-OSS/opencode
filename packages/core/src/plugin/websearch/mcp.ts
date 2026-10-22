@@ -2,6 +2,7 @@ export * as WebSearchMcp from "./mcp.js"
 
 import { Duration, Effect, Schema } from "effect"
 import { HttpClient, HttpClientRequest } from "effect/http"
+import { HttpProxy } from "@opencode/util/http-proxy"
 import { collectBoundedResponseBody } from "../../tool/http-body.js"
 import { ChildProcess } from "effect/process"
 import { AppProcess } from "@opencode/util/process"
@@ -22,12 +23,12 @@ const windowsProxyScript = [
   "[string]$response.Content",
 ].join("; ")
 
-export const windowsProxyCommand = ChildProcess.make("powershell.exe", [
-  "-NoProfile",
-  "-NonInteractive",
-  "-EncodedCommand",
-  Buffer.from(windowsProxyScript, "utf16le").toString("base64"),
-])
+export const windowsProxyCommand = () =>
+  ChildProcess.make(
+    "powershell.exe",
+    ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(windowsProxyScript, "utf16le").toString("base64")],
+    { env: HttpProxy.environment(), extendEnv: true },
+  )
 
 const windowsProxyPayload = (url: string, proxy: string, headers: Record<string, string>, body: Uint8Array) =>
   JSON.stringify({ url, proxy, headers, body: Buffer.from(body).toString("base64") })
@@ -40,7 +41,7 @@ export const windowsProxyRequest = (
   body: Uint8Array,
 ) =>
   Effect.gen(function* () {
-    const result = yield* run(windowsProxyCommand, {
+    const result = yield* run(windowsProxyCommand(), {
       timeout: Duration.seconds(25),
       maxOutputBytes: MAX_RESPONSE_BYTES,
       stdin: windowsProxyPayload(url, proxy, headers, body),

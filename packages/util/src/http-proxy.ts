@@ -6,6 +6,8 @@ const agents = new Map<string, ProxyAgent>()
 const direct: { agent?: Agent } = {}
 const configuration: { enabled?: boolean; proxy?: string; bypass?: readonly string[] } = {}
 const proxyVariables = ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy"]
+// The corporate gateway stays internal even before config loads or when its alias changes.
+const internalHosts = ["10.53.7.23", "ai.proxy01.ksq.at"]
 
 export function configure(input: {
   use_http_proxy?: boolean
@@ -30,6 +32,7 @@ export function environment(): Record<string, string | undefined> {
         ...(process.env.NO_PROXY || "").split(/[,\s]+/),
         ...(process.env.no_proxy || "").split(/[,\s]+/),
         ...(configuration.bypass ?? []),
+        ...internalHosts,
         "localhost",
         "127.0.0.1",
         "[::1]",
@@ -56,6 +59,7 @@ export function proxyFor(input: string | URL) {
     hostname === "localhost" ||
     hostname === "127.0.0.1" ||
     hostname === "[::1]" ||
+    internalHosts.includes(hostname) ||
     configuration.bypass?.includes(hostname)
   )
     return

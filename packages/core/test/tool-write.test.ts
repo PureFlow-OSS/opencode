@@ -103,6 +103,28 @@ const call = (input: typeof WriteTool.Input.Type, id = "call-write") => ({
 const it = testEffect(Layer.empty)
 
 describe("WriteTool", () => {
+  it.live("rejects an existing UTF-16 BOM file without changing bytes", () =>
+    withTempDir((tmp) => {
+      const fixture = makeWriteFixture()
+      const target = path.join(tmp.path, "utf16.txt")
+      const original = Uint8Array.from([0xff, 0xfe, 0x61, 0])
+      return Effect.promise(() => fs.writeFile(target, original)).pipe(
+        Effect.andThen(
+          withTool(tmp.path, fixture, (registry) =>
+            executeTool(registry, call({ path: "utf16.txt", content: "replacement" })),
+          ),
+        ),
+        Effect.andThen((result) =>
+          Effect.gen(function* () {
+            expect(result).toMatchObject({ status: "error", error: { message: "Unable to write utf16.txt" } })
+            expect(fixture.writes).toEqual([])
+            expect(Uint8Array.from(yield* Effect.promise(() => fs.readFile(target)))).toEqual(original)
+          }),
+        ),
+      )
+    }),
+  )
+
   it.live("registers and creates a relative file through FileMutation once", () =>
     withTempDir((tmp) => {
       const fixture = makeWriteFixture()
@@ -235,20 +257,40 @@ describe("WriteTool", () => {
       const fixture = makeWriteFixture()
       const preserved = path.join(tmp.path, "preserved.txt")
       const created = path.join(tmp.path, "created.txt")
-      return Effect.promise(() => fs.writeFile(preserved, Uint8Array.from([0x47, 0x72, 0xfc, 0xdf, 0x65]))).pipe(
+      const failed = path.join(tmp.path, "failed.txt")
+      const original = Uint8Array.from([0x47, 0x72, 0xfc, 0xdf, 0x65, 0x20, 0x80])
+      return Effect.promise(() =>
+        Promise.all([
+          fs.writeFile(preserved, original),
+          fs.writeFile(failed, original),
+        ]),
+      ).pipe(
         Effect.andThen(
           withTool(tmp.path, fixture, (registry) =>
             Effect.gen(function* () {
-              yield* executeTool(registry, call({ path: "preserved.txt", content: "Grüße" }, "call-preserved"))
-              yield* executeTool(registry, call({ path: "created.txt", content: "Grüße" }, "call-created"))
+              yield* executeTool(registry, call({ path: "preserved.txt", content: "Grüße €" }, "call-preserved"))
+              yield* executeTool(registry, call({ path: "created.txt", content: "Grüße €" }, "call-created"))
+              const result = yield* executeTool(
+                registry,
+                call({ path: "failed.txt", content: "Grüße € ✓" }, "call-failed"),
+              )
+              expect(result).toMatchObject({
+                status: "error",
+                error: {
+                  message: 'Cannot preserve Windows-1252 encoding: character "✓" cannot be represented.',
+                },
+              })
             }),
           ),
         ),
-        Effect.andThen(() => Effect.promise(() => Promise.all([fs.readFile(preserved), fs.readFile(created)]))),
-        Effect.tap(([preservedBytes, createdBytes]) =>
+        Effect.andThen(() =>
+          Effect.promise(() => Promise.all([fs.readFile(preserved), fs.readFile(created), fs.readFile(failed)])),
+        ),
+        Effect.tap(([preservedBytes, createdBytes, failedBytes]) =>
           Effect.sync(() => {
-            expect(Uint8Array.from(preservedBytes)).toEqual(Uint8Array.from([0x47, 0x72, 0xfc, 0xdf, 0x65]))
-            expect(Uint8Array.from(createdBytes)).toEqual(new TextEncoder().encode("Grüße"))
+            expect(Uint8Array.from(preservedBytes)).toEqual(original)
+            expect(Uint8Array.from(createdBytes)).toEqual(new TextEncoder().encode("Grüße €"))
+            expect(Uint8Array.from(failedBytes)).toEqual(original)
           }),
         ),
       )

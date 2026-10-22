@@ -23,6 +23,7 @@ import {
 } from "@opencode/ai"
 import { LLMClient, RequestExecutor } from "@opencode/ai/route"
 import { compileRequest } from "@opencode/ai/route/client"
+import { HttpProxy } from "@opencode/util/http-proxy"
 import { expect } from "bun:test"
 import { Effect, Layer } from "effect"
 import { HttpClientRequest, HttpClientResponse } from "effect/http"
@@ -223,6 +224,55 @@ it.effect("uses only the provider timeout signal when the request signal is null
 
     expect(requestSignal).toBeInstanceOf(AbortSignal)
     expect(requestSignal?.aborted).toBeFalse()
+  }),
+)
+
+it.live("keeps AI Factory traffic direct while proxying other legacy AI SDK requests", () =>
+  Effect.gen(function* () {
+    const requests: string[] = []
+    const proxy = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: (request) => {
+        requests.push("proxy:" + new URL(request.url).pathname)
+        return Response.json({ proxied: true })
+      },
+    })
+    yield* Effect.addFinalizer(() => Effect.sync(() => proxy.stop(true)))
+    const endpoint = Bun.serve({
+      hostname: "127.0.0.2",
+      port: 0,
+      fetch: (request) => {
+        requests.push("factory:" + new URL(request.url).pathname)
+        return Response.json({ direct: true })
+      },
+    })
+    yield* Effect.addFinalizer(() => Effect.sync(() => endpoint.stop(true)))
+    yield* Effect.addFinalizer(() => Effect.sync(() => HttpProxy.configure({})))
+    HttpProxy.configure({
+      use_http_proxy: true,
+      http_proxy: proxy.url.toString(),
+      aifactory_host: endpoint.url.toString(),
+    })
+
+    const aisdk = yield* AISDK.Service
+    let wrappedFetch: typeof fetch | undefined
+    yield* aisdk.hook.sdk((event) => {
+      wrappedFetch = event.options.fetch
+      event.sdk = { languageModel: () => ({ provider: event.model.providerID }) }
+    })
+    yield* aisdk.language(model("test-ai-sdk"))
+    const request = wrappedFetch
+    if (!request) return yield* Effect.die("Expected wrapped fetch")
+    const direct = yield* Effect.promise(() => request(new URL("/models", endpoint.url)))
+    const response = yield* Effect.promise(() => request(new URL("/chat", "http://127.0.0.3:" + endpoint.port)))
+    const directBody = yield* Effect.promise(() => direct.json())
+    const responseBody = yield* Effect.promise(() => response.json())
+
+    expect(requests).toEqual(["factory:/models", "proxy:/chat"])
+    expect(directBody).toEqual({ direct: true })
+    expect(responseBody).toEqual({ proxied: true })
+    expect(new URL(response.url).pathname).toBe("/chat")
   }),
 )
 
