@@ -843,3 +843,10 @@ im Desktop entstand vor dem HTTP-Abruf. GUI-/Desktop-Typechecks und Changed-Lint
 erfolgreich. Kein vollständiger Build, kein Anwendungsneustart und keine Änderung
 an produktiven Service-/Konfigurationsdateien. Auslieferung beim nächsten
 Desktop-/CLI-Build erforderlich.
+
+### Legacy dev Windows updater migration preparation (2026-10-22)
+- Added prepare-legacy-update.ps1 and streamed minisign verification pinned to the public key embedded in dev 1.14.x. Requires the original Tauri private key; validates Authenticode first and SHA-512 against Electron latest.yml. Build wrapper prepares latest.json automatically when key is supplied; explicit -PrepareLegacyUpdate fails early if missing.
+- Existing output can be prepared without compiling again only if it was built with the new NSIS hooks. Accepts old Tauri /P /R /UPDATE arguments and restarts the Electron binary at the fixed corporate directory. No installer executed.
+- Corporate ZIP preserves optional latest.json/.sig. Backend rewrites relative manifest assets to absolute feed URLs and preserves rollout token; historic external absolute URLs retained. Invalid/traversal/local-file URLs rejected. Stock dev client supplies no key and normally receives Normal.
+- Verification: Desktop manifest/ZIP tests 3 pass (16 assertions); backend release/config HTTP tests 2 pass (112 assertions); Desktop bun typecheck and dotnet compile pass; actual Tauri CLI 2.10.1 ephemeral-key signature verified; real NSIS hooks/plugins compile pass; PowerShell syntax and git diff checks pass. Targeted lint: 0 errors, existing/style-policy warnings remain. Existing SQLitePCLRaw NU1903 compile warning unchanged.
+- No full Desktop build, live Docker restart, release promotion, real signing key access or installer execution. Original key availability requested. Real old-client installation test and signed release publication remain prerequisites for live rollout. HTTP transport restrictions compiled into the old client cannot be changed by this backend.

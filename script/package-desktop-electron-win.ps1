@@ -1,6 +1,7 @@
 param(
   [string] $WorkingDirectory = (Join-Path $PSScriptRoot "..\packages\desktop"),
-  [switch] $SkipCliBuild
+  [switch] $SkipCliBuild,
+  [switch] $PrepareLegacyUpdate
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,6 +22,9 @@ if (-not (Test-Path (Join-Path $desktopDirectory "electron-builder.config.ts") -
 }
 
 $desktopPackage = Get-Content (Join-Path $desktopDirectory "package.json") -Raw | ConvertFrom-Json
+if ($PrepareLegacyUpdate -and -not ($env:TAURI_SIGNING_PRIVATE_KEY -or $env:TAURI_SIGNING_PRIVATE_KEY_PATH)) {
+  throw "-PrepareLegacyUpdate requires the original TAURI_SIGNING_PRIVATE_KEY or TAURI_SIGNING_PRIVATE_KEY_PATH"
+}
 $originalOpenCodeVersion = $env:OPENCODE_VERSION
 $originalOpenCodeCliDist = $env:OPENCODE_CLI_DIST
 $openCodeVersionWasSetByScript = $false
@@ -76,6 +80,16 @@ try {
     [IO.Path]::GetFullPath((Join-Path $desktopDirectory $env:OPENCODE_ELECTRON_OUTPUT_DIR.Trim()))
   }
   Copy-Item -LiteralPath (Join-Path $desktopDirectory "../../CHANGELOG.md") -Destination (Join-Path $outputDirectory "changelog.md") -Force
+
+  # Never retain a manifest for installer bytes from an earlier build.
+  if (Test-Path -LiteralPath (Join-Path $outputDirectory "latest.json") -PathType Leaf) {
+    Remove-Item -LiteralPath (Join-Path $outputDirectory "latest.json")
+  }
+  if ($PrepareLegacyUpdate -or $env:TAURI_SIGNING_PRIVATE_KEY -or $env:TAURI_SIGNING_PRIVATE_KEY_PATH) {
+    & (Join-Path $PSScriptRoot "prepare-legacy-update.ps1") -OutputDirectory $outputDirectory -Version $env:OPENCODE_VERSION
+  } else {
+    Write-Host "Legacy Tauri migration was not prepared: supply the original TAURI_SIGNING_PRIVATE_KEY or TAURI_SIGNING_PRIVATE_KEY_PATH"
+  }
 
   Write-Host "Packaged Windows desktop output in $outputDirectory"
 }

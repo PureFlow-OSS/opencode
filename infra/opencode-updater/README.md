@@ -124,6 +124,49 @@ return `Deprecation: true`. Historical GET requests remain available; new writes
 return HTTP 410. Existing feedback records are retained, and feedback navigation
 and positive approval requirements are removed from the admin UI.
 
+### Windows migration from the dev 1.14.x Tauri client
+
+The Electron Windows installer can also be delivered through the old client's
+Tauri updater. This requires **both** its normal Authenticode signature and a
+Tauri/minisign signature made with the **original** private key corresponding to
+the public key embedded in the old client. A newly generated key will not work.
+The preparation verifies that key and both the final installer bytes and the
+`latest.yml` SHA-512. Never modify or re-sign the EXE afterwards.
+
+Provide `TAURI_SIGNING_PRIVATE_KEY` (or `TAURI_SIGNING_PRIVATE_KEY_PATH`) and
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` through your existing secret setup. The
+Windows build wrapper automatically prepares the migration when a key is present;
+`-PrepareLegacyUpdate` makes a missing key an error before building. Tauri CLI
+2.10.1 is used only during preparation and is not bundled into the application.
+
+To prepare an already built, Authenticode-signed installer without rebuilding:
+
+```powershell
+.\script\prepare-legacy-update.ps1 -OutputDirectory .\packages\desktop\dist-v2.1.2-ai-signed -Version 2.1.2
+```
+
+Run this from the repository root. `-SkipSigning` verifies existing `.exe.sig`
+files instead of using the private key. The installer must have been built with
+the legacy NSIS hooks included; preparation does not patch an existing EXE.
+Keep `latest.yml`, `latest.json`, the EXE,
+its `.exe.sig` and `changelog.md` together in the ZIP uploaded to the updater.
+The corporate release packager includes the migration manifest and signatures.
+`latest.json` supports only the Windows architectures actually present in that
+package. The old `/P /R /UPDATE` installer flags are accepted by Electron's NSIS
+hooks, with the corporate `C:\Entwicklung\OpenCode` install directory retained.
+
+The unchanged dev client calls its built-in Tauri manifest endpoint without an
+AI Factory key, so it normally receives the **Normal** feed. Publishing to Beta
+alone does not migrate those clients. Manifest requests that already select a
+stage retain that stage in the generated download URLs. Existing HTTP manifests
+also require the old client to have allowed that endpoint; this server cannot
+change transport restrictions compiled into an installed client.
+
+These are Windows migration artifacts, not replacements for Tauri macOS/Linux
+packages. A real update from an installed old client must be validated before
+promoting the migration release to Normal; signing/manifest tests and NSIS
+compile checks do not run an installer or migrate a user's installation.
+
 Run `dotnet build --no-restore` followed by `bun test ./tests/releases.test.ts`
 from this directory to check migration, promotion rollback, stage delivery stops,
 restart persistence, and feedback deprecation using disposable local data.
