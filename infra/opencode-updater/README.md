@@ -108,6 +108,24 @@ Each stage contains its own `latest.yml`, installer, optional `latest.json`, and
 `feed/ai-gilde/` directories only when the corresponding durable stage does not
 already exist. Existing durable stages are never overwritten by migration.
 
+### Existing Electron clients (1.14.37/1.14.38)
+
+The corporate Windows builds named `opencode-electron-win-x64.exe` already use
+Electron, from `packages/desktop-electron` in the dev branch. They consume
+`/config` (or `/version` and `/url`), followed by `feed/latest.yml` and its
+referenced installer. The newer `opencode-desktop-win-x64.exe` filename is
+resolved from that manifest and does not require an alias or Tauri migration.
+Keep the existing app identity, Windows signing publisher and corporate install
+directory when building the new installer.
+
+Upload the new signed EXE, its `.blockmap`, `latest.yml` and `changelog.md` as
+usual, then promote Beta → AI Gilde → Normal for the intended users. The old
+Electron client's AI Factory key selects the rollout stage, and the feed token
+keeps subsequent downloads in that stage. `sha512` checks installer integrity;
+it is not the Authenticode signature. These Electron clients need neither a
+Tauri key nor `latest.json`. The separately maintained Tauri package under the
+old `packages/desktop` path uses a different update protocol.
+
 Release mutations are serialized. Uploads and promotions validate a staged copy
 before publishing; a failed database update restores the previous target feed.
 Promotion retains the source stage's files. Missing package files are reported

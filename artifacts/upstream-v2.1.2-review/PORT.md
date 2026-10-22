@@ -843,3 +843,9 @@ im Desktop entstand vor dem HTTP-Abruf. GUI-/Desktop-Typechecks und Changed-Lint
 erfolgreich. Kein vollständiger Build, kein Anwendungsneustart und keine Änderung
 an produktiven Service-/Konfigurationsdateien. Auslieferung beim nächsten
 Desktop-/CLI-Build erforderlich.
+
+### Corrected legacy updater identification (2026-10-22)
+- User supplied dist-v37-ai-signed-1.zip. Its four entries are opencode-electron-win-x64.exe, blockmap, latest.yml version 1.14.37, changelog.md. It is Electron, not the parallel Tauri package in dev/packages/desktop. SHA-512 of the archive installer matches the supplied latest.yml.
+- Earlier Tauri migration preparation was based on the wrong package identification and was reverted in full. No Tauri signing key or latest.json is required for this corporate Electron build. Also corrected the claim about missing AI Factory headers: the actual old Electron config client sends them and resolves tester stages.
+- Controlled real Electron regression used the old Electron update-server.ts/update-server-trust.ts from origin/dev and old installed electron-updater library, isolated app version 1.14.37, local API/feed and never-executed installer fixture. Passed config request with test key, version comparison 1.14.37 -> 2.1.2, latest.yml resolution, new opencode-desktop-win-x64.exe filename, SHA-512 download verification and beta query token propagation. No installer or real user application executed/restarted. Test harness: legacy-electron-check.ts (ignored review artifact).
+- Existing backend endpoints, new NSIS install path and app identity already support this update protocol. Actual old installed-client upgrade remains a release smoke test. No full build or live rollout done.
