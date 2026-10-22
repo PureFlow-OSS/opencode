@@ -29,6 +29,15 @@ describe("window registry", () => {
     expect(setup(undefined).registry.persisted()).toEqual([])
   })
 
+  test("restores duplicate persisted ids once while preserving distinct windows and their order", () => {
+    const app = setup(["a", "b", "a", "", 42, "b", "c"])
+    expect(app.registry.persisted()).toEqual(["a", "b", "c"])
+    for (const id of app.registry.persisted()) app.registry.register(id, { name: id })
+    expect(app.registry.list()).toEqual([{ name: "a" }, { name: "b" }, { name: "c" }])
+    expect(app.registry.closed("b")).toBe(true)
+    expect(app.state.stored).toEqual(["a", "c"])
+  })
+
   test("registers each id once and forgets a deliberately closed window", () => {
     const app = opened("a", "a", "b")
     expect(app.state.stored).toEqual(["a", "b"])
