@@ -1,6 +1,8 @@
 export default {
   "status.label": "Update",
   "action.checkNow": "Check now",
+  "action.unavailable": "Unavailable",
+  "action.disabled": "Updates disabled",
   "action.checking": "Checking…",
   "action.downloading": "Downloading…",
   "action.installRestart": "Install and restart",
@@ -23,6 +25,8 @@ export default {
   "releaseNotes.description": "Show What's New popups after updates",
   "check.title": "Check for updates",
   "check.description": "Manually check for updates and install if available",
+  "check.unavailable": "The update service is unavailable, so updates cannot be checked right now.",
+  "check.disabled": "Updates are disabled for this installation.",
   "menu.check": "Check for Updates…",
   "dialog.checkFailed.message": "Update check failed.",
   "dialog.checkFailed.title": "Update Error",

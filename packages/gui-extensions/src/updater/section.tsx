@@ -1,6 +1,7 @@
-import { createMemo, type JSX } from "solid-js"
+import { Show, createMemo, type JSX } from "solid-js"
 import { Button } from "@opencode/ui/button"
 import { Switch } from "@opencode/ui/switch"
+import { Spinner } from "@opencode/ui/spinner"
 import { useExtension } from "../sdk"
 import { updaterAction } from "./action"
 import type { UpdaterState } from "./contract"
@@ -10,6 +11,16 @@ export default function UpdatesSection(props: { state: () => UpdaterState | unde
   const ctx = useExtension<typeof definition>()
   const releaseNotes = ctx.stores.releaseNotes
   const action = createMemo(() => updaterAction(props.state()))
+
+  const checkDescription = createMemo(() => {
+    const state = props.state()
+
+    if (!state) return ctx.t("check.unavailable")
+
+    if (state.status === "disabled") return ctx.t("check.disabled")
+
+    return ctx.t("check.description")
+  })
 
   return (
     <div class="settings-section">
@@ -29,14 +40,18 @@ export default function UpdatesSection(props: { state: () => UpdaterState | unde
           </div>
         </Row>
 
-        <Row title={ctx.t("check.title")} description={ctx.t("check.description")}>
+        <Row title={ctx.t("check.title")} description={checkDescription()}>
           <Button
             data-action="settings-check-updates"
             size="normal"
             variant="neutral"
             disabled={!action().run}
+            aria-busy={action().busy ?? false}
             onClick={() => props.run()}
           >
+            <Show when={action().busy}>
+              <Spinner class="size-3.5" />
+            </Show>
             {ctx.t(action().label)}
           </Button>
         </Row>

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { createHash } from "node:crypto"
 import { createServer } from "node:http"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, realpath, rm, symlink, unlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { Schema } from "effect"
@@ -31,16 +31,29 @@ test.skipIf(process.platform !== "win32")(
 
     try {
       await mkdir(path.join(directory, "user-data"))
+      await mkdir(path.join(directory, "node_modules"))
+      await symlink(
+        await realpath(path.resolve(import.meta.dir, "../../node_modules/electron-updater")),
+        path.join(directory, "node_modules/electron-updater"),
+        "junction",
+      )
       await Bun.write(path.join(directory, "app-update.yml"), "updaterCacheDirName: regression-updater\n")
+      await Bun.write(
+        path.join(directory, "start.cjs"),
+        `
+const { app } = require("electron")
+app.setPath("userData", ${JSON.stringify(path.join(directory, "user-data"))})
+app.setPath("sessionData", ${JSON.stringify(path.join(directory, "user-data"))})
+app.disableHardwareAcceleration()
+import("./check.mjs").catch((error) => { console.error(error); app.exit(1) })
+`,
+      )
       await Bun.write(
         path.join(directory, "check.ts"),
         `
 import { app } from "electron"
 import { windowsUpdater } from ${JSON.stringify(path.join(import.meta.dir, "client.ts"))}
 import { updateAppAdapter } from ${JSON.stringify(path.join(import.meta.dir, "cache.ts"))}
-app.setPath("userData", ${JSON.stringify(path.join(directory, "user-data"))})
-app.setPath("sessionData", ${JSON.stringify(path.join(directory, "user-data"))})
-app.disableHardwareAcceleration()
 async function run() {
   await app.whenReady()
   const client = windowsUpdater(updateAppAdapter({
@@ -71,10 +84,11 @@ run().then(() => app.exit(0), (error) => { console.error(error); app.exit(1) })
       const compiled = await Bun.build({
         entrypoints: [path.join(directory, "check.ts")],
         outdir: directory,
-        naming: "check.cjs",
+        naming: "check.mjs",
         target: "node",
-        format: "cjs",
-        external: ["electron"],
+        format: "esm",
+        // Match the packaged main process: native ESM resolves updater subpaths at runtime.
+        external: ["electron", "electron-updater"],
       })
 
       expect(compiled.success).toBe(true)
@@ -87,7 +101,7 @@ run().then(() => app.exit(0), (error) => { console.error(error); app.exit(1) })
       const child = Bun.spawn(
         [
           path.resolve(import.meta.dir, "../../node_modules/electron/dist/electron.exe"),
-          path.join(directory, "check.cjs"),
+          path.join(directory, "start.cjs"),
         ],
         { cwd: directory, env, stdout: "pipe", stderr: "pipe" },
       )
@@ -112,6 +126,7 @@ run().then(() => app.exit(0), (error) => { console.error(error); app.exit(1) })
       expect(requests.every((request) => request.key === "regression-key")).toBe(true)
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()))
+      await unlink(path.join(directory, "node_modules/electron-updater")).catch(() => {})
       await rm(directory, { recursive: true, force: true })
     }
   },

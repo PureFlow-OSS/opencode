@@ -1,5 +1,5 @@
-import type { AppAdapter } from "electron-updater/out/AppAdapter"
-import { ElectronHttpExecutor } from "electron-updater/out/electronHttpExecutor"
+import type { AppAdapter } from "electron-updater/out/AppAdapter.js"
+import { ElectronHttpExecutor } from "electron-updater/out/electronHttpExecutor.js"
 import { NsisUpdater } from "electron-updater"
 
 class WindowsUpdater extends NsisUpdater {

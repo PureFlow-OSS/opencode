@@ -810,3 +810,36 @@ im Store-Editor. Es wurden keine Tester oder Store-Einträge gespeichert. Die
 persistenten Feeds Beta 2.1.3 und AI-Gilde 2.1.2 bleiben verfügbar. Der separate
 Desktop-HTTP-Executor-Fix ist durch diesen Container-Neubau weiterhin nicht in
 einem neuen Desktop-Paket ausgeliefert.
+
+### Desktop-Neustart: Service-Dateisperre und ausgefallene Updater-Erweiterung
+
+Ein kurzzeitiges Windows-Deny-Delete-Handle auf `service-prod.json` reproduziert
+den gemeldeten Dienstabbruch beim atomischen Umbenennen der eigenen temporären
+Registrierung. Nur unter Windows und nur bei Node-Fehlercodes EPERM/EACCES/EBUSY
+wird das Rename nun bis zu 20-mal im Abstand von 100 ms wiederholt. Die bestehende
+Registrierung wird nie vorab gelöscht oder in ihren Berechtigungen verändert.
+Die eigene eindeutige TMP-Datei wird auch bei dauerhaftem Fehler und Unterbrechung
+bereinigt. Eigentumsprüfung und Abschaltverhalten bleiben unverändert.
+
+Drei Tests mit echten PowerShell-Dateisperren scheitern ohne Fix und bestehen mit
+Fix: Freigabe nach kurzer Sperre, begrenztes Scheitern bei dauerhafter Sperre und
+TMP-Bereinigung bei Unterbrechung. Zehn gezielte Registrierungs-/Eigentumstests
+bestanden insgesamt; CLI-Typecheck erfolgreich.
+
+Der graue Prüfbutton und der nicht verfügbare Changelog waren dagegen kein
+versteckter Download. Das aktuelle Desktop-Log bestätigt, dass die gesamte Updater-
+Erweiterung beim Import von `electron-updater/out/electronHttpExecutor` scheitert.
+Beim vorherigen Fix fehlte die für native ESM erforderliche Endung `.js`. Der
+Import ist korrigiert. Der echte Electron-Regressionslauf verwendet nun ESM mit
+externem electron-updater statt eingebündelter CJS-Abhängigkeiten. Er reproduziert
+mit dem alten Import denselben ERR_MODULE_NOT_FOUND und besteht mit dem korrigierten
+Import einschließlich tatsächlichem Prüfen/Download, Cache und Auth-Header.
+
+Die Einstellungen kennzeichnen fehlenden/deaktivierten Dienst ausdrücklich.
+Prüfen, Herunterladen und Installieren zeigen zusätzlich einen Spinner und
+aria-busy. Die zuvor fehlenden deutschen Changelog-Texte sind ergänzt. Der
+produktive Changelog-Endpunkt antwortet mit HTTP 200; seine Nichterreichbarkeit
+im Desktop entstand vor dem HTTP-Abruf. GUI-/Desktop-Typechecks und Changed-Lint
+erfolgreich. Kein vollständiger Build, kein Anwendungsneustart und keine Änderung
+an produktiven Service-/Konfigurationsdateien. Auslieferung beim nächsten
+Desktop-/CLI-Build erforderlich.
