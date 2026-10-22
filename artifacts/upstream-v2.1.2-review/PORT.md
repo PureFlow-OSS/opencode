@@ -518,3 +518,18 @@ bestehende Chats und Entwürfe werden nicht überschrieben. Der vorbereitete Tex
 enthält keine rohe Fehlermeldung und bittet um Diagnose, Reparatur und Prüfung
 der Chat-Funktion. Drei gezielte Kontext-/Redaktions-Tests sowie App-Typecheck
 bestanden; keine vollständige Desktop-Build- oder Installer-Ausführung.
+
+### Installer-Pfad und Playwright-Audit
+
+Im aktuellen Packaging ist keine Playwright-Mitlieferung eingerichtet.
+Playwright und seine Browser erscheinen in Entwicklungs-/Testabhängigkeiten,
+nicht in den Desktop-Laufzeitabhängigkeiten oder extraResources. Es wurden keine
+Browserpakete entfernt oder zusätzlich eingebaut.
+
+Der Installer setzt `$INSTDIR` jetzt auch in `customInit` auf
+`C:\Entwicklung\OpenCode`, nach der NSIS-Auswertung bisheriger Installationsdaten
+und `/D`-Parameter. Der Updater-Helper verwendet diesen festen Pfad bereits.
+Zwei kleine NSIS-Vertragstests bestanden, einschließlich vorgegebenem früherem
+Pfad und `/D`-Aufruf; die Testprogramme schreiben ausschließlich in temporäre
+Verzeichnisse und installieren keine Desktop-Anwendung. Kein vollständiger
+Build, keine Ausführung des tatsächlichen Produktinstallers.

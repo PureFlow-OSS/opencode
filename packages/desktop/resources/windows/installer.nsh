@@ -11,3 +11,9 @@
   StrCpy $isForceCurrentInstall "1"
   WriteRegStr HKCU "Software\${APP_GUID}" InstallLocation "C:\Entwicklung\OpenCode"
 !macroend
+
+; Run after initMultiUser and /D parsing in every installer instance, including
+; the elevated inner instance used for silent per-machine upgrades.
+!macro customInit
+  StrCpy $INSTDIR "C:\Entwicklung\OpenCode"
+!macroend
