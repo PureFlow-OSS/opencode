@@ -8,6 +8,8 @@
     <PackageReference Include="Klausmd5.AutoController" Version="0.4.0" />
     <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0" />
+    <!-- Override EF's older transitive bundle so the native SQLite library is patched on every platform. -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.14" />
     <PackageReference Include="Quartz.Extensions.Hosting" Version="3.18.1" />
   </ItemGroup>
   <ItemGroup>
