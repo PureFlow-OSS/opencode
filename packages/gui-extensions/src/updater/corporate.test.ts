@@ -48,6 +48,8 @@ describe("corporate updater", () => {
   })
 
   test("compares semantic versions", () => {
+    expect(compareVersions("1.18.29", "2.1.2")).toBe(1)
+    expect(compareVersions("2.1.2", "1.18.29")).toBe(-1)
     expect(compareVersions("2.0.0", "2.0.1")).toBe(1)
     expect(compareVersions("2.0.0", "2.0.0")).toBe(0)
     expect(compareVersions("v2.1.0", "2.0.9")).toBe(-1)
@@ -55,6 +57,8 @@ describe("corporate updater", () => {
   })
 
   test("applies only a newer corporate version", () => {
+    expect(isUpdateNewer("1.18.29", "2.1.2")).toBe(true)
+    expect(isUpdateNewer("2.1.2", "1.18.29")).toBe(false)
     expect(isUpdateNewer("2.0.0", "2.0.1")).toBe(true)
     expect(isUpdateNewer("2.0.0", "2.0.0")).toBe(false)
     expect(isUpdateNewer("2.1.0", "2.0.9")).toBe(false)

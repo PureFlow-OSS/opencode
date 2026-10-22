@@ -126,6 +126,14 @@ it is not the Authenticode signature. These Electron clients need neither a
 Tauri key nor `latest.json`. The separately maintained Tauri package under the
 old `packages/desktop` path uses a different update protocol.
 
+The later 1.18.29 Electron updater in `feat/merge-upstream-dev-v18` has an
+inverted version gate: its comparison returns positive for a newer server
+version, but its `>= 0` branch reports no update. That build can therefore report
+`up-to-date` for 2.1.2 before contacting the installer feed. This is a client-side
+bug; those installations need a manual installer upgrade once. The current v2
+client accepts a positive comparison, with regression coverage for
+1.18.29 → 2.1.2. Do not falsify the feed version to bypass the old client check.
+
 Release mutations are serialized. Uploads and promotions validate a staged copy
 before publishing; a failed database update restores the previous target feed.
 Promotion retains the source stage's files. Missing package files are reported

@@ -855,3 +855,8 @@ Desktop-/CLI-Build erforderlich.
 - NU1903 advisory GHSA-2m69-gcr7-jv3q affects native SQLite before 3.50.2. Loaded the resolved win-x64 native DLL directly: sqlite3_libversion() reports 3.54.0.
 - dotnet restore --force-evaluate with NuGetAudit=true, NuGetAuditMode=all and -warnaserror succeeded. dotnet build --no-restore: zero warnings/errors. dotnet list package --include-transitive --vulnerable: no known vulnerable packages.
 - Existing backend release, model policy, tester/MCP integration tests: 3 pass, 111 assertions, using disposable databases/configuration. No live database changes, Docker rebuild/restart or full Desktop build.
+
+### Legacy 1.18.29 update gate diagnosis (2026-10-22)
+- Logs report 1.18.29 packaged and checking -> up-to-date before feed activity. In feat/merge-upstream-dev-v18:packages/desktop/src/main/updater.ts, compareVersions(current, remote) >= 0 returns no update, while update-server.ts returns positive when remote is newer. Thus 1.18.29 -> 2.1.2 is incorrectly rejected by that later legacy client. Earlier generic-feed compatibility checks from the separate desktop-electron path did not cover this gate.
+- Current GUI extension platform already uses isUpdateNewer > 0 correctly. Added exact cross-major forward/reverse regression assertions. Corporate updater tests: 25 pass, 45 assertions; GUI extensions bun typecheck passes; lint:changed passes; direct oxlint of the touched test file has 0 warnings/errors.
+- Documented the exception to old-client compatibility. No old checkout/installed client patched, no server versions falsified, no build/installer/restart. Affected 1.18.29 installations require one manual upgrade to a corrected client.
