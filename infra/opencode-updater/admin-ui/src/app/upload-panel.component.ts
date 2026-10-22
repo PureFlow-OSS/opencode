@@ -1,19 +1,6 @@
-import { Component, effect, inject } from "@angular/core"
-import { injectMutation, injectQuery } from "@tanstack/angular-query-experimental"
-import { ApiService } from "./api.service"
-
-type ReleaseRecord = {
-  id: string
-  version: string
-  channel: string
-  zipName: string
-  zipSize: number
-  notes?: string | null
-  promoted: boolean
-  positiveCount: number
-  totalCount: number
-  createdAt: string
-}
+import { Component, effect, inject, signal } from "@angular/core"
+import { injectMutation, injectQuery, injectQueryClient } from "@tanstack/angular-query-experimental"
+import { ApiService, ReleaseChannel, ReleaseChannelStatus } from "./api.service"
 
 @Component({
   selector: "app-upload-panel",
@@ -23,45 +10,47 @@ type ReleaseRecord = {
       <h2>Beta Upload</h2>
       <p>Upload a ZIP into the beta feed. The version is read from <code>latest.yml</code> inside the archive.</p>
       <div class="status-row">
-        <section class="status-box">
-          <span>Beta Channel</span>
-          <strong>{{ betaFeedVersion }}</strong>
-          <small>{{ betaReleaseLabel }}</small>
-        </section>
-        <section class="status-box">
-          <span>Normal Channel</span>
-          <strong>{{ normalFeedVersion }}</strong>
-          <small>{{ normalStateText }}</small>
-        </section>
-        <section class="status-box">
-          <span>AI-Gilde Channel</span>
-          <strong>{{ aiGildeFeedVersion }}</strong>
-          <small>{{ aiGildeUserCount }} testers · {{ aiGildePositiveThreshold }} positive approvals required</small>
-        </section>
-        <section class="status-box">
-          <span>Beta testers</span>
-          <strong>{{ betaUserCount }}</strong>
-          <small>{{ betaPositiveThreshold }} positive approvals required</small>
-        </section>
+        @for (channel of channels(); track channel.channel) {
+          <section class="status-box">
+            <span>{{ channelLabel(channel.channel) }}</span>
+            <strong>{{ channel.version ?? channel.release?.version ?? "No release yet" }}</strong>
+            <small>{{ deliveryText(channel) }}</small>
+          </section>
+        }
       </div>
       <form class="form" (submit)="submit($event)">
         <label>
           ZIP file
-          <input name="archive" type="file" accept=".zip,application/zip" />
+          <input name="archive" type="file" accept=".zip,application/zip" [disabled]="uploading()" />
         </label>
         <label>
           Notes
-          <textarea name="notes" rows="4" placeholder="Tell beta testers what to verify"></textarea>
+          <textarea name="notes" rows="4" placeholder="Describe what this beta build changes" [disabled]="uploading()"></textarea>
         </label>
-        <button type="submit">Publish beta</button>
+        <button type="submit" [disabled]="uploading()">
+          @if (uploading()) {
+            Publishing…
+          } @else {
+            Publish beta
+          }
+        </button>
       </form>
-      <p class="status-text" [class.error]="!!statusError">{{ statusText }}</p>
+      @if (statusText()) {
+        <p class="status-text" role="status">{{ statusText() }}</p>
+      }
+      @if (queryError()) {
+        <p class="status-text error" role="alert">Release status unavailable: {{ queryError() }}</p>
+      }
+      @if (statusError()) {
+        <p class="status-text error" role="alert">{{ statusError() }}</p>
+      }
     </article>
   `,
   styleUrl: "./upload-panel.component.css",
 })
 export class UploadPanelComponent {
   readonly api = inject(ApiService)
+  readonly queryClient = injectQueryClient()
   readonly statusQuery = injectQuery(() => ({
     queryKey: ["release-status"],
     queryFn: () => this.api.listReleaseStatus(),
@@ -69,87 +58,59 @@ export class UploadPanelComponent {
   readonly uploadMutation = injectMutation(() => ({
     mutationFn: (payload: { archive: File; notes?: string }) => this.api.uploadRelease(payload),
   }))
-  statusText = ""
-  statusError = ""
+  readonly statusText = signal("")
+  readonly statusError = signal("")
+  readonly queryError = signal("")
 
   constructor() {
     effect(() => {
-      if (this.statusQuery.isError()) this.statusText = "Status unavailable"
+      if (this.statusQuery.isError()) {
+        const error = this.statusQuery.error()
+        this.queryError.set(error instanceof Error ? error.message : error ? String(error) : "Unknown error")
+        return
+      }
+      if (this.statusQuery.isSuccess()) this.queryError.set("")
     })
   }
 
-  private get status() {
-    return this.statusQuery.data()
+  channels() {
+    return this.statusQuery.data()?.channels ?? []
   }
 
-  private get betaRelease() {
-    return this.status?.betaRelease ?? [...(this.status?.releases ?? [])].reverse().find((release) => release.channel === "beta")
+  uploading() {
+    return this.uploadMutation.isPending()
   }
 
-  private get normalRelease() {
-    return this.status?.normalRelease ?? [...(this.status?.releases ?? [])].reverse().find((release) => release.channel === "normal")
+  channelLabel(channel: ReleaseChannel) {
+    if (channel === "ai-gilde") return "AI-Gilde"
+    if (channel === "beta") return "Beta"
+    return "Normal"
   }
 
-  get betaFeedVersion() {
-    return this.status?.betaFeedVersion || this.betaRelease?.version || "No beta release yet"
-  }
-
-  get betaReleaseLabel() {
-    if (!this.betaRelease) return "Waiting for first beta ZIP"
-    return this.betaRelease.notes || "No notes provided"
-  }
-
-  get normalFeedVersion() {
-    return this.status?.normalFeedVersion || this.normalRelease?.version || "No normal release yet"
-  }
-
-  get normalStateText() {
-    if (!this.status) return "Loading status..."
-    return this.status.normalStopped ? "Delivery stopped" : "Delivery active"
-  }
-
-  get betaUserCount() {
-    return this.status?.betaUserCount ?? 0
-  }
-
-  get betaPositiveThreshold() {
-    return this.status?.betaPositiveThreshold ?? 0
-  }
-
-  get aiGildeFeedVersion() {
-    return this.status?.aiGildeFeedVersion || "No AI-Gilde release yet"
-  }
-
-  get aiGildeUserCount() {
-    return this.status?.aiGildeUserCount ?? 0
-  }
-
-  get aiGildePositiveThreshold() {
-    return this.status?.aiGildePositiveThreshold ?? 0
+  deliveryText(channel: ReleaseChannelStatus) {
+    if (!channel.filesAvailable) return "Missing package files"
+    return channel.stopped ? "Delivery stopped" : "Delivery active"
   }
 
   submit(event: SubmitEvent) {
     event.preventDefault()
     const form = event.currentTarget as HTMLFormElement
     const archive = form.elements.namedItem("archive") as HTMLInputElement
-    if (!archive.files?.[0]) return
-    this.statusText = "Uploading..."
-    this.statusError = ""
-    this.uploadMutation.mutate(
-      {
-        archive: archive.files[0],
-        notes: (form.elements.namedItem("notes") as HTMLTextAreaElement).value,
-      },
-      {
-        onSuccess: (release) => {
-          this.statusText = `Uploaded ${release.version} to beta feed`
-          void this.statusQuery.refetch()
-        },
-        onError: (error) => {
-          this.statusError = error instanceof Error ? error.message : String(error)
-          this.statusText = "Upload failed"
-        },
-      },
-    )
+    const file = archive.files?.[0]
+    if (!file || this.uploading()) return
+    const notes = (form.elements.namedItem("notes") as HTMLTextAreaElement).value
+    this.statusText.set("Uploading…")
+    this.statusError.set("")
+    void this.uploadMutation
+      .mutateAsync({ archive: file, notes })
+      .then(async (release) => {
+        await this.queryClient.invalidateQueries({ queryKey: ["release-status"] })
+        this.statusText.set(`Uploaded ${release.version} to beta feed`)
+        form.reset()
+      })
+      .catch((error) => {
+        this.statusError.set(error instanceof Error ? error.message : String(error))
+        this.statusText.set("Upload failed")
+      })
   }
 }

@@ -35,7 +35,8 @@ builder.Services.AddCors((options) =>
     .AllowAnyHeader()
     .AllowAnyMethod());
 });
-builder.Services.AddSingleton(new LocalFeed(Path.Combine(builder.Environment.ContentRootPath, "feed")));
+builder.Services.AddSingleton(new LocalFeed(Path.Combine(builder.Environment.ContentRootPath, "data", "feed")));
+builder.Services.AddSingleton<FeedOperationGate>();
 builder.Services.AddSingleton<UpdaterChannelStateStore>();
 builder.Services.AddSingleton<UpdaterVersionResolver>();
 builder.Services.AddSingleton<UpdaterRolloutResolver>();
@@ -81,6 +82,22 @@ var app = builder.Build();
 
 app.UseCors();
 
+app.Use(async (context, next) =>
+{
+  if (context.Request.Path.Equals("/opencode/feedback") || context.Request.Path.Equals("/opencode/admin/feedback"))
+  {
+    context.Response.Headers["Deprecation"] = "true";
+    if (!HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method))
+    {
+      context.Response.StatusCode = StatusCodes.Status410Gone;
+      await context.Response.WriteAsJsonAsync(new { error = "Feedback endpoints are deprecated" });
+      return;
+    }
+  }
+
+  await next();
+});
+
 using (var scope = app.Services.CreateScope())
 {
   var db = scope.ServiceProvider.GetRequiredService<FeedbackContext>();
@@ -90,6 +107,7 @@ using (var scope = app.Services.CreateScope())
   if (!await HasColumnAsync(db.Database, "Feedbacks", "BetaSentiment"))
     db.Database.ExecuteSqlRaw(@"ALTER TABLE ""Feedbacks"" ADD COLUMN ""BetaSentiment"" TEXT NULL");
   await EnsureAdminTablesAsync(db.Database.GetDbConnection(), scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>());
+  FeedPublication.MigrateLegacy(scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>());
 }
 
 app.MapGet("/opencode/admin", () => Results.Redirect("/opencode/admin/"));
@@ -191,33 +209,32 @@ app.MapGet("/opencode/admin/releases", async (UpdaterAdminStore store) => Result
 app.MapGet("/opencode/admin/releases/status", async (
   UpdaterAdminStore store,
   UpdaterChannelStateStore channelState,
-  LocalFeed feed,
   UpdaterConfigStore configStore,
-  FeedbackContext feedbackDb
+  LocalFeed feed
 ) =>
 {
   var beta = await configStore.LoadBetaOptionsAsync();
   var releases = await store.ListReleasesAsync();
-  var trackedVersion = await ResolveActiveVersionAsync(feed, store, UpdaterChannel.Beta, releases);
-  await BackfillBetaFeedbackVersionAsync(feedbackDb, trackedVersion, releases);
-  var feedbackCounts = string.IsNullOrWhiteSpace(trackedVersion) ? (0L, 0L) : await GetBetaFeedbackCountsAsync(feedbackDb, trackedVersion);
+  var channelStates = new[]
+  {
+    feed.Status(UpdaterChannel.Beta, channelState, releases),
+    feed.Status(UpdaterChannel.AiGilde, channelState, releases),
+    feed.Status(UpdaterChannel.Normal, channelState, releases),
+  };
   return Results.Json(new
   {
-    releases = releases.Select((release) => trackedVersion is not null && string.Equals(release.Version, trackedVersion, StringComparison.OrdinalIgnoreCase)
-      ? release with { PositiveCount = feedbackCounts.Item1, TotalCount = feedbackCounts.Item2 }
-      : release),
-    normalStopped = await channelState.IsNormalStoppedAsync(),
+    releases,
+    channels = channelStates,
+    normalStopped = channelState.IsStopped(UpdaterChannel.Normal),
     betaUserCount = beta.Users.Length,
     betaPositiveThreshold = ChannelPositiveThreshold(UpdaterChannel.Beta, beta),
     aiGildeUserCount = beta.AiGildeUsers.Length,
     aiGildePositiveThreshold = ChannelPositiveThreshold(UpdaterChannel.AiGilde, beta),
-    aiGildeFeedVersion = feed.TryReadVersionFromLatestYml(UpdaterChannel.AiGilde),
-    betaRelease = releases.FirstOrDefault((release) => string.Equals(release.Version, trackedVersion, StringComparison.OrdinalIgnoreCase)) is { } betaRelease
-      ? betaRelease with { PositiveCount = feedbackCounts.Item1, TotalCount = feedbackCounts.Item2 }
-      : null,
+    aiGildeFeedVersion = channelStates[1].Version,
+    betaRelease = releases.FirstOrDefault((release) => release.Channel == "beta"),
     normalRelease = releases.FirstOrDefault((release) => release.Channel == "normal"),
-    betaFeedVersion = trackedVersion,
-    normalFeedVersion = feed.TryReadVersionFromLatestYml(UpdaterChannel.Normal),
+    betaFeedVersion = channelStates[0].Version,
+    normalFeedVersion = channelStates[2].Version,
   });
 });
 
@@ -287,7 +304,9 @@ app.MapPut("/opencode/admin/testers", async (UpdaterTesterRequest body, UpdaterC
 
 app.MapPost("/opencode/admin/releases/upload", async (
   HttpRequest request,
-  UpdaterAdminStore store
+  UpdaterAdminStore store,
+  LocalFeed feed,
+  FeedOperationGate gate
 ) =>
 {
   if (!request.HasFormContentType)
@@ -302,40 +321,54 @@ app.MapPost("/opencode/admin/releases/upload", async (
   if (string.IsNullOrWhiteSpace(version))
     return Results.BadRequest(new { error = "latest.yml with a version field is required inside the ZIP" });
 
-  var feedRoot = Path.Combine(request.HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath, "feed", "beta");
-  Directory.CreateDirectory(feedRoot);
-  CleanDirectory(feedRoot, preserve: ["_archives"]);
-  Directory.CreateDirectory(Path.Combine(feedRoot, "_archives"));
+  using var operation = await gate.EnterAsync(request.HttpContext.RequestAborted);
+  var published = feed.ChannelPath(UpdaterChannel.Beta);
+  var staging = published + ".staging-" + Guid.NewGuid().ToString("N");
+  var archiveDirectory = Path.Combine(staging, "_archives");
   var zipName = Path.GetFileName(file.FileName);
-  var zipPath = Path.Combine(feedRoot, "_archives", zipName);
+  var zipPath = Path.Combine(archiveDirectory, zipName);
+  Directory.CreateDirectory(staging);
+  Directory.CreateDirectory(archiveDirectory);
+  try
+  {
+  if (Directory.Exists(Path.Combine(published, "_archives")))
+    FeedPublication.Copy(Path.Combine(published, "_archives"), archiveDirectory);
   await using (var source = file.OpenReadStream())
   await using (var destination = File.Create(zipPath))
   {
     await source.CopyToAsync(destination, request.HttpContext.RequestAborted);
   }
 
-  await ExtractZipToDirectoryAsync(zipPath, feedRoot, request.HttpContext.RequestAborted);
+  await ExtractZipToDirectoryAsync(zipPath, staging, request.HttpContext.RequestAborted);
+  var error = LocalFeed.Validate(staging, version);
+  if (error is not null)
+    return Results.Conflict(new { error });
 
-  var release = await store.UploadReleaseAsync(new UploadReleaseRequest(
+  var upload = new UploadReleaseRequest(
     version,
     file.FileName,
     await ComputeSha256Async(file, request.HttpContext.RequestAborted),
     file.Length,
     form["notes"].ToString()
-  ));
+  );
+  var release = await FeedPublication.PublishAsync(staging, published, () => store.UploadReleaseAsync(upload));
   return Results.Ok(release);
+  }
+  finally
+  {
+    if (Directory.Exists(staging)) Directory.Delete(staging, true);
+  }
 });
 
 app.MapPost("/opencode/admin/releases/{id}/promote", async (
   string id,
   UpdaterAdminStore store,
   LocalFeed feed,
-  UpdaterConfigStore configStore,
-  HttpRequest request,
-  FeedbackContext feedbackDb
+  FeedOperationGate gate,
+  HttpRequest request
 ) =>
 {
-  var beta = await configStore.LoadBetaOptionsAsync(request.HttpContext.RequestAborted);
+  using var operation = await gate.EnterAsync(request.HttpContext.RequestAborted);
   var releases = await store.ListReleasesAsync();
   var release = releases.FirstOrDefault((item) => item.Id == id);
   if (release is null) return Results.NotFound();
@@ -345,30 +378,43 @@ app.MapPost("/opencode/admin/releases/{id}/promote", async (
   var activeVersion = await ResolveActiveVersionAsync(feed, store, releaseChannel, releases);
   if (!string.Equals(release.Version, activeVersion, StringComparison.OrdinalIgnoreCase))
     return Results.BadRequest(new { error = $"A newer {release.Channel} release is active and must be promoted instead" });
-  var counts = await GetBetaFeedbackCountsAsync(feedbackDb, release.Version);
   var target = releaseChannel == UpdaterChannel.Beta ? UpdaterChannel.AiGilde : UpdaterChannel.Normal;
-  if (counts.positiveCount < ChannelPositiveThreshold(releaseChannel, beta))
-    return Results.BadRequest(new { error = $"Not enough validated positive feedback to promote to {UpdaterChannelName(target)}" });
+  var source = feed.ChannelPath(releaseChannel);
+  var validationError = LocalFeed.Validate(source, release.Version);
+  if (validationError is not null)
+    return Results.Conflict(new { error = validationError });
 
-  var promoted = await store.PromoteReleaseAsync(id, UpdaterChannelName(target), request.HttpContext.RequestAborted);
-  if (promoted is null) return Results.NotFound();
-
-  var feedRoot = Path.Combine(request.HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath, "feed");
-  CopyDirectory(Path.Combine(feedRoot, UpdaterChannelName(releaseChannel)),
-    target == UpdaterChannel.Normal ? feedRoot : Path.Combine(feedRoot, UpdaterChannelName(target)));
-  return Results.Ok(promoted with { Channel = UpdaterChannelName(target), Promoted = true, PositiveCount = counts.positiveCount, TotalCount = counts.totalCount });
+  var staging = feed.ChannelPath(target) + ".staging-" + Guid.NewGuid().ToString("N");
+  try
+  {
+    FeedPublication.Copy(source, staging, excludeArchives: true);
+    var stagedError = LocalFeed.Validate(staging, release.Version);
+    if (stagedError is not null) return Results.Conflict(new { error = stagedError });
+    var promoted = await FeedPublication.PublishAsync(staging, feed.ChannelPath(target), async () =>
+      await store.PromoteReleaseAsync(id, UpdaterChannelName(target), request.HttpContext.RequestAborted)
+        ?? throw new InvalidOperationException("Release disappeared during promotion"));
+    return Results.Ok(promoted);
+  }
+  finally
+  {
+    if (Directory.Exists(staging)) Directory.Delete(staging, true);
+  }
 });
 
-app.MapPost("/opencode/admin/releases/normal/stop", async (UpdaterChannelStateStore channelState) =>
+app.MapPost("/opencode/admin/releases/{channel}/stop", async (string channel, UpdaterChannelStateStore channelState) =>
 {
-  await channelState.SetNormalStoppedAsync(true);
-  return Results.Ok(new { normalStopped = true });
+  if (UpdaterChannelInfo.TryParse(channel) is not { } selected)
+    return Results.BadRequest(new { error = "channel must be normal, beta, or ai-gilde" });
+  await channelState.SetStoppedAsync(selected, true);
+  return Results.Ok(new { channel, stopped = true });
 });
 
-app.MapPost("/opencode/admin/releases/normal/clear", async (UpdaterChannelStateStore channelState) =>
+app.MapPost("/opencode/admin/releases/{channel}/clear", async (string channel, UpdaterChannelStateStore channelState) =>
 {
-  await channelState.SetNormalStoppedAsync(false);
-  return Results.Ok(new { normalStopped = false });
+  if (UpdaterChannelInfo.TryParse(channel) is not { } selected)
+    return Results.BadRequest(new { error = "channel must be normal, beta, or ai-gilde" });
+  await channelState.SetStoppedAsync(selected, false);
+  return Results.Ok(new { channel, stopped = false });
 });
 
 app.MapGet("/opencode/admin/feedback", async (UpdaterAdminStore store) => Results.Json(await store.ListFeedbackAsync()));
@@ -593,18 +639,24 @@ app.MapGet("/", () => Results.Redirect("/opencode/version"));
 app.MapGet("/opencode/version", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver) =>
 {
   var rollout = await rolloutResolver.ResolveAsync(request, request.HttpContext.RequestAborted);
+  if (await request.HttpContext.RequestServices.GetRequiredService<UpdaterChannelStateStore>().IsStoppedAsync(rollout.Channel))
+    return Results.Json(new { error = $"{UpdaterChannelName(rollout.Channel)} release delivery is stopped" }, statusCode: StatusCodes.Status503ServiceUnavailable);
   return Results.Text(rollout.Version, "text/plain");
 });
 
 app.MapGet("/opencode/url", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver) =>
 {
   var rollout = await rolloutResolver.ResolveAsync(request, request.HttpContext.RequestAborted);
+  if (await request.HttpContext.RequestServices.GetRequiredService<UpdaterChannelStateStore>().IsStoppedAsync(rollout.Channel))
+    return Results.Json(new { error = $"{UpdaterChannelName(rollout.Channel)} release delivery is stopped" }, statusCode: StatusCodes.Status503ServiceUnavailable);
   return Results.Text(BuildFeedUrl(rollout, request), "text/plain");
 });
 
 app.MapGet("/opencode/config", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver) =>
 {
   var rollout = await rolloutResolver.ResolveAsync(request, request.HttpContext.RequestAborted);
+  if (request.HttpContext.RequestServices.GetRequiredService<UpdaterChannelStateStore>().IsStopped(rollout.Channel))
+    return Results.Json(new { error = "Release delivery is stopped" }, statusCode: StatusCodes.Status503ServiceUnavailable);
   return Results.Json(new
   {
     version = rollout.Version,
@@ -616,6 +668,8 @@ app.MapGet("/opencode/config", async (HttpRequest request, UpdaterRolloutResolve
 app.MapGet("/opencode/latest.json", async (HttpContext context, LocalFeed feed, UpdaterRolloutResolver rolloutResolver) =>
 {
   var rollout = await rolloutResolver.ResolveAsync(context.Request, context.RequestAborted);
+  if (context.RequestServices.GetRequiredService<UpdaterChannelStateStore>().IsStopped(rollout.Channel))
+    return Results.Json(new { error = "Release delivery is stopped" }, statusCode: StatusCodes.Status503ServiceUnavailable);
   if (feed.TryGet("latest.json", rollout.Channel, out var local)) return await LocalFileAsync(context, local);
   return Results.NotFound();
 });
@@ -710,6 +764,8 @@ app.MapGet("/opencode/modelcards.json", async (HttpRequest request, UpdaterRollo
 app.MapGet("/opencode/feed/{**asset}", async (HttpContext context, LocalFeed feed, UpdaterRolloutResolver rolloutResolver, string? asset) =>
 {
   var rollout = await rolloutResolver.ResolveAsync(context.Request, context.RequestAborted);
+  if (context.RequestServices.GetRequiredService<UpdaterChannelStateStore>().IsStopped(rollout.Channel))
+    return Results.Json(new { error = "Release delivery is stopped" }, statusCode: StatusCodes.Status503ServiceUnavailable);
   var resolvedAsset = (asset ?? "").TrimStart('/');
   if (string.IsNullOrWhiteSpace(resolvedAsset) || resolvedAsset.Contains("..", StringComparison.Ordinal))
     return Results.BadRequest();
@@ -804,8 +860,8 @@ static async Task ExtractZipToDirectoryAsync(string zipPath, string targetDirect
   {
     if (string.IsNullOrWhiteSpace(entry.FullName)) continue;
     var outputPath = Path.GetFullPath(Path.Combine(targetDirectory, entry.FullName));
-    if (!outputPath.StartsWith(Path.GetFullPath(targetDirectory), StringComparison.OrdinalIgnoreCase))
-      continue;
+    if (!outputPath.StartsWith(Path.GetFullPath(targetDirectory) + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+      throw new InvalidDataException("Archive entry escapes the release directory");
 
     if (string.IsNullOrEmpty(entry.Name))
     {
@@ -820,62 +876,12 @@ static async Task ExtractZipToDirectoryAsync(string zipPath, string targetDirect
   }
 }
 
-static void CleanDirectory(string directory, string[]? preserve = null)
-{
-  var preserveSet = new HashSet<string>(preserve ?? [], StringComparer.OrdinalIgnoreCase);
-  foreach (var path in Directory.EnumerateFileSystemEntries(directory))
-  {
-    var name = Path.GetFileName(path);
-    if (preserveSet.Contains(name)) continue;
-    if (Directory.Exists(path))
-    {
-      Directory.Delete(path, true);
-      continue;
-    }
-
-    File.Delete(path);
-  }
-}
-
-static void CopyDirectory(string sourceDirectory, string targetDirectory)
-{
-  Directory.CreateDirectory(targetDirectory);
-  foreach (var sourcePath in Directory.EnumerateFileSystemEntries(sourceDirectory, "*", SearchOption.AllDirectories))
-  {
-    var relative = Path.GetRelativePath(sourceDirectory, sourcePath);
-    if (relative.StartsWith("..", StringComparison.Ordinal) || relative.Contains($"{Path.DirectorySeparatorChar}_archives{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-      continue;
-
-    var targetPath = Path.Combine(targetDirectory, relative);
-    if (Directory.Exists(sourcePath))
-    {
-      Directory.CreateDirectory(targetPath);
-      continue;
-    }
-
-    Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
-    File.Copy(sourcePath, targetPath, true);
-  }
-}
-
 static string? ParseBetaFeedback(string text)
 {
   var normalized = text.TrimStart();
   var match = Regex.Match(normalized, @"^(Version erfolgreich getestet|Fehler gefunden)\b", RegexOptions.IgnoreCase);
   if (!match.Success) return null;
   return match.Groups[1].Value.Equals("Version erfolgreich getestet", StringComparison.OrdinalIgnoreCase) ? "positive" : "negative";
-}
-
-static async Task<(long positiveCount, long totalCount)> GetBetaFeedbackCountsAsync(FeedbackContext db, string version)
-{
-  var feedbacks = await db.Feedbacks
-    .Where((feedback) => feedback.Category == "beta" && feedback.AppVersion == version)
-    .Select((feedback) => new { feedback.BetaSentiment, feedback.Text })
-    .ToListAsync();
-
-  var totalCount = feedbacks.LongCount();
-  var positiveCount = feedbacks.LongCount((feedback) => feedback.BetaSentiment == "positive" || (string.IsNullOrWhiteSpace(feedback.BetaSentiment) && ParseBetaFeedback(feedback.Text) == "positive"));
-  return (positiveCount, totalCount);
 }
 
 static string[] NormalizeTesterList(string[]? values) =>
@@ -2285,6 +2291,38 @@ sealed class McpConfigStore(IWebHostEnvironment env)
 
 sealed class LocalFeed(string root)
 {
+  public string ChannelPath(UpdaterChannel channel) => Path.Combine(root, ChannelName(channel));
+
+  public ChannelStatus Status(UpdaterChannel channel, UpdaterChannelStateStore state, IReadOnlyList<ReleaseRecord> releases)
+  {
+    var version = TryReadVersionFromLatestYml(channel);
+    var release = releases.FirstOrDefault((item) => item.Channel == ChannelName(channel) && item.Version == version)
+      ?? releases.FirstOrDefault((item) => item.Version == version)
+      ?? releases.FirstOrDefault((item) => item.Channel == ChannelName(channel));
+    return new ChannelStatus(ChannelName(channel), version ?? release?.Version, release, state.IsStopped(channel), FilesAvailable(channel));
+  }
+
+  public bool FilesAvailable(UpdaterChannel channel) => Validate(ChannelPath(channel), TryReadVersionFromLatestYml(channel)) is null;
+
+  public static string? Validate(string directory, string? expectedVersion)
+  {
+    var latest = Path.Combine(directory, "latest.yml");
+    if (!File.Exists(latest)) return "Release package latest.yml is missing";
+    var content = File.ReadAllText(latest);
+    var version = Regex.Match(content, @"(?m)^\s*version:\s*[""']?(?<value>[^""'\r\n#]+)");
+    if (!version.Success || string.IsNullOrWhiteSpace(expectedVersion) || version.Groups["value"].Value.Trim() != expectedVersion)
+      return "Release package version does not match the release record";
+    var installer = Regex.Match(content, @"(?m)^path:\s*[""']?(?<value>[^""'\r\n#]+)");
+    if (!installer.Success) installer = Regex.Match(content, @"(?m)^\s*-\s*url:\s*[""']?(?<value>[^""'\r\n#]+)");
+    if (!installer.Success) return "Release package has no installer reference";
+    var relative = installer.Groups["value"].Value.Trim();
+    var prefix = Path.GetFullPath(directory) + Path.DirectorySeparatorChar;
+    var path = Path.GetFullPath(Path.Combine(directory, relative));
+    if (!path.StartsWith(prefix, StringComparison.Ordinal) || !File.Exists(path))
+      return "Release package installer is missing";
+    return null;
+  }
+
   static string ChannelName(UpdaterChannel channel) => channel switch
   {
     UpdaterChannel.Beta => "beta",
@@ -2294,7 +2332,7 @@ sealed class LocalFeed(string root)
 
   public bool TryGet(string relativePath, UpdaterChannel channel, out string file)
   {
-    var channelRoot = channel == UpdaterChannel.Normal ? root : Path.Combine(root, ChannelName(channel));
+    var channelRoot = ChannelPath(channel);
     file = Path.Combine(channelRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
     return File.Exists(file);
   }
@@ -2304,7 +2342,7 @@ sealed class LocalFeed(string root)
 
   public string? TryReadVersionFromLatestYml(UpdaterChannel channel)
   {
-    var channelRoot = channel == UpdaterChannel.Normal ? root : Path.Combine(root, ChannelName(channel));
+    var channelRoot = ChannelPath(channel);
     var path = Path.Combine(channelRoot, "latest.yml");
     if (!File.Exists(path)) return null;
 
@@ -2315,7 +2353,7 @@ sealed class LocalFeed(string root)
 
     if (string.IsNullOrWhiteSpace(version)) return null;
 
-    var value = version["version:".Length..].Trim().Trim('"');
+    var value = version["version:".Length..].Trim().Trim('"', '\'');
     return string.IsNullOrWhiteSpace(value) ? null : value;
   }
 
@@ -2807,20 +2845,20 @@ sealed record AuditRecord(string Id, string FeedbackId, string Actor, string Act
 
 sealed class UpdaterChannelStateStore(IWebHostEnvironment env)
 {
-  readonly string flagPath = Path.Combine(env.ContentRootPath, "data", "normal-channel-stopped.flag");
-
-  bool Exists()
+  string Flag(UpdaterChannel channel) => Path.Combine(env.ContentRootPath, "data", $"{channel switch
   {
-    Directory.CreateDirectory(Path.GetDirectoryName(flagPath)!);
-    return File.Exists(flagPath);
-  }
+    UpdaterChannel.Beta => "beta",
+    UpdaterChannel.AiGilde => "ai-gilde",
+    _ => "normal",
+  }}-channel-stopped.flag");
 
-  public Task<bool> IsNormalStoppedAsync() => Task.FromResult(Exists());
+  public bool IsStopped(UpdaterChannel channel) => File.Exists(Flag(channel));
+  public Task<bool> IsStoppedAsync(UpdaterChannel channel) => Task.FromResult(IsStopped(channel));
+  public bool IsNormalStopped() => IsStopped(UpdaterChannel.Normal);
 
-  public bool IsNormalStopped() => Exists();
-
-  public Task SetNormalStoppedAsync(bool stopped)
+  public Task SetStoppedAsync(UpdaterChannel channel, bool stopped)
   {
+    var flagPath = Flag(channel);
     Directory.CreateDirectory(Path.GetDirectoryName(flagPath)!);
     if (stopped)
       File.WriteAllText(flagPath, DateTimeOffset.UtcNow.ToString("O"));

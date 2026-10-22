@@ -6,8 +6,11 @@
   min-height: 200px;
 }
 
-.progress {
-  margin-top: 12px;
+.channel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .item button {

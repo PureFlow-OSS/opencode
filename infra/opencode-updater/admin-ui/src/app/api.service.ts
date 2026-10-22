@@ -33,7 +33,17 @@ type FeedbackAttachment = {
   image: boolean
 }
 
-type ModelChannel = "beta" | "ai-gilde" | "normal"
+export type ReleaseChannel = "beta" | "ai-gilde" | "normal"
+
+type ModelChannel = ReleaseChannel
+
+export type ReleaseChannelStatus = {
+  channel: ReleaseChannel
+  version: string | null
+  release: ReleaseRecord | null
+  stopped: boolean
+  filesAvailable: boolean
+}
 
 export type ModelSettingsPromotionResult = {
   promoted: boolean
@@ -165,6 +175,7 @@ export type McpStoreItem = {
 
 type ReleaseStatus = {
   releases: ReleaseRecord[]
+  channels: ReleaseChannelStatus[]
   normalStopped: boolean
   betaUserCount: number
   betaPositiveThreshold: number
@@ -224,12 +235,16 @@ export class ApiService {
     }))
   }
 
-  async stopNormalChannel() {
-    return this.readJson<{ normalStopped: boolean }>(await fetch("/opencode/admin/releases/normal/stop", { method: "POST" }))
+  async stopReleaseChannel(channel: ReleaseChannel) {
+    return this.readJson<unknown>(
+      await fetch(`/opencode/admin/releases/${encodeURIComponent(channel)}/stop`, { method: "POST" }),
+    )
   }
 
-  async clearNormalChannel() {
-    return this.readJson<{ normalStopped: boolean }>(await fetch("/opencode/admin/releases/normal/clear", { method: "POST" }))
+  async clearReleaseChannel(channel: ReleaseChannel) {
+    return this.readJson<unknown>(
+      await fetch(`/opencode/admin/releases/${encodeURIComponent(channel)}/clear`, { method: "POST" }),
+    )
   }
 
   async listFeedback() {

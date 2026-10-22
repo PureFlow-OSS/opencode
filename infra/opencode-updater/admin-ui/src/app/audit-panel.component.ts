@@ -1,78 +1,98 @@
-import { Component, inject } from "@angular/core"
-import { injectMutation, injectQuery } from "@tanstack/angular-query-experimental"
-import { ApiService } from "./api.service"
-
-type ReleaseRecord = {
-  id: string
-  version: string
-  channel: string
-  positiveCount: number
-  totalCount: number
-  notes?: string | null
-}
+import { Component, inject, signal } from "@angular/core"
+import { injectMutation, injectQuery, injectQueryClient } from "@tanstack/angular-query-experimental"
+import { ApiService, ReleaseChannel, ReleaseChannelStatus } from "./api.service"
 
 @Component({
   selector: "app-audit-panel",
   standalone: true,
   template: `
     <article class="card">
-      <h2>Beta uploads</h2>
-      <p>Promote releases step by step: beta to AI-Gilde, then AI-Gilde to normal. Each step requires positive feedback from the matching tester group. Normal channel can be stopped here.</p>
+      <h2>Releases</h2>
+      <p>Promote manually from beta to AI-Gilde, then from AI-Gilde to normal.</p>
       <div class="controls">
-        <button type="button" class="secondary" (click)="refresh()">Refresh</button>
-        <button type="button" class="secondary" (click)="stopNormal()" [disabled]="statusQuery.data()?.normalStopped">Stop normal</button>
-        <button type="button" class="secondary" (click)="clearNormal()" [disabled]="!statusQuery.data()?.normalStopped">Clear stop</button>
+        <button type="button" class="secondary" (click)="refresh()" [disabled]="statusQuery.isFetching()">Refresh</button>
       </div>
+      @if (statusQuery.isPending()) {
+        <p class="status-text" role="status">Loading release channels…</p>
+      }
+      @if (statusQuery.isError()) {
+        <p class="status-text error" role="alert">Release status unavailable: {{ queryError() }}</p>
+      }
       <div class="list">
-        @if ((statusQuery.data()?.releases ?? []).length === 0) {
+        @if (statusQuery.isSuccess() && channels().length === 0) {
           <section class="item empty">
-            <strong>No beta uploads yet</strong>
-            <p>Upload a ZIP to make a beta release available for review and promotion.</p>
+            <strong>No release channels yet</strong>
+            <p>Upload a ZIP to publish the first beta release.</p>
           </section>
         }
-        @for (release of statusQuery.data()?.releases ?? []; track release.id) {
+        @for (channel of channels(); track channel.channel) {
           <section class="item">
             <div class="item-top">
-              <strong>{{ release.version }}</strong>
-              <span>{{ release.channel }}</span>
+              <strong>{{ channelLabel(channel.channel) }}</strong>
+              <span>{{ channel.version ?? channel.release?.version ?? "No release yet" }}</span>
             </div>
-            <p>{{ release.positiveCount }}/{{ threshold(release) }} positive feedback required</p>
-            <small>{{ release.totalCount }} feedback item(s) submitted</small>
-            @if (release.notes) {
-              <small>{{ release.notes }}</small>
+            <p>{{ deliveryText(channel) }}</p>
+            @if (channel.release?.notes) {
+              <small>{{ channel.release.notes }}</small>
             }
-            <div class="progress">
-              <span [style.width.%]="progress(release)"></span>
-            </div>
-            @if (release.channel !== 'normal') {
+            <div class="channel-actions">
+              @if (channel.channel !== 'normal') {
+                <button
+                  type="button"
+                  [disabled]="!canPromote(channel) || busy()"
+                  (click)="promote(channel)"
+                >
+                  @if (promoting() === channel.channel) {
+                    Promoting…
+                  } @else {
+                    Promote {{ channelLabel(channel.channel) }} to {{ nextChannelLabel(channel.channel) }}
+                  }
+                </button>
+              }
               <button
                 type="button"
-                [disabled]="!canPromote(release)"
-                (click)="promote(release.id)"
+                class="secondary"
+                [disabled]="!canStop(channel) || busy()"
+                (click)="stop(channel)"
               >
-                Promote to {{ nextChannel(release) }}
+                @if (stopping() === channel.channel) {
+                  Stopping…
+                } @else {
+                  Stop {{ channelLabel(channel.channel) }}
+                }
               </button>
-              @if (!canPromote(release)) {
-                <small>
-                  @if (isSuperseded(release)) {
-                    A newer release is active in this channel.
-                  } @else if (release.totalCount === 0) {
-                    Waiting for feedback.
-                  } @else {
-                    Need {{ remainingPositive(release) }} more positive feedback item(s).
-                  }
-                </small>
-              }
+              <button
+                type="button"
+                class="secondary"
+                [disabled]="!channel.stopped || !channel.filesAvailable || busy()"
+                (click)="resume(channel)"
+              >
+                @if (resuming() === channel.channel) {
+                  Resuming…
+                } @else {
+                  Resume {{ channelLabel(channel.channel) }}
+                }
+              </button>
+            </div>
+            @if (channel.channel !== 'normal' && !canPromote(channel)) {
+              <small>{{ promotionHint(channel) }}</small>
             }
           </section>
         }
       </div>
+      @if (mutationStatus()) {
+        <p class="status-text" role="status">{{ mutationStatus() }}</p>
+      }
+      @if (mutationError()) {
+        <p class="status-text error" role="alert">{{ mutationError() }}</p>
+      }
     </article>
   `,
   styleUrl: "./audit-panel.component.css",
 })
 export class AuditPanelComponent {
   readonly api = inject(ApiService)
+  readonly queryClient = injectQueryClient()
   readonly statusQuery = injectQuery(() => ({
     queryKey: ["release-status"],
     queryFn: () => this.api.listReleaseStatus(),
@@ -81,59 +101,115 @@ export class AuditPanelComponent {
     mutationFn: (id: string) => this.api.promoteRelease(id),
   }))
   readonly stopMutation = injectMutation(() => ({
-    mutationFn: () => this.api.stopNormalChannel(),
+    mutationFn: (channel: ReleaseChannel) => this.api.stopReleaseChannel(channel),
   }))
-  readonly clearMutation = injectMutation(() => ({
-    mutationFn: () => this.api.clearNormalChannel(),
+  readonly resumeMutation = injectMutation(() => ({
+    mutationFn: (channel: ReleaseChannel) => this.api.clearReleaseChannel(channel),
   }))
+  readonly promoting = signal<ReleaseChannel | null>(null)
+  readonly stopping = signal<ReleaseChannel | null>(null)
+  readonly resuming = signal<ReleaseChannel | null>(null)
+  readonly mutationStatus = signal("")
+  readonly mutationError = signal("")
 
   constructor() {
-    void this.refresh()
+    void this.statusQuery.refetch()
+  }
+
+  channels() {
+    return this.statusQuery.data()?.channels ?? []
+  }
+
+  queryError() {
+    const error = this.statusQuery.error()
+    if (error instanceof Error) return error.message
+    return error ? String(error) : "Unknown error"
+  }
+
+  busy() {
+    return this.promoting() !== null || this.stopping() !== null || this.resuming() !== null
+  }
+
+  channelLabel(channel: ReleaseChannel) {
+    if (channel === "ai-gilde") return "AI-Gilde"
+    if (channel === "beta") return "Beta"
+    return "Normal"
+  }
+
+  nextChannelLabel(channel: ReleaseChannel) {
+    return channel === "beta" ? "AI-Gilde" : "normal"
+  }
+
+  deliveryText(channel: ReleaseChannelStatus) {
+    if (!channel.filesAvailable) return "Missing package files"
+    return channel.stopped ? "Delivery stopped" : "Delivery active"
+  }
+
+  canPromote(channel: ReleaseChannelStatus) {
+    return channel.filesAvailable && channel.release?.channel === channel.channel && channel.release.version === channel.version
+  }
+
+  canStop(channel: ReleaseChannelStatus) {
+    return channel.filesAvailable && !channel.stopped
+  }
+
+  promotionHint(channel: ReleaseChannelStatus) {
+    if (channel.release?.channel !== channel.channel) return "This release has already been promoted to the next channel."
+    if (!channel.filesAvailable) return "The package files for this release are missing."
+    return "The active release does not match the release record."
   }
 
   refresh() {
     void this.statusQuery.refetch()
   }
 
-  get betaPositiveThreshold() {
-    return this.statusQuery.data()?.betaPositiveThreshold ?? 1
+  promote(channel: ReleaseChannelStatus) {
+    if (!channel.release || !this.canPromote(channel) || this.busy()) return
+    this.promoting.set(channel.channel)
+    this.mutationError.set("")
+    this.mutationStatus.set("Promoting…")
+    void this.promoteMutation
+      .mutateAsync(channel.release.id)
+      .then(async (release) => {
+        await this.queryClient.invalidateQueries({ queryKey: ["release-status"] })
+        this.mutationStatus.set(`Promoted ${release.version} to ${this.nextChannelLabel(channel.channel)}`)
+      })
+      .catch((error) => this.setError(error, "Promotion failed"))
+      .finally(() => this.promoting.set(null))
   }
 
-  threshold(release: ReleaseRecord) {
-    return release.channel === "ai-gilde" ? (this.statusQuery.data()?.aiGildePositiveThreshold ?? 1) : this.betaPositiveThreshold
+  stop(channel: ReleaseChannelStatus) {
+    if (!this.canStop(channel) || this.busy()) return
+    this.stopping.set(channel.channel)
+    this.mutationError.set("")
+    this.mutationStatus.set(`Stopping ${this.channelLabel(channel.channel)}…`)
+    void this.stopMutation
+      .mutateAsync(channel.channel)
+      .then(async () => {
+        await this.queryClient.invalidateQueries({ queryKey: ["release-status"] })
+        this.mutationStatus.set(`Stopped ${this.channelLabel(channel.channel)}`)
+      })
+      .catch((error) => this.setError(error, "Stop failed"))
+      .finally(() => this.stopping.set(null))
   }
 
-  nextChannel(release: ReleaseRecord) {
-    return release.channel === "beta" ? "AI-Gilde" : "normal"
+  resume(channel: ReleaseChannelStatus) {
+    if (!channel.stopped || !channel.filesAvailable || this.busy()) return
+    this.resuming.set(channel.channel)
+    this.mutationError.set("")
+    this.mutationStatus.set(`Resuming ${this.channelLabel(channel.channel)}…`)
+    void this.resumeMutation
+      .mutateAsync(channel.channel)
+      .then(async () => {
+        await this.queryClient.invalidateQueries({ queryKey: ["release-status"] })
+        this.mutationStatus.set(`Resumed ${this.channelLabel(channel.channel)}`)
+      })
+      .catch((error) => this.setError(error, "Resume failed"))
+      .finally(() => this.resuming.set(null))
   }
 
-  progress(release: ReleaseRecord) {
-    return Math.min(100, (release.positiveCount / this.threshold(release)) * 100)
-  }
-
-  canPromote(release: ReleaseRecord) {
-    return !this.isSuperseded(release) && release.channel !== "normal" && release.positiveCount >= this.threshold(release)
-  }
-
-  isSuperseded(release: ReleaseRecord) {
-    if (release.channel !== "beta" && release.channel !== "ai-gilde") return false
-    const activeVersion = release.channel === "ai-gilde" ? this.statusQuery.data()?.aiGildeFeedVersion : this.statusQuery.data()?.betaFeedVersion
-    return !!activeVersion && release.version !== activeVersion
-  }
-
-  remainingPositive(release: ReleaseRecord) {
-    return Math.max(0, this.threshold(release) - release.positiveCount)
-  }
-
-  promote(id: string) {
-    void this.promoteMutation.mutateAsync(id).then(() => this.refresh())
-  }
-
-  stopNormal() {
-    void this.stopMutation.mutateAsync().then(() => this.statusQuery.refetch())
-  }
-
-  clearNormal() {
-    void this.clearMutation.mutateAsync().then(() => this.statusQuery.refetch())
+  private setError(error: unknown, fallback: string) {
+    this.mutationStatus.set(fallback)
+    this.mutationError.set(error instanceof Error ? error.message : String(error))
   }
 }

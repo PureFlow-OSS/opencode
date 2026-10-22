@@ -702,3 +702,47 @@ Screenshot visuell geprüft. GUI-Extensions- und Desktop-Typecheck sowie
 `lint:changed HEAD` erfolgreich; der laufende Updater liefert den bestehenden
 Endpunkt bereits mit HTTP 200. Kein vollständiger Build, keine Auslieferung
 und kein Neustart der Anwendung oder des Updater-Servers.
+
+### Updater: verschwundene Promotions und Feedback-Abhängigkeit
+
+Ursache des gemeldeten Problems: Release-Dateien lagen unter `/app/feed`, außerhalb
+des vorhandenen Docker-Datenvolumes. Beim früher freigegebenen Container-Neuaufbau
+gingen diese Dateien verloren, während die SQLite-Release-Einträge erhalten blieben.
+Die bisherige Promotion änderte zuerst den Datenbankkanal; der anschließende
+Kopiervorgang konnte scheitern und einen scheinbar promoteten Eintrag hinterlassen.
+
+Die ursprüngliche 2.1.2-ZIP wurde lokal wiedergefunden und gegen die in der
+Datenbank gespeicherte SHA-256-Prüfsumme sowie den Installer-SHA-512 aus latest.yml
+geprüft. Ihr AI-Gilde-Feed wurde ohne Datenbankänderung und ohne Neustart
+wiederhergestellt. Die währenddessen vom Nutzer hochgeladene Beta 2.1.3 wurde
+erkannt und unverändert erhalten. Beide Stages wurden zusätzlich im bestehenden
+Datenvolume unter `/app/data/feed` gesichert. Normal hat weiterhin einen
+historischen Datenbankeintrag ohne zugehörige Paketdateien; dort wurde kein
+anderes Paket ersatzweise veröffentlicht.
+
+Die Admin-Oberfläche verwendet getrennte Beta-/AI-Gilde-/Normal-Karten und
+manuelle Promotions ohne positives Feedback. Pending-, Erfolgs- und Fehlermeldungen
+sowie gemeinsame Cache-Invalidierung ersetzen das bisher nötige F5. Stop und
+Resume sind pro Stage vorgesehen. Feedback-Navigation entfällt; historische
+Datensätze bleiben erhalten.
+
+Backend: persistente Feeds in `data/feed/{beta,ai-gilde,normal}`, Migration ohne
+Überschreiben vorhandener Stages, serialisierte Uploads/Promotions mit validiertem
+Staging und Wiederherstellung des alten Zielfeeds bei Datenbankfehlern. Stoppflags
+gelten pro Stage für Paket-/Versionsauslieferung und überstehen Neustarts;
+Provider-Konfiguration und MCP bleiben erreichbar. Feedback-Schreibzugriffe
+liefern HTTP 410, historische GETs bleiben mit `Deprecation: true` lesbar.
+
+Verifiziert: .NET-Compile, Angular-Typecheck, 94 HTTP-Assertions in zwei isolierten
+Server-Regressionen, Browserprüfung für unmittelbare Rückmeldungen, gemeinsame
+Cache-Aktualisierung, Stopp/Fortsetzen und sichtbare Fehler. Oxlint ohne Meldungen.
+Die bestehende NuGet-Warnung NU1903 zu SQLitePCLRaw bleibt unverändert.
+
+Nach zusätzlicher ausdrücklicher Nutzerfreigabe wurden Backend und Admin-UI neu
+gebaut und mit dem bestehenden Compose-Projekt samt Konfigurations-Binds und
+Datenvolume gestartet. Vor dem Austausch wurden der gestoppte Runtime-Feed und
+das Datenvolume lokal unter `opencode-updater-before-rebuild-1792681741456` im
+Benutzer-Temp gesichert und die aktuellen Stage-Dateien ins Volume übernommen.
+Produktiver Status und Browserprüfung bestätigen Beta 2.1.3 und AI-Gilde 2.1.2
+mit vorhandenen Dateien, Normal 2.14.36 mit ausdrücklich fehlenden Dateien.
+Es wurden keine Releases zusätzlich promotet oder produktiven Stoppflags geändert.

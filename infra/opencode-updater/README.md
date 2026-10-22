@@ -19,8 +19,8 @@ If client sends `X-OpenCode-AiFactory-Api-Key`, updater can evaluate beta rollou
 
 1. Edit `appsettings.json`
 2. Optionally edit `appsettings.beta.json` for key-based beta rollout
-3. Put a `feed/latest.yml` with `version:` if you want stable version to come from local feed
-4. Optionally put beta artifacts under `feed/beta/` with its own `latest.yml`
+3. Upload a release ZIP through the admin console to publish Beta
+4. Use Releases to promote Beta → AI Gilde → Normal manually
 5. `Updater.Version` / `appsettings.beta.json -> Updater.Version` are fallback when no matching local `latest.yml` exists
 6. Restart container
 
@@ -97,14 +97,36 @@ Requests may include `X-OpenCode-AiFactory-Api-Key`. When `UpdaterBeta.Enabled` 
 
 `/opencode/url` and `/opencode/config` return a feed URL with a short-lived hashed `beta` token for matched beta users so downstream feed requests stay on beta config without exposing raw API keys.
 
-Local feed layout:
+Local feed layout (inside the existing Docker data volume):
 
-- stable: `feed/latest.json`, `feed/latest.yml`, `feed/<asset>`
-- stable changelog: `feed/changelog.md`
-- beta: `feed/beta/latest.json`, `feed/beta/latest.yml`, `feed/beta/<asset>`
-- beta changelog: `feed/beta/changelog.md`
+- normal: `data/feed/normal/`
+- AI Gilde: `data/feed/ai-gilde/`
+- beta: `data/feed/beta/`
 
-When beta user is matched, updater first looks in `feed/beta/`. Stable users keep using `feed/`. Missing files return `404`.
+Each stage contains its own `latest.yml`, installer, optional `latest.json`, and
+`changelog.md`. Startup migrates the legacy `feed/`, `feed/beta/`, and
+`feed/ai-gilde/` directories only when the corresponding durable stage does not
+already exist. Existing durable stages are never overwritten by migration.
+
+Release mutations are serialized. Uploads and promotions validate a staged copy
+before publishing; a failed database update restores the previous target feed.
+Promotion retains the source stage's files. Missing package files are reported
+explicitly, with the database version still visible in the admin console.
+
+The Releases page offers manual promotion without feedback approval gates, plus
+Stop and Resume for each stage. `POST /opencode/admin/releases/{channel}/stop`
+and `/clear` persist delivery state. A stopped stage returns HTTP 503 for
+`/version`, `/url`, `/latest.json`, and `/feed/{asset}`; model configuration and
+MCP services remain available. Missing files otherwise return HTTP 404.
+
+Feedback is deprecated: `/opencode/feedback` and `/opencode/admin/feedback`
+return `Deprecation: true`. Historical GET requests remain available; new writes
+return HTTP 410. Existing feedback records are retained, and feedback navigation
+and positive approval requirements are removed from the admin UI.
+
+Run `dotnet build --no-restore` followed by `bun test ./tests/releases.test.ts`
+from this directory to check migration, promotion rollback, stage delivery stops,
+restart persistence, and feedback deprecation using disposable local data.
 
 `GET /opencode/changelog.md` returns markdown changelog from matching feed directory using same stable/beta resolution as update files.
 
@@ -125,8 +147,8 @@ Important behavior:
 - `appsettings.beta.json` is only used for requests that match beta rollout
 - each stage serves its own `Updater.ProviderConfig`; model rules are not inherited from another stage
 - copy tested model settings explicitly using the per-model promotion buttons
-- if `feed/beta/latest.yml` exists, beta users get that version first
-- if `feed/beta/latest.yml` does not exist, beta users fall back to `appsettings.beta.json -> Updater.Version`
+- if `data/feed/beta/latest.yml` exists, beta users get that version first
+- if `data/feed/beta/latest.yml` does not exist, beta users fall back to `appsettings.beta.json -> Updater.Version`
 - if `UpdaterBeta.LiteLLM.ApiKey` is set, updater calls LiteLLM with that management key in `x-litellm-api-key` and passes the user key as `?key=<user-key>`
 - if `UpdaterBeta.LiteLLM.ApiKey` is empty, updater uses the user key itself in `x-litellm-api-key`
 - URLs in JSON must be quoted strings
@@ -205,7 +227,7 @@ With that setup:
 
 - users without the header stay on stable
 - users with a non-matching key stay on stable
-- users with a matching key switch to beta and receive version `1.14.38` unless `feed/beta/latest.yml` overrides it
+- users with a matching key switch to beta and receive version `1.14.38` unless `data/feed/beta/latest.yml` overrides it
 
 This setup is useful when normal user keys are not allowed to call LiteLLM management routes directly. In that case the updater uses `LiteLLM.ApiKey` for `/key/info` and checks the end-user key passed in the updater header via `?key=<user-key>`.
 
@@ -570,9 +592,9 @@ docker run -d --name opencode-updater-test -p 8080:8080 `
 
 If file exists in matching feed directory, server serves local file directly.
 
-If `feed/latest.yml` exists and contains a `version:` line, stable `/opencode/version` uses that value first.
+If `data/feed/normal/latest.yml` exists and contains a `version:` line, stable `/opencode/version` uses that value first.
 
-If `feed/beta/latest.yml` exists and contains a `version:` line, matched beta users use that value first.
+If `data/feed/beta/latest.yml` exists and contains a `version:` line, matched beta users use that value first.
 
 `Updater.Version` is fallback for stable when no local stable `latest.yml` can be read. `appsettings.beta.json -> Updater.Version` is fallback for beta when no local beta `latest.yml` can be read.
 
