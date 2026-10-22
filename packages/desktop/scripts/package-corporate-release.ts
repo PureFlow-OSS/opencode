@@ -45,44 +45,28 @@ export async function packageCorporateRelease(options: {
   const output = path.resolve(options.output)
   const files = await releaseFiles(options.assets, output)
   const metadata = await Promise.all(
-    manifests.map(
-      async (manifest) =>
-        [
-          manifest.name,
-          await mergeManifest({
-            directory: options.metadata,
-            sources: manifest.sources,
-            version: options.version,
-            files,
-          }),
-        ] as const,
-    ),
+    manifests.map(async (manifest) => [
+      manifest.name,
+      await mergeManifest({ directory: options.metadata, sources: manifest.sources, version: options.version, files }),
+    ] as const),
   )
   const changelog = await changelogContent({
     file: path.join(options.assets, "changelog.md"),
     version: options.version,
     releaseNotes: options.releaseNotes,
   })
-  const legacy = Bun.file(path.join(options.assets, "latest.json"))
-  const legacyContent = (await legacy.exists()) ? await legacy.text() : undefined
-  if (legacyContent) {
-    const manifest: unknown = JSON.parse(legacyContent)
-    if (!manifest || typeof manifest !== "object" || !("version" in manifest) || manifest.version !== options.version)
-      throw new Error("Legacy update manifest version does not match the release")
-  }
 
   const zip = new ZipWriter(new BlobWriter("application/zip"), { level: 0 })
   for (const [name, content] of metadata) await zip.add(name, new TextReader(content))
   for (const file of files) await zip.add(path.basename(file), new BlobReader(Bun.file(file)))
   await zip.add("changelog.md", new TextReader(changelog))
-  if (legacyContent) await zip.add("latest.json", new TextReader(legacyContent))
 
   await Bun.write(output, await zip.close())
 
   const verify = new ZipReader(new BlobReader(Bun.file(output)))
   const entries = await verify.getEntries()
   await verify.close()
-  const expected = files.length + manifests.length + 1 + (legacyContent ? 1 : 0)
+  const expected = files.length + manifests.length + 1
   if (entries.length !== expected) throw new Error("Corporate release ZIP entry count does not match")
   console.log("packaged " + entries.length + " corporate entries for " + options.version)
 }
@@ -90,7 +74,7 @@ export async function packageCorporateRelease(options: {
 async function releaseFiles(directory: string, output: string) {
   const files = (
     await Array.fromAsync(
-      new Bun.Glob("*.{exe,sig,blockmap,dmg,zip,AppImage,deb,rpm,app.tar.gz}").scan({ cwd: directory, absolute: true }),
+      new Bun.Glob("*.{exe,blockmap,dmg,zip,AppImage,deb,rpm,app.tar.gz}").scan({ cwd: directory, absolute: true }),
     )
   )
     .map((file) => path.resolve(file))
@@ -121,29 +105,24 @@ async function mergeManifest(input: {
   if (missing.length)
     throw new Error("Corporate release manifests referenced missing assets: " + [...new Set(missing)].join(", "))
 
-  return (
-    [
-      "version: " + input.version,
-      "releaseDate: " + manifest.releaseDate,
-      "files:",
-      ...manifest.files.flatMap((file) => [
-        "  - url: " + file.url,
-        "    sha512: " + file.sha512,
-        "    size: " + file.size,
-        ...(file.blockMapSize === undefined ? [] : ["    blockMapSize: " + file.blockMapSize]),
-      ]),
-      "path: " + path.basename(manifest.files[0]!.url),
-      "sha512: " + manifest.files[0]!.sha512,
-    ].join("\n") + "\n"
-  )
+  return [
+    "version: " + input.version,
+    "releaseDate: " + manifest.releaseDate,
+    "files:",
+    ...manifest.files.flatMap((file) => [
+      "  - url: " + file.url,
+      "    sha512: " + file.sha512,
+      "    size: " + file.size,
+      ...(file.blockMapSize === undefined ? [] : ["    blockMapSize: " + file.blockMapSize]),
+    ]),
+    "path: " + path.basename(manifest.files[0]!.url),
+    "sha512: " + manifest.files[0]!.sha512,
+  ].join("\n") + "\n"
 }
 
 function parseManifest(content: string, version: string, source: string): Manifest {
   const lines = content.split("\n")
-  const found = lines
-    .find((line) => line.startsWith("version:"))
-    ?.slice("version:".length)
-    .trim()
+  const found = lines.find((line) => line.startsWith("version:"))?.slice("version:".length).trim()
   if (found !== version) throw new Error("Desktop metadata version mismatch: expected " + version + ", got " + found)
 
   const releaseDate = lines
@@ -173,20 +152,10 @@ function parseManifest(content: string, version: string, source: string): Manife
   return { releaseDate, files }
 }
 
-async function changelogContent(input: {
-  readonly file: string
-  readonly version: string
-  readonly releaseNotes?: string
-}) {
+async function changelogContent(input: { readonly file: string; readonly version: string; readonly releaseNotes?: string }) {
   const file = Bun.file(input.file)
   if (await file.exists()) return await file.text()
-  return (
-    "# OpenCode " +
-    input.version +
-    "\n\n" +
-    (input.releaseNotes?.trim() || "See the published release for details.") +
-    "\n"
-  )
+  return "# OpenCode " + input.version + "\n\n" + (input.releaseNotes?.trim() || "See the published release for details.") + "\n"
 }
 
 async function requireFile(file: string) {

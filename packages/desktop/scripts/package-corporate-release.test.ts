@@ -24,7 +24,7 @@ describe("corporate release packaging", () => {
             manifest("opencode-desktop-linux-x64.AppImage", "linux-hash"),
           ],
           [
-            "latest-yml-aarch64-unknown-linux-gnu/latest-linux-arm64.yml",
+          "latest-yml-aarch64-unknown-linux-gnu/latest-linux-arm64.yml",
             manifest("opencode-desktop-linux-arm64.AppImage", "linux-hash"),
           ],
         ].map(async ([file, content]) => Bun.write(path.join(metadata, file), content)),
@@ -78,27 +78,6 @@ describe("corporate release packaging", () => {
       const changelog = entries.find((entry) => entry.filename === "changelog.md")
       expect(await changelog?.getData(new TextWriter())).toBe("# OpenCode 2.1.2\n\nFixes\n")
       await zip.close()
-
-      const legacy = JSON.stringify({
-        version: "2.1.2",
-        platforms: { "windows-x86_64": { url: "opencode-desktop-win-x64.exe", signature: "legacy-signature" } },
-      })
-      await Bun.write(path.join(assets, "latest.json"), legacy)
-      await Bun.write(path.join(assets, "opencode-desktop-win-x64.exe.sig"), "legacy-signature")
-      await packageCorporateRelease({ assets, metadata, output, version: "2.1.2" })
-      const migration = new ZipReader(new BlobReader(Bun.file(output)))
-      const migrated = await migration.getEntries()
-      expect(await migrated.find((entry) => entry.filename === "latest.json")?.getData(new TextWriter())).toBe(legacy)
-      expect(
-        await migrated
-          .find((entry) => entry.filename === "opencode-desktop-win-x64.exe.sig")
-          ?.getData(new TextWriter()),
-      ).toBe("legacy-signature")
-      await migration.close()
-      await Bun.write(path.join(assets, "latest.json"), JSON.stringify({ version: "2.1.1" }))
-      await expect(packageCorporateRelease({ assets, metadata, output, version: "2.1.2" })).rejects.toThrow(
-        "Legacy update manifest version",
-      )
     } finally {
       await rm(root, { recursive: true, force: true })
     }

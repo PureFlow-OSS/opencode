@@ -738,7 +738,7 @@ app.MapGet("/opencode/latest.json", async (HttpContext context, LocalFeed feed, 
   var rollout = await rolloutResolver.ResolveAsync(context.Request, context.RequestAborted);
   if (context.RequestServices.GetRequiredService<UpdaterChannelStateStore>().IsStopped(rollout.Channel))
     return Results.Json(new { error = "Release delivery is stopped" }, statusCode: StatusCodes.Status503ServiceUnavailable);
-  if (feed.TryGet("latest.json", rollout.Channel, out var local)) return await ServeLegacyTauriManifestAsync(context, local, rollout);
+  if (feed.TryGet("latest.json", rollout.Channel, out var local)) return await LocalFileAsync(context, local);
   return Results.NotFound();
 });
 
@@ -876,67 +876,6 @@ static string BuildFeedUrl(UpdaterRollout rollout, HttpRequest request)
   return rollout.Channel != UpdaterChannel.Normal && !string.IsNullOrWhiteSpace(rollout.ChannelToken)
     ? $"{baseUrl}?beta={rollout.ChannelToken}"
     : baseUrl;
-}
-
-static string BuildAssetUrl(UpdaterRollout rollout, HttpRequest request, string asset)
-{
-  return AppendChannelToken(new UriBuilder($"{GetPublicBaseUrl(rollout.Options, request).TrimEnd('/')}/opencode/feed/{Uri.EscapeDataString(asset)}"), rollout);
-}
-
-static string AppendChannelToken(UriBuilder url, UpdaterRollout rollout)
-{
-  if (rollout.Channel == UpdaterChannel.Normal || string.IsNullOrWhiteSpace(rollout.ChannelToken)) return url.Uri.ToString();
-  var query = url.Query.TrimStart('?')
-    .Split('&', StringSplitOptions.RemoveEmptyEntries)
-    .Where((part) => !part.StartsWith("beta=", StringComparison.OrdinalIgnoreCase))
-    .Append($"beta={rollout.ChannelToken}");
-  url.Query = string.Join("&", query);
-  return url.Uri.ToString();
-}
-
-static async Task<IResult> ServeLegacyTauriManifestAsync(HttpContext context, string path, UpdaterRollout rollout)
-{
-  await using var stream = File.OpenRead(path);
-  JsonObject? manifest;
-  try { manifest = await JsonNode.ParseAsync(stream, cancellationToken: context.RequestAborted) as JsonObject; }
-  catch (JsonException)
-  {
-    return Results.Json(new { error = "latest.json contains invalid JSON" }, statusCode: StatusCodes.Status400BadRequest);
-  }
-  if (manifest is null)
-    return Results.Json(new { error = "latest.json must contain a JSON object" }, statusCode: StatusCodes.Status400BadRequest);
-
-  if (manifest["platforms"] is JsonObject platforms)
-  {
-    foreach (var platform in platforms)
-    {
-      if (platform.Value is not JsonObject target || target["url"] is not JsonValue url) continue;
-      if (!url.TryGetValue<string>(out var installer) || string.IsNullOrWhiteSpace(installer))
-        return Results.Json(new { error = "latest.json platform URLs must be non-empty strings" }, statusCode: StatusCodes.Status400BadRequest);
-      if (Uri.TryCreate(installer, UriKind.Absolute, out var absolute))
-      {
-        if (absolute.Scheme is not "http" and not "https")
-          return Results.Json(new { error = "latest.json installer URLs must use HTTP or HTTPS" }, statusCode: StatusCodes.Status400BadRequest);
-        var publicBase = new Uri(GetPublicBaseUrl(rollout.Options, context.Request).TrimEnd('/'));
-        if (absolute.Scheme == publicBase.Scheme && absolute.Authority == publicBase.Authority)
-          target["url"] = AppendChannelToken(new UriBuilder(absolute), rollout);
-        continue;
-      }
-
-      var asset = Path.GetFileName(installer);
-      if (
-        string.IsNullOrWhiteSpace(asset) ||
-        asset != installer ||
-        installer.Contains('/') ||
-        installer.Contains('\\') ||
-        asset is "." or ".."
-      )
-        return Results.Json(new { error = "latest.json platform URLs must be absolute URLs or asset basenames" }, statusCode: StatusCodes.Status400BadRequest);
-      target["url"] = BuildAssetUrl(rollout, context.Request, asset);
-    }
-  }
-
-  return Results.Text(manifest.ToJsonString(), "application/json; charset=utf-8");
 }
 
 

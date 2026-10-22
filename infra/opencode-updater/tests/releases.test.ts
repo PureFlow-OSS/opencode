@@ -51,12 +51,9 @@ foreach ($version in @('1.0.0','1.0.1','1.0.2')) {
   [System.IO.Directory]::CreateDirectory($source) | Out-Null
   $bytes = [System.Text.Encoding]::UTF8.GetBytes('installer-' + $version)
   [System.IO.File]::WriteAllBytes((Join-Path $source 'installer.exe'), $bytes)
-  [System.IO.File]::WriteAllBytes((Join-Path $source 'opencode-desktop-win-x64.exe'), [System.Text.Encoding]::UTF8.GetBytes('desktop-installer-' + $version))
   $hash = [Convert]::ToBase64String([System.Security.Cryptography.SHA512]::HashData($bytes))
   $yaml = "version: $version\nfiles:\n  - url: installer.exe\n    sha512: $hash\n    size: $($bytes.Length)\npath: installer.exe\nsha512: $hash\n"
   [System.IO.File]::WriteAllText((Join-Path $source 'latest.yml'), $yaml)
-  $manifest = '{"version":"' + $version + '","notes":"' + $version + ' notes","pub_date":"2026-10-21T12:00:00Z","platforms":{"windows-x86_64":{"url":"opencode-desktop-win-x64.exe","signature":"legacy-signature"},"windows-x86_64-nsis":{"url":"https://example.test/opencode-desktop-win-x64.exe","signature":"nsis-signature"}}}'
-  [System.IO.File]::WriteAllText((Join-Path $source 'latest.json'), $manifest)
   if ($version -eq '1.0.2') { [System.IO.File]::Delete((Join-Path $source 'installer.exe')) }
   [System.IO.Compression.ZipFile]::CreateFromDirectory($source, (Join-Path $Root ($version + '.zip')))
 }
@@ -135,22 +132,6 @@ foreach ($version in @('1.0.0','1.0.1','1.0.2')) {
     expect(promoted.channels.map((item: { version: string }) => item.version)).toEqual(["1.0.0", "1.0.0", "0.6.0"])
     expect(promoted.channels.every((item: { filesAvailable: boolean }) => item.filesAvailable)).toBe(true)
     expect(await file(`${feed("beta")}/installer.exe`).text()).toBe("installer-1.0.0")
-    const manifest = await (await request("/latest.json", { headers: headers("beta") })).json()
-    expect(manifest).toMatchObject({
-      version: "1.0.0",
-      notes: "1.0.0 notes",
-      pub_date: "2026-10-21T12:00:00Z",
-      platforms: {
-        "windows-x86_64": { signature: "legacy-signature" },
-        "windows-x86_64-nsis": { signature: "nsis-signature" },
-      },
-    })
-    const installerUrl = new URL(manifest.platforms["windows-x86_64"].url)
-    expect(installerUrl.origin).toBe(base)
-    expect(installerUrl.pathname).toBe("/opencode/feed/opencode-desktop-win-x64.exe")
-    expect(installerUrl.searchParams.has("beta")).toBe(true)
-    expect(manifest.platforms["windows-x86_64-nsis"].url).toBe("https://example.test/opencode-desktop-win-x64.exe")
-    expect(await (await fetch(installerUrl)).text()).toBe("desktop-installer-1.0.0")
     const newer = await upload("1.0.1")
     expect(newer.status).toBe(200)
     const missing = await newer.json()
@@ -159,48 +140,10 @@ foreach ($version in @('1.0.0','1.0.1','1.0.2')) {
     expect((await status()).releases.find((item: { id: string }) => item.id === missing.id).channel).toBe("beta")
     expect((await status()).channels[0]).toMatchObject({ version: "1.0.1", filesAvailable: false })
     expect(await file(`${feed("ai-gilde")}/installer.exe`).text()).toBe("installer-1.0.0")
-    await Bun.write(
-      file(`${feed("beta")}/latest.json`),
-      JSON.stringify({
-        version: "1.0.1",
-        platforms: {
-          "windows-x86_64": { url: `${base}/opencode/feed/opencode-desktop-win-x64.exe` },
-          "windows-x86_64-nsis": { url: "https://example.test/opencode-desktop-win-x64.exe" },
-        },
-      }),
-    )
-    const historic = await (await request("/latest.json", { headers: headers("beta") })).json()
-    const historicUrl = new URL(historic.platforms["windows-x86_64"].url)
-    expect(historicUrl.origin).toBe(base)
-    expect(historicUrl.pathname).toBe("/opencode/feed/opencode-desktop-win-x64.exe")
-    expect(historicUrl.searchParams.has("beta")).toBe(true)
-    expect(historic.platforms["windows-x86_64-nsis"].url).toBe("https://example.test/opencode-desktop-win-x64.exe")
-    expect(await (await fetch(historicUrl)).text()).toBe("desktop-installer-1.0.1")
-    await Bun.write(
-      file(`${feed("beta")}/latest.json`),
-      JSON.stringify({
-        version: "1.0.1",
-        platforms: { "windows-x86_64": { url: "../normal/opencode-desktop-win-x64.exe" } },
-      }),
-    )
-    expect((await request("/latest.json", { headers: headers("beta") })).status).toBe(400)
-    await Bun.write(file(`${feed("beta")}/latest.json`), "{invalid")
-    expect((await request("/latest.json", { headers: headers("beta") })).status).toBe(400)
-    await Bun.write(
-      file(`${feed("beta")}/latest.json`),
-      JSON.stringify({ platforms: { "windows-x86_64": { url: "C:\\installer.exe" } } }),
-    )
-    expect((await request("/latest.json", { headers: headers("beta") })).status).toBe(400)
     expect((await request(`/admin/releases/${release.id}/promote`, { method: "POST" })).status).toBe(200)
     expect(await file(`${feed("normal")}/installer.exe`).text()).toBe("installer-1.0.0")
     expect(await file(`${feed("normal")}/beta/latest.yml`).exists()).toBe(false)
     expect(await file(`${feed("normal")}/ai-gilde/latest.yml`).exists()).toBe(false)
-    const normalManifest = await (await request("/latest.json")).json()
-    const normalInstallerUrl = new URL(normalManifest.platforms["windows-x86_64"].url)
-    expect(normalInstallerUrl.origin).toBe(base)
-    expect(normalInstallerUrl.pathname).toBe("/opencode/feed/opencode-desktop-win-x64.exe")
-    expect(normalInstallerUrl.search).toBe("")
-    expect(await (await fetch(normalInstallerUrl)).text()).toBe("desktop-installer-1.0.0")
     for (const channel of ["beta", "ai-gilde", "normal"]) {
       expect((await request(`/admin/releases/${channel}/stop`, { method: "POST" })).status).toBe(200)
       for (const route of ["/version", "/url", "/latest.json", "/feed/latest.yml"])
