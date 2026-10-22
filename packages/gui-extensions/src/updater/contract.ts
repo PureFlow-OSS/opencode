@@ -21,6 +21,7 @@ export const Updater = Ipc.define({
   state: UpdaterState,
   methods: {
     check: { output: UpdaterState },
+    changelog: { output: Schema.Struct({ content: Schema.String }) },
     /** Restarts into a staged update, or opens the installer download. */
     install: {},
   },

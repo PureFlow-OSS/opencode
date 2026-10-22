@@ -26,8 +26,31 @@ const setup: Setup<typeof definition> = (ctx) => {
   }
 
   const Section = lazy(() => import("./section"))
+  const Changelog = lazy(() => import("./changelog"))
   // Settings rows are small; load them while idle so settings opens without a blank row.
-  onCleanup(onIdle(() => void Section.preload()))
+  onCleanup(
+    onIdle(() => {
+      void Section.preload()
+      void Changelog.preload()
+    }),
+  )
+
+  ctx.add(SettingsPage, {
+    id: "changelog",
+    icon: "menu",
+    available: "desktop",
+    get title() {
+      return ctx.t("changelog.title")
+    },
+    get entries() {
+      return [{ id: "changelog", title: ctx.t("changelog.title"), description: ctx.t("changelog.description") }]
+    },
+    render: () => (
+      <Suspense>
+        <Changelog updater={updater} />
+      </Suspense>
+    ),
+  })
 
   ctx.add(TitlebarItem, () => {
     const current = state()

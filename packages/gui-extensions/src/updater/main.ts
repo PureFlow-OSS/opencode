@@ -57,6 +57,12 @@ const setup: MainSetup<typeof definition> = async (ctx) => {
   const provider = ctx.provide(Updater, {
     state: () => updater.state(),
     check: () => runPromise(updater.check),
+    changelog: async () => {
+      const { fetchCorporateChangelog } = await import("./corporate")
+      const settings = await corporateSettings(ctx)
+
+      return { content: await fetchCorporateChangelog(settings, { apiKey: await apiKey(ctx) }) }
+    },
     install: () => runPromise(updater.install),
   })
 
@@ -129,6 +135,7 @@ function promise<A>(evaluate: () => Promise<A>) {
 
 async function corporateSettings(ctx: Parameters<MainSetup<typeof definition>>[0]) {
   const client = await sidecarClient(ctx)
+
   return client.config.corporate()
 }
 
@@ -139,6 +146,7 @@ async function apiKey(ctx: Parameters<MainSetup<typeof definition>>[0]) {
 
   if (key?.value.type === "key") {
     const value = key.value.key.trim()
+
     if (value) return value
   }
 
@@ -151,9 +159,11 @@ async function apiKey(ctx: Parameters<MainSetup<typeof definition>>[0]) {
  */
 async function sidecarClient(ctx: Parameters<MainSetup<typeof definition>>[0]) {
   const server = ctx.serverEndpoints.get("sidecar")
+
   if (!server) throw new Error("Sidecar server is unavailable")
 
   const { OpenCode } = await import("@opencode/client/promise")
+
   return OpenCode.make({
     baseUrl: server.url,
     headers: Object.keys(server.headers).length ? server.headers : undefined,

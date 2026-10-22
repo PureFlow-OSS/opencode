@@ -12,6 +12,13 @@ export default {
   "migration.description":
     "For now, OpenCode Beta is moving to OpenCode Stable. Download version {{version}}, then install OpenCode from the disk image to continue receiving updates.",
   "section.title": "Updates",
+  "changelog.title": "Changelog",
+  "changelog.description": "Release notes from your configured update server and channel.",
+  "changelog.refresh": "Refresh",
+  "changelog.loading": "Loading changelog…",
+  "changelog.failed": "The changelog could not be loaded. Try refreshing.",
+  "changelog.empty": "No changelog is available for this update channel yet.",
+  "changelog.unavailable": "The desktop update service is currently unavailable.",
   "releaseNotes.title": "Release notes",
   "releaseNotes.description": "Show What's New popups after updates",
   "check.title": "Check for updates",

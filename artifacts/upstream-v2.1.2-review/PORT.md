@@ -680,3 +680,25 @@ vorherigen festen Tool-Limit.
 
 Verifiziert: elf Dokumenttests, Core-Typecheck, Lint und Diff-Prüfung erfolgreich.
 Kein vollständiger Build und kein Neustart.
+
+### Changelog in den Desktop-Einstellungen
+
+Die Updater-Erweiterung trägt wieder eine eigene Changelog-Seite zu den
+Einstellungen bei. Markdown kommt über Desktop-IPC vom konfigurierten
+Updater-Endpunkt `/changelog.md`, mit denselben vertrauenswürdigen Corporate-
+Settings, Proxy-Einstellungen und dem AI-Factory-Key wie bei Updates. Der
+Updater bestimmt damit weiterhin den Rollout-Kanal; der Renderer kann weder
+Zieladresse noch Kanal vorgeben. Es wird kein GitHub-Changelog ersatzweise
+geladen. Die separate bisherige What's-New-Funktion bleibt unverändert.
+
+Die Seite hat eine Aktualisieren-Schaltfläche und ausdrückliche Lade-, Fehler-
+und Leerzustände. Neue Provider-Generationen dürfen keinen alten Changelog
+anzeigen; überholte Anfragen werden verworfen. Darstellung wird im Leerlauf
+vorgeladen, der Markdown-Abruf erst beim Öffnen der Seite gestartet.
+
+Verifiziert: 46 Updater-Tests, erfolgreicher Browser-Keeper für fehlgeschlagenen
+Abruf, erneutes Laden ohne leere Einstellungen, Markdown und leeren Changelog.
+Screenshot visuell geprüft. GUI-Extensions- und Desktop-Typecheck sowie
+`lint:changed HEAD` erfolgreich; der laufende Updater liefert den bestehenden
+Endpunkt bereits mit HTTP 200. Kein vollständiger Build, keine Auslieferung
+und kein Neustart der Anwendung oder des Updater-Servers.

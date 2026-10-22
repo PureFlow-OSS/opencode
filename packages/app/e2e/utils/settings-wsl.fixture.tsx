@@ -31,6 +31,8 @@ export function mount(input: {
   hold?: string | null
   /** Enables the updater Ipc; check and install reject with this message, which may be empty. */
   updater?: string | null
+  /** Answers the updater's changelog method from a routed fixture URL. */
+  changelog?: string | null
 }) {
   const root = document.getElementById("root")
 
@@ -176,6 +178,14 @@ export function mount(input: {
     const bridge: Bridge = {
       packaged: false,
       async call(request) {
+        if (request.ipc === "updater" && request.method === "changelog" && input.changelog) {
+          const response = await fetch(input.changelog)
+
+          if (!response.ok) throw new Error("Changelog fixture request failed")
+
+          return { content: await response.text() }
+        }
+
         if (request.ipc === "updater" && input.updater != null) throw new Error(input.updater)
         const method = methods.get(request.ipc)?.[request.method]
 
@@ -187,7 +197,8 @@ export function mount(input: {
         return result ?? null
       },
       async subscribe(ipc) {
-        if (ipc === "updater" && input.updater != null) return { available: true, state: { status: "idle" } }
+        if (ipc === "updater" && (input.updater != null || input.changelog))
+          return { available: true, state: { status: "idle" } }
 
         if (ipc === "wsl" || ipc === "ssh") return { available: true, state: snapshot(ipc) }
 

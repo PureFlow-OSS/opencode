@@ -19,11 +19,7 @@ export type CorporateSettings = {
 }
 
 export function corporateBaseUrl(settings: CorporateSettings) {
-  return (
-    settings.updater?.trim() ||
-    embeddedBaseUrl() ||
-    DEFAULT_BASE_URL
-  ).replace(/\/+$/, "")
+  return (settings.updater?.trim() || embeddedBaseUrl() || DEFAULT_BASE_URL).replace(/\/+$/, "")
 }
 
 function embeddedBaseUrl() {
@@ -52,7 +48,12 @@ function allowedFeedUrl(url: string, baseUrl: string) {
   if (target.origin === base.origin && (target.pathname === basePath || target.pathname.startsWith(`${basePath}/`)))
     return url
 
-  if ((target.protocol !== "http:" && target.protocol !== "https:") || target.username || target.password || target.hash)
+  if (
+    (target.protocol !== "http:" && target.protocol !== "https:") ||
+    target.username ||
+    target.password ||
+    target.hash
+  )
     return
 
   if (target.pathname !== `${basePath}/feed`) return
@@ -71,7 +72,10 @@ function headers(input: HeadersInit, apiKey: string | undefined) {
 }
 
 export async function fetchCorporateValue(url: string, options: { headers?: HeadersInit; fetchFn?: Fetch } = {}) {
-  const response = await (options.fetchFn ?? HttpProxy.fetch)(url, { cache: "no-store", headers: options.headers }).catch((cause) => {
+  const response = await (options.fetchFn ?? HttpProxy.fetch)(url, {
+    cache: "no-store",
+    headers: options.headers,
+  }).catch((cause) => {
     throw new Error(`Update server request failed for ${url}: ${message(cause)}`, { cause })
   })
 
@@ -88,8 +92,9 @@ export function compareVersions(current: string, next: string) {
   const left = parseVersion(current)
   const right = parseVersion(next)
 
-  const delta = Array.from({ length: Math.max(left.length, right.length) }, (_, index) =>
-    (right[index] ?? 0) - (left[index] ?? 0),
+  const delta = Array.from(
+    { length: Math.max(left.length, right.length) },
+    (_, index) => (right[index] ?? 0) - (left[index] ?? 0),
   ).find((value) => value !== 0)
 
   if (!delta) return 0
@@ -102,10 +107,13 @@ export function isUpdateNewer(current: string, next: string) {
 }
 
 /** Reads the corporate version and feed URL. Trusted host settings only; repository config could redirect the key. */
-export async function fetchCorporateUpdate(settings: CorporateSettings, options: {
-  readonly apiKey?: string
-  readonly fetchFn?: Fetch
-} = {}) {
+export async function fetchCorporateUpdate(
+  settings: CorporateSettings,
+  options: {
+    readonly apiKey?: string
+    readonly fetchFn?: Fetch
+  } = {},
+) {
   const urls = corporateUrls(settings)
   const requestHeaders = headers({}, options.apiKey?.trim() || undefined)
 
@@ -121,8 +129,38 @@ export async function fetchCorporateUpdate(settings: CorporateSettings, options:
   return { baseUrl: urls.baseUrl, version, url: feedUrl, configUrl: urls.config }
 }
 
+/** Reads the corporate changelog. Trusted host settings only; the renderer cannot choose a URL or channel. */
+export async function fetchCorporateChangelog(
+  settings: CorporateSettings,
+  options: {
+    readonly apiKey?: string
+    readonly fetchFn?: Fetch
+  } = {},
+) {
+  HttpProxy.configure(settings)
+  const url = `${corporateBaseUrl(settings)}/changelog.md`
+
+  const response = await (options.fetchFn ?? HttpProxy.fetch)(url, {
+    cache: "no-store",
+    headers: headers({ Accept: "text/markdown" }, options.apiKey?.trim() || undefined),
+    redirect: "error",
+    signal: AbortSignal.timeout(15000),
+  })
+
+  if (response.status === 404) return ""
+
+  if (!response.ok)
+    throw new Error(`Update server request failed for ${url}: HTTP ${response.status} ${response.statusText}`)
+
+  return (await response.text()).trim()
+}
+
 function parseVersion(value: string) {
-  return value.trim().replace(/^v/i, "").split(".").map((part) => Number.parseInt(part, 10))
+  return value
+    .trim()
+    .replace(/^v/i, "")
+    .split(".")
+    .map((part) => Number.parseInt(part, 10))
 }
 
 function message(cause: unknown) {

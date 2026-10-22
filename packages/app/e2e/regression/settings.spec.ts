@@ -15,6 +15,43 @@ const override =
 
 const contributors = "https://api.github.com/repos/anomalyco/opencode/contributors?anon=1&per_page=1"
 
+test("desktop changelog shows updater Markdown, keeps settings visible while loading, and retries failures", async ({
+  page,
+}, testInfo) => {
+  const release = Promise.withResolvers<void>()
+  let requests = 0
+  await page.route("**/changelog-fixture.md", async (route) => {
+    requests += 1
+
+    if (requests === 1) return route.fulfill({ status: 503, body: "Unavailable" })
+
+    if (requests === 2) await release.promise
+
+    return route.fulfill({
+      status: 200,
+      contentType: "text/markdown",
+      body: requests === 2 ? "# v2.1.2-beta\n\n## Fixed\n\n- Corporate provider updates\n- MCP improvements" : "",
+    })
+  })
+  await mockWorkspace(page, { name: "Changelog", sessions: [] })
+  await page.goto(
+    `/e2e/utils/settings-wsl.html?${new URLSearchParams({ server: SERVER, mode: "stopped", changelog: "/changelog-fixture.md" })}`,
+  )
+  const settings = page.getByTestId("settings-screen")
+  await settings.getByRole("tab", { name: "Changelog", exact: true }).click()
+  await expect(settings.getByRole("alert")).toHaveText("The changelog could not be loaded. Try refreshing.")
+  await settings.getByRole("button", { name: "Refresh", exact: true }).click()
+  await expect(settings.getByRole("status")).toContainText("Loading changelog")
+  await expect(settings.getByRole("heading", { name: "Changelog", exact: true })).toBeVisible()
+  release.resolve()
+  await expect(settings.getByRole("heading", { name: "v2.1.2-beta", exact: true })).toBeVisible()
+  await expect(settings.getByRole("listitem").filter({ hasText: "MCP improvements" })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath("settings-changelog.png") })
+  await settings.getByRole("button", { name: "Refresh", exact: true }).click()
+  await expect(settings.getByRole("status")).toHaveText("No changelog is available for this update channel yet.")
+  expect(requests).toBe(3)
+})
+
 test.use({ serviceWorkers: "block" })
 
 // One project with 12 worktrees, each with one session, and a configured zsh shell.

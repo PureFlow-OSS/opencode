@@ -4,6 +4,7 @@ import {
   compareVersions,
   corporateBaseUrl,
   corporateUrls,
+  fetchCorporateChangelog,
   fetchCorporateUpdate,
   isUpdateNewer,
   type Fetch,
@@ -53,11 +54,11 @@ describe("corporate updater", () => {
     expect(compareVersions("2.0", "2.0.0")).toBe(0)
   })
 
-test("applies only a newer corporate version", () => {
-  expect(isUpdateNewer("2.0.0", "2.0.1")).toBe(true)
-  expect(isUpdateNewer("2.0.0", "2.0.0")).toBe(false)
-  expect(isUpdateNewer("2.1.0", "2.0.9")).toBe(false)
-})
+  test("applies only a newer corporate version", () => {
+    expect(isUpdateNewer("2.0.0", "2.0.1")).toBe(true)
+    expect(isUpdateNewer("2.0.0", "2.0.0")).toBe(false)
+    expect(isUpdateNewer("2.1.0", "2.0.9")).toBe(false)
+  })
 
   test("fetches the authenticated version and feed URL", async () => {
     const seen: { url: URL; headers: Headers }[] = []
@@ -88,12 +89,15 @@ test("applies only a newer corporate version", () => {
   })
 
   test("preserves a same-origin feed URL and query", async () => {
-    const result = await fetchCorporateUpdate({ updater: "http://localhost/opencode" }, {
-      fetchFn: endpointFetch({
-        "/opencode/version": "2.1.3",
-        "/opencode/url": "http://localhost/opencode/feed?beta=stable-token",
-      }),
-    })
+    const result = await fetchCorporateUpdate(
+      { updater: "http://localhost/opencode" },
+      {
+        fetchFn: endpointFetch({
+          "/opencode/version": "2.1.3",
+          "/opencode/url": "http://localhost/opencode/feed?beta=stable-token",
+        }),
+      },
+    )
 
     expect(result.url).toBe("http://localhost/opencode/feed?beta=stable-token")
   })
@@ -102,9 +106,12 @@ test("applies only a newer corporate version", () => {
     ["http://advertised.example/opencode/feed", "http://localhost/opencode/feed"],
     ["http://advertised.example/opencode/feed?beta=test-token", "http://localhost/opencode/feed?beta=test-token"],
   ])("rebases a known feed path to the trusted origin", async (advertised, feed) => {
-    const result = await fetchCorporateUpdate({ updater: "http://localhost/opencode" }, {
-      fetchFn: endpointFetch({ "/opencode/version": "2.1.3", "/opencode/url": advertised }),
-    })
+    const result = await fetchCorporateUpdate(
+      { updater: "http://localhost/opencode" },
+      {
+        fetchFn: endpointFetch({ "/opencode/version": "2.1.3", "/opencode/url": advertised }),
+      },
+    )
 
     expect(result.url).toBe(feed)
   })
@@ -122,17 +129,68 @@ test("applies only a newer corporate version", () => {
     "http://advertised.example/opencode/feed?beta=a&beta=b",
   ])("rejects an unsafe off-origin feed URL: %s", async (advertised) => {
     await expect(
-      fetchCorporateUpdate({ updater: "http://localhost/opencode" }, {
-        fetchFn: endpointFetch({ "/opencode/version": "2.1.3", "/opencode/url": advertised }),
-      }),
+      fetchCorporateUpdate(
+        { updater: "http://localhost/opencode" },
+        {
+          fetchFn: endpointFetch({ "/opencode/version": "2.1.3", "/opencode/url": advertised }),
+        },
+      ),
     ).rejects.toThrow("Update server feed URL is not allowed")
   })
 
   test("reports the URL and HTTP status for failed responses", async () => {
     await expect(
       fetchCorporateUpdate({}, { fetchFn: () => response("offline", { status: 503, statusText: "Unavailable" }) }),
+    ).rejects.toThrow("Update server request failed for http://10.53.7.23/opencode/version: HTTP 503 Unavailable")
+  })
+
+  test("fetches the trusted changelog route with the custom key header and no channel query", async () => {
+    const seen: { init?: RequestInit; request: Request; url: URL }[] = []
+
+    const content = await fetchCorporateChangelog(
+      { updater: "https://updates.example/opencode/" },
+      {
+        apiKey: " secret ",
+        fetchFn: (url, init) => {
+          const request = new Request(url, init)
+          seen.push({ init, request, url: new URL(request.url) })
+
+          return response(" # Changelog\n\n- Fixed an update. ")
+        },
+      },
+    )
+
+    expect(content).toBe("# Changelog\n\n- Fixed an update.")
+    expect(seen.length).toBe(1)
+    expect(seen[0].url.href).toBe("https://updates.example/opencode/changelog.md")
+    expect(seen[0].url.search).toBe("")
+    expect(seen[0].request.headers.get(API_KEY_HEADER)).toBe("secret")
+    expect(seen[0].request.headers.get("Accept")).toBe("text/markdown")
+    expect(seen[0].init?.cache).toBe("no-store")
+    expect(seen[0].request.redirect).toBe("error")
+  })
+
+  test("returns an empty changelog for a missing route", async () => {
+    await expect(
+      fetchCorporateChangelog(
+        { updater: "https://updates.example/opencode" },
+        {
+          fetchFn: () => response("Not Found", { status: 404, statusText: "Not Found" }),
+        },
+      ),
+    ).resolves.toBe("")
+  })
+
+  test("rejects a failed changelog response", async () => {
+    await expect(
+      fetchCorporateChangelog(
+        { updater: "https://updates.example/opencode" },
+        {
+          fetchFn: () => response("Unavailable", { status: 500, statusText: "Internal Server Error" }),
+        },
+      ),
     ).rejects.toThrow(
-      "Update server request failed for http://10.53.7.23/opencode/version: HTTP 503 Unavailable",
+      "Update server request failed for https://updates.example/opencode/changelog.md: HTTP 500 Internal Server Error",
     )
   })
 
@@ -144,23 +202,29 @@ test("applies only a newer corporate version", () => {
 
   test("rejects a feed URL outside the update server origin", async () => {
     await expect(
-      fetchCorporateUpdate({ updater: "https://updates.example/opencode/" }, {
-        fetchFn: endpointFetch({
-          "/opencode/version": "2.1.3",
-          "/opencode/url": "https://evil.example/feed",
-        }),
-      }),
+      fetchCorporateUpdate(
+        { updater: "https://updates.example/opencode/" },
+        {
+          fetchFn: endpointFetch({
+            "/opencode/version": "2.1.3",
+            "/opencode/url": "https://evil.example/feed",
+          }),
+        },
+      ),
     ).rejects.toThrow("Update server feed URL is not allowed")
   })
 
   test("rejects a feed URL in a different path under the update server origin", async () => {
     await expect(
-      fetchCorporateUpdate({ updater: "https://updates.example/opencode/" }, {
-        fetchFn: endpointFetch({
-          "/opencode/version": "2.1.3",
-          "/opencode/url": "https://updates.example/other/feed",
-        }),
-      }),
+      fetchCorporateUpdate(
+        { updater: "https://updates.example/opencode/" },
+        {
+          fetchFn: endpointFetch({
+            "/opencode/version": "2.1.3",
+            "/opencode/url": "https://updates.example/other/feed",
+          }),
+        },
+      ),
     ).rejects.toThrow("Update server feed URL is not allowed")
   })
 })
