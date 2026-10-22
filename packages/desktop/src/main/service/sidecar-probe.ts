@@ -3,6 +3,7 @@ import path from "node:path"
 import { app } from "electron"
 import type { Endpoint } from "@opencode/client/service"
 import { cliBuildID } from "./cli-build"
+import { serviceRegistrationFile } from "./service-registration"
 
 // The main thread idles between showing the first window and evaluating the main bundle, waiting
 // for the renderer's asset requests. That slot is long enough to find out whether a compatible
@@ -22,7 +23,16 @@ export function startSidecarProbe() {
     path.join(process.resourcesPath, process.platform === "win32" ? "opencode-cli.exe" : "opencode-cli"),
   )
   probe = import("@opencode/client/service")
-    .then(async ({ Service }) => Service.discover({ version, buildID: await buildID }))
+    .then(async ({ Service }) =>
+      Service.discover({
+        version,
+        buildID: await buildID,
+        file: serviceRegistrationFile({
+          state: process.env.XDG_STATE_HOME ?? path.join(app.getPath("home"), ".local", "state"),
+          channel: process.env.OPENCODE_DESKTOP_SERVER_CHANNEL ?? import.meta.env.OPENCODE_CLI_CHANNEL ?? "latest",
+        }),
+      }),
+    )
     .catch(() => undefined)
 }
 

@@ -11,6 +11,24 @@ const load = async (command: "build" | "serve") => ({
   config: await createConfig({ command, mode: command === "build" ? "production" : "development" }),
 })
 
+test.each(["prod", "latest", "dev", "beta", "local", undefined])(
+  "keeps the CLI service channel separate from desktop identity: %s",
+  async (channel) => {
+    const previous = process.env.OPENCODE_CHANNEL
+
+    try {
+      if (channel === undefined) delete process.env.OPENCODE_CHANNEL
+      else process.env.OPENCODE_CHANNEL = channel
+      expect((await load("build")).config.main?.define?.["import.meta.env.OPENCODE_CLI_CHANNEL"]).toBe(
+        JSON.stringify(channel ?? "latest"),
+      )
+    } finally {
+      if (previous === undefined) delete process.env.OPENCODE_CHANNEL
+      else process.env.OPENCODE_CHANNEL = previous
+    }
+  },
+)
+
 test("embeds the corporate updater URL only when the build supplies it", async () => {
   const previous = process.env.OPENCODE_UPDATE_BASE_URL
   try {

@@ -6,6 +6,7 @@ import { cleanStages } from "./cli-stages"
 import { DesktopCli } from "./desktop-cli"
 import { SidecarCredentials } from "./sidecar-credentials"
 import { sidecarProbe } from "./sidecar-probe"
+import { serviceRegistrationFile } from "./service-registration"
 
 export * as BackgroundService from "./background-service"
 
@@ -44,14 +45,12 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
 
   const ensure = () =>
     client.Service.ensure({
-      file:
-        process.env.OPENCODE_DESKTOP_SERVER_CHANNEL === "local"
-          ? path.join(
-              process.env.XDG_STATE_HOME ?? path.join(app.getPath("home"), ".local", "state"),
-              "opencode",
-              "service-local.json",
-            )
-          : undefined,
+      file: serviceRegistrationFile({
+        state: process.env.XDG_STATE_HOME ?? path.join(app.getPath("home"), ".local", "state"),
+        channel:
+          process.env.OPENCODE_DESKTOP_SERVER_CHANNEL ??
+          (app.isPackaged ? (import.meta.env.OPENCODE_CLI_CHANNEL ?? "latest") : "latest"),
+      }),
       version,
       buildID: mode === "initial" ? cli.buildID : undefined,
       // A fixed port makes a second contender fail to bind and back off; port 0 never collides, so two

@@ -355,3 +355,25 @@ lokal sichtbar und zuletzt verwendet gespeicherten ausgeschlossenen Anbieter,
 AI-Factory-Priorität, OpenAI-/Copilot-Auswahl, den beschränkten Verbindungsdialog
 sowie erhaltene Modell-/Variantenauswahl beim Sitzungswechsel. Gegen das vorherige
 dist schlägt der Ausschluss-Test erwartungsgemäß fehl. Kein Gesamtbuild/Packaging.
+
+### Startverzögerung im signierten Prod-Build
+
+Am 22.10.2026 anhand `dist-v18.29-ai-signed/win-unpacked` und der Desktop-Logs
+diagnostiziert: Fenster und Hauptprozess sind nach wenigen hundert Millisekunden
+bereit. CLI-Hash und erstmaliges Staging benötigen zusammen rund 550 ms. Die CLI
+registriert sich unter `service-prod.json`, während Desktop-Ensure und früher Probe
+weiter `service.json` lesen. Die dortige Registrierung gehört zum alten, nicht mehr
+laufenden Dienst. Dadurch bleibt die Oberfläche trotz gesundem neuen Dienst wartend.
+
+Der Desktop übernimmt jetzt den unveränderten CLI-Buildkanal zusätzlich zur
+Desktop-Produktidentität. Beide Verbindungswege verwenden dieselbe Dateinamensregel
+wie die CLI: prod → service-prod.json, local → service-local.json, die gemeinsamen
+Releasekanäle → service.json. Die vorhandene lokale Entwicklungs-Übersteuerung
+bleibt erhalten; heruntergeladene Entwicklungs-CLIs nutzen weiterhin service.json.
+
+Read-only am laufenden Dienst geprüft: Health HTTP 200 in 4 ms; Discovery über den
+korrigierten Prod-Pfad inklusive Hash des konkreten gebündelten Executables in
+291 ms erfolgreich (davon 285 ms Hash). Dreizehn gezielte Kanal-/Buildkonfigurations-
+Tests und Desktop-Typecheck bestanden. Lint ohne Fehler; vier bestehende
+Abstandswarnungen in unberührten Abschnitten der Buildkonfigurationstests.
+Kein Gesamtbuild, keine Änderung am gebündelten Build und kein App-/Dienstneustart.
