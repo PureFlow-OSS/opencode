@@ -1,9 +1,10 @@
-import { Component, inject } from "@angular/core"
+import { Component, inject, signal } from "@angular/core"
 import { FormsModule } from "@angular/forms"
 import { injectMutation, injectQuery } from "@tanstack/angular-query-experimental"
 import { ApiService, McpStoreItem } from "./api.service"
 
 type StoreDraft = {
+  oauthRequired: boolean
   name: string
   description: string
   url: string
@@ -13,6 +14,7 @@ type StoreDraft = {
 }
 
 const emptyDraft = (): StoreDraft => ({
+  oauthRequired: false,
   name: "",
   description: "",
   url: "",
@@ -42,24 +44,25 @@ export class McpStorePanelComponent {
   }))
 
   draft = emptyDraft()
-  editing?: string
-  error = ""
-  status = ""
+  readonly editing = signal<string | undefined>(undefined)
+  readonly error = signal("")
+  readonly status = signal("")
 
   items() {
     return this.store.data() ?? []
   }
 
   add() {
-    this.editing = "new"
+    this.editing.set("new")
     this.draft = emptyDraft()
-    this.error = ""
-    this.status = ""
+    this.error.set("")
+    this.status.set("")
   }
 
   edit(item: McpStoreItem) {
-    this.editing = item.name
+    this.editing.set(item.name)
     this.draft = {
+      oauthRequired: item.oauthRequired ?? false,
       name: item.name,
       description: item.description ?? "",
       url: item.url,
@@ -67,8 +70,8 @@ export class McpStorePanelComponent {
       headerPlaceholder: item.headerPlaceholder ?? "",
       enabled: item.enabled,
     }
-    this.error = ""
-    this.status = ""
+    this.error.set("")
+    this.status.set("")
   }
 
   addHeader() {
@@ -85,38 +88,39 @@ export class McpStorePanelComponent {
   }
 
   cancel() {
-    this.editing = undefined
+    this.editing.set(undefined)
     this.draft = emptyDraft()
-    this.error = ""
-    this.status = ""
+    this.error.set("")
+    this.status.set("")
   }
 
   submit(event: SubmitEvent) {
     event.preventDefault()
     const name = this.draft.name.trim()
     if (!name) {
-      this.error = "Enter a unique store name."
+      this.error.set("Enter a unique store name.")
       return
     }
     if (!this.draft.url.trim()) {
-      this.error = "Enter the MCP URL."
+      this.error.set("Enter the MCP URL.")
       return
     }
     const headerNames = this.draft.headerNames.map((header) => header.trim()).filter(Boolean)
-    if (headerNames.length === 0) {
-      this.error = "Add at least one header name (users fill in the values in OpenCode)."
+    if (!this.draft.oauthRequired && headerNames.length === 0) {
+      this.error.set("Add at least one header name (users fill in the values in OpenCode).")
       return
     }
     if (new Set(headerNames.map((header) => header.toLowerCase())).size !== headerNames.length) {
-      this.error = "Header names must be unique."
+      this.error.set("Header names must be unique.")
       return
     }
-    this.error = ""
-    this.status = "Saving…"
+    this.error.set("")
+    this.status.set("Saving…")
     this.saveMutation.mutate(
       {
         name,
         item: {
+          oauthRequired: this.draft.oauthRequired,
           name,
           description: this.draft.description.trim() || null,
           url: this.draft.url.trim(),
@@ -127,13 +131,13 @@ export class McpStorePanelComponent {
       },
       {
         onSuccess: async () => {
-          this.status = `${name} is available in the MCP store.`
-          this.editing = undefined
+          this.status.set(`${name} is available in the MCP store.`)
+          this.editing.set(undefined)
           await this.store.refetch()
         },
         onError: (error) => {
-          this.status = ""
-          this.error = error instanceof Error ? error.message : String(error)
+          this.status.set("")
+          this.error.set(error instanceof Error ? error.message : String(error))
         },
       },
     )
@@ -141,15 +145,15 @@ export class McpStorePanelComponent {
 
   remove(name: string) {
     if (!confirm(`Remove “${name}” from the MCP store?`)) return
-    this.status = ""
-    this.error = ""
+    this.status.set("")
+    this.error.set("")
     this.deleteMutation.mutate(name, {
       onSuccess: async () => {
-        this.status = `${name} was removed.`
-        if (this.editing === name) this.cancel()
+        this.status.set(`${name} was removed.`)
+        if (this.editing() === name) this.cancel()
         await this.store.refetch()
       },
-      onError: (error) => (this.error = error instanceof Error ? error.message : String(error)),
+      onError: (error) => this.error.set(error instanceof Error ? error.message : String(error)),
     })
   }
 }

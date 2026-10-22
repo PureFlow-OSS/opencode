@@ -164,6 +164,7 @@ export type McpConfig = {
 }
 
 export type McpStoreItem = {
+  oauthRequired?: boolean
   name: string
   description?: string | null
   url: string
@@ -193,6 +194,15 @@ export type Testers = {
   betaGroups: string[]
   aiGildeUsers: string[]
   aiGildeGroups: string[]
+}
+
+export type TesterSearchEntry = {
+  userName: string
+  currentChannel: "beta" | "ai-gilde" | "none"
+}
+
+export type TesterSearchResponse = {
+  results: TesterSearchEntry[]
 }
 
 @Injectable({ providedIn: "root" })
@@ -225,6 +235,10 @@ export class ApiService {
 
   async listTesters() {
     return this.readJson<Testers>(await fetch("/opencode/admin/testers", { cache: "no-store" }))
+  }
+
+  async searchTesters(term: string) {
+    return this.readJson<TesterSearchResponse>(await fetch(`/opencode/admin/testers/search?q=${encodeURIComponent(term)}`, { cache: "no-store" }))
   }
 
   async saveTesters(testers: Testers) {

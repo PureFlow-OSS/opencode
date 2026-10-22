@@ -283,6 +283,73 @@ app.MapGet("/opencode/admin/testers", async (UpdaterConfigStore configStore, Can
   });
 });
 
+app.MapGet("/opencode/admin/testers/search", async (
+  HttpRequest request,
+  UpdaterConfigStore configStore,
+  FeedbackKeyResolver keyResolver,
+  IHttpClientFactory clientFactory,
+  CancellationToken cancellationToken
+) =>
+{
+  var term = request.Query["q"].FirstOrDefault()?.Trim() ?? "";
+  var beta = await configStore.LoadBetaOptionsAsync(cancellationToken);
+  if (string.IsNullOrWhiteSpace(beta.LiteLLM.BaseUrl))
+    return Results.BadRequest(new { error = "LiteLLM base URL is not configured" });
+  if (string.IsNullOrWhiteSpace(beta.LiteLLM.ApiKey))
+    return Results.BadRequest(new { error = "LiteLLM management API key is required to search keys" });
+
+  try
+  {
+    using var keyListRequest = new HttpRequestMessage(HttpMethod.Get, BuildLiteLLMKeyListUrl(beta) + "?per_page=100");
+    keyListRequest.Headers.TryAddWithoutValidation("x-litellm-api-key", beta.LiteLLM.ApiKey.Trim());
+    using var keyListResponse = await clientFactory.CreateClient().SendAsync(keyListRequest, cancellationToken);
+    if (!keyListResponse.IsSuccessStatusCode)
+      return Results.BadRequest(new { error = "LiteLLM key list failed with " + keyListResponse.StatusCode });
+
+    await using var stream = await keyListResponse.Content.ReadAsStreamAsync(cancellationToken);
+    using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+    var keys = document.RootElement.ValueKind == JsonValueKind.Array ? document.RootElement : default;
+    if (
+      keys.ValueKind == JsonValueKind.Undefined &&
+      document.RootElement.ValueKind == JsonValueKind.Object &&
+      document.RootElement.TryGetProperty("keys", out var keysProperty) &&
+      keysProperty.ValueKind == JsonValueKind.Array
+    )
+      keys = keysProperty;
+    if (keys.ValueKind != JsonValueKind.Array)
+      return Results.BadRequest(new { error = "Unexpected LiteLLM key list response" });
+
+    var keyHashes = keys.EnumerateArray()
+      .Select(ExtractKeyNameOrHash)
+      .OfType<KeyListEntry>()
+      .Where((entry) => !string.IsNullOrWhiteSpace(entry.Name) || !string.IsNullOrWhiteSpace(entry.Hash))
+      .ToArray();
+
+    return Results.Json(new
+    {
+      results = (await Task.WhenAll(keyHashes.Select((entry) => ResolveKeyEntryNameAsync(entry, beta, keyResolver, clientFactory, cancellationToken))))
+        .Where((name) => !string.IsNullOrWhiteSpace(name))
+        .Select((name) => name!)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Where((name) => term.Length == 0 || name.Contains(term, StringComparison.OrdinalIgnoreCase))
+        .OrderBy((name) => name, StringComparer.OrdinalIgnoreCase)
+        .Select((name) => new
+        {
+          userName = name,
+          currentChannel = beta.Users.Contains(name, StringComparer.OrdinalIgnoreCase) ? "beta"
+            : beta.AiGildeUsers.Contains(name, StringComparer.OrdinalIgnoreCase) ? "ai-gilde"
+            : "none",
+        })
+        .Take(25)
+        .ToArray(),
+    });
+  }
+  catch (Exception error) when (error is not OperationCanceledException)
+  {
+    return Results.Json(new { error = "LiteLLM tester search is unavailable" }, statusCode: StatusCodes.Status502BadGateway);
+  }
+});
+
 app.MapPut("/opencode/admin/testers", async (UpdaterTesterRequest body, UpdaterConfigStore configStore, CancellationToken cancellationToken) =>
 {
   await configStore.SaveTesterListsAsync(
@@ -891,6 +958,50 @@ static string[] NormalizeTesterList(string[]? values) =>
     .Distinct(StringComparer.OrdinalIgnoreCase)
     .ToArray();
 
+static string? ExtractKeyName(JsonElement key)
+{
+  if (key.ValueKind != JsonValueKind.Object) return null;
+  foreach (var field in new[] { "key_alias", "key_name", "alias", "name" })
+  {
+    if (!key.TryGetProperty(field, out var property) || property.ValueKind != JsonValueKind.String) continue;
+    var value = property.GetString()?.Trim();
+    if (string.IsNullOrWhiteSpace(value)) continue;
+    return value.Split(" - ", 2, StringSplitOptions.TrimEntries)[0];
+  }
+  foreach (var field in new[] { "user", "user_id", "username", "display_name", "team", "team_id", "team_alias" })
+  {
+    if (!key.TryGetProperty(field, out var property) || property.ValueKind != JsonValueKind.String) continue;
+    var value = property.GetString()?.Trim();
+    if (!string.IsNullOrWhiteSpace(value)) return value;
+  }
+  return null;
+}
+
+static KeyListEntry? ExtractKeyNameOrHash(JsonElement entry)
+{
+  if (entry.ValueKind == JsonValueKind.String)
+  {
+    var hash = entry.GetString()?.Trim();
+    return string.IsNullOrWhiteSpace(hash) ? null : new KeyListEntry(null, hash);
+  }
+  if (entry.ValueKind != JsonValueKind.Object) return null;
+  var name = ExtractKeyName(entry);
+  return string.IsNullOrWhiteSpace(name) && entry.TryGetProperty("key", out var keyProperty) && keyProperty.ValueKind == JsonValueKind.String
+    ? new KeyListEntry(name, keyProperty.GetString()?.Trim())
+    : new KeyListEntry(name, null);
+}
+
+static async Task<string?> ResolveKeyEntryNameAsync(KeyListEntry entry, UpdaterBetaOptions beta, FeedbackKeyResolver keyResolver, IHttpClientFactory clientFactory, CancellationToken cancellationToken)
+{
+  if (!string.IsNullOrWhiteSpace(entry.Name)) return entry.Name;
+  if (string.IsNullOrWhiteSpace(entry.Hash)) return null;
+  var name = await keyResolver.ResolveBetaUserNameAsync(entry.Hash, beta, clientFactory, cancellationToken);
+  return string.IsNullOrWhiteSpace(name) ? null : name;
+}
+
+static string BuildLiteLLMKeyListUrl(UpdaterBetaOptions beta) =>
+  $"{beta.LiteLLM.BaseUrl.TrimEnd('/')}/{beta.LiteLLM.KeyListPath.TrimStart('/')}";
+
 static string UpdaterChannelName(UpdaterChannel channel) => UpdaterChannelInfo.Name(channel);
 
 static int ChannelPositiveThreshold(UpdaterChannel channel, UpdaterBetaOptions options) =>
@@ -1044,6 +1155,7 @@ sealed class LiteLLMBetaOptions
 {
   public string BaseUrl { get; set; } = "";
   public string KeyInfoPath { get; set; } = "/key/info";
+  public string KeyListPath { get; set; } = "/key/list";
   public string ApiKey { get; set; } = "";
   public string ModelInfoPath { get; set; } = "/model/info";
   public string ModelsPath { get; set; } = "/v1/models";
@@ -1078,6 +1190,8 @@ static class UpdaterChannelInfo
 }
 
 sealed record UpdaterTesterRequest(string[]? BetaUsers, string[]? BetaGroups, string[]? AiGildeUsers, string[]? AiGildeGroups);
+
+record KeyListEntry(string? Name, string? Hash);
 
 sealed record ModelCardSnapshot(
   DateTimeOffset GeneratedAt,
@@ -2089,6 +2203,9 @@ sealed class McpManagedAuthOptions
 
 sealed class McpStoreOptions
 {
+  [JsonPropertyName("oauthRequired")]
+  public bool OAuthRequired { get; set; }
+
   [JsonPropertyName("name")]
   public string Name { get; set; } = "";
 
@@ -2129,7 +2246,7 @@ sealed class McpStoreStore(IWebHostEnvironment env)
     if (name.Trim().Length > 128) return "Store entry name must not exceed 128 characters";
     if (!Uri.TryCreate(config.Url, UriKind.Absolute, out var uri)) return "Store entries require an absolute URL";
     if (uri.Scheme is not ("http" or "https")) return "Store URLs must use HTTP or HTTPS";
-    if (config.HeaderNames.Length == 0) return "Store entries require at least one header name";
+    if (!config.OAuthRequired && config.HeaderNames.Length == 0) return "Store entries require at least one header name or OAuth";
     if (config.HeaderNames.Any((header) => string.IsNullOrWhiteSpace(header) || header.Trim().Length > 128)) return "Header names must be non-empty and at most 128 characters";
     if (new HashSet<string>(config.HeaderNames.Select((header) => header.Trim()), StringComparer.OrdinalIgnoreCase).Count != config.HeaderNames.Length) return "Header names must be unique";
     return null;
@@ -2164,6 +2281,7 @@ sealed class McpStoreStore(IWebHostEnvironment env)
         url = item.Url,
         headerNames = item.HeaderNames,
         headerPlaceholder = item.HeaderPlaceholder,
+        oauthRequired = item.OAuthRequired,
       })
       .ToList();
   }
@@ -2184,6 +2302,7 @@ sealed class McpStoreStore(IWebHostEnvironment env)
       url = config.Url,
       headerNames = config.HeaderNames,
       headerPlaceholder = config.HeaderPlaceholder,
+      oauthRequired = config.OAuthRequired,
       enabled = config.Enabled,
     }));
     command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));

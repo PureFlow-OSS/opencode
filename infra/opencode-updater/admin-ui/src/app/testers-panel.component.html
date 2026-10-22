@@ -3,48 +3,116 @@
     <div>
       <p class="panel-kicker">Rollout groups</p>
       <h2>Testers</h2>
-      <p>One entry per line (or comma separated). Matches LiteLLM <code>key/info</code> users and groups. Beta wins when a key matches both lists.</p>
+      <p>Search LiteLLM key names and assign each user to one rollout channel. Group lists stay editable below.</p>
     </div>
   </header>
+
+  <form class="tester-search" (submit)="search($event)">
+    <input
+      type="text"
+      name="searchTerm"
+      [(ngModel)]="searchTerm"
+      placeholder="Search key name, e.g. Klaus"
+      [disabled]="!ready() || searchMutation.isPending()"
+    />
+    <button type="submit" [disabled]="!ready() || searchMutation.isPending()">
+      {{ searchMutation.isPending() ? 'Searching…' : 'Search' }}
+    </button>
+  </form>
+
+  @if (searchResults().length > 0) {
+    <div class="search-result">
+      <ul class="search-list">
+        @for (entry of searchResults(); track entry.userName) {
+          <li>
+            <div class="search-hit">
+              <strong>{{ entry.userName }}</strong>
+              @switch (entry.currentChannel) {
+                @case ("beta") { <span class="channel-tag beta">beta tester</span> }
+                @case ("ai-gilde") { <span class="channel-tag ai-gilde">AI-Gilde tester</span> }
+                @default { <span class="channel-tag none">not a tester</span> }
+              }
+            </div>
+            <div class="add-actions">
+              <button type="button" class="add" [disabled]="!ready() || entry.currentChannel === 'beta'" (click)="addTester('beta', entry.userName)">+ Beta</button>
+              <button type="button" class="add" [disabled]="!ready() || entry.currentChannel === 'ai-gilde'" (click)="addTester('ai-gilde', entry.userName)">+ AI-Gilde</button>
+            </div>
+          </li>
+        }
+      </ul>
+    </div>
+  } @else if (searchCompleted()) {
+    <p class="message" role="status">No keys found.</p>
+  }
 
   <div class="tester-grid">
     <section class="tester-section">
       <div class="section-title">
         <strong>Beta testers</strong>
-        <span>First channel. Receives <code>feed/beta</code>.</span>
+        <span>First stage for testing new releases.</span>
       </div>
       <label>
         Users
-        <textarea [(ngModel)]="betaUsers" name="betaUsers" rows="6" placeholder="Klaus Scheiböck"></textarea>
+        <ul class="tester-list">
+          @for (user of betaUsers(); track user) {
+            <li>
+              <span>{{ user }}</span>
+              <button
+                type="button"
+                class="remove"
+                [disabled]="!ready()"
+                (click)="removeTester('beta', user)"
+                [attr.aria-label]="'Remove ' + user + ' from Beta'"
+              >−</button>
+            </li>
+          } @empty {
+            <li class="empty">No beta testers yet.</li>
+          }
+        </ul>
       </label>
       <label>
         Groups
-        <textarea [(ngModel)]="betaGroups" name="betaGroups" rows="4" placeholder="desktop-beta"></textarea>
+        <textarea [(ngModel)]="betaGroups" name="betaGroups" rows="4" placeholder="desktop-beta" [disabled]="!ready()"></textarea>
       </label>
     </section>
 
     <section class="tester-section">
       <div class="section-title">
         <strong>AI-Gilde</strong>
-        <span>Second channel. Receives <code>feed/ai-gilde</code> after beta promotion.</span>
+        <span>Second stage, after beta testing and before normal rollout.</span>
       </div>
       <label>
         Users
-        <textarea [(ngModel)]="aiGildeUsers" name="aiGildeUsers" rows="6" placeholder="Klaus Scheiböck"></textarea>
+        <ul class="tester-list">
+          @for (user of aiGildeUsers(); track user) {
+            <li>
+              <span>{{ user }}</span>
+              <button
+                type="button"
+                class="remove"
+                [disabled]="!ready()"
+                (click)="removeTester('ai-gilde', user)"
+                [attr.aria-label]="'Remove ' + user + ' from AI-Gilde'"
+              >−</button>
+            </li>
+          } @empty {
+            <li class="empty">No AI-Gilde testers yet.</li>
+          }
+        </ul>
       </label>
       <label>
         Groups
-        <textarea [(ngModel)]="aiGildeGroups" name="aiGildeGroups" rows="4" placeholder="ai-gilde"></textarea>
+        <textarea [(ngModel)]="aiGildeGroups" name="aiGildeGroups" rows="4" placeholder="ai-gilde" [disabled]="!ready()"></textarea>
       </label>
     </section>
   </div>
 
   <div class="form-actions">
-    <button type="button" [disabled]="saveMutation.isPending()" (click)="submit($event)">{{ saveMutation.isPending() ? 'Saving…' : 'Save testers' }}</button>
+    <button type="button" [disabled]="!ready()" (click)="submit($event)">{{ saveMutation.isPending() ? 'Saving…' : 'Save groups' }}</button>
   </div>
 
-  @if (testersQuery.isPending()) { <p class="message">Loading tester lists…</p> }
-  @if (testersQuery.isError()) { <p class="message error">Tester lists unavailable.</p> }
-  @if (error) { <p class="message error">{{ error }}</p> }
-  @if (status) { <p class="message">{{ status }}</p> }
+  @if (testersQuery.isPending()) { <p class="message" role="status">Loading tester lists…</p> }
+  @if (testersQuery.isError()) { <p class="message error" role="alert">Tester lists unavailable.</p> }
+  @if (error()) { <p class="message error" role="alert">{{ error() }}</p> }
+  @if (status()) { <p class="message" role="status">{{ status() }}</p> }
 </article>

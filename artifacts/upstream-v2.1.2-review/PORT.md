@@ -746,3 +746,52 @@ Benutzer-Temp gesichert und die aktuellen Stage-Dateien ins Volume übernommen.
 Produktiver Status und Browserprüfung bestätigen Beta 2.1.3 und AI-Gilde 2.1.2
 mit vorhandenen Dateien, Normal 2.14.36 mit ausdrücklich fehlenden Dateien.
 Es wurden keine Releases zusätzlich promotet oder produktiven Stoppflags geändert.
+
+### Windows-Updater: HTTP-Client bei eigenem Cache
+
+Der Screenshotfehler `Cannot read properties of null (reading 'request')` entstand
+im Desktop, nicht im Updater-Server. Bei Übergabe eines eigenen AppAdapters lässt
+electron-updater 6.8.9 seinen internen HTTP-Executor null. Der Adapter ist für den
+konfigurierten Windows-Cache nötig. Eine kleine NSIS-Unterklasse initialisiert
+nun denselben ElectronHttpExecutor einschließlich Login-Weiterleitung wie der
+normale Updater-Konstruktor. Cache-Pfad, direkte Netzwerk-Session und bestehende
+Installationsübergabe bleiben erhalten.
+
+Die Regression führt einen echten Electron-Main-Prozess mit isolierten Benutzer-
+und Cache-Verzeichnissen aus. Sie prüft den echten latest.yml-Abruf und Installer-
+Download mit Prüfsumme und AI-Factory-Header am lokalen HTTP-Server. Der Test-
+Installer wird nie ausgeführt. Acht Assertions erfolgreich; zusätzlich bestanden
+die bestehenden 46 Corporate-/Cache-/State-Machine-Tests. Desktop- und GUI-
+Extensions-Typechecks erfolgreich. Kein Desktop-Paket oder vollständiger Build.
+
+### Updater-Port: Tester-Suche und MCP-Store-OAuth
+
+Die Referenzfunktionen wurden in `ai-gilde-updater` gefunden. Der Server erhält
+die namensbasierte LiteLLM-Tester-Suche zurück, ohne Schlüssel/Hashes an den
+Browser auszugeben. OAuthRequired wird wieder aus vorhandenen Store-Einträgen
+gelesen, beim Speichern erhalten und im öffentlichen Store ausgegeben; reine
+OAuth-Einträge benötigen keine Header. Die OpenCode-MCP-Übernahme unterstützt
+dieses Flag bereits (neun bestehende Model-Tests erfolgreich).
+
+Der isolierte Backendtest prüft Suche, Deduplizierung, Management-Key-Weitergabe,
+fehlende Schlüssel-Leaks, Fehlerantworten, erhaltene Tester-Gruppen und OAuth-
+Roundtrips bis zur SQLite-Konfiguration (16 Assertions erfolgreich).
+
+Die Admin-Oberfläche bietet wieder LiteLLM-Namenssuche, Plus-Schaltflächen zum
+Zuordnen/Verschieben und Minus-Schaltflächen zum Entfernen. Bestehende Gruppen
+bleiben erhalten und bearbeitbar. Listen und Suchtreffer wechseln erst nach
+erfolgreichem Speichern; fehlgeschlagene Aktionen lassen die Zuordnung und
+Gruppeneingaben unverändert. Namensvergleiche berücksichtigen unterschiedliche
+Groß-/Kleinschreibung. Async-Rückmeldungen verwenden Angular-Signals.
+
+Der MCP-Store-Editor bietet wieder OAuth required, übernimmt bestehende Flags,
+akzeptiert OAuth-only-Einträge und zeigt die Anmeldeart in der Liste an. Auch
+Speicherfehler und das Schließen des Editors werden unmittelbar sichtbar.
+
+Verifiziert: Angular-Typecheck und Browser-Regressionslauf mit isolierten API-
+Antworten für Suche, Zuordnen, Verschieben, erfolgreiches/fehlgeschlagenes Entfernen,
+Gruppenerhalt und OAuth-only-Speichern samt erneutem Öffnen. Beide Screenshots
+visuell geprüft. In diesem Folgeschritt wurden weder Container neu gebaut noch
+produktive Tester-/MCP-Einträge verändert; die UI-/Server-Änderungen benötigen den
+nächsten freigegebenen Updater-Neubau. Der Desktop-Fix benötigt einen neuen
+Desktop-Build; kein vollständiger Desktop-Build wurde gestartet.

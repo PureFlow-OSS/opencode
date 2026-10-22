@@ -3,21 +3,21 @@
     <div>
       <p class="panel-kicker">MCP Store</p>
       <h2>MCP Store</h2>
-      <p>Offered MCPs users can add in OpenCode. Admin defines URL and header names; users fill in the values.</p>
+      <p>Offered MCPs users can add in OpenCode. Choose OAuth sign-in or define headers users fill in.</p>
     </div>
     <button type="button" class="secondary" (click)="add()">+ Add entry</button>
   </header>
 
-  @if (editing) {
+  @if (editing()) {
     <form class="store-form" (submit)="submit($event)">
       <div class="form-title">
-        <strong>{{ editing === 'new' ? 'Add store entry' : 'Edit ' + editing }}</strong>
+        <strong>{{ editing() === 'new' ? 'Add store entry' : 'Edit ' + editing() }}</strong>
         <span>Store entries are not enforced. Users adopt them in a later OpenCode settings tab.</span>
       </div>
       <div class="form-grid">
         <label>
           Entry name
-          <input name="name" [(ngModel)]="draft.name" [readonly]="editing !== 'new'" placeholder="for example, devops" required />
+          <input name="name" [(ngModel)]="draft.name" [readonly]="editing() !== 'new'" placeholder="for example, devops" required />
         </label>
         <label>
           MCP URL
@@ -26,6 +26,10 @@
         <label class="full-width">
           Description
           <input name="description" [(ngModel)]="draft.description" placeholder="What this MCP offers to users" />
+        </label>
+        <label class="toggle full-width">
+          <input name="oauthRequired" [(ngModel)]="draft.oauthRequired" type="checkbox" />
+          <span><strong>OAuth required</strong><small>Users sign in through the MCP server’s OAuth flow. Headers are optional.</small></span>
         </label>
         <div class="header-fields">
           @for (header of draft.headerNames; track $index; let i = $index) {
@@ -61,8 +65,8 @@
     </form>
   }
 
-  @if (error) { <p class="message error">{{ error }}</p> }
-  @if (status) { <p class="message">{{ status }}</p> }
+  @if (error()) { <p class="message error">{{ error() }}</p> }
+  @if (status()) { <p class="message">{{ status() }}</p> }
 
   <div class="store-list">
     @if (store.isPending()) {
@@ -79,7 +83,8 @@
             </div>
             @if (item.description) { <small>{{ item.description }}</small> }
             <code>{{ item.url }}</code>
-            <small>Headers: {{ item.headerNames.join(', ') }}</small>
+            @if (item.oauthRequired) { <small>OAuth sign-in required</small> }
+            @if (item.headerNames.length) { <small>Headers: {{ item.headerNames.join(', ') }}</small> }
           </div>
           <div class="row-actions">
             <button type="button" class="secondary" (click)="edit(item)">Edit</button>
