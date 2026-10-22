@@ -84,9 +84,23 @@ if ($keyVaultComplete) {
     "--timestamp-rfc3161", $timestampUrl,
     "--timestamp-digest", "SHA256",
     "--verbose"
-  ) + $files
-  & $tool.Source @arguments
-  if ($LASTEXITCODE -ne 0) { throw "AzureSignTool exited with status $LASTEXITCODE" }
+  )
+  foreach ($file in $files) {
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+      $output = @(& $tool.Source @arguments $file 2>&1)
+      $signingExitCode = $LASTEXITCODE
+      $output | ForEach-Object { Write-Host $_ }
+      if ($signingExitCode -eq 0) { break }
+
+      # AzureSignTool's exit code only says signing failed; retry the underlying sharing violation alone.
+      $sharingViolation = ($output -join "`n") -match '(?im)^\s*Signing failed with error (?:0x)?80070020\.\s*$'
+      if (-not $sharingViolation -or $attempt -eq 5) {
+        throw "AzureSignTool exited with status $signingExitCode for $file after $attempt attempt(s)"
+      }
+      Write-Host "Installer file is in use (80070020); retrying signing in 2 seconds ($attempt/5): $file"
+      Start-Sleep -Seconds 2
+    }
+  }
   exit 0
 }
 
