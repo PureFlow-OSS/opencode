@@ -134,7 +134,7 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
     name: "opencode-simulation-graph",
     setup(build) {
       build.onLoad(
-        { filter: /packages[/\\]simulation[/\\]src[/\\](frontend[/\\](simulation|server)|control-server)\.ts$/ },
+        { filter: /packages[/\\]simulation[/\\]src[/\\](frontend[/\\](simulation|server|png)|control-server)\.ts$/ },
         (args) => void simulationInputs.add(args.path),
       )
     },

@@ -572,3 +572,22 @@ zugehörigen Regressionstests scheitern; die Änderungen wurden anschließend
 wiederhergestellt und die Tests erneut erfolgreich ausgeführt. Kein externer
 Such-/Modellaufruf, keine persönliche Konfigurationsänderung, kein vollständiger
 Build und kein Neustart der Anwendung.
+
+### PDF-Canvas in der CLI-Artefaktprüfung
+
+Die Artefaktprüfung darf die gemeinsam genutzte Canvas-Bibliothek und ihre
+nativen Skia-Bindings nicht pauschal als Simulationscode einstufen. Diese
+Sperreinträge wurden entfernt; konkrete Simulations-PNG- und Screenshot-Font-
+Marker bleiben gesperrt. Der Modulgraph-Sammler erfasst zusätzlich
+frontend/png.ts, damit die vorhandene PNG-Graphprüfung tatsächlich greifen
+kann. Der Scanner schließt seinen Dateistream auch bei einer Ablehnung.
+
+Das vorhandene eigenständige PDF-/Office-Compile-Testprogramm bestand nach der
+Korrektur die Artefaktprüfung. Es wurde kein neuer vollständiger CLI- oder
+Desktop-Build ausgeführt. PDF-Verarbeitung, AnyDoc-Aufrufe und Netzwerkrouting
+wurden durch diese Korrektur nicht geändert.
+
+Der gezielte Verifier-Test akzeptiert PDF-/Canvas-/Skia-Artefakte, weist
+Simulations-PNG-/Screenshot-Font-Marker und leere Artefaktverzeichnisse ab und
+prüft die PNG-Sperre im vollständigen Bridge-Modulgraph. Test, CLI-Typecheck,
+Lint und Diff-Prüfung bestanden.

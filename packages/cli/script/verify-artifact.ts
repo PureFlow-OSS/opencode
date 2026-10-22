@@ -3,7 +3,7 @@ import path from "node:path"
 import { collectFiles } from "./files"
 
 const forbidden = [
-  "@napi-rs/canvas",
+  // Canvas is also needed by PDF rendering. Reject simulation-specific payloads instead.
   "@fontsource/commit-mono",
   "@fontsource/noto-sans",
   "SimulationPng",
@@ -15,9 +15,6 @@ const forbidden = [
   "CommitMono-400-Regular.otf",
   "NotoSansSymbols.ttf",
   "src/frontend/png.ts",
-  "skia.darwin-",
-  "skia.linux-",
-  "skia.win32-",
 ]
 const overlap = Math.max(...forbidden.map((value) => value.length)) - 1
 
@@ -48,13 +45,18 @@ async function artifactFiles(target: string): Promise<string[]> {
 async function scan(file: string) {
   let trailing = ""
   const reader = Bun.file(file).stream().getReader()
-  while (true) {
-    const chunk = await reader.read()
-    if (chunk.done) return
-    const text = trailing + Buffer.from(chunk.value).toString("latin1")
-    const leaked = forbidden.find((marker) => text.includes(marker))
-    if (leaked) throw new Error(`Artifact file ${file} contains forbidden simulation payload: ${leaked}`)
-    trailing = text.slice(-overlap)
+  try {
+    while (true) {
+      const chunk = await reader.read()
+      if (chunk.done) return
+      const text = trailing + Buffer.from(chunk.value).toString("latin1")
+      const leaked = forbidden.find((marker) => text.includes(marker))
+      if (leaked) throw new Error(`Artifact file ${file} contains forbidden simulation payload: ${leaked}`)
+      trailing = text.slice(-overlap)
+    }
+  } finally {
+    await reader.cancel()
+    reader.releaseLock()
   }
 }
 
