@@ -14,6 +14,7 @@ import { Usage } from "@opencode/ai"
 import { Document, Info } from "@opencode/schema/config"
 import { describe, expect, test } from "bun:test"
 import { Effect, Layer, Schema } from "effect"
+import { TestClock } from "effect/testing"
 import { testEffect } from "../lib/effect"
 import { PluginTestLayer } from "./fixture"
 
@@ -45,6 +46,67 @@ function eventually<A>(
 }
 
 describe("AiFactoryPlugin", () => {
+  it.effect("refreshes visibility without rediscovery or retaining the startup snapshot", () =>
+    Effect.acquireUseRelease(
+      Effect.sync(() => {
+        const state = { hidden: false, requests: [] as string[] }
+        const server = Bun.serve({
+          hostname: "127.0.0.1",
+          port: 0,
+          fetch(request) {
+            const pathname = new URL(request.url).pathname
+            state.requests.push(pathname)
+            if (pathname === "/v1/models") return Response.json({ data: [{ id: "GLM-OCR" }] })
+            if (pathname === "/modelcards.json") return Response.json({ aifactory: { models: [] } })
+            return Response.json({
+              aifactory: { model_visibility: state.hidden ? [{ pattern: "GLM-OCR", visible: false }] : [] },
+            })
+          },
+        })
+        return { state, server }
+      }),
+      ({ state, server }) =>
+        Effect.gen(function* () {
+          const config = yield* Config.Test
+          const models = yield* Model.Service
+          const local = new Document({
+            type: "document",
+            info: decode({
+              updater: server.url.origin,
+              aifactory_host: server.url.origin,
+              providers: { aifactory: { settings: { apiKey: "refresh-secret" } } },
+            }),
+          })
+          yield* config.setEntries([
+            new Document({
+              type: "document",
+              info: decode({ aifactory: { model_visibility: [{ pattern: "GLM-OCR", visible: false }] } }),
+            }),
+            local,
+          ])
+          const service = yield* Config.Service
+          yield* addPlugin().pipe(
+            Effect.provideService(Config.Service, {
+              ...service,
+              localEntries: () => Effect.succeed([local]),
+            }),
+          )
+          const current = models.get(Provider.ID.make("aifactory"), Model.ID.make("GLM-OCR"))
+          expect((yield* current)?.enabled).toBe(true)
+          state.hidden = true
+          yield* TestClock.adjust("30 seconds")
+          yield* eventually(current, (model) => model?.enabled === false)
+          expect((yield* models.available()).some((model) => model.id === "GLM-OCR")).toBe(false)
+          state.hidden = false
+          yield* TestClock.adjust("30 seconds")
+          yield* eventually(current, (model) => model?.enabled === true)
+          expect(state.requests.filter((path) => path === "/v1/models")).toHaveLength(1)
+          expect(state.requests.filter((path) => path === "/modelcards.json")).toHaveLength(1)
+          expect(state.requests.filter((path) => path === "/provider-config.json")).toHaveLength(3)
+        }),
+      ({ server }) => Effect.sync(() => server.stop(true)),
+    ))
+
   test("is registered before dynamic provider plugins", () => {
     expect(AiFactoryPlugin.id).toBe("opencode.provider.aifactory")
     const ids = ProviderPlugins.map((plugin) => plugin.id)
@@ -159,8 +221,9 @@ describe("AiFactoryPlugin", () => {
           })
           expect(JSON.stringify(yield* providers.available())).not.toContain("test-secret")
           expect(JSON.stringify(yield* models.available())).not.toContain("test-secret")
-          expect(yield* models.available().pipe(Effect.map((models) => models.map((model) => model.id))))
-            .not.toContain("all-proxy-models")
+          expect(yield* models.available().pipe(Effect.map((models) => models.map((model) => model.id)))).not.toContain(
+            "all-proxy-models",
+          )
         }),
       ({ server }) => Effect.promise(() => server.stop(true)),
     ),
@@ -218,7 +281,9 @@ describe("AiFactoryPlugin", () => {
             { authorization: "Bearer direct-secret", header: "direct-secret", path: "/v1/models" },
           ])
           expect(model?.enabled).toBe(true)
-          expect((yield* models.available()).some((model) => model.id === Model.ID.make("all-proxy-models"))).toBe(false)
+          expect((yield* models.available()).some((model) => model.id === Model.ID.make("all-proxy-models"))).toBe(
+            false,
+          )
           expect(yield* models.get(Provider.ID.make("aifactory"), Model.ID.make("all-proxy-models"))).toBeDefined()
           expect((yield* providers.get(Provider.ID.make("aifactory")))?.settings?.baseURL).toBe(
             server.url.origin + "/v1",
@@ -277,13 +342,10 @@ describe("AiFactoryPlugin", () => {
             (model) => model !== undefined,
           )
           yield* credentials.activate(second.id)
-          yield* eventually(
-            providers.snapshot(),
-            (snapshot) => {
-              const source = snapshot.records.get(Provider.ID.make("aifactory"))?.sourceConnection
-              return source?.type === "credential" && source.id === second.id
-            },
-          )
+          yield* eventually(providers.snapshot(), (snapshot) => {
+            const source = snapshot.records.get(Provider.ID.make("aifactory"))?.sourceConnection
+            return source?.type === "credential" && source.id === second.id
+          })
           expect((yield* models.available()).some((model) => model.id === Model.ID.make("gpt-5.6"))).toBe(true)
         }),
       ({ server }) => Effect.promise(() => server.stop(true)),
@@ -481,9 +543,7 @@ describe("AiFactoryPlugin", () => {
             ),
           )
           expect(missingWorker.enabled).toBe(false)
-          expect(
-            (yield* models.available()).some((model) => model.id === Model.ID.make("missing-worker")),
-          ).toBe(false)
+          expect((yield* models.available()).some((model) => model.id === Model.ID.make("missing-worker"))).toBe(false)
           expect(JSON.stringify(yield* providers.available())).not.toContain("legacy-secret")
           expect(JSON.stringify(yield* models.available())).not.toContain("legacy-secret")
           expect(
@@ -516,4 +576,3 @@ function required<T>(value: T | undefined): T {
   if (value === undefined) throw new Error("required value was undefined")
   return value
 }
-

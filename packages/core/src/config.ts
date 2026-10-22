@@ -63,6 +63,8 @@ export function corporateSettings(entries: readonly Entry[]): Corporate {
 export interface Interface {
   /** Returns location config documents and discovery sources from lowest to highest priority. */
   readonly entries: () => Effect.Effect<Entry[]>
+  /** Local documents before the managed remote snapshot is overlaid. */
+  readonly localEntries?: () => Effect.Effect<Entry[]>
   /** Trusted global, explicit and system settings; repository files cannot redirect corporate credentials. */
   readonly corporate?: () => Effect.Effect<Corporate>
   /** Compatibility roots consumed by internal compatibility plugins. */
@@ -118,6 +120,7 @@ export const testLayer = (
       const updates = yield* PubSub.unbounded<Watcher.Update>()
       const service = Test.of({
         entries: () => Ref.get(entries),
+        localEntries: () => Ref.get(entries),
         corporate: () => Ref.get(entries).pipe(Effect.map(corporateSettings)),
         compatibility: () => Effect.succeed(compatibility),
         changes: () => Stream.fromPubSub(updates),
@@ -143,6 +146,7 @@ export const layer = (options?: Options) =>
       const reloadLock = Semaphore.makeUnsafe(1)
       const updateLock = Semaphore.makeUnsafe(1)
       const corporate = { current: {} as Corporate }
+      const localEntries = { current: [] as Entry[] }
       const decodeOptions = { errors: "all", onExcessProperty: "ignore" } as const
       const decodeInfo = Schema.decodeUnknownOption(Info, decodeOptions)
       const parseInfo = Effect.fn("Config.parseInfo")(function* (text: string, source: string) {
@@ -335,6 +339,7 @@ export const layer = (options?: Options) =>
           use_http_proxy: corporate.current.use_http_proxy ?? true,
           http_proxy: corporate.current.http_proxy || "http://webgwooe.rbgooe.at:8080",
         })
+        localEntries.current = local
         if (options?.global === false) return local
         const auth = (yield* credentials.list(Integration.ID.make("aifactory"))).at(-1)?.value
         const settings = corporate.current
@@ -493,6 +498,7 @@ export const layer = (options?: Options) =>
 
       return Service.of({
         corporate: () => Effect.succeed(corporate.current),
+        localEntries: () => Effect.succeed(localEntries.current),
         entries: Effect.fnUntraced(function* () {
           return configs
         }),

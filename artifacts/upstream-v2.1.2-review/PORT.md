@@ -377,3 +377,31 @@ korrigierten Prod-Pfad inklusive Hash des konkreten gebündelten Executables in
 Tests und Desktop-Typecheck bestanden. Lint ohne Fehler; vier bestehende
 Abstandswarnungen in unberührten Abschnitten der Buildkonfigurationstests.
 Kein Gesamtbuild, keine Änderung am gebündelten Build und kein App-/Dienstneustart.
+
+### Modellregeln während laufender Desktop-Sitzungen aktualisieren
+
+Live-Diagnose: Der Prod-Dienst hatte noch einen alten verwalteten Regelstand ohne
+die Ausblendung von GLM-OCR und Qwen3.8-27B-FP8. Der aktuelle Updater-Abruf mit dem
+aktiven AI-Factory-Key liefert beide Ausblendungen. Der unautorisierte Browserabruf
+liefert einen anderen Regelumfang; die keyabhängige Konfiguration bleibt maßgebend.
+
+Der Provider aktualisiert die verwalteten Modellregeln jetzt alle 30 Sekunden und
+umgeht dabei den sonst fünf Minuten gültigen HTTP-Cache. Modelle und Preise werden
+bei diesem Policy-Abruf nicht erneut abgefragt. Identitätswechsel und lokale
+Konfigurationsereignisse laufen weiterhin über den vollständigen Ladeweg; eine
+Semaphore serialisiert beide Wege. Nur tatsächliche Katalogänderungen lösen die
+bestehenden Provider-/Model-Updated-Ereignisse für die Oberfläche aus.
+
+Config hält lokale Dokumente einschließlich Projektregeln vor dem entfernten
+Overlay separat bereit. Der beim Start geladene Remote-Snapshot kann dadurch
+gelöschte Ausblendregeln nicht wiederherstellen. Bei fehlgeschlagenem oder
+ungültigem Abruf bleibt der letzte gültige, URL-/Key-spezifische Stand erhalten;
+eine gültige leere Konfiguration kann Regeln bewusst entfernen. MCP-Konfiguration
+und laufende Agent-Aktionen werden bei diesem Refresh nicht neu geladen.
+
+Verifiziert: zwölf Tests / 67 Assertions für Provider, Config-Cache und Corporate-
+Konfiguration, inklusive Hide/Unhide per TestClock, nur einmaliger Modelldiscovery,
+entferntem Start-Snapshot, erhaltenen Projektregeln, HTTP-Fehlern und ungültigem
+JSON. Der Snapshot-Regressionstest scheitert mit dem früheren Merge-Verhalten.
+Core-Typecheck und Linting bestanden. Kein Gesamtbuild, keine Änderung am
+laufenden Nutzerdienst und keine Änderung am Updater-Backend.

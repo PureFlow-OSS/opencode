@@ -25,10 +25,13 @@ export function providerConfigUrl(config?: unknown) {
   return `${updateBaseUrl(config)}/provider-config.json`
 }
 
-export function providerConfigPayload(value: unknown): Record<string, unknown> {
-  if (!isRecord(value)) return {}
+export function providerConfigPayload(value: unknown) {
+  if (!isRecord(value)) return
   const updater = isRecord(value.Updater) ? value.Updater : isRecord(value.updater) ? value.updater : undefined
-  return Option.getOrUndefined(decode(updater?.ProviderConfig ?? updater?.providerConfig ?? value)) ?? {}
+  const payload = updater && ("ProviderConfig" in updater || "providerConfig" in updater)
+    ? updater.ProviderConfig ?? updater.providerConfig
+    : value
+  return Option.getOrUndefined(decode(payload))
 }
 
 export function aiFactoryModel(value: unknown) {
@@ -63,14 +66,16 @@ export async function readProviderConfig(
   fetchFn: typeof fetch = HttpProxy.fetch,
   init: RequestInit = {},
   config?: unknown,
+  options?: { refresh?: boolean },
 ): Promise<Record<string, unknown>> {
   const url = providerConfigUrl(config)
   const key = new Headers(init.headers).get(PROVIDER_CONFIG_AIFACTORY_API_KEY_HEADER) ?? ""
   const cached = cache.get(`${url}|${key}`)
-  if (cached && cached.until > Date.now()) return cached.payload
+  if (cached && !options?.refresh && cached.until > Date.now()) return cached.payload
   const payload = await fetchFn(url, { ...init, signal: AbortSignal.timeout(3000) })
-    .then(async (response) => (response.ok ? providerConfigPayload(await response.json()) : {}))
-    .catch(() => ({}))
-  if (Object.keys(payload).length) cache.set(`${url}|${key}`, { until: Date.now() + 300_000, payload })
+    .then(async (response) => (response.ok ? providerConfigPayload(await response.json()) : undefined))
+    .catch(() => undefined)
+  if (payload === undefined) return cached?.payload ?? {}
+  cache.set(`${url}|${key}`, { until: Date.now() + 300_000, payload })
   return payload
 }

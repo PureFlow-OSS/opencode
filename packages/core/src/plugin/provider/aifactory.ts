@@ -13,7 +13,7 @@ import { Provider } from "../../provider.js"
 import { Variant } from "../../variant.js"
 import { Event } from "@opencode/schema/config"
 import { HttpProxy } from "@opencode/util/http-proxy"
-import { Duration, Effect, Schema, Stream } from "effect"
+import { Duration, Effect, Schema, Semaphore, Stream } from "effect"
 
 const integrationID = Integration.ID.make("aifactory")
 const providerID = Provider.ID.make("aifactory")
@@ -43,9 +43,14 @@ export const AiFactoryPlugin = define({
     let definitions: readonly Model.Info[] = []
     let connection: IntegrationConnection.Info | undefined
     let connectionID = ""
+    let discovered: readonly string[] = noModels
+    let prices: readonly ModelCard[] = []
+    const loading = Semaphore.makeUnsafe(1)
 
-    const load = Effect.fn("AiFactoryPlugin.load")(function* () {
-      const settings = yield* (config.corporate ? config.corporate() : Effect.map(config.entries(), Config.corporateSettings))
+    const load = Effect.fn("AiFactoryPlugin.load")(function* (policyOnly: boolean) {
+      const settings = yield* config.corporate
+        ? config.corporate()
+        : Effect.map(config.entries(), Config.corporateSettings)
       const active = yield* ctx.integration.connection.active("aifactory").pipe(Effect.orElseSucceed(() => undefined))
       const credential = active
         ? yield* ctx.integration.connection.resolve(active).pipe(Effect.orElseSucceed(() => undefined))
@@ -60,18 +65,23 @@ export const AiFactoryPlugin = define({
       const nextConnectionID = active?.type === "credential" ? active.id : active ? active.type : ""
       const providerConfig = nextToken
         ? yield* Effect.promise(() =>
-          ConfigManaged.readProviderConfig(
-            serviceFetch === globalThis.fetch ? HttpProxy.fetch : serviceFetch,
-            init,
-            settings,
-          ),
+            ConfigManaged.readProviderConfig(
+              serviceFetch === globalThis.fetch ? HttpProxy.fetch : serviceFetch,
+              init,
+              settings,
+              { refresh: true },
+            ),
           )
         : {}
-      const ids = nextToken ? yield* discover(http, nextToken, nextBaseURL) : noModels
-      const cards = nextToken ? yield* modelCards(http, nextToken, settings) : []
+      const reuse = policyOnly && nextToken === token && nextBaseURL === baseURL && nextConnectionID === connectionID
+      const ids = reuse ? discovered : nextToken ? yield* discover(http, nextToken, nextBaseURL) : noModels
+      const cards = reuse ? prices : nextToken ? yield* modelCards(http, nextToken, settings) : []
       const fallback = cards.flatMap((card) => (card.model?.trim() ? [card.model.trim()] : []))
       const allEntries = yield* config.entries()
-      const localAIFactory = Config.latest(allEntries, "aifactory")
+      // Config.entries also contains the remote snapshot loaded at startup. It must not resurrect
+      // removed visibility rules after a live refresh. Preserve local/project rules separately.
+      const localEntries = config.localEntries ? yield* config.localEntries() : allEntries
+      const localAIFactory = Config.latest(localEntries, "aifactory")
       const providers = Config.latest(allEntries, "providers") ?? {}
       const title = Config.latest(allEntries, "agents")?.title
       const defaults = [
@@ -91,6 +101,8 @@ export const AiFactoryPlugin = define({
         ...visibilityRules(record(providerConfig.aifactory).model_visibility),
       ]
       const next = catalog(ids.length > 0 ? ids : fallback, limits, visibility, defaults, cards)
+      discovered = ids
+      prices = cards
 
       if (
         nextToken === token &&
@@ -136,15 +148,22 @@ export const AiFactoryPlugin = define({
       { providerID },
     )
 
-    yield* load()
+    const reload = (policyOnly = false) => loading.withPermit(load(policyOnly))
+    yield* reload()
+    // Refresh only model policy here. Reloading all managed config could reconnect MCPs mid-call.
+    yield* Effect.sleep("30 seconds").pipe(
+      Effect.andThen(reload(true)),
+      Effect.forever,
+      Effect.forkScoped({ startImmediately: true }),
+    )
     yield* bus.subscribe(Credential.Event.Switched).pipe(
       Stream.filter((event) => event.data.integrationID === integrationID),
-      Stream.runForEach(() => load()),
+      Stream.runForEach(() => reload()),
       Effect.forkScoped({ startImmediately: true }),
     )
     yield* bus.subscribe(Event.Updated).pipe(
       Stream.filter(() => true),
-      Stream.runForEach(() => load()),
+      Stream.runForEach(() => reload()),
       Effect.forkScoped({ startImmediately: true }),
     )
   }),
@@ -282,7 +301,8 @@ function modelCards(http: HttpClient.HttpClient, token: string, settings: Config
 }
 
 function decodeModelCards(value: unknown): ModelCard[] {
-  const models = isRecord(value) && isRecord(value.aifactory) && Array.isArray(value.aifactory.models) ? value.aifactory.models : []
+  const models =
+    isRecord(value) && isRecord(value.aifactory) && Array.isArray(value.aifactory.models) ? value.aifactory.models : []
   return models.flatMap((item) => (isRecord(item) ? [item as unknown as ModelCard] : []))
 }
 
@@ -365,11 +385,13 @@ function catalog(
         ...base.capabilities,
         input: workers.has(id) ? [...new Set([...base.capabilities.input, "image"])] : base.capabilities.input,
       },
-      cost: [{
-        input: money(costs.input),
-        output: money(costs.output),
-        cache: { read: Money.USDPerMillionTokens.zero, write: Money.USDPerMillionTokens.zero },
-      }],
+      cost: [
+        {
+          input: money(costs.input),
+          output: money(costs.output),
+          cache: { read: Money.USDPerMillionTokens.zero, write: Money.USDPerMillionTokens.zero },
+        },
+      ],
       variants,
       enabled:
         workers.has(id) && !defaults.includes(id) && (!ids.includes(id) || !visible(id, visibility, defaults))
