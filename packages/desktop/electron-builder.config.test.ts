@@ -131,6 +131,48 @@ test("the output directory can be overridden for local builds", () => {
   })
 })
 
+test.skipIf(process.platform !== "win32")("signing failures retain the signer's diagnostic output", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "opencode-signing-output-"))
+  try {
+    await Bun.write(
+      path.join(dir, "AzureSignTool.cmd"),
+      "@echo off\r\necho Signing failed with error 80072EE7.\r\nexit /b 23\r\n",
+    )
+    await Bun.write(path.join(dir, "installer.exe"), "signing test fixture")
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        "--eval",
+        `import { getConfig } from ${JSON.stringify(import.meta.resolve("./electron-builder.config"))};
+       await getConfig().win.signtoolOptions.sign({ path: ${JSON.stringify(path.join(dir, "installer.exe"))} });`,
+      ],
+      {
+        env: {
+          ...process.env,
+          PATH: `${dir}${path.delimiter}${process.env.PATH ?? ""}`,
+          AZURE_KEYVAULT_URL: "https://signing-test.invalid",
+          AZURE_KEYVAULT_CLIENT_ID: "test-client",
+          AZURE_KEYVAULT_CLIENT_SECRET: "test-secret",
+          AZURE_KEYVAULT_TENANT_ID: "test-tenant",
+          AZURE_KEYVAULT_CERT: "test-certificate",
+        },
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    )
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ])
+    expect(code).not.toBe(0)
+    expect(stdout).toContain("Signing failed with error 80072EE7.")
+    expect(stderr).toContain("AzureSignTool exited with status 23")
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
 test("trims external dependencies without excluding runtime files", () => {
   const fileStats = statSync(import.meta.filename)
   const dirStats = statSync(import.meta.dirname)

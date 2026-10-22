@@ -2,14 +2,11 @@ import { execFile } from "node:child_process"
 import { readdir, stat } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { promisify } from "node:util"
 
 import type { CustomMacSignOptions } from "app-builder-lib"
 import { Arch, type Configuration } from "electron-builder"
 import { NativeArch } from "../../script/native-arch"
 import { CLI_BINARIES, getCurrentCli, nodePtyPackage } from "./scripts/utils"
-
-const execFileAsync = promisify(execFile)
 
 const packageDir = path.dirname(fileURLToPath(import.meta.url))
 
@@ -50,11 +47,20 @@ async function signWindows(configuration: { path: string }) {
 
   if (process.env.GITHUB_ACTIONS !== "true" && !keyVault && !trustedSigning) return
 
-  await execFileAsync(
-    "pwsh",
-    ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", signScript, configuration.path],
-    { cwd: rootDir, windowsHide: true },
-  )
+  await new Promise<void>((resolve, reject) => {
+    execFile(
+      "pwsh",
+      ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", signScript, configuration.path],
+      { cwd: rootDir, windowsHide: true },
+      (error, stdout, stderr) => {
+        // AzureSignTool writes the underlying signing HRESULT to stdout, even on failure.
+        process.stdout.write(stdout)
+        process.stderr.write(stderr)
+        if (error) return reject(error)
+        resolve()
+      },
+    )
+  })
 }
 
 function macSignOptions(options: CustomMacSignOptions): CustomMacSignOptions {
