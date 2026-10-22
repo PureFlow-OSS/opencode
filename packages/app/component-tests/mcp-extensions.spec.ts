@@ -29,8 +29,23 @@ story("embeds MCP management and the store in the native extensions tab", async 
   expect(bounds?.width).toBeGreaterThan(640)
   const inputBounds = await dialog.getByLabel("Name").boundingBox()
   expect(inputBounds!.x - bounds!.x).toBeGreaterThanOrEqual(16)
+  await expect(dialog.getByLabel("Name")).toBeFocused()
+
+  const clearance = await dialog.getByLabel("Name").evaluate((input) => {
+    const field = input.closest('[data-slot="input-wrapper"]')!.getBoundingClientRect()
+    const form = input.closest("form")!.getBoundingClientRect()
+
+    return Math.min(field.left - form.left, form.right - field.right)
+  })
+
+  expect(clearance).toBeGreaterThanOrEqual(4)
+  await expect(dialog.getByLabel("Name")).toHaveAttribute("placeholder", /\S/)
+  await expect(dialog.getByLabel("Command")).toHaveAttribute("placeholder", /\S/)
   await dialog.getByLabel("Name").fill("Fresh MCP")
   await dialog.getByRole("button", { name: "Remote" }).click()
+  await expect(dialog.getByLabel("URL")).toHaveAttribute("placeholder", /\S/)
+  await expect(dialog.getByLabel("Header name")).toHaveAttribute("placeholder", /\S/)
+  await expect(dialog.getByLabel("Header value")).toHaveAttribute("placeholder", /\S/)
   await expect(dialog.getByRole("switch", { name: "OAuth", exact: true })).not.toBeChecked()
   await dialog.getByLabel("URL").fill("https://mcp.example/fresh")
   await dialog.getByRole("button", { name: "Save", exact: true }).click()

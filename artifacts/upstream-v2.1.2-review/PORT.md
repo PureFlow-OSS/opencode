@@ -405,3 +405,22 @@ entferntem Start-Snapshot, erhaltenen Projektregeln, HTTP-Fehlern und ungültige
 JSON. Der Snapshot-Regressionstest scheitert mit dem früheren Merge-Verhalten.
 Core-Typecheck und Linting bestanden. Kein Gesamtbuild, keine Änderung am
 laufenden Nutzerdienst und keine Änderung am Updater-Backend.
+
+### MCP-Dialog beim ersten Öffnen
+
+Der automatisch fokussierte Name lag direkt am Rand des scrollbaren Formulars.
+Dadurch wurde der drei Pixel breite Fokusrahmen seitlich abgeschnitten. Vier Pixel
+Innenabstand im Scrollbereich erhalten den vollständigen Rahmen; der äußere
+Formularabstand und die große, viewportbegrenzte Dialoggröße bleiben erhalten.
+
+Die im Port fehlenden Platzhalter aus dem alten Dialog wurden für Name, Befehl,
+URL, Header und OAuth-Client-ID/Scope wieder ergänzt. Store-spezifische Header-
+Hinweise und der Hinweis auf den automatisch verwendeten AI-Factory-Key haben
+weiterhin Vorrang. Neue i18n-Keys sind ausschließlich in der englischen Quelle.
+
+Verifiziert: Der erweiterte bestehende MCP-Komponententest scheiterte vor der
+Layoutkorrektur mit null Pixel Abstand zum Scrollrand. Danach bestehen alle fünf
+MCP-Browsertests einschließlich erstem Autofokus, Platzhaltern, kleinem Viewport,
+Speichern, OAuth und Unterbrechungsbestätigung. App-Typecheck bestanden; Lint ohne
+Fehler, bestehende Warnungen im Dialog unverändert. Kein Gesamtbuild und keine
+Änderung am laufenden Desktop oder Hintergrunddienst.

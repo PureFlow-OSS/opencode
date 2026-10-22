@@ -195,11 +195,12 @@ export const DialogMcpForm: Component<{
           description={language.t("settings.mcp.form.description")}
         />
       </DialogHeader>
-      <DialogBody class="min-h-0 px-4 pt-4 pb-4">
-        <form id="mcp-server-form" class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto" onSubmit={submit}>
+      <DialogBody class="min-h-0 px-3 pt-3 pb-3">
+        <form id="mcp-server-form" class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-1" onSubmit={submit}>
           <TextField
             autofocus
             label={language.t("settings.mcp.form.name")}
+            placeholder={language.t("settings.mcp.form.namePlaceholder")}
             value={form.name}
             readOnly={editing() || !!props.preset}
             onChange={(value) => setForm({ name: value, nameError: undefined })}
@@ -227,6 +228,7 @@ export const DialogMcpForm: Component<{
           <Show when={form.type === "local"}>
             <TextField
               label={language.t("settings.mcp.form.command")}
+              placeholder={language.t("settings.mcp.form.commandPlaceholder")}
               value={form.command}
               onChange={(value) => setForm({ command: value, commandError: undefined })}
               validationState={form.commandError ? "invalid" : undefined}
@@ -236,6 +238,7 @@ export const DialogMcpForm: Component<{
           <Show when={form.type === "remote"}>
             <TextField
               label={language.t("settings.mcp.form.url")}
+              placeholder={language.t("settings.mcp.form.urlPlaceholder")}
               value={form.url}
               readOnly={props.preset}
               onChange={(value) => setForm({ url: value, urlError: undefined })}
@@ -251,6 +254,7 @@ export const DialogMcpForm: Component<{
                       class="flex-1"
                       hideLabel
                       label={language.t("settings.mcp.form.headerName")}
+                      placeholder={language.t("settings.mcp.form.headerNamePlaceholder")}
                       value={row.key}
                       readOnly={lockedHeader(row.key)}
                       onChange={(value) => setForm("headers", index(), { key: value, error: undefined })}
@@ -263,7 +267,7 @@ export const DialogMcpForm: Component<{
                       placeholder={
                         usesAifactoryApiKey(row.key)
                           ? language.t("settings.mcp.form.aifactoryPlaceholder")
-                          : (props.headerPlaceholder ?? undefined)
+                          : (props.headerPlaceholder ?? language.t("settings.mcp.form.headerValuePlaceholder"))
                       }
                       onChange={(value) => setForm("headers", index(), { value, error: undefined })}
                       validationState={row.error ? "invalid" : undefined}
@@ -319,6 +323,7 @@ export const DialogMcpForm: Component<{
               <div class="flex flex-col gap-3 border-l border-border pl-4">
                 <TextField
                   label={language.t("settings.mcp.form.oauthClientId")}
+                  placeholder={language.t("settings.mcp.form.oauthClientIdPlaceholder")}
                   value={form.oauth.client_id}
                   onChange={(value) => setForm("oauth", "client_id", value)}
                 />
@@ -329,6 +334,7 @@ export const DialogMcpForm: Component<{
                 />
                 <TextField
                   label={language.t("settings.mcp.form.oauthScope")}
+                  placeholder={language.t("settings.mcp.form.oauthScopePlaceholder")}
                   value={form.oauth.scope}
                   onChange={(value) => setForm("oauth", "scope", value)}
                 />
