@@ -637,3 +637,30 @@ werden lokal erzeugt, ohne Unternehmensdokumente an ein Modell zu senden.
 
 Verifiziert: zehn Dokumenttests, Core-Typecheck, Lint und Diff-Prüfung
 erfolgreich. Kein vollständiger Desktop-Build oder Neustart.
+
+### Nachrichten-Ribbon als einzelne Hover-Vorschau
+
+Das kompakte Ribbon zeigt kurze, dezente Markierungen und betont die aktuelle
+sowie überfahrene Nachricht. Statt einer vollständigen Liste mit Diff-Balken
+öffnet sich eine einzelne abgerundete Karte neben der betreffenden Markierung:
+Nutzerfrage als Titel, bis zu drei Zeilen Antworttext als Vorschau. Reasoning
+und Tool-Inhalte werden nicht als Antwortvorschau verwendet.
+
+Ein gemeinsames HoverCard bleibt erhalten; beim Wechsel der Markierung wandert
+sein Anker. Es werden keine Popups pro Nachricht oder zusätzliche Datenabfragen
+angelegt. Die Karte bleibt beim Übergang mit der Maus erreichbar. Klick,
+Enter/Leertaste und Escape werden unterstützt, die normale Listenvariante
+bleibt erhalten. Bestehender E2E-Keeper um diese sichtbaren Verträge erweitert;
+Screenshot im Browser geprüft.
+
+Vorher-Messung am vorhandenen Produktionsbundle: Cold-Session-Einstieg erstmals
+korrekt nach 1.622 ms, stabil nach 1.645 ms. Derselbe Ablauf nach der Änderung
+im lokalen Entwicklungsserver: 928/949 ms, Szenario erfolgreich. Diese Werte
+sind wegen unterschiedlicher Build-Modi nicht als Performancegewinn vergleichbar.
+Ein belastbarer Produktionsvergleich nach der Änderung bleibt bis zum nächsten
+freigegebenen Build offen; es wurde kein vollständiger Build gestartet.
+
+Verifikation: Ribbon-E2E-Keeper erfolgreich, App- und Session-UI-Typechecks,
+Lint und Diff-Prüfung erfolgreich. Der zusätzliche gesamte E2E-Typecheck
+scheitert in unveränderten Testdateien (Terminal-/Timeline-Probes, Composer,
+Review und Timeline-Stream); keine Meldung betrifft den Ribbon-Keeper.

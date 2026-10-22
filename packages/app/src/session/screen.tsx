@@ -359,10 +359,7 @@ function SessionScreenContent(props: {
               </SessionIdentityHeader>
             </Show>
             <Show when={messagesReady() && session.identity.params.id}>
-              <div
-                class="h-full min-h-0"
-                classList={{ "md:ps-8": session.history.visibleUserMessages().length > 1 }}
-              >
+              <div class="h-full min-h-0" classList={{ "md:ps-8": session.history.visibleUserMessages().length > 1 }}>
                 {timelineView()}
               </div>
               <Show when={isDesktop() && session.history.visibleUserMessages().length > 1}>
@@ -372,6 +369,23 @@ function SessionScreenContent(props: {
                     messages={session.history.visibleUserMessages()}
                     current={timeline.currentMessage()}
                     getLabel={(message) => readPromptPresentation(message.metadata)?.displayText ?? message.text}
+                    getPreview={(message) => {
+                      const messages = session.history.messages()
+                      const start = messages.findIndex((item) => item.id === message.id)
+
+                      if (start < 0) return
+                      const end = messages.findIndex((item, index) => index > start && item.type === "user")
+
+                      return messages
+                        .slice(start + 1, end < 0 ? undefined : end)
+                        .flatMap((item) =>
+                          item.type === "assistant"
+                            ? item.content.flatMap((part) => (part.type === "text" ? [part.text] : []))
+                            : [],
+                        )
+                        .join("\n")
+                        .slice(0, 600)
+                    }}
                     onMessageSelect={timeline.actions.selectMessage}
                   />
                 </div>

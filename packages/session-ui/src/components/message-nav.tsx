@@ -1,6 +1,7 @@
 import type { FileDiffInfo, SessionMessageUser } from "@opencode/client/promise"
 import { HoverCard } from "@kobalte/core/hover-card"
-import { ComponentProps, For, Match, Show, createMemo, createSignal, splitProps, Switch } from "solid-js"
+import { ComponentProps, For, Match, Show, createMemo, createUniqueId, splitProps, Switch } from "solid-js"
+import { createStore } from "solid-js/store"
 import { useI18n } from "@opencode/ui/context/i18n"
 
 export function MessageNav(
@@ -10,6 +11,7 @@ export function MessageNav(
     size: "normal" | "compact"
     onMessageSelect: (message: SessionMessageUser) => void
     getLabel?: (message: SessionMessageUser) => string | undefined
+    getPreview?: (message: SessionMessageUser) => string | undefined
     getChanges?: (message: SessionMessageUser) => FileDiffInfo[] | undefined
   },
 ) {
@@ -21,52 +23,75 @@ export function MessageNav(
     "size",
     "onMessageSelect",
     "getLabel",
+    "getPreview",
     "getChanges",
     "class",
   ])
 
-  const [hovercardOpen, setHovercardOpen] = createSignal(false)
+  const [state, setState] = createStore<{
+    open: boolean
+    message?: SessionMessageUser
+    anchor?: HTMLButtonElement
+  }>({ open: false })
+
+  const previewID = createUniqueId()
+
+  const anchorRect = createMemo(() => {
+    const anchor = state.anchor
+
+    return () => anchor?.getBoundingClientRect()
+  })
 
   const selectMessage = (message: SessionMessageUser) => {
-    setHovercardOpen(false)
+    setState("open", false)
     local.onMessageSelect(message)
   }
 
   const content = (className?: string) => (
-    <ul role="list" data-component="message-nav" data-size={local.size} class={className} {...others}>
+    <ul
+      role="list"
+      data-component="message-nav"
+      data-size={local.size}
+      class={className}
+      style={{ "--message-nav-count": local.messages.length }}
+      {...others}
+    >
       <For each={local.messages}>
         {(message) => {
           const handleClick = () => selectMessage(message)
-
-          const handleKeyPress = (event: KeyboardEvent) => {
-            if (event.key !== "Enter" && event.key !== " ") return
-            event.preventDefault()
-            selectMessage(message)
-          }
 
           return (
             <li data-slot="message-nav-item">
               <Switch>
                 <Match when={local.size === "compact"}>
-                  <div
+                  <button
+                    type="button"
                     data-slot="message-nav-tick-button"
                     data-active={message.id === local.current?.id || undefined}
                     aria-label={local.getLabel?.(message) || i18n.t("ui.messageNav.newMessage")}
                     aria-current={message.id === local.current?.id || undefined}
-                    role="button"
-                    tabindex={0}
+                    aria-describedby={state.open && state.message?.id === message.id ? previewID : undefined}
                     onClick={handleClick}
-                    onKeyDown={handleKeyPress}
+                    onPointerEnter={(event) => setState({ message, anchor: event.currentTarget })}
+                    onFocus={(event) => setState({ message, anchor: event.currentTarget, open: true })}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") setState("open", false)
+
+                      if (event.key !== "Enter" && event.key !== " ") return
+                      event.preventDefault()
+                      event.stopPropagation()
+                      selectMessage(message)
+                    }}
                   >
                     <div data-slot="message-nav-tick-line" />
-                  </div>
+                  </button>
                 </Match>
                 <Match when={local.size === "normal"}>
                   <button
                     data-slot="message-nav-message-button"
                     aria-current={message.id === local.current?.id || undefined}
                     onClick={handleClick}
-                    onKeyDown={handleKeyPress}
+                    type="button"
                   >
                     <MessageDiffBars changes={local.getChanges?.(message) ?? []} />
                     <div
@@ -91,11 +116,12 @@ export function MessageNav(
     <Switch>
       <Match when={local.size === "compact"}>
         <HoverCard
-          open={hovercardOpen()}
-          onOpenChange={setHovercardOpen}
-          openDelay={0}
+          open={state.open && !!state.message}
+          onOpenChange={(open) => setState("open", open)}
+          openDelay={120}
           closeDelay={120}
-          placement="right-start"
+          placement="right"
+          getAnchorRect={anchorRect()}
           gutter={8}
           overflowPadding={24}
           fitViewport
@@ -104,8 +130,24 @@ export function MessageNav(
             {content()}
           </HoverCard.Trigger>
           <HoverCard.Portal>
-            <HoverCard.Content data-slot="message-nav-hovercard-content">
-              <MessageNav {...props} size="normal" class="" onMessageSelect={selectMessage} />
+            <HoverCard.Content id={previewID} data-slot="message-nav-hovercard-content">
+              <Show when={state.message} keyed>
+                {(message) => (
+                  <button
+                    type="button"
+                    data-slot="message-nav-preview-button"
+                    aria-label={local.getLabel?.(message) || i18n.t("ui.messageNav.newMessage")}
+                    onClick={() => selectMessage(message)}
+                  >
+                    <div data-slot="message-nav-preview-title">
+                      {local.getLabel?.(message) || i18n.t("ui.messageNav.newMessage")}
+                    </div>
+                    <Show when={local.getPreview?.(message)}>
+                      {(preview) => <div data-slot="message-nav-preview-body">{preview()}</div>}
+                    </Show>
+                  </button>
+                )}
+              </Show>
             </HoverCard.Content>
           </HoverCard.Portal>
         </HoverCard>
