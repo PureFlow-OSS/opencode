@@ -27,8 +27,8 @@ export class TestersPanelComponent {
   searchTerm = signal("")
   betaUsers = signal<string[]>([])
   aiGildeUsers = signal<string[]>([])
-  betaGroups = signal("")
-  aiGildeGroups = signal("")
+  betaGroups = signal<string[]>([])
+  aiGildeGroups = signal<string[]>([])
   searchResults = signal<TesterSearchEntry[]>([])
   searchCompleted = signal(false)
   status = signal("")
@@ -40,24 +40,13 @@ export class TestersPanelComponent {
       if (!data) return
       this.betaUsers.set(data.betaUsers)
       this.aiGildeUsers.set(data.aiGildeUsers)
-      this.betaGroups.set(data.betaGroups.join("\n"))
-      this.aiGildeGroups.set(data.aiGildeGroups.join("\n"))
+      this.betaGroups.set(data.betaGroups)
+      this.aiGildeGroups.set(data.aiGildeGroups)
     })
   }
 
   ready() {
     return this.testersQuery.isSuccess() && !this.saveMutation.isPending() && !this.searchMutation.isPending()
-  }
-
-  parseList(value: string) {
-    return [
-      ...new Set(
-        value
-          .split(/[\n,]/)
-          .map((item) => item.trim())
-          .filter((item) => item.length > 0),
-      ),
-    ]
   }
 
   search(event: Event) {
@@ -104,8 +93,8 @@ export class TestersPanelComponent {
   applySavedTesters(data: Testers) {
     this.betaUsers.set(data.betaUsers)
     this.aiGildeUsers.set(data.aiGildeUsers)
-    this.betaGroups.set(data.betaGroups.join("\n"))
-    this.aiGildeGroups.set(data.aiGildeGroups.join("\n"))
+    this.betaGroups.set(data.betaGroups)
+    this.aiGildeGroups.set(data.aiGildeGroups)
     this.searchResults.update((results) =>
       results.map((entry) => ({
         ...entry,
@@ -156,17 +145,12 @@ export class TestersPanelComponent {
     )
   }
 
-  submit(event: Event) {
-    event.preventDefault()
-    this.save(this.currentPayload(), "Tester groups saved.")
-  }
-
   currentPayload() {
     return {
       betaUsers: this.betaUsers(),
-      betaGroups: this.parseList(this.betaGroups()),
+      betaGroups: this.betaGroups(),
       aiGildeUsers: this.aiGildeUsers(),
-      aiGildeGroups: this.parseList(this.aiGildeGroups()),
+      aiGildeGroups: this.aiGildeGroups(),
     }
   }
 }

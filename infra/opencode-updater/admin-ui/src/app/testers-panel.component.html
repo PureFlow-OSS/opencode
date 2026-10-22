@@ -3,7 +3,7 @@
     <div>
       <p class="panel-kicker">Rollout groups</p>
       <h2>Testers</h2>
-      <p>Search LiteLLM key names and assign each user to one rollout channel. Group lists stay editable below.</p>
+      <p>Search LiteLLM key names and assign each user to one rollout channel.</p>
     </div>
   </header>
 
@@ -70,10 +70,6 @@
           }
         </ul>
       </label>
-      <label>
-        Groups
-        <textarea [(ngModel)]="betaGroups" name="betaGroups" rows="4" placeholder="desktop-beta" [disabled]="!ready()"></textarea>
-      </label>
     </section>
 
     <section class="tester-section">
@@ -100,15 +96,7 @@
           }
         </ul>
       </label>
-      <label>
-        Groups
-        <textarea [(ngModel)]="aiGildeGroups" name="aiGildeGroups" rows="4" placeholder="ai-gilde" [disabled]="!ready()"></textarea>
-      </label>
     </section>
-  </div>
-
-  <div class="form-actions">
-    <button type="button" [disabled]="!ready()" (click)="submit($event)">{{ saveMutation.isPending() ? 'Saving…' : 'Save groups' }}</button>
   </div>
 
   @if (testersQuery.isPending()) { <p class="message" role="status">Loading tester lists…</p> }
