@@ -37,7 +37,25 @@ export const register = Effect.fnUntraced(function* (options: {
     found.url === info.url &&
     found.pid === info.pid &&
     found.password === info.password
-  yield* fs.writeFileString(temp, encoded, { mode: 0o600 }).pipe(Effect.andThen(fs.rename(temp, options.file)))
+  yield* fs.writeFileString(temp, encoded, { mode: 0o600 }).pipe(
+    Effect.andThen(
+      fs.rename(temp, options.file).pipe(
+        Effect.retry({
+          while: (error) => {
+            const cause = error.reason.cause
+            return (
+              process.platform === "win32" &&
+              cause instanceof Error &&
+              "code" in cause &&
+              ["EPERM", "EACCES", "EBUSY"].some((code) => cause.code === code)
+            )
+          },
+          schedule: Schedule.max([Schedule.spaced("100 millis"), Schedule.recurs(20)]),
+        }),
+      ),
+    ),
+    Effect.ensuring(fs.remove(temp, { force: true }).pipe(Effect.ignore)),
+  )
   yield* current.pipe(
     Effect.catchCause((cause) =>
       Effect.logWarning("managed service registration check failed; shutting down", {
