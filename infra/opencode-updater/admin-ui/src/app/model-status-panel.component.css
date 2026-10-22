@@ -219,6 +219,11 @@ select option {
   font-size: 11px;
 }
 
+.model-card-actions button.promote {
+  border-color: var(--rrz-blue);
+  color: var(--rrz-blue);
+}
+
 .model-name {
   min-width: 0;
 }

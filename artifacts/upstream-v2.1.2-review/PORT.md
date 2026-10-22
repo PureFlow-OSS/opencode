@@ -424,3 +424,68 @@ MCP-Browsertests einschließlich erstem Autofokus, Platzhaltern, kleinem Viewpor
 Speichern, OAuth und Unterbrechungsbestätigung. App-Typecheck bestanden; Lint ohne
 Fehler, bestehende Warnungen im Dialog unverändert. Kein Gesamtbuild und keine
 Änderung am laufenden Desktop oder Hintergrunddienst.
+
+### Dokumente, OCR und Vision Recall
+
+V2 registriert jetzt `document_search`, `document_summary`, `document_ocr` und
+`vision_recall`. Anhänge und PDF-Ergebnisse des Read-Tools werden vor der
+Modellanfrage nach der jeweiligen Modellregel verarbeitet. Native PDF-/Bilddaten
+gehen nur bei aktivierter Fähigkeit direkt zum Modell; sonst wird lokaler Text
+indexiert bzw. auf die konfigurierten OCR-/Vision-Worker verwiesen. Verborgene
+Worker bleiben für diese Aufgaben verfügbar, ohne im Chat auswählbar zu werden.
+
+Originale und extrahierte Seiten liegen in einem persistenten, nach Session und
+Inhalt getrennten Cache. OCR-Ergebnisse stehen danach auch für Suche und
+Zusammenfassung zur Verfügung. Visuelle Abfragen rendern maximal vier konkrete
+PDF-Seiten, sequenziell und mit begrenzten Bildabmessungen. Summaries verarbeiten
+alle indizierten Inhalte in begrenzten Abschnitten und verdichten die Ergebnisse
+erneut, statt unbeschränkt große Abschlussanfragen zu erzeugen. Trunkierte Worker-
+Antworten werden als Fehler ausgewiesen. Office-Text erhält keine erfundenen
+physischen Seitenangaben.
+
+Word/Excel und weitere Office-Formate werden lokal durch AnyDoc WASM gelesen;
+PDF.js und Canvas liefern PDF-Text und Seitenbilder. Die Module werden erst beim
+Dokumentzugriff geladen. Es gibt keine hosted Firecrawl-OCR. Erstellen und
+Bearbeiten bleiben Aufgabe verbundener MCP-Tools. Neue Lizenzen sind unter Über
+aufgeführt. Binäre Office-Anhänge werden nicht mehr vor der Verarbeitung verworfen.
+
+`provider-config.json` steuert direkte PDF-/Bildeingaben, Worker sowie erlaubte
+Reasoning-Stufen und deren Standard. Explizite Stufen ersetzen die automatisch
+erzeugte Liste; gleichnamige frische zentrale Regeln verdrängen lokale Altstände.
+Die Dokumentpolicy bleibt intern und wird nicht als Provideroption versendet.
+
+Verifiziert: 165 Core-Tests einschließlich realer PDF-/DOCX-/XLSX-Fixtures,
+vollständigem Tool-/Hook-/HTTP-Weg über lokale Test-Worker, verborgenem Worker,
+seitengenauem Recall, OCR-Folgesuche, Cache-Persistenz/Session-Trennung, nativer
+PDF-Policy und Fehlerdarstellung; 13 Composer-Tests. Ein absichtlich eingefügter
+PDF-Policy-Bypass lässt die neuen Integrationstests scheitern und wurde wieder
+entfernt. Typechecks für Core, App, CLI und Desktop bestanden. Ein kleiner
+isolierter Bun-Compile-Test verarbeitet RTF, PDF-Text und PDF-Seitenbilder auch
+ohne node_modules im Arbeitsverzeichnis. PDF.js meldet dabei seine erfolglose
+redundante Canvas-Suche; die explizit eingebetteten Adapter rendern erfolgreich.
+Kein vollständiger Desktop-/CLI-Build und kein Neustart der laufenden Anwendung.
+
+### Drei Konfigurationsstufen im Updater
+
+Die bereits vorbereitete AI-Gilde-Release-/Tester-Verwaltung wurde aus dem
+unveränderten Nutzer-Stash gezielt in den aktuellen Stand übernommen. Model Status
+bietet Beta, AI Gilde und Normal. Pro Modell wird die passende Limit-/Dokument-/
+Reasoning-Regel einschließlich Sichtbarkeit einmalig aus der Vorstufe übernommen:
+Beta nach AI Gilde, AI Gilde nach Normal. Wildcards werden nur für das gewählte
+Modell materialisiert. Andere Modelle und globale Modellvorgaben bleiben erhalten;
+spätere Quelländerungen wandern nicht automatisch weiter.
+
+Der aktive API-Key wählt die entsprechende Provider-Konfiguration. Neue
+AI-Gilde-Einstellungen liegen ohne separaten Bind-Mount im vorhandenen data-Volume;
+eine bereits bereitgestellte appsettings.ai-gilde.json wird weiterhin verwendet.
+Release-Metadaten dürfen bei fehlenden Angaben weiterhin Normal als Fallback
+nutzen, während Modellregeln getrennt bleiben. Die Release-Promotion behält ihr
+korrektes Datenbankziel und kopiert Normal-Releases in den Feed-Hauptordner.
+
+Verifiziert: isolierter HTTP-Test mit drei temporären Konfigurationen und lokalem
+LiteLLM-Testserver, 37 Assertions für Promotion, Trennung, Sichtbarkeit,
+Wildcard-Materialisierung, fehlende Regeln, ungültige Kanäle, Legacy-API-Alias,
+persistentes data-Verzeichnis und Release-Metadaten-Fallback. Angular-Templates
+kompilieren mit ngc --noEmit; .NET-Compile erfolgreich. Die bestehende NU1903-
+Warnung für SQLitePCLRaw.lib.e_sqlite3 2.1.11 bleibt unverändert. Kein Docker-Build,
+Deployment oder Eingriff in persönliche Konfigurationsdateien.

@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "ng serve --host 0.0.0.0 --port 4200",
-    "build": "ng build"
+    "build": "ng build",
+    "typecheck": "ngc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
     "@angular/common": "^21.0.0",

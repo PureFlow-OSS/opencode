@@ -26,6 +26,67 @@ If client sends `X-OpenCode-AiFactory-Api-Key`, updater can evaluate beta rollou
 
 ## Provider config
 
+### Three configuration stages
+
+Model Status offers **Beta → AI Gilde → Normal**. Each stage has its own model
+limits, visibility, reasoning levels, and document/OCR/vision policy. The active
+AI Factory key selects the stage through the configured tester users/groups;
+Beta takes precedence when a key matches both tester lists.
+
+Use **Von Beta übernehmen** on an AI Gilde model, or **Von AI Gilde übernehmen**
+on a Normal model, to copy that model's effective settings and visibility once.
+The source stage remains unchanged. Later source edits do not propagate until
+the button is used again. Matching wildcard rules are materialized for the
+selected model, so other models and global model defaults are unaffected.
+
+The API is `POST /opencode/admin/model-settings/promote?model=<id>&channel=ai-gilde|normal`.
+Beta has no predecessor. Missing or invalid promotion targets return HTTP 400.
+
+Normal and Beta continue to use `appsettings.json` and `appsettings.beta.json`.
+AI Gilde uses a supplied `appsettings.ai-gilde.json` when present; otherwise its
+settings are saved in `data/appsettings.ai-gilde.json`, inside the existing Docker
+data volume. No new bind mount is required. Existing personal configuration files
+are not rewritten by this source change.
+
+### Document and reasoning policy
+
+An AI Factory model's `model_limits` rule controls the document pipeline:
+
+```json
+{
+  "pattern": "glm5.3",
+  "reasoning": true,
+  "reasoning_variants": ["low", "medium", "high"],
+  "default_reasoning_variant": "medium",
+  "document_vision": true,
+  "document_vision_native": false,
+  "native_image_vision": false,
+  "document_ocr_native_pdf": true,
+  "document_ocr_model": "GLM-OCR",
+  "document_vision_model": "Qwen3-VL-8B"
+}
+```
+
+`document_vision_native` allows the selected conversation model to receive PDFs
+directly. Otherwise PDFs are indexed locally for document search and page-level
+recall. `native_image_vision` controls direct image input. The configured OCR and
+vision workers handle scanned pages and visual questions; `document_ocr_native_pdf`
+allows the OCR worker to receive PDFs directly instead of rendered page images.
+Workers can stay hidden in the chat model selector.
+
+Word and Excel are read locally through AnyDoc, with no hosted Firecrawl OCR.
+Creating and editing documents remains the responsibility of connected MCP tools.
+
+To verify configuration promotion without touching Docker or personal data:
+
+```powershell
+dotnet build --no-restore
+bun test ./tests/model-config.test.ts
+```
+
+The HTTP regression test launches a temporary server with disposable configuration,
+SQLite data, and a local fake LiteLLM endpoint, then stops only that test process.
+
 The updater can also serve provider-side rollout config for the desktop app.
 
 Set `ProviderConfig.model` to provision the default model. Local or project config can still override it with `model`.
@@ -62,8 +123,8 @@ Important behavior:
 
 - `appsettings.json` stays the stable config
 - `appsettings.beta.json` is only used for requests that match beta rollout
-- for beta requests, values in `appsettings.beta.json` override the matching stable values recursively; values not defined there fall back to `appsettings.json`
-- this includes `Updater.ProviderConfig`, so beta can override individual model settings without copying the stable configuration
+- each stage serves its own `Updater.ProviderConfig`; model rules are not inherited from another stage
+- copy tested model settings explicitly using the per-model promotion buttons
 - if `feed/beta/latest.yml` exists, beta users get that version first
 - if `feed/beta/latest.yml` does not exist, beta users fall back to `appsettings.beta.json -> Updater.Version`
 - if `UpdaterBeta.LiteLLM.ApiKey` is set, updater calls LiteLLM with that management key in `x-litellm-api-key` and passes the user key as `?key=<user-key>`
@@ -306,7 +367,7 @@ If `Updater.Motd` is not configured, the server defaults to `RRZ AI Factory`. Se
 
 `/opencode/modelcards.json` returns a consolidated model-card payload for the currently active rollout.
 
-The **Model Status** page in the admin UI can edit a model's context, output, temperature, thinking, and modalities. Saving creates or updates an exact model rule in the selected `appsettings.json` or `appsettings.beta.json`. For beta, **Use stable fallback** removes that exact beta rule so the stable setting applies again.
+The **Model Status** page edits context, output, temperature, reasoning levels, modalities, and document policy in the selected stage. Saving creates an exact model rule; resetting removes that rule so the selected stage's wildcard rule or client defaults apply. Use the promotion button to adopt settings from the predecessor stage.
 
 The response includes:
 

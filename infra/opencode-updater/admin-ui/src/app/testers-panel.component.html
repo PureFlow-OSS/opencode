@@ -1,0 +1,50 @@
+<article class="card testers-card">
+  <header class="panel-header">
+    <div>
+      <p class="panel-kicker">Rollout groups</p>
+      <h2>Testers</h2>
+      <p>One entry per line (or comma separated). Matches LiteLLM <code>key/info</code> users and groups. Beta wins when a key matches both lists.</p>
+    </div>
+  </header>
+
+  <div class="tester-grid">
+    <section class="tester-section">
+      <div class="section-title">
+        <strong>Beta testers</strong>
+        <span>First channel. Receives <code>feed/beta</code>.</span>
+      </div>
+      <label>
+        Users
+        <textarea [(ngModel)]="betaUsers" name="betaUsers" rows="6" placeholder="Klaus Scheiböck"></textarea>
+      </label>
+      <label>
+        Groups
+        <textarea [(ngModel)]="betaGroups" name="betaGroups" rows="4" placeholder="desktop-beta"></textarea>
+      </label>
+    </section>
+
+    <section class="tester-section">
+      <div class="section-title">
+        <strong>AI-Gilde</strong>
+        <span>Second channel. Receives <code>feed/ai-gilde</code> after beta promotion.</span>
+      </div>
+      <label>
+        Users
+        <textarea [(ngModel)]="aiGildeUsers" name="aiGildeUsers" rows="6" placeholder="Klaus Scheiböck"></textarea>
+      </label>
+      <label>
+        Groups
+        <textarea [(ngModel)]="aiGildeGroups" name="aiGildeGroups" rows="4" placeholder="ai-gilde"></textarea>
+      </label>
+    </section>
+  </div>
+
+  <div class="form-actions">
+    <button type="button" [disabled]="saveMutation.isPending()" (click)="submit($event)">{{ saveMutation.isPending() ? 'Saving…' : 'Save testers' }}</button>
+  </div>
+
+  @if (testersQuery.isPending()) { <p class="message">Loading tester lists…</p> }
+  @if (testersQuery.isError()) { <p class="message error">Tester lists unavailable.</p> }
+  @if (error) { <p class="message error">{{ error }}</p> }
+  @if (status) { <p class="message">{{ status }}</p> }
+</article>

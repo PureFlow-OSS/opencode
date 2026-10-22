@@ -13,6 +13,7 @@
         <button type="button" [class.active]="page === 'model-status'" (click)="show('model-status')">Model Status</button>
         <button type="button" [class.active]="page === 'mcp'" (click)="show('mcp')">MCP</button>
         <button type="button" [class.active]="page === 'mcp-store'" (click)="show('mcp-store')">MCP Store</button>
+        <button type="button" [class.active]="page === 'testers'" (click)="show('testers')">Testers</button>
       </nav>
     </div>
   </section>
@@ -37,6 +38,10 @@
   } @else if (page === 'mcp-store') {
     <section class="single">
       <app-mcp-store-panel />
+    </section>
+  } @else if (page === 'testers') {
+    <section class="single">
+      <app-testers-panel />
     </section>
   } @else {
     <section class="single">

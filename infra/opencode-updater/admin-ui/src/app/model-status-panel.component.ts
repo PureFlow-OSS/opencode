@@ -16,7 +16,7 @@ import { ChannelPickerComponent } from "./channel-picker.component"
           <p>Änderungen werden direkt in die gewählte Konfigurationsdatei gespeichert.</p>
         </div>
         <div class="header-actions">
-          <app-channel-picker [channel]="channel()" (channelChange)="setChannel($event === 'normal' ? 'stable' : 'beta')" />
+          <app-channel-picker [channel]="channel()" [allowAiGilde]="true" [disabled]="!!promoting()" (channelChange)="setChannel($event)" />
           <button type="button" class="secondary" (click)="syncModels()" [disabled]="syncingModels()">{{ syncingModels() ? 'Refreshing…' : 'Fetch models from LiteLLM' }}</button>
           <div class="count-pill">Models: {{ models().length }}</div>
         </div>
@@ -90,6 +90,11 @@ import { ChannelPickerComponent } from "./channel-picker.component"
                 </div>
                 <div class="model-card-actions">
                   <button type="button" class="secondary" (click)="syncContext(model.model)" [disabled]="syncingContext() === model.model">{{ syncingContext() === model.model ? 'Syncing…' : 'Sync context' }}</button>
+                  @if (channel() !== 'beta') {
+                    <button type="button" class="secondary promote" (click)="promote(model.model)" [disabled]="promoting() === model.model || syncingContext() === model.model">
+                      {{ promoting() === model.model ? 'Promoting…' : channel() === 'ai-gilde' ? 'Von Beta übernehmen' : 'Von AI Gilde übernehmen' }}
+                    </button>
+                  }
                   <button type="button" class="secondary" (click)="edit(model)">Settings</button>
                 </div>
               </div>
@@ -179,7 +184,7 @@ import { ChannelPickerComponent } from "./channel-picker.component"
 })
 export class ModelStatusPanelComponent {
   readonly api = inject(ApiService)
-  readonly channel = signal<"stable" | "beta">("beta")
+  readonly channel = signal<"beta" | "ai-gilde" | "normal">("beta")
   readonly editing = signal<string | null>(null)
   readonly draft = signal<ModelSettings>({})
   readonly providerDraft = signal<ProviderSettings>({})
@@ -187,6 +192,7 @@ export class ModelStatusPanelComponent {
   readonly savingProvider = signal(false)
   readonly syncingContext = signal<string | null>(null)
   readonly syncingModels = signal(false)
+  readonly promoting = signal<string | null>(null)
   readonly error = signal<string | null>(null)
   readonly success = signal<string | null>(null)
   readonly cleanupReport = signal<ModelLimitsReport | null>(null)
@@ -212,7 +218,8 @@ export class ModelStatusPanelComponent {
     })
   }
 
-  setChannel(channel: "stable" | "beta") {
+  setChannel(channel: "beta" | "ai-gilde" | "normal") {
+    if (this.promoting()) return
     if (this.channel() === channel) return
     this.channel.set(channel)
     this.editing.set(null)
@@ -294,7 +301,7 @@ export class ModelStatusPanelComponent {
       this.cleanupReport.set(null)
       this.cleanupSelection.set(new Set())
       await this.modelCards.refetch()
-      this.success.set(`${result.removed} Modellregel(n) aus appsettings${this.channel() === "beta" ? ".beta" : ""}.json entfernt`)
+      this.success.set(`${result.removed} Modellregel(n) aus ${this.configFile()} entfernt`)
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : "Could not remove stale model rules")
     } finally {
@@ -313,7 +320,7 @@ export class ModelStatusPanelComponent {
     try {
       await this.api.saveProviderSettings(this.channel(), this.providerDraft())
       await this.providerSettings.refetch()
-      this.success.set(`Saved global models to appsettings${this.channel() === "beta" ? ".beta" : ""}.json`)
+      this.success.set(`Saved global models to ${this.configFile()}`)
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : "Could not save global model settings")
     } finally {
@@ -357,6 +364,28 @@ export class ModelStatusPanelComponent {
     }
   }
 
+  async promote(model: string) {
+    const channel = this.channel()
+    if (channel === "beta") return
+    this.promoting.set(model)
+    this.error.set(null)
+    this.success.set(null)
+    try {
+      const result = await this.api.promoteModelSettings(model, channel)
+      if (!result.promoted) {
+        this.error.set(`Keine Regel für ${model} in ${channel === "ai-gilde" ? "Beta" : "AI Gilde"} gefunden — Promotion nicht möglich`)
+        return
+      }
+      this.editing.set(null)
+      await this.modelCards.refetch()
+      this.success.set(`${model} wurde nach ${channel === "ai-gilde" ? "AI Gilde" : "Normal"} übernommen`)
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : `Could not promote ${model} to ${channel === "ai-gilde" ? "AI Gilde" : "Normal"}`)
+    } finally {
+      this.promoting.set(null)
+    }
+  }
+
   setNumber(key: "context" | "output", value: string) {
     this.draft.update((draft) => ({ ...draft, [key]: value === "" ? null : Number(value) }))
   }
@@ -396,7 +425,7 @@ export class ModelStatusPanelComponent {
       await this.api.saveModelSettings(model, this.channel(), this.draft())
       this.editing.set(null)
       await this.modelCards.refetch()
-      this.success.set(`Saved ${model} to appsettings${this.channel() === "beta" ? ".beta" : ""}.json`)
+      this.success.set(`Saved ${model} to ${this.configFile()}`)
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : "Could not save model settings")
     } finally {
@@ -414,7 +443,7 @@ export class ModelStatusPanelComponent {
       await this.modelCards.refetch()
       this.success.set(`Removed the exact ${this.channel()} override for ${model}`)
     } catch (error) {
-      this.error.set(error instanceof Error ? error.message : "Could not reset beta settings")
+      this.error.set(error instanceof Error ? error.message : `Could not reset ${this.channelLabel()} settings`)
     } finally {
       this.saving.set(false)
     }
@@ -423,6 +452,14 @@ export class ModelStatusPanelComponent {
   formatNumber(value?: number | null) {
     if (value === undefined || value === null) return "n/a"
     return new Intl.NumberFormat("de-DE").format(value)
+  }
+
+  configFile() {
+    return `appsettings${this.channel() === "normal" ? "" : this.channel() === "beta" ? ".beta" : ".ai-gilde"}.json`
+  }
+
+  channelLabel() {
+    return this.channel() === "ai-gilde" ? "AI Gilde" : this.channel() === "normal" ? "Normal" : "Beta"
   }
 
   formatBoolean(value?: boolean | null) {

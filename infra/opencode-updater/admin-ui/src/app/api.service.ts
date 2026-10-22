@@ -33,6 +33,14 @@ type FeedbackAttachment = {
   image: boolean
 }
 
+type ModelChannel = "beta" | "ai-gilde" | "normal"
+
+export type ModelSettingsPromotionResult = {
+  promoted: boolean
+  copiedLimits: boolean
+  copiedVisibility: boolean
+}
+
 type ModelCard = {
   model: string
   context?: number | null
@@ -160,10 +168,20 @@ type ReleaseStatus = {
   normalStopped: boolean
   betaUserCount: number
   betaPositiveThreshold: number
+  aiGildeUserCount?: number
+  aiGildePositiveThreshold?: number
+  aiGildeFeedVersion?: string | null
   betaRelease?: ReleaseRecord | null
   normalRelease?: ReleaseRecord | null
   betaFeedVersion?: string | null
   normalFeedVersion?: string | null
+}
+
+export type Testers = {
+  betaUsers: string[]
+  betaGroups: string[]
+  aiGildeUsers: string[]
+  aiGildeGroups: string[]
 }
 
 @Injectable({ providedIn: "root" })
@@ -192,6 +210,18 @@ export class ApiService {
 
   async promoteRelease(id: string) {
     return this.readJson<ReleaseRecord>(await fetch(`/opencode/admin/releases/${id}/promote`, { method: "POST" }))
+  }
+
+  async listTesters() {
+    return this.readJson<Testers>(await fetch("/opencode/admin/testers", { cache: "no-store" }))
+  }
+
+  async saveTesters(testers: Testers) {
+    return this.readJson<Testers>(await fetch("/opencode/admin/testers", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(testers),
+    }))
   }
 
   async stopNormalChannel() {
@@ -238,15 +268,15 @@ export class ApiService {
     })
   }
 
-  async listModelCards(channel: "stable" | "beta" = "stable") {
+  async listModelCards(channel: ModelChannel = "normal") {
     return this.readJson<ModelCardsResponse>(await fetch(`/opencode/admin/modelcards?channel=${channel}`, { cache: "no-store" }))
   }
 
-  async getModelLimitsReport(channel: "stable" | "beta") {
+  async getModelLimitsReport(channel: ModelChannel) {
     return this.readJson<ModelLimitsReport>(await fetch(`/opencode/admin/model-limits/report?channel=${channel}`, { cache: "no-store" }))
   }
 
-  async cleanupModelLimits(channel: "stable" | "beta", patterns: string[]) {
+  async cleanupModelLimits(channel: ModelChannel, patterns: string[]) {
     return this.readJson<{ channel: string; removed: number; patterns: string[] }>(
       await fetch(`/opencode/admin/model-limits/cleanup?channel=${channel}`, {
         method: "POST",
@@ -262,7 +292,7 @@ export class ApiService {
     )
   }
 
-  async saveModelSettings(model: string, channel: "stable" | "beta", settings: ModelSettings) {
+  async saveModelSettings(model: string, channel: ModelChannel, settings: ModelSettings) {
     return this.readJson<ModelSettings>(await fetch(`/opencode/admin/model-settings?channel=${channel}&model=${encodeURIComponent(model)}`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
@@ -270,23 +300,29 @@ export class ApiService {
     }))
   }
 
-  async syncModelContext(model: string, channel: "stable" | "beta") {
+  async syncModelContext(model: string, channel: ModelChannel) {
     return this.readJson<{ context: number }>(await fetch(`/opencode/admin/model-settings/sync-context?channel=${channel}&model=${encodeURIComponent(model)}`, {
       method: "POST",
     }))
   }
 
-  async resetModelSettings(model: string, channel: "stable" | "beta") {
+  async resetModelSettings(model: string, channel: ModelChannel) {
     const response = await fetch(`/opencode/admin/model-settings?channel=${channel}&model=${encodeURIComponent(model)}`, { method: "DELETE" })
     if (response.status === 404) throw new Error(`No exact ${channel} override exists for ${model}`)
     if (!response.ok) throw new Error(await response.text())
   }
 
-  async getProviderSettings(channel: "stable" | "beta") {
+  async promoteModelSettings(model: string, channel: "ai-gilde" | "normal") {
+    return this.readJson<ModelSettingsPromotionResult>(await fetch(`/opencode/admin/model-settings/promote?model=${encodeURIComponent(model)}&channel=${channel}`, {
+      method: "POST",
+    }))
+  }
+
+  async getProviderSettings(channel: ModelChannel) {
     return this.readJson<ProviderSettings>(await fetch(`/opencode/admin/provider-settings?channel=${channel}`, { cache: "no-store" }))
   }
 
-  async saveProviderSettings(channel: "stable" | "beta", settings: ProviderSettings) {
+  async saveProviderSettings(channel: ModelChannel, settings: ProviderSettings) {
     return this.readJson<ProviderSettings>(await fetch(`/opencode/admin/provider-settings?channel=${channel}`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
