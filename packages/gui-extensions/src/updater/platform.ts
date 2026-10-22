@@ -4,26 +4,32 @@ import { access } from "node:fs/promises"
 import { copyFile, mkdtemp } from "node:fs/promises"
 import path from "node:path"
 import { HttpProxy } from "@opencode/util/http-proxy"
-import electronUpdater, { NsisUpdater } from "electron-updater"
+import electronUpdater from "electron-updater"
 import { Effect } from "effect"
 import { fetchCorporateUpdate, isUpdateNewer, type CorporateSettings } from "./corporate"
 import { updateAppAdapter, updateCacheDirectory } from "./cache"
+import { windowsUpdater } from "./client"
 import type { Platform } from "./machine"
 
 const restartTimeout = 10_000
 
 const windowsInstallDirectory = "C:/Entwicklung/OpenCode"
+
 const updateClient = process.platform === "win32" ? windowsUpdateClient() : electronUpdater.autoUpdater
+
+type WindowsInstaller = {
+  current?: string
+}
 
 function windowsUpdateClient() {
   const cacheDirectory = updateCacheDirectory({
     platform: process.platform,
     installDirectory: windowsInstallDirectory,
   })
+
   if (!cacheDirectory) return electronUpdater.autoUpdater
 
-  return new NsisUpdater(
-    null,
+  return windowsUpdater(
     updateAppAdapter({
       cacheDirectory,
       resourcesPath: process.resourcesPath,
@@ -47,7 +53,7 @@ export const make = Effect.fn("Updater.platform")(function* (input: {
   readonly apiKey: () => Promise<string | undefined>
 }) {
   const userAgent = `opencode/${input.channel === "prod" ? "latest" : input.channel}/${app.getVersion()}/desktop`
-  const windowsInstaller: { current?: string } = {}
+  const windowsInstaller: WindowsInstaller = {}
   const runFork = Effect.runForkWith(yield* Effect.context())
   updateClient.logger = {
     info: (...args) => runFork(Effect.logInfo(...args)),
@@ -117,7 +123,7 @@ export const make = Effect.fn("Updater.platform")(function* (input: {
   } satisfies Platform
 })
 
-function stageUpdate(windowsInstaller: { current?: string }, options: { readonly differential: boolean }) {
+function stageUpdate(windowsInstaller: WindowsInstaller, options: { readonly differential: boolean }) {
   if (process.platform !== "darwin")
     return Effect.tryPromise({
       try: async () => {
@@ -129,7 +135,9 @@ function stageUpdate(windowsInstaller: { current?: string }, options: { readonly
         await updateClient.netSession.setProxy({ mode: "direct" })
 
         const [installer] = await updateClient.downloadUpdate()
+
         if (!installer) throw new Error("Windows updater did not download an installer")
+
         windowsInstaller.current = installer
       },
       catch: (error) => error,
@@ -159,12 +167,13 @@ function stageUpdate(windowsInstaller: { current?: string }, options: { readonly
   })
 }
 
-function installAndRestart(windowsInstaller: { current?: string }) {
+function installAndRestart(windowsInstaller: WindowsInstaller) {
   return Effect.callback<void, Error>((resume) => {
     // The packaged helper waits for this process to exit, clears the fixed corporate directory, then runs
     // the NSIS installer. That handoff owns the moment Windows unlocks files, which quitAndInstall cannot.
     if (process.platform === "win32") {
       const installer = windowsInstaller.current
+
       if (!installer) resume(Effect.fail(new Error("Windows update is not staged")))
       else
         startWindowsHelper(installer).then(
@@ -217,12 +226,15 @@ async function startWindowsHelper(installer: string) {
   await access(helper)
   const directory = await mkdtemp(path.join(app.getPath("temp"), "opencode-updater-"))
   const stagedHelper = path.join(directory, "OpenCode.UpdaterHelper.exe")
+
   await copyFile(helper, stagedHelper)
+
   const child = spawn(
     stagedHelper,
     ["--parent-pid", String(process.pid), "--installer-path", installer, "--install-dir", windowsInstallDirectory],
     { detached: true, stdio: "ignore", windowsHide: true },
   )
+
   await new Promise<void>((resolve, reject) => {
     child.once("spawn", resolve)
     child.once("error", reject)
