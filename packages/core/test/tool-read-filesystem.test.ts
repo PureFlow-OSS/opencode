@@ -409,6 +409,40 @@ describe("ReadToolFileSystem", () => {
     }),
   )
 
+  it.effect("extracts Office text locally and preserves read pagination", () =>
+    Effect.gen(function* () {
+      const { environment, files, directory } = yield* fixture
+      const file = path.join(directory, "report.rtf")
+      yield* files.writeFileString(file, "{\\rtf1\\ansi Revenue 1200\\par Expenses 800\\par Profit 400}")
+
+      const result = yield* ReadToolFileSystem.read(environment, absolute(file), "report.rtf", { limit: 1 })
+
+      expect(result.type).toBe("text-page")
+      if (result.type !== "text-page") throw new Error("Expected extracted document text")
+      expect(result.content).toContain("Revenue 1200")
+      expect(result.content).not.toContain("Expenses 800")
+      expect(result).toMatchObject({ truncated: true, next: 2 })
+      const following = yield* ReadToolFileSystem.read(environment, absolute(file), "report.rtf", { offset: 2 })
+
+      if (following.type !== "text-page") throw new Error("Expected continuation of extracted document text")
+      expect(following.content).toContain("Expenses 800")
+      expect(following.content).toContain("Profit 400")
+    }),
+  )
+
+  it.effect("reports unusable Office files as document errors instead of binary data", () =>
+    Effect.gen(function* () {
+      const { environment, files, directory } = yield* fixture
+      const file = path.join(directory, "broken.docx")
+      yield* files.writeFile(file, Uint8Array.of(0, 1, 2, 3))
+
+      const error = yield* ReadToolFileSystem.read(environment, absolute(file), "broken.docx").pipe(Effect.flip)
+
+      expect(error).toBeInstanceOf(ReadToolFileSystem.DocumentReadError)
+      expect(error.message).toContain("Cannot extract document broken.docx")
+    }),
+  )
+
   it.effect("reads PDFs as bounded media", () =>
     Effect.gen(function* () {
       const { environment, files, directory } = yield* fixture

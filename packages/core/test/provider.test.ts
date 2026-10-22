@@ -32,6 +32,7 @@ describe("Provider", () => {
         chunkTimeout: 1000,
         compaction: { type: "native" },
         transport: "websocket",
+        opencodeDocument: { visionModel: "private-worker", nativePdf: false },
       }),
     ).toEqual({
       apiKey: "secret",

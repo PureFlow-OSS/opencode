@@ -6,7 +6,7 @@ import { Model } from "@opencode/core/model"
 import { Money } from "@opencode/schema/money"
 import { Plugin } from "@opencode/core/plugin"
 import { PluginHost } from "@opencode/core/plugin/host"
-import { AiFactoryPlugin } from "@opencode/core/plugin/provider/aifactory"
+import { AiFactoryPlugin, OpenCodeDocument } from "@opencode/core/plugin/provider/aifactory"
 import { ProviderPlugins } from "@opencode/core/plugin/provider"
 import { Provider } from "@opencode/core/provider"
 import { SessionUsage } from "@opencode/core/session/usage"
@@ -59,7 +59,12 @@ describe("AiFactoryPlugin", () => {
             if (pathname === "/v1/models") return Response.json({ data: [{ id: "GLM-OCR" }] })
             if (pathname === "/modelcards.json") return Response.json({ aifactory: { models: [] } })
             return Response.json({
-              aifactory: { model_visibility: state.hidden ? [{ pattern: "GLM-OCR", visible: false }] : [] },
+              aifactory: {
+                model_visibility: state.hidden ? [{ pattern: "GLM-OCR", visible: false }] : [],
+                model_limits: [
+                  { pattern: "GLM-OCR", native_image_vision: false, reasoning: true, reasoning_variants: ["high"] },
+                ],
+              },
             })
           },
         })
@@ -75,6 +80,11 @@ describe("AiFactoryPlugin", () => {
               updater: server.url.origin,
               aifactory_host: server.url.origin,
               providers: { aifactory: { settings: { apiKey: "refresh-secret" } } },
+              aifactory: {
+                model_limits: [
+                  { pattern: "GLM-OCR", native_image_vision: true, reasoning: true, reasoning_variants: ["low"] },
+                ],
+              },
             }),
           })
           yield* config.setEntries([
@@ -93,6 +103,8 @@ describe("AiFactoryPlugin", () => {
           )
           const current = models.get(Provider.ID.make("aifactory"), Model.ID.make("GLM-OCR"))
           expect((yield* current)?.enabled).toBe(true)
+          expect((yield* current)?.capabilities.input).not.toContain("image")
+          expect((yield* current)?.variants.map((variant) => variant.id)).toEqual([Model.VariantID.make("high")])
           state.hidden = true
           yield* TestClock.adjust("30 seconds")
           yield* eventually(current, (model) => model?.enabled === false)
@@ -105,7 +117,8 @@ describe("AiFactoryPlugin", () => {
           expect(state.requests.filter((path) => path === "/provider-config.json")).toHaveLength(3)
         }),
       ({ server }) => Effect.sync(() => server.stop(true)),
-    ))
+    ),
+  )
 
   test("is registered before dynamic provider plugins", () => {
     expect(AiFactoryPlugin.id).toBe("opencode.provider.aifactory")
@@ -421,14 +434,24 @@ describe("AiFactoryPlugin", () => {
                   context: 1000,
                   output: 2000,
                   native_image_vision: true,
+                  document_vision: true,
+                  document_vision_native: false,
+                  document_ocr_native_pdf: true,
+                  document_ocr_model: "GLM-OCR",
+                  document_vision_model: "Qwen3-VL-4B",
+                  reasoning_variants: ["low", "xhigh"],
+                  default_reasoning_variant: "low",
                   output_modalities: ["text", "audio"],
                 },
                 {
                   pattern: "worker-model",
                   document_ocr_model: "worker-model",
                   document_vision_native: true,
+                  reasoning: true,
+                  default_reasoning_variant: "high",
                   variants: { high: { reasoningEffort: "extreme" } },
                 },
+                { pattern: "deepseek-r1", reasoning: false, reasoning_variants: ["low"] },
                 {
                   pattern: "worker-model",
                   document_vision_model: "missing-worker",
@@ -496,6 +519,7 @@ describe("AiFactoryPlugin", () => {
           expect(gpt).toMatchObject({
             enabled: false,
             capabilities: { input: ["text", "image"], output: ["text", "audio"] },
+            settings: { reasoningEffort: "low" },
             limit: { context: 1000, output: 2000 },
             cost: [
               {
@@ -510,12 +534,21 @@ describe("AiFactoryPlugin", () => {
           })
           expect(deepseek).toMatchObject({
             enabled: true,
-            variants: [
-              { id: Model.VariantID.make("low"), settings: { reasoningEffort: "low" } },
-              { id: Model.VariantID.make("medium"), settings: { reasoningEffort: "medium" } },
-              { id: Model.VariantID.make("high"), settings: { reasoningEffort: "high" } },
-            ],
+            variants: [],
           })
+          expect(deepseek.settings?.reasoningEffort).toBeUndefined()
+          expect(Schema.decodeUnknownSync(OpenCodeDocument)(gpt.settings?.opencodeDocument)).toEqual({
+            vision: true,
+            nativePdf: false,
+            nativeImage: true,
+            ocrNativePdf: true,
+            ocrModel: "GLM-OCR",
+            visionModel: "Qwen3-VL-4B",
+          })
+          expect(gpt.variants.map((variant) => variant.id)).toEqual([
+            Model.VariantID.make("low"),
+            Model.VariantID.make("xhigh"),
+          ])
           expect(glm).toMatchObject({
             cost: [
               {

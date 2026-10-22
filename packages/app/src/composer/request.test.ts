@@ -9,6 +9,35 @@ function inline(filename: string, mime: string, extra?: Partial<ImageAttachmentP
 }
 
 describe("buildPromptRequest", () => {
+  test("materializes document paths for server extraction while keeping other path references lightweight", () => {
+    const result = buildPromptRequest({
+      prompt: [
+        { type: "path", id: "pdf", filename: "report.pdf", mime: "application/pdf", path: "docs/report.pdf" },
+        {
+          type: "path",
+          id: "word",
+          filename: "report.docx",
+          mime: "application/octet-stream",
+          path: "docs/report.docx",
+        },
+        { type: "path", id: "excel", filename: "data.xlsx", mime: "application/octet-stream", path: "docs/data.xlsx" },
+        { type: "path", id: "binary", filename: "archive.zip", mime: "application/zip", path: "archive.zip" },
+      ],
+      context: [],
+      images: [],
+      text: "Inspect these documents",
+      sessionDirectory: "/repo",
+    })
+
+    expect(result.files).toEqual([
+      { uri: "file:///repo/docs/report.pdf", mime: "application/pdf", name: "report.pdf" },
+      { uri: "file:///repo/docs/report.docx", mime: "application/octet-stream", name: "report.docx" },
+      { uri: "file:///repo/docs/data.xlsx", mime: "application/octet-stream", name: "data.xlsx" },
+    ])
+    expect(result.attachments).toHaveLength(4)
+    expect(result.displayText).toBe("Inspect these documents")
+  })
+
   test("builds text, files, and agents from the prompt", () => {
     const prompt: Prompt = [
       { type: "text", content: "hello", start: 0, end: 5 },

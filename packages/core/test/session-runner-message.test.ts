@@ -20,6 +20,41 @@ const model = Model.Ref.make({ id: Model.ID.make("model"), providerID: Provider.
 const build = Agent.defaultID
 
 describe("toLLMMessages", () => {
+  test.each(["report.docx", "sheet.xlsx"])(
+    "retains %s for document processing instead of dropping binary content",
+    (name) => {
+      const messages = toLLMMessages(
+        [
+          SessionMessage.User.make({
+            id: id("office"),
+            type: "user",
+            text: "Read the attachment",
+            files: [
+              FileAttachment.make({
+                data: Base64.make("UEsDBA=="),
+                mime: "application/octet-stream",
+                name,
+                source: { type: "inline" },
+              }),
+            ],
+            time: { created },
+          }),
+        ],
+        model,
+      )
+
+      expect(messages[0].content).toEqual([
+        Message.text("Read the attachment"),
+        {
+          type: "media",
+          media: Media.base64("UEsDBA==", "application/octet-stream"),
+          filename: name,
+          metadata: undefined,
+        },
+      ])
+    },
+  )
+
   test("background user shells enter model context only through their completion notification", () => {
     const shell = SessionMessage.Shell.make({
       id: id("background-shell"),

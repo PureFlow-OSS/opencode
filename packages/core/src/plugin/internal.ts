@@ -9,6 +9,8 @@ import { Context, Effect, Scope } from "effect"
 import { HttpClient } from "effect/http"
 import { Agent } from "../agent.js"
 import { Model } from "../model.js"
+import { ModelResolver } from "../model-resolver.js"
+import { PluginHooks } from "./hooks.js"
 import { Provider } from "../provider.js"
 import { Command } from "../command.js"
 import { Config } from "../config.js"
@@ -77,6 +79,7 @@ import { OpenCodeTools } from "../tool/plugin/opencode.js"
 import { QuestionTool } from "../tool/plugin/question.js"
 import { ReadToolFileSystem } from "../tool/read-filesystem.js"
 import { ReadTool } from "../tool/plugin/read.js"
+import { DocumentTools } from "../tool/plugin/document.js"
 import { ShellTool } from "../tool/plugin/shell.js"
 import { SkillTool } from "../tool/plugin/skill.js"
 import { SubagentTool } from "../tool/plugin/subagent.js"
@@ -111,6 +114,8 @@ const services = [
   AppProcess.Service,
   Provider.Service,
   Model.Service,
+  ModelResolver.Service,
+  PluginHooks.Service,
   Command.Service,
   Config.Service,
   Credential.Service,
@@ -165,6 +170,8 @@ export const requirements = LayerNode.group([
   AppProcess.node,
   Provider.node,
   Model.node,
+  ModelResolver.node,
+  PluginHooks.node,
   Command.node,
   Config.node,
   Credential.node,
@@ -241,6 +248,7 @@ const pre = [
   McpResourceTools.Plugin,
   QuestionTool.Plugin,
   ReadTool.Plugin,
+  DocumentTools.Plugin,
   ShellTool.Plugin,
   SkillTool.Plugin,
   SubagentTool.Plugin,

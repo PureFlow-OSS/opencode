@@ -1,5 +1,7 @@
 import apache from "./apache-2.0.txt?raw"
 import betterOfficeNotice from "./betteroffice-notice.txt?raw"
+import anydocLicense from "./anydoc-license.txt?raw"
+import canvasLicense from "./canvas-license.txt?raw"
 import { crates, crateTexts } from "./crates"
 
 /**
@@ -7,6 +9,33 @@ import { crates, crateTexts } from "./crates"
  * Notices and license texts are reproduced verbatim from each project, so they are not translated.
  */
 export const notices = [
+  {
+    name: "AnyDoc",
+    detail: "@firecrawl/anydoc-wasm",
+    detailKey: undefined,
+    url: "https://github.com/firecrawl/anydoc",
+    license: "MIT",
+    notice: "Copyright (c) 2026 Sideguide Technologies Inc.",
+    text: anydocLicense,
+  },
+  {
+    name: "PDF.js",
+    detail: "pdfjs-dist",
+    detailKey: undefined,
+    url: "https://github.com/mozilla/pdf.js",
+    license: "Apache License 2.0",
+    notice: "Copyright Mozilla Foundation",
+    text: apache,
+  },
+  {
+    name: "Canvas",
+    detail: "@napi-rs/canvas",
+    detailKey: undefined,
+    url: "https://github.com/Brooooooklyn/canvas",
+    license: "MIT",
+    notice: undefined,
+    text: canvasLicense,
+  },
   {
     name: "BetterOffice",
     detail: "@betteroffice/docx, @betteroffice/xlsx, @betteroffice/pptx, @betteroffice/fonts",

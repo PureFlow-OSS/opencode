@@ -175,6 +175,18 @@ export function buildPromptRequest(input: BuildPromptRequestInput): PromptReques
     .filter(isPathAttachment)
     .map((part) => ({ name: part.filename, mime: part.mime, path: part.path }))
 
+  // Materialize document attachments even when the selected model cannot read them natively:
+  // the server's document tools extract their text or use the configured OCR/vision worker.
+  const documents = attachments.flatMap((part) => {
+    if (!/\.(pdf|docx?|docm|xlsx?|xlsm|xlsb|pptx?|pptm|odt|ods|odp|rtf|epub)$/i.test(part.name)) return []
+    const uri = `file://${encodeFilePath(absolute(input.sessionDirectory, part.path))}`
+
+    if (used.has(uri)) return []
+    used.add(uri)
+
+    return [{ uri, mime: part.mime, name: part.name }]
+  })
+
   return {
     text: [
       ...(input.text.trim() ? [input.text] : []),
@@ -182,7 +194,7 @@ export function buildPromptRequest(input: BuildPromptRequestInput): PromptReques
       ...comments.map((comment) => (comment.type === "note" ? formatNoteComment(comment) : formatCommentNote(comment))),
     ].join("\n"),
     displayText: input.text,
-    files: [...files, ...context, ...inline],
+    files: [...files, ...context, ...inline, ...documents],
     agents,
     skills,
     comments,

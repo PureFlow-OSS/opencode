@@ -74,9 +74,13 @@ const directoryAttachment = (file: FileAttachment): ContentPart => ({
 })
 
 const attachmentContent = (file: FileAttachment): ContentPart[] => {
-  if (file.mime === "text/plain") return [textAttachment(file)]
+  if (file.mime === "text/plain" && !/\.rtf$/i.test(file.name ?? "")) return [textAttachment(file)]
   if (file.mime === "application/x-directory") return [directoryAttachment(file)]
-  if (imageMimes.has(file.mime) || file.mime === "application/pdf") {
+  if (
+    imageMimes.has(file.mime) ||
+    file.mime === "application/pdf" ||
+    /\.(docx?|docm|xlsx?|xlsm|xlsb|pptx?|pptm|odt|ods|odp|rtf|epub)$/i.test(file.name ?? "")
+  ) {
     const location = attachmentLocation(file)
     return [...(location === undefined ? [] : [Message.text(`Attached file: ${location}`)]), media(file)]
   }

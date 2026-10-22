@@ -29,6 +29,15 @@ export class BinaryFileError extends Schema.TaggedError<BinaryFileError>()("Read
   }
 }
 
+export class DocumentReadError extends Schema.TaggedError<DocumentReadError>()("ReadTool.DocumentReadError", {
+  resource: Schema.String,
+  detail: Schema.String,
+}) {
+  override get message() {
+    return `Cannot extract document ${this.resource}: ${this.detail}`
+  }
+}
+
 export class MediaIngestLimitError extends Schema.TaggedError<MediaIngestLimitError>()(
   "ReadTool.MediaIngestLimitError",
   {
@@ -63,6 +72,7 @@ export type ReadError =
   | Environment.NotFound
   | Environment.Failed
   | BinaryFileError
+  | DocumentReadError
   | MediaIngestLimitError
   | OffsetOutOfRangeError
   | PathKindError
@@ -135,6 +145,26 @@ export const read = Effect.fn("ReadTool.read")(function* (
   if (first instanceof ListPage) return first
 
   const media = Mime.detect(first.bytes)
+  if (
+    /\.(docx?|docm|xlsx?|xlsm|xlsb|pptx?|pptm|odt|ods|odp|rtf|epub)$/i.test(input) &&
+    (media !== "text/plain" || /\.rtf$/i.test(input))
+  ) {
+    if (first.info.size > MAX_MEDIA_INGEST_BYTES)
+      return yield* new MediaIngestLimitError({ resource, maximumBytes: MAX_MEDIA_INGEST_BYTES })
+    const whole = yield* readFile(files, input, resource)
+    const document = yield* Effect.tryPromise({
+      try: async () => {
+        const { extractDocument } = await import("../document/extract.js")
+        return extractDocument(whole.bytes, path.basename(input))
+      },
+      catch: (error) =>
+        new DocumentReadError({ resource, detail: error instanceof Error ? error.message : String(error) }),
+    })
+    const selected = textPage(document.text, true, page, "utf-8")
+    if (!selected) return yield* Effect.die("Complete document extraction did not settle")
+    return yield* makeTextPage(input, resource, selected, false, document.text.split("\n").length)
+  }
+
   if (MEDIA_MIMES.has(media)) {
     if (first.info.size > MAX_MEDIA_INGEST_BYTES)
       return yield* new MediaIngestLimitError({ resource, maximumBytes: MAX_MEDIA_INGEST_BYTES })

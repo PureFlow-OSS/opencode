@@ -22,6 +22,16 @@ const discoveryTimeout = Duration.toMillis("5 seconds")
 const hiddenDefaults = ["*embedding*", "all-proxy-models", "all-team-models"]
 const noModels: readonly never[] = []
 
+export const OpenCodeDocument = Schema.Struct({
+  vision: Schema.Boolean,
+  nativePdf: Schema.Boolean,
+  nativeImage: Schema.Boolean,
+  ocrNativePdf: Schema.Boolean,
+  ocrModel: Schema.optional(Schema.String),
+  visionModel: Schema.optional(Schema.String),
+})
+export type OpenCodeDocument = typeof OpenCodeDocument.Type
+
 export const AiFactoryPlugin = define({
   id: "opencode.provider.aifactory",
   effect: Effect.fn(function* (ctx) {
@@ -92,9 +102,12 @@ export const AiFactoryPlugin = define({
         rawModel(record(record(providers.aifactory).options).small_model),
         rawModel(record(record(providers.aifactory).settings).small_model),
       ].flatMap((value) => (value ? [value] : []))
+      const remoteLimits = rules(record(providerConfig.aifactory).model_limits)
       const limits = [
-        ...rules(record(localAIFactory).model_limits),
-        ...rules(record(providerConfig.aifactory).model_limits),
+        ...rules(record(localAIFactory).model_limits).filter(
+          (local) => !remoteLimits.some((remote) => remote.pattern.toLowerCase() === local.pattern.toLowerCase()),
+        ),
+        ...remoteLimits,
       ]
       const visibility = [
         ...visibilityRules(record(localAIFactory).model_visibility),
@@ -215,7 +228,7 @@ function definition(id: string, limits: Rule[], visibility: VisibilityRule[], de
     name: id,
     family: Model.Family.make(id.split(/[-/]/)[0]),
     package: "@opencode/ai/providers/openai-compatible",
-    settings: info.options,
+    settings: { ...info.options, opencodeDocument: info.opencodeDocument },
     capabilities: { tools: true, input: info.input, output: info.outputModalities, temperature: info.temperature },
     variants: [],
     time: { released: 0 },
@@ -238,6 +251,8 @@ type Rule = {
   native_image_vision?: boolean
   document_ocr_model?: string
   document_vision_model?: string
+  reasoning_variants?: readonly string[]
+  default_reasoning_variant?: string
   input?: string[]
   output_modalities?: string[]
   modalities?: { input?: string[]; output?: string[] }
@@ -341,7 +356,19 @@ function rule(modelID: string, limits: Rule[]) {
         : documentInput.filter((value) => value !== "image"),
     outputModalities: item?.output_modalities ?? item?.modalities?.output ?? ["text"],
     options: item?.options ?? {},
-    variants: item?.variants ?? {},
+    variants: item?.variants,
+    reasoningVariants: item?.reasoning_variants,
+    defaultReasoningVariant: item?.default_reasoning_variant,
+    opencodeDocument: Object.fromEntries(
+      Object.entries({
+        vision: item?.document_vision ?? false,
+        nativePdf: item?.document_vision_native ?? false,
+        nativeImage: item?.native_image_vision ?? false,
+        ocrNativePdf: item?.document_ocr_native_pdf ?? false,
+        ocrModel: item?.document_ocr_model,
+        visionModel: item?.document_vision_model,
+      }).filter(([, value]) => value !== undefined),
+    ),
   }
 }
 
@@ -368,19 +395,28 @@ function catalog(
     const base = definition(id, limits, visibility, defaults)
     const info = rule(id, limits)
     const costs = price(id, cards)
-    const configuredVariants = Object.entries(info.variants).map(([id, value]) => ({
+    const configuredVariants = Object.entries(info.variants ?? {}).map(([id, value]) => ({
       id: Model.VariantID.make(id),
       settings: record(value),
       headers: {},
       body: {},
     }))
-    const generated = info.reasoning ? Variant.resolve(base, [{ type: "effort" }]) : []
-    const variants = [
-      ...generated.filter((variant) => !configuredVariants.some((item) => item.id === variant.id)),
-      ...configuredVariants,
-    ]
+    const generated =
+      info.reasoning && info.variants === undefined
+        ? Variant.resolve(
+            base,
+            info.reasoningVariants === undefined
+              ? [{ type: "effort" }]
+              : [{ type: "effort", values: info.reasoningVariants }],
+          )
+        : []
+    const variants = info.variants === undefined ? generated : configuredVariants
+    const defaultVariant = variants.find((variant) => variant.id === info.defaultReasoningVariant)
     return {
       ...base,
+      settings: defaultVariant ? Provider.mergeOverlay(base.settings, defaultVariant.settings) : base.settings,
+      headers: defaultVariant ? Provider.mergeHeaders(base.headers, defaultVariant.headers) : base.headers,
+      body: defaultVariant ? Provider.mergeOverlay(base.body, defaultVariant.body) : base.body,
       capabilities: {
         ...base.capabilities,
         input: workers.has(id) ? [...new Set([...base.capabilities.input, "image"])] : base.capabilities.input,
