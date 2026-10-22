@@ -795,3 +795,18 @@ visuell geprüft. In diesem Folgeschritt wurden weder Container neu gebaut noch
 produktive Tester-/MCP-Einträge verändert; die UI-/Server-Änderungen benötigen den
 nächsten freigegebenen Updater-Neubau. Der Desktop-Fix benötigt einen neuen
 Desktop-Build; kein vollständiger Desktop-Build wurde gestartet.
+
+Nach erneutem Nutzerhinweis wurden Backend und Admin-UI am 22.10.2026 ausdrücklich
+neu gebaut und ausgerollt. Der Live-Browsertest fand dabei einen weiteren Fehler
+der übernommenen Tester-Suche: LiteLLM ignoriert `per_page` und begrenzt die
+Standardseite auf zehn Schlüssel. Gemäß dem tatsächlichen LiteLLM-OpenAPI-Vertrag
+verwendet die Suche nun `size=100`, `return_full_object=true` und den URL-kodierten
+Suchbegriff als `search`; weiterhin werden nur Namen ausgegeben. Die verstärkte
+Regression scheitert mit der alten Anfrage und besteht mit 17 Assertions.
+
+Nach Auslieferung dieses Backend-Fixes bestätigt der Live-Browsertest echte
+Treffer für die Namenssuche sowie Plus-/Minus-Schaltflächen und die OAuth-Option
+im Store-Editor. Es wurden keine Tester oder Store-Einträge gespeichert. Die
+persistenten Feeds Beta 2.1.3 und AI-Gilde 2.1.2 bleiben verfügbar. Der separate
+Desktop-HTTP-Executor-Fix ist durch diesen Container-Neubau weiterhin nicht in
+einem neuen Desktop-Paket ausgeliefert.

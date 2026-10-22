@@ -300,7 +300,8 @@ app.MapGet("/opencode/admin/testers/search", async (
 
   try
   {
-    using var keyListRequest = new HttpRequestMessage(HttpMethod.Get, BuildLiteLLMKeyListUrl(beta) + "?per_page=100");
+    var keyListUrl = BuildLiteLLMKeyListUrl(beta) + "?size=100&return_full_object=true" + (term == "" ? "" : "&search=" + Uri.EscapeDataString(term));
+    using var keyListRequest = new HttpRequestMessage(HttpMethod.Get, keyListUrl);
     keyListRequest.Headers.TryAddWithoutValidation("x-litellm-api-key", beta.LiteLLM.ApiKey.Trim());
     using var keyListResponse = await clientFactory.CreateClient().SendAsync(keyListRequest, cancellationToken);
     if (!keyListResponse.IsSuccessStatusCode)

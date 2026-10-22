@@ -7,15 +7,21 @@ import path from "node:path"
 test("tester search and MCP Store OAuth survive the API and stored configuration", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "opencode-admin-restoration-"))
   const seen: string[] = []
+  const queries: string[] = []
   let invalid = false
   const gateway = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
     fetch(request) {
       seen.push(request.headers.get("x-litellm-api-key") ?? "")
-      if (new URL(request.url).pathname.endsWith("/key/info"))
-        return Response.json({ info: { key_alias: "Hidden name - work" } })
+      const url = new URL(request.url)
+      if (url.pathname.endsWith("/key/info")) return Response.json({ info: { key_alias: "Hidden name - work" } })
+      if (!url.pathname.endsWith("/key/list")) return Response.json({ data: [] })
+      queries.push(url.search)
       if (invalid) return Response.json({ keys: 42 })
+      // LiteLLM defaults to ten entries and ignores the old per_page parameter.
+      if (url.searchParams.get("size") !== "100" || url.searchParams.get("return_full_object") !== "true")
+        return Response.json({ keys: [{ key_alias: "Someone on the first page" }] })
       return Response.json({
         keys: [
           { key_alias: "Klaus - work", key: "never-expose" },
@@ -85,6 +91,7 @@ test("tester search and MCP Store OAuth survive the API and stored configuration
     const found = await request("/admin/testers/search?q=kLa")
     expect(found.status).toBe(200)
     expect(await found.json()).toEqual({ results: [{ userName: "Klaus", currentChannel: "beta" }] })
+    expect(new URLSearchParams(queries[0]).get("search")).toBe("kLa")
     const all = await (await request("/admin/testers/search?q=")).text()
     expect(all).not.toContain("never-expose")
     expect(all).not.toContain("hash-only")
