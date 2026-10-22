@@ -611,3 +611,29 @@ Core und Schema sowie Lint bestanden. Client-Generierung erfolgreich ohne
 Änderung generierter Dateien; die serialisierte Schema-Beschreibung bleibt
 erhalten. Die Originaldatei besteht nun Validierung und lokale Extraktion.
 Kein vollständiger Build, kein Modellaufruf und kein App-/Service-Neustart.
+
+### Excel-Zusammenfassungen mit Reasoning-Modellen
+
+Die gemeldete Arbeitsmappe wird lokal vollständig extrahiert: drei Blätter,
+52.408 Zeichen. Die 18.000-Zeichen-Vorschau ist absichtlich begrenzt; die
+vollständige Extraktion bleibt im Dokumentcache. Das gesuchte Wort
+„Arbeitspaket“ kommt nicht vor und erklärt den leeren Suchtreffer.
+
+Die Zusammenfassung verwendete hingegen nur 2.048 Ausgabe-Tokens pro Chunk.
+Das ist bei Reasoning-Modellen auch das Budget für die interne Herleitung und
+kann vor der eigentlichen Antwort erschöpft sein. Das Summary-Budget wird auf
+8.192 angehoben und weiterhin am konfigurierten Modelllimit gedeckelt.
+Ein Abbruch wegen Tokenlimit wird vor einer leeren Antwort erkannt; es gibt
+keinen automatischen zweiten Modellaufruf und keinen Ersatz durch Reasoning.
+Die konkrete Finish-Reason der früheren Antwort wurde nicht gespeichert und
+ist aus dem Screenshot allein nicht abschließend feststellbar.
+
+Lokale HTTP-Regressionen prüfen reine Reasoning-Ausgabe mit Tokenlimit,
+eine leere regulär beendete Antwort, das erhöhte Budget und dessen Begrenzung
+auf ein niedriger konfiguriertes Modelllimit. Eine lange synthetische
+Arbeitsmappe wird vollständig in fünf Chunks plus Zusammenführung verarbeitet;
+auch die letzte Zeile jenseits der Vorschau erreicht den Worker. Testantworten
+werden lokal erzeugt, ohne Unternehmensdokumente an ein Modell zu senden.
+
+Verifiziert: zehn Dokumenttests, Core-Typecheck, Lint und Diff-Prüfung
+erfolgreich. Kein vollständiger Desktop-Build oder Neustart.

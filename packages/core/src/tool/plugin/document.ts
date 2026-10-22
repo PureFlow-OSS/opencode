@@ -114,12 +114,13 @@ export const Plugin = define({
             }),
           )
           .pipe(Effect.timeout("2 minutes"))
-        if (!response.text.trim())
-          return yield* new ToolFailure({ message: `Document worker ${worker.id} returned no text` })
         if (response.finishReason.normalized === "length")
           return yield* new ToolFailure({
-            message: "Document worker output was truncated; choose fewer pages or a narrower question",
+            message:
+              "Document worker output token budget was exhausted; reasoning may have consumed the budget before an answer. Choose a narrower question or adjust the model output limit.",
           })
+        if (!response.text.trim())
+          return yield* new ToolFailure({ message: `Document worker ${worker.id} returned no text` })
         return response.text
       }).pipe(
         Effect.mapError((error) =>
@@ -456,7 +457,8 @@ export const Plugin = define({
                         undefined,
                         `${question}\n\nSummarize the following source chunk concisely, preserving document names, page references, and facts. Never invent missing information:\n${chunk}`,
                         [],
-                        2048,
+                        // Reasoning and answer text share the provider's output budget.
+                        8192,
                       ),
                     { concurrency: 1 },
                   )

@@ -35,10 +35,16 @@ function pdf() {
   return new Uint8Array(document.close())
 }
 
-const fixture = (nativePdf: boolean) =>
+const fixture = (nativePdf: boolean, summary: "answer" | "reasoning-length" | "empty" = "answer") =>
   Effect.acquireRelease(
     Effect.sync(() => {
-      const requests: { model: string; messages: readonly { content: unknown }[]; authorization: string | null }[] = []
+      const requests: {
+        model: string
+        messages: readonly { content: unknown }[]
+        max_tokens?: number
+        max_completion_tokens?: number
+        authorization: string | null
+      }[] = []
       const server = Bun.serve({
         hostname: "127.0.0.1",
         port: 0,
@@ -51,6 +57,8 @@ const fixture = (nativePdf: boolean) =>
               Schema.Struct({
                 model: Schema.String,
                 messages: Schema.Array(Schema.Struct({ content: Schema.Unknown })),
+                max_tokens: Schema.optional(Schema.Number),
+                max_completion_tokens: Schema.optional(Schema.Number),
               }),
             )(await request.json())
             requests.push({ ...body, authorization: request.headers.get("authorization") })
@@ -59,9 +67,12 @@ const fixture = (nativePdf: boolean) =>
                 ? "Expenses 800"
                 : body.model === "vision-worker"
                   ? "A chart on page 2"
-                  : "A source-grounded summary"
+                  : summary === "answer"
+                    ? "A source-grounded summary"
+                    : ""
+            const reasoning = body.model === "primary" && summary === "reasoning-length"
             return new Response(
-              `data: ${JSON.stringify({ id: "completion", object: "chat.completion.chunk", model: body.model, created: 1, choices: [{ index: 0, delta: { role: "assistant", content: text }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ id: "completion", object: "chat.completion.chunk", model: body.model, created: 1, choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } })}\n\ndata: [DONE]\n\n`,
+              `data: ${JSON.stringify({ id: "completion", object: "chat.completion.chunk", model: body.model, created: 1, choices: [{ index: 0, delta: { role: "assistant", content: text, ...(reasoning ? { reasoning_content: "Internal reasoning without an answer" } : {}) }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ id: "completion", object: "chat.completion.chunk", model: body.model, created: 1, choices: [{ index: 0, delta: {}, finish_reason: reasoning ? "length" : "stop" }], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } })}\n\ndata: [DONE]\n\n`,
               { headers: { "Content-Type": "text/event-stream" } },
             )
           }
@@ -86,6 +97,7 @@ const setup = Effect.fn(function* (input: Effect.Success<ReturnType<typeof fixtu
           model_limits: [
             {
               pattern: "primary",
+              output: 32000,
               document_vision: true,
               document_vision_native: input.nativePdf,
               document_ocr_native_pdf: true,
@@ -121,7 +133,60 @@ const setup = Effect.fn(function* (input: Effect.Success<ReturnType<typeof fixtu
   return { host, model, session, hooks, run }
 })
 
+const cacheText = Effect.fn(function* (sessionID: Tool.Context["sessionID"], text: string) {
+  const global = yield* Global.Service
+  const cache = DocumentCache.make(path.join(global.data, "document-cache"))
+  const manifest = yield* Effect.promise(() =>
+    cache.put(
+      sessionID,
+      new TextEncoder().encode(text),
+      "workbook.xlsx",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ),
+  )
+  return yield* Effect.promise(() => cache.update(sessionID, manifest, { pages: [{ page: 1, text }] }))
+})
+
 describe("document tools", () => {
+  for (const mode of ["reasoning-length", "empty"] as const) {
+    it.effect(`distinguishes ${mode} summary responses without retrying or exposing reasoning`, () =>
+      Effect.gen(function* () {
+        const input = yield* fixture(false, mode)
+        const context = yield* setup(input)
+        yield* cacheText(context.session.id, "## Sheet 1\nWork package 1")
+        const result = yield* context.run("document_summary", {})
+        expect(result.status).toBe("error")
+        const output = JSON.stringify(result.error)
+        expect(output).toContain(mode === "reasoning-length" ? "output token budget was exhausted" : "returned no text")
+        expect(output).not.toContain("Internal reasoning without an answer")
+        expect(input.requests).toHaveLength(1)
+        expect(input.requests[0].max_tokens ?? input.requests[0].max_completion_tokens).toBe(8192)
+      }),
+    )
+  }
+
+  it.effect("summarizes all cached workbook text beyond the attachment preview and respects the model limit", () =>
+    Effect.gen(function* () {
+      const input = yield* fixture(false)
+      const context = yield* setup(input)
+      const models = yield* Model.Service
+      yield* models.transform((editor) =>
+        editor.update(context.model.providerID, context.model.id, (model) => {
+          model.limit.output = 4096
+        }),
+      )
+      const text = `## First sheet\n${"Cell value\n".repeat(5200)}\n## Last sheet\nFINAL_WORKBOOK_ROW_17`
+      yield* cacheText(context.session.id, text)
+      const result = yield* context.run("document_summary", {})
+      expect(result.status).toBe("completed")
+      expect(input.requests).toHaveLength(6)
+      expect(JSON.stringify(input.requests)).toContain("FINAL_WORKBOOK_ROW_17")
+      expect(input.requests.map((request) => request.max_tokens ?? request.max_completion_tokens)).toEqual([
+        4096, 4096, 4096, 4096, 4096, 4096,
+      ])
+    }),
+  )
+
   it.effect("indexes PDFs, recalls pages through hidden workers, and retains OCR for follow-up search", () =>
     Effect.gen(function* () {
       const input = yield* fixture(false)
