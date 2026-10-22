@@ -113,6 +113,38 @@ const failed = (plugins: Plugin.Interface) =>
   )
 
 describe("PluginSupervisor reload", () => {
+  it.live("settles startup with missing plugin dependencies and preserves healthy registrations", () =>
+    Effect.gen(function* () {
+      const directory = yield* tmpdirScoped()
+      yield* Effect.promise(async () => {
+        await Bun.write(path.join(directory.path, ".opencode/plugins/healthy.ts"), greeter("still-available"))
+        await Bun.write(
+          path.join(directory.path, ".opencode/plugins/missing-sdk.ts"),
+          'import "@opencode-ai/plugin/not-installed"; export default { id: "missing-sdk", async setup() {} }',
+        )
+        await Bun.write(
+          path.join(directory.path, ".opencode/plugins/missing-runtime.ts"),
+          'import { execFileSync } from "node:child_process"; execFileSync("opencode-missing-node-runtime-fixture"); export default { id: "missing-runtime", async setup() {} }',
+        )
+      })
+      const locations = yield* LocationServiceMap.Service
+      yield* Effect.gen(function* () {
+        const plugins = yield* Plugin.Service
+        const commands = yield* Command.Service
+        yield* plugins.awaitActivation.pipe(Effect.timeout("5 seconds"))
+        const inventory = yield* plugins.list()
+        expect(inventory.filter((plugin) => plugin.state.status === "failed")).toHaveLength(2)
+        expect(inventory).toContainEqual(expect.objectContaining({ id: "greeter", state: { status: "active" } }))
+        expect(inventory.some((plugin) => plugin.source.type === "builtin" && plugin.state.status === "active")).toBe(
+          true,
+        )
+        expect(yield* commands.get("still-available")).toBeDefined()
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(directory.path) }))),
+      )
+    }),
+  )
   ;(
     [
       { name: "on a helper-only save", helper: "nested/helper.ts", touchEntry: false },

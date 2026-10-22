@@ -489,3 +489,32 @@ persistentes data-Verzeichnis und Release-Metadaten-Fallback. Angular-Templates
 kompilieren mit ngc --noEmit; .NET-Compile erfolgreich. Die bestehende NU1903-
 Warnung für SQLitePCLRaw.lib.e_sqlite3 2.1.11 bleibt unverändert. Kein Docker-Build,
 Deployment oder Eingriff in persönliche Konfigurationsdateien.
+
+### Plugin-Abhängigkeiten und Fehlerisolation
+
+Die v2-CLI initialisiert die eingebettete Plugin-Laufzeit vor dem Serverstart.
+Lokale Plugins können dadurch `@opencode/plugin` und Effect ohne eigene
+node_modules-Kopien importieren. Die Paketinstallation erfolgt über Arborist
+innerhalb der Bun-Laufzeit; ein separates node.exe wird dafür nicht gestartet.
+Externe Programme, die ein Plugin selbst aufruft, sind davon unabhängig.
+Alte Imports wie `@opencode-ai/plugin` werden nicht automatisch zur v2-API
+umgeschrieben.
+
+Lade-/Setupfehler werden im Plugin-Inventar erfasst, ohne die gesunde Generation
+zu verwerfen. Fehlgeschlagene State-Transforms deaktivieren die betroffenen
+Registrierungen samt Hooks und RPC-Handlern. Die bestehenden 32 Tests dieser
+Grenzen bestanden. Zwei zusätzliche Regressionstests prüfen ein eigenständig
+geladenes Plugin ohne lokale SDK-/Effect-Installation und einen realen
+Location-Start mit fehlendem SDK-Import sowie fehlendem Laufzeitprogramm.
+Beide bestehen; Core-Typecheck erfolgreich. Dies ist keine Zusage, beliebige
+externe Programme oder jede inkompatible ältere Plugin-API einzubetten.
+
+Unter Erweiterungen / Plugins bleiben fehlgeschlagene externe Plugins sichtbar,
+mit Fehlerstatus und gekürzter, bereinigter Fehlermeldung. Änderungen am
+Plugin-Inventar aktualisieren die Liste. „Repair with agent“ öffnet einen
+Bestätigungsdialog und danach einen eigenen Chat-Entwurf mit Quelle,
+Arbeitsverzeichnis und Fehlerreferenz. Der Agent wird erst nach Absenden tätig;
+bestehende Chats und Entwürfe werden nicht überschrieben. Der vorbereitete Text
+enthält keine rohe Fehlermeldung und bittet um Diagnose, Reparatur und Prüfung
+der Chat-Funktion. Drei gezielte Kontext-/Redaktions-Tests sowie App-Typecheck
+bestanden; keine vollständige Desktop-Build- oder Installer-Ausführung.

@@ -1,5 +1,5 @@
 import { expect } from "bun:test"
-import { cp } from "node:fs/promises"
+import { cp, stat } from "node:fs/promises"
 import path from "node:path"
 import { Brand, Cause, Deferred, Effect, Exit, Fiber, Layer, Option, Schedule, Schema, Scope, Stream } from "effect"
 import { Agent } from "@opencode/schema/agent"
@@ -30,6 +30,33 @@ const it = testEffect(
     AppNodeBuilder.build(Npm.node, [Global.node.replace(tempGlobalLayer)]),
     Watcher.layer().pipe(Layer.provide(Watcher.nativeLayer)),
   ),
+)
+
+it.live("loads a standalone plugin without a local SDK or Effect installation", () =>
+  Effect.gen(function* () {
+    const directory = yield* tmpdirScoped()
+    yield* Effect.promise(() =>
+      Bun.write(
+        path.join(directory.path, "index.ts"),
+        `import { define } from "@opencode/plugin/effect/plugin"
+         import { Effect } from "effect"
+         export default define({ id: "standalone", effect: ctx =>
+           ctx.command.transform(editor => editor.add({ name: "standalone", execute: () => Effect.void }))
+             .pipe(Effect.asVoid)
+         })`,
+      ),
+    )
+    expect(
+      yield* Effect.promise(() => stat(path.join(directory.path, "node_modules")).then(() => true, () => false)),
+    ).toBe(false)
+    const modules = yield* PluginModule.make()
+    const loaded = yield* modules.load({ type: "add", target: directory.path, options: {} })
+    expect(loaded).toMatchObject({ id: "standalone" })
+    if (!("id" in loaded) || !loaded.id) throw new Error("Expected standalone plugin to load")
+    const plugins = yield* Plugin.Service
+    yield* plugins.activate([loaded])
+    expect(yield* plugins.list()).toMatchObject([{ id: "standalone", state: { status: "active" } }])
+  }),
 )
 
 it.live("watches creation of an external helper with missing parent directories", () =>
