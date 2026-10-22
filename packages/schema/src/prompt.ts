@@ -19,7 +19,12 @@ export const FileSource = Schema.Union([
 export type FileSource = typeof FileSource.Type
 
 export const Base64 = Schema.String.check(
-  Schema.isPattern(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u),
+  // JavaScriptCore rejects large valid inputs with the nested quartet regex.
+  // Check length separately at runtime and retain the exact wire constraint.
+  Schema.makeFilter<string>(
+    (value) => value.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}(?![\s\S])/u.test(value),
+    Schema.isPattern(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u).annotations,
+  ),
 ).annotate({ identifier: "Prompt.Base64" })
 export type Base64 = typeof Base64.Type
 

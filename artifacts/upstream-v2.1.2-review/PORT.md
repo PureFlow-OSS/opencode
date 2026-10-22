@@ -591,3 +591,23 @@ Der gezielte Verifier-Test akzeptiert PDF-/Canvas-/Skia-Artefakte, weist
 Simulations-PNG-/Screenshot-Font-Marker und leere Artefaktverzeichnisse ab und
 prüft die PNG-Sperre im vollständigen Bridge-Modulgraph. Test, CLI-Typecheck,
 Lint und Diff-Prüfung bestanden.
+
+### Große Dokumentanhänge beim Senden
+
+Die Base64-Prüfung im gemeinsamen Prompt-Schema weist große gültige Anhänge
+unter Bun/JavaScriptCore fälschlich ab. Der Fehler entsteht vor der AnyDoc-
+Extraktion und führt beim Senden zu HTTP 500. Mit der lokal bereitgestellten
+10,47-MiB-Präsentation wurde die Ablehnung reproduziert; AnyDoc kann dieselbe
+Datei lokal erfolgreich extrahieren. Die Datei selbst wird weder in Tests
+übernommen noch hochgeladen.
+
+Ein synthetischer 12-MiB-Anhang reproduziert den Fehler im tatsächlichen
+Session.prompt-Pfad einschließlich dauerhafter Aufnahme. Die gemeinsame
+Validierung verwendet künftig eine flache Alphabet-/Padding-Prüfung mit
+separater Längenprüfung; das akzeptierte Base64-Format bleibt unverändert.
+
+Verifiziert: 51 Core-Tests und drei Schema-Tests erfolgreich, Typechecks für
+Core und Schema sowie Lint bestanden. Client-Generierung erfolgreich ohne
+Änderung generierter Dateien; die serialisierte Schema-Beschreibung bleibt
+erhalten. Die Originaldatei besteht nun Validierung und lokale Extraktion.
+Kein vollständiger Build, kein Modellaufruf und kein App-/Service-Neustart.

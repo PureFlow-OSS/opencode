@@ -461,6 +461,33 @@ describe("Session.prompt", () => {
     }),
   )
 
+  it.effect("admits large presentation attachments without changing their bytes", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* Session.Service
+      const bytes = Buffer.alloc(12 * 1024 * 1024, Buffer.from(Array.from({ length: 256 }, (_, index) => index)))
+      bytes.set([0x50, 0x4b, 0x03, 0x04])
+      const data = bytes.toString("base64")
+
+      const message = yield* session.prompt({
+        sessionID,
+        text: "Summarize each slide",
+        files: [
+          {
+            uri: `data:application/vnd.openxmlformats-officedocument.presentationml.presentation;base64,${data}`,
+            name: "presentation.pptx",
+          },
+        ],
+        resume: false,
+      })
+
+      expect(message.payload.files?.[0]?.data === data).toBe(true)
+      expect(message.payload.files?.[0]?.name).toBe("presentation.pptx")
+      const stored = yield* admitted(message.id)
+      expect(stored?.type === "user" && stored.payload.files?.[0]?.data === data).toBe(true)
+    }),
+  )
+
   it.effect("sniffs data URL content instead of trusting its declared MIME", () =>
     Effect.gen(function* () {
       yield* setup
