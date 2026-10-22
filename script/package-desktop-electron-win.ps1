@@ -68,7 +68,16 @@ try {
     "-c.extraMetadata.version=$env:OPENCODE_VERSION"
   )
 
-  Write-Host "Packaged Windows desktop output in $env:OPENCODE_ELECTRON_OUTPUT_DIR"
+  $outputDirectory = if ([string]::IsNullOrWhiteSpace($env:OPENCODE_ELECTRON_OUTPUT_DIR)) {
+    Join-Path $desktopDirectory "dist"
+  } elseif ([IO.Path]::IsPathRooted($env:OPENCODE_ELECTRON_OUTPUT_DIR.Trim())) {
+    [IO.Path]::GetFullPath($env:OPENCODE_ELECTRON_OUTPUT_DIR.Trim())
+  } else {
+    [IO.Path]::GetFullPath((Join-Path $desktopDirectory $env:OPENCODE_ELECTRON_OUTPUT_DIR.Trim()))
+  }
+  Copy-Item -LiteralPath (Join-Path $desktopDirectory "../../CHANGELOG.md") -Destination (Join-Path $outputDirectory "changelog.md") -Force
+
+  Write-Host "Packaged Windows desktop output in $outputDirectory"
 }
 finally {
   Pop-Location
