@@ -129,10 +129,19 @@ export const makeMainWindows = Effect.fn("Window.make")(function* () {
     const usable = early && !early.win.isDestroyed() ? early : undefined
     const ids = registry.persisted()
     const list = ids.length ? ids : [usable?.id ?? randomUUID()]
+    const stored = getStore().get(WINDOW_IDS_KEY)
+    runFork(
+      Effect.logInfo("restoring main windows", {
+        stored: Array.isArray(stored) ? stored.length : 0,
+        distinct: ids.length,
+        open: registry.list().length,
+        restoring: list.filter((id) => !getWindowByID(id)).length,
+      }),
+    )
 
     if (usable && !list.includes(usable.id)) usable.win.destroy()
 
-    return list.map((id) => create(id, usable?.id === id ? usable : undefined))
+    return list.map((id) => getWindowByID(id) ?? create(id, usable?.id === id ? usable : undefined))
   }
 
   const create = (id: string = randomUUID(), early?: EarlyWindow) => {
@@ -235,5 +244,3 @@ export const makeMainWindows = Effect.fn("Window.make")(function* () {
 
   return { create, restore }
 })
-
-

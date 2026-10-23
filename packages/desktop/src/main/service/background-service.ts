@@ -63,7 +63,15 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
       ],
       env: { ...BackgroundServiceEnvironment.fromProcess(), OPENCODE_SERVICE_BUILD_ID: cli.buildID ?? "" },
       onStart: (reason, previousVersion) =>
-        runFork(Effect.logInfo("v2 CLI background service starting", { reason, previousVersion })),
+        runFork(
+          Effect.logInfo("v2 CLI background service starting", {
+            reason,
+            previousVersion,
+            binary: cli.command[0],
+            version: cli.version,
+            buildID: cli.buildID,
+          }),
+        ),
     })
 
   // A compatible service the entry module already found is adopted at once; ensure() still runs
@@ -71,7 +79,14 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
   const early = mode === "initial" && !isolated ? yield* Effect.promise(() => sidecarProbe(cli.buildID)) : undefined
 
   if (early) yield* Effect.sync(() => void ensure().catch(() => undefined))
-  const service = early ?? (yield* Effect.tryPromise(ensure))
+
+  const service =
+    early ??
+    (yield* Effect.tryPromise(ensure).pipe(
+      Effect.tapError((error) =>
+        Effect.logError("v2 CLI background service failed", { binary: cli.command[0], error: error.cause }),
+      ),
+    ))
 
   if (service.auth?.type !== "basic") throw new Error("V2 CLI background service did not provide authentication")
   const url = new URL(service.url)

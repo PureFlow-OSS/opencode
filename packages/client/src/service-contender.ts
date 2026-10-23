@@ -16,12 +16,7 @@ export function spawnServiceContender(
   args: ReadonlyArray<string>,
   env?: Readonly<Record<string, string | undefined>>,
 ): ServiceContender {
-  const child = spawn(command, args, {
-    detached: true,
-    windowsHide: true,
-    stdio: ["ignore", "ignore", "pipe"],
-    env: { ...process.env, ...env },
-  })
+  const child = startServiceProcess(command, args, env)
   let error: Error | undefined
   let closed = false
   let stderr = Buffer.alloc(0)
@@ -35,7 +30,7 @@ export function spawnServiceContender(
   child.stderr?.on("data", onStderr)
   if (child.stderr !== null && "unref" in child.stderr && typeof child.stderr.unref === "function") child.stderr.unref()
   child.once("error", (cause) => {
-    error = new Error("Failed to start server", { cause })
+    error = spawnError(command, cause)
   })
   child.once("close", () => {
     closed = true
@@ -52,6 +47,37 @@ export function spawnServiceContender(
       stderr = Buffer.alloc(0)
     },
   }
+}
+
+function startServiceProcess(
+  command: string,
+  args: ReadonlyArray<string>,
+  env?: Readonly<Record<string, string | undefined>>,
+) {
+  try {
+    return spawn(command, args, {
+      detached: true,
+      windowsHide: true,
+      stdio: ["ignore", "ignore", "pipe"],
+      env: { ...process.env, ...env },
+    })
+  } catch (cause) {
+    throw spawnError(command, cause)
+  }
+}
+
+function spawnError(command: string, cause: unknown) {
+  // Arguments and environment may contain credentials; retain only the executable and OS error fields.
+  const failure: NodeJS.ErrnoException | undefined = cause instanceof Error ? cause : undefined
+  const details = failure
+    ? (["code", "errno", "syscall"] as const).flatMap((key) => {
+        const value = failure[key]
+        return typeof value === "string" || typeof value === "number" ? [`${key}=${value}`] : []
+      })
+    : []
+  return new Error(`Failed to start server: ${command}${details.length ? ` (${details.join(", ")})` : ""}`, {
+    cause,
+  })
 }
 
 /**

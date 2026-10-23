@@ -1,4 +1,7 @@
 import { afterEach, expect, test } from "bun:test"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import path from "node:path"
 import {
   contenderFinished,
   contenderPool,
@@ -14,6 +17,35 @@ afterEach(() => {
     contender.child.kill("SIGKILL")
   })
 })
+
+test("spawn failures identify the executable and OS error without exposing arguments or environment", async () => {
+  const command = path.join(tmpdir(), `opencode-missing-${crypto.randomUUID()}`, "opencode-cli.exe")
+  const contender = spawnServiceContender(command, ["private-argument"], { PRIVATE_KEY: "private-environment" })
+  spawned.push(contender)
+  await finished(contender)
+
+  expect(contender.error()?.message).toContain(command)
+  expect(contender.error()?.message).toContain("code=ENOENT")
+  expect(contender.error()?.cause).toBeInstanceOf(Error)
+  expect(contender.error()?.message).not.toContain("private-argument")
+  expect(contender.error()?.message).not.toContain("private-environment")
+})
+
+test.skipIf(process.platform !== "win32")(
+  "synchronous Windows spawn failures retain the executable and OS error",
+  () => {
+    const root = mkdtempSync(path.join(tmpdir(), "opencode-invalid-executable-"))
+    const command = path.join(root, "opencode-cli.exe")
+    writeFileSync(command, "Not a Windows executable")
+
+    try {
+      expect(() => spawnServiceContender(command, ["private-argument"])).toThrow(command)
+      expect(() => spawnServiceContender(command, ["private-argument"])).toThrow("code=")
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  },
+)
 
 test("remembers the first startup failure and reports it once no attempt is left", async () => {
   const pool = contenderPool({ ...defaultEnsureTiming, spawnDelay: 0 })
