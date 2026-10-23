@@ -27,24 +27,37 @@ describe("updater cache directory", () => {
         installDirectory: "C:/Entwicklung/OpenCode",
         cacheDirectory: "c:/entwicklung/opencode",
       }),
-    ).toBeUndefined()
+    ).toBe("C:\\Entwicklung\\ai.opencode.desktop\\updates")
     expect(
       updateCacheDirectory({
         platform: "win32",
         installDirectory: "C:/Entwicklung/OpenCode",
         cacheDirectory: "C:/Entwicklung/OpenCode/cache",
       }),
-    ).toBeUndefined()
+    ).toBe("C:\\Entwicklung\\ai.opencode.desktop\\updates")
   })
 
-  test("allows other drives and ignores a custom cache outside Windows", () => {
+  test.each(["", "D:/opencode-cache", "C:/Users/test/AppData/cache", "C:/Entwicklung-other", "C:/Entwicklung/../Temp"])(
+    "keeps installer downloads within the allowlisted directory for cache %s",
+    (cacheDirectory) => {
+      expect(
+        updateCacheDirectory({
+          platform: "win32",
+          installDirectory: "C:/Entwicklung/OpenCode",
+          cacheDirectory,
+        }),
+      ).toBe("C:\\Entwicklung\\ai.opencode.desktop\\updates")
+    },
+  )
+
+  test("preserves allowed custom subdirectories and ignores a custom cache outside Windows", () => {
     expect(
       updateCacheDirectory({
         platform: "win32",
         installDirectory: "C:/Entwicklung/OpenCode",
-        cacheDirectory: "D:/opencode-cache",
+        cacheDirectory: "C:/Entwicklung/custom-cache",
       }),
-    ).toBe(path.win32.resolve("D:/opencode-cache"))
+    ).toBe("C:\\Entwicklung\\custom-cache")
     expect(
       updateCacheDirectory({
         platform: "linux",

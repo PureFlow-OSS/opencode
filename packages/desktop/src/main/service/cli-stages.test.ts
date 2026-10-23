@@ -7,6 +7,24 @@ import { Effect, Layer } from "effect"
 
 import { cleanStages, stageCli } from "./cli-stages"
 import { cliBuildID } from "./cli-build"
+import { cliStageRoot } from "./cli-stage-root"
+
+test.skipIf(process.platform !== "win32")(
+  "Windows executable stages stay outside user profiles and separate channels",
+  () => {
+    expect(cliStageRoot("C:\\Users\\Alice\\AppData\\Roaming\\ai.opencode.desktop")).toBe(
+      "C:\\Entwicklung\\ai.opencode.desktop\\cli",
+    )
+    expect(cliStageRoot("D:\\Profiles\\Bob\\ai.opencode.desktop")).toBe("C:\\Entwicklung\\ai.opencode.desktop\\cli")
+    expect(cliStageRoot("C:\\Users\\Alice\\AppData\\Roaming\\ai.opencode.desktop.dev")).toBe(
+      "C:\\Entwicklung\\ai.opencode.desktop.dev\\cli",
+    )
+  },
+)
+
+test.skipIf(process.platform === "win32")("other platforms keep CLI stages in user data", () => {
+  expect(cliStageRoot("/home/alice/.config/ai.opencode.desktop")).toBe("/home/alice/.config/ai.opencode.desktop/cli")
+})
 
 test("same-version rebuilds stage different executables and preserve the old copy", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "opencode-cli-rebuild-"))

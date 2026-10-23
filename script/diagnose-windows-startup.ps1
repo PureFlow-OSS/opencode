@@ -30,7 +30,7 @@ $windows = if (Test-Path -LiteralPath $settings) {
 }
 
 $fingerprint = if (Test-Path -LiteralPath $bundled) { (Get-FileHash -LiteralPath $bundled -Algorithm SHA256).Hash }
-$cache = Join-Path $UserDataDirectory 'cli'
+$cache = Join-Path (Join-Path 'C:\Entwicklung' (Split-Path $UserDataDirectory -Leaf)) 'cli'
 $staged = if ($fingerprint -and (Test-Path -LiteralPath $cache)) {
   Get-ChildItem -LiteralPath $cache -Directory |
     Where-Object { $_.Name.EndsWith('-' + $fingerprint, [StringComparison]::OrdinalIgnoreCase) } |
@@ -45,7 +45,9 @@ $executables = @(@($bundled) + @($staged) | Where-Object { $_ } | ForEach-Object
     $info.sha256 = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash
     $info.matchesBundled = $info.sha256 -eq $fingerprint
     $info.signature = [string](Get-AuthenticodeSignature -LiteralPath $binary).Status
-    if ($ProbeCli) {
+    if ($ProbeCli -and ![IO.Path]::GetFullPath($binary).StartsWith('C:\Entwicklung\', [StringComparison]::OrdinalIgnoreCase)) {
+      $info.probe = @{ error = 'Execution outside C:\Entwicklung is not permitted' }
+    } elseif ($ProbeCli) {
       $probe = New-Object System.Diagnostics.Process
       try {
         $probe.StartInfo.FileName = $binary

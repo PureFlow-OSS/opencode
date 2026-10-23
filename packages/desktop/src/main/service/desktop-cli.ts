@@ -12,6 +12,7 @@ import { getStore } from "../storage/store"
 import { parseCliVersion } from "./cli-version"
 import { cliBuildID } from "./cli-build"
 import { stageCli } from "./cli-stages"
+import { cliStageRoot } from "./cli-stage-root"
 
 const execFileAsync = promisify(execFile)
 
@@ -91,7 +92,7 @@ const resolveBundledCli = Effect.fn("DesktopCli.resolveBundled")(function* (isol
 
   const binary =
     app.isPackaged || isolated
-      ? yield* stageCli(bundled, path.join(app.getPath("userData"), "cli"), version, buildID)
+      ? yield* stageCli(bundled, cliStageRoot(app.getPath("userData")), version, buildID)
       : bundled
 
   return { version, buildID, binary, command: [binary] }

@@ -1,7 +1,7 @@
 import { app, autoUpdater } from "electron"
 import { spawn } from "node:child_process"
 import { access } from "node:fs/promises"
-import { copyFile, mkdtemp } from "node:fs/promises"
+import { copyFile, mkdir, mkdtemp } from "node:fs/promises"
 import path from "node:path"
 import { HttpProxy } from "@opencode/util/http-proxy"
 import electronUpdater from "electron-updater"
@@ -224,7 +224,12 @@ function installAndRestart(windowsInstaller: WindowsInstaller) {
 async function startWindowsHelper(installer: string) {
   const helper = path.join(process.resourcesPath, "updater-helper", "OpenCode.UpdaterHelper.exe")
   await access(helper)
-  const directory = await mkdtemp(path.join(app.getPath("temp"), "opencode-updater-"))
+  const cache = updateCacheDirectory({ platform: "win32", installDirectory: windowsInstallDirectory })
+
+  if (!cache) throw new Error("Windows update cache is unavailable")
+
+  await mkdir(cache, { recursive: true })
+  const directory = await mkdtemp(path.join(cache, "opencode-updater-"))
   const stagedHelper = path.join(directory, "OpenCode.UpdaterHelper.exe")
 
   await copyFile(helper, stagedHelper)

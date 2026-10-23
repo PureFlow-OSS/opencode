@@ -8,15 +8,21 @@ export function updateCacheDirectory(input: {
   readonly installDirectory: string
   readonly cacheDirectory?: string
 }) {
-  const cache = (input.cacheDirectory ?? embeddedUpdateCacheDirectory())?.trim()
-  if (input.platform !== "win32" || !cache) return undefined
+  if (input.platform !== "win32") return undefined
+
+  const fallback = "C:\\Entwicklung\\ai.opencode.desktop\\updates"
+  const cache = (input.cacheDirectory ?? embeddedUpdateCacheDirectory())?.trim() || fallback
 
   const directory = path.win32.resolve(cache)
   const install = path.win32.resolve(input.installDirectory)
-  // The install helper deletes the installation directory, so the cache can live anywhere outside that subtree.
+  // Executables must remain below the corporate allowlisted directory and outside the installation it replaces.
   const cached = directory.toLowerCase()
   const installed = install.toLowerCase()
-  if (cached === installed || cached.startsWith(installed + path.win32.sep)) return undefined
+
+  if (!cached.startsWith("c:\\entwicklung\\")) return cached === "c:\\entwicklung" ? directory : fallback
+
+  if (cached === installed || cached.startsWith(installed + path.win32.sep)) return fallback
+
   return directory
 }
 
@@ -44,7 +50,9 @@ export function updateAppAdapter(input: UpdateAppAdapterInput): AppAdapter {
 }
 
 function embeddedUpdateCacheDirectory() {
-  return typeof OPENCODE_UPDATE_CACHE_DIR === "string"
-    ? OPENCODE_UPDATE_CACHE_DIR
-    : process.env.OPENCODE_UPDATE_CACHE_DIR
+  // SAFETY: Vite replaces this declared string constant; unbundled tests have no binding, so typeof avoids ReferenceError.
+  // eslint-disable-next-line anti-slop/no-runtime-typeof
+  const bundled = typeof OPENCODE_UPDATE_CACHE_DIR === "string" ? OPENCODE_UPDATE_CACHE_DIR : undefined
+
+  return bundled ?? process.env.OPENCODE_UPDATE_CACHE_DIR
 }
