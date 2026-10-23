@@ -163,7 +163,11 @@ describe("corporate HTTP proxy", () => {
     origin.stop(true)
   }, 30000) // A cold child process loads the actual undici package on Windows.
 
-  test.each(["bun", "node"] as const)("performs a real %s request through the configured proxy", async (runtime) => {
+  test.each(
+    ["bun", "node"].flatMap((runtime) =>
+      ["", "proxy-user", "proxy%40user:p%40ss%3Aword"].map((credentials) => ({ runtime, credentials })),
+    ),
+  )("performs a real $runtime proxy request with credentials '$credentials'", async ({ runtime, credentials }) => {
     const origin = Bun.serve({
       hostname: "127.0.0.1",
       port: 0,
@@ -171,8 +175,10 @@ describe("corporate HTTP proxy", () => {
         Response.json({ authorization: request.headers.get("authorization"), path: new URL(request.url).pathname }),
     })
     const tunnels: string[] = []
+    const authentications: (string | string[] | undefined)[] = []
     const proxy = createServer((request, response) => {
       tunnels.push(request.url ?? "")
+      authentications.push(request.headers["proxy-authorization"])
       response.writeHead(200, { "content-type": "application/json" })
       response.end(
         JSON.stringify({ authorization: request.headers.authorization, path: new URL(request.url!).pathname }),
@@ -180,6 +186,7 @@ describe("corporate HTTP proxy", () => {
     })
     proxy.on("connect", (request, socket, head) => {
       tunnels.push(request.url ?? "")
+      authentications.push(request.headers["proxy-authorization"])
       const upstream = connect(origin.port!, "127.0.0.1", () => {
         socket.write("HTTP/1.1 200 Connection Established\r\n\r\n")
         upstream.write(head)
@@ -194,7 +201,10 @@ describe("corporate HTTP proxy", () => {
     await new Promise<void>((resolve) => proxy.listen(0, "127.0.0.1", resolve))
     const address = proxy.address()
     if (!address || typeof address === "string") throw new Error("Proxy did not bind a TCP port")
-    const config = { use_http_proxy: true, http_proxy: `http://127.0.0.1:${address.port}` }
+    const config = {
+      use_http_proxy: true,
+      http_proxy: `http://${credentials ? `${credentials}@` : ""}127.0.0.1:${address.port}`,
+    }
     const file = path.join(import.meta.dir, `.http-proxy-${crypto.randomUUID()}.mjs`)
     try {
       const body = await (async () => {
@@ -238,6 +248,11 @@ describe("corporate HTTP proxy", () => {
       })()
       expect(body).toEqual({ authorization: "Bearer test-token", path: "/proxy-test" })
       expect(tunnels).toHaveLength(1)
+      expect(authentications).toEqual([
+        credentials
+          ? `Basic ${Buffer.from(credentials === "proxy-user" ? "proxy-user:" : "proxy@user:p@ss:word").toString("base64")}`
+          : undefined,
+      ])
     } finally {
       await fs.rm(file, { force: true })
       origin.stop(true)

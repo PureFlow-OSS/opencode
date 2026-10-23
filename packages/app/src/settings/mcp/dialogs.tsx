@@ -77,11 +77,12 @@ type FormState = {
   url: string
   headers: HeaderRow[]
   oauthEnabled: boolean
-  oauth: { client_id: string; client_secret: string; scope: string }
+  oauth: { client_id: string; client_secret: string; scope: string; redirect_uri: string }
   disabled: boolean
   nameError?: string
   commandError?: string
   urlError?: string
+  redirectError?: string
 }
 
 export const DialogMcpForm: Component<{
@@ -98,6 +99,7 @@ export const DialogMcpForm: Component<{
   const language = useLanguage()
   const editing = () => !!props.name && (props.existingNames?.has(props.name) ?? !props.preset)
   const lockedHeader = (key: string) => props.lockedHeaderNames?.includes(key) ?? false
+  const oauth = props.config?.type === "remote" ? props.config.oauth || undefined : undefined
 
   const [form, setForm] = createStore<FormState>({
     name: props.name ?? "",
@@ -106,14 +108,12 @@ export const DialogMcpForm: Component<{
     url: props.config?.type === "remote" ? props.config.url : "",
     headers: headersFromRecord(props.config?.type === "remote" ? props.config.headers : undefined),
     oauthEnabled: props.config?.type === "remote" && !!props.config.oauth,
-    oauth:
-      props.config?.type === "remote" && !!props.config.oauth
-        ? {
-            client_id: props.config.oauth.client_id ?? "",
-            client_secret: props.config.oauth.client_secret ?? "",
-            scope: props.config.oauth.scope ?? "",
-          }
-        : { client_id: "", client_secret: "", scope: "" },
+    oauth: {
+      client_id: oauth?.client_id ?? "",
+      client_secret: oauth?.client_secret ?? "",
+      scope: oauth?.scope ?? "",
+      redirect_uri: oauth?.redirect_uri ?? `http://127.0.0.1:${oauth?.callback_port ?? 19876}/mcp/oauth/callback`,
+    },
     disabled: props.config?.disabled ?? false,
   })
 
@@ -143,13 +143,32 @@ export const DialogMcpForm: Component<{
           : undefined
     setForm("urlError", urlError)
 
+    const redirectUri = form.oauth.redirect_uri.trim()
+    const redirect = URL.parse(redirectUri)
+    const redirectError =
+      form.type === "remote" &&
+      form.oauthEnabled &&
+      redirectUri &&
+      (!redirect ||
+        redirect.protocol !== "http:" ||
+        redirect.hostname !== "127.0.0.1" ||
+        !redirect.port ||
+        Number(redirect.port) === 0 ||
+        redirect.username ||
+        redirect.password ||
+        redirect.search ||
+        redirect.hash)
+        ? language.t("settings.mcp.form.error.oauthRedirectUri")
+        : undefined
+    setForm("redirectError", redirectError)
+
     let headerError = false
     form.headers.forEach((row, index) => {
       const invalid = lockedHeader(row.key) && !row.value.trim() && !usesAifactoryApiKey(row.key)
       headerError ||= invalid
       setForm("headers", index, "error", invalid ? language.t("settings.mcp.form.error.headerRequired") : undefined)
     })
-    if (nameError || commandError || urlError || headerError) return
+    if (nameError || commandError || urlError || redirectError || headerError) return
 
     if (form.type === "local") {
       return {
@@ -159,12 +178,16 @@ export const DialogMcpForm: Component<{
         disabled: form.disabled,
       }
     }
+    const previousOAuth = props.config?.type === "remote" ? props.config.oauth || undefined : undefined
     const oauth = form.oauthEnabled
       ? {
-          ...(props.config?.type === "remote" && props.config.oauth ? props.config.oauth : {}),
+          ...previousOAuth,
           client_id: form.oauth.client_id.trim() || undefined,
           client_secret: form.oauth.client_secret.trim() || undefined,
           scope: form.oauth.scope.trim() || undefined,
+          redirect_uri: redirectUri || undefined,
+          // The backend prioritizes callback_port; let the explicit URI pin its own port.
+          callback_port: redirectUri ? undefined : previousOAuth?.callback_port,
         }
       : (false as const)
     return {
@@ -337,6 +360,17 @@ export const DialogMcpForm: Component<{
                   placeholder={language.t("settings.mcp.form.oauthScopePlaceholder")}
                   value={form.oauth.scope}
                   onChange={(value) => setForm("oauth", "scope", value)}
+                />
+                <TextField
+                  label={language.t("settings.mcp.form.oauthRedirectUri")}
+                  description={language.t("settings.mcp.form.oauthRedirectUriDescription")}
+                  value={form.oauth.redirect_uri}
+                  onChange={(value) => {
+                    setForm("oauth", "redirect_uri", value)
+                    setForm("redirectError", undefined)
+                  }}
+                  validationState={form.redirectError ? "invalid" : undefined}
+                  error={form.redirectError}
                 />
               </div>
             </Show>

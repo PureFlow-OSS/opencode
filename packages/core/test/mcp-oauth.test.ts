@@ -13,23 +13,35 @@ const authServer = Bun.serve({ port: 0, fetch: () => new Response(null, { status
 afterAll(() => authServer.stop(true))
 
 test("routes MCP transport and OAuth requests through the configured corporate proxy", async () => {
-  const requests: { url: string; authorization: string | null }[] = []
+  const requests: { url: string; authorization: string | null; proxyAuthorization: string | null }[] = []
   const proxy = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
     fetch: (request) => {
-      requests.push({ url: request.url, authorization: request.headers.get("authorization") })
+      requests.push({
+        url: request.url,
+        authorization: request.headers.get("authorization"),
+        proxyAuthorization: request.headers.get("proxy-authorization"),
+      })
       return Response.json({ proxied: true })
     },
   })
-  HttpProxy.configure({ use_http_proxy: true, http_proxy: proxy.url.toString() })
+  const url = new URL(proxy.url)
+  url.username = "mcp-user"
+  HttpProxy.configure({ use_http_proxy: true, http_proxy: url.toString() })
   try {
     const fetch = await Effect.runPromise(McpOAuth.loggedFetch({ server: "proxy-check" }))
     const response = await fetch("http://mcp-proxy-check.invalid/mcp", {
       headers: { authorization: "Bearer mcp-test" },
     })
     expect(await response.json()).toEqual({ proxied: true })
-    expect(requests).toEqual([{ url: "http://mcp-proxy-check.invalid/mcp", authorization: "Bearer mcp-test" }])
+    expect(requests).toEqual([
+      {
+        url: "http://mcp-proxy-check.invalid/mcp",
+        authorization: "Bearer mcp-test",
+        proxyAuthorization: `Basic ${Buffer.from("mcp-user:").toString("base64")}`,
+      },
+    ])
   } finally {
     HttpProxy.configure({})
     proxy.stop(true)

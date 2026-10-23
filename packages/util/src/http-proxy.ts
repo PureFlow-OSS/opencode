@@ -89,8 +89,19 @@ export const fetch: typeof globalThis.fetch = Object.assign(
   async (input: Parameters<typeof globalThis.fetch>[0], init?: Parameters<typeof globalThis.fetch>[1]) => {
     const proxy = proxyFor(input instanceof Request ? input.url : input.toString())
     if (process.versions.bun && proxy) {
+      const url = new URL(proxy)
+      const authorization =
+        url.username || url.password
+          ? `Basic ${Buffer.from(`${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`).toString("base64")}`
+          : undefined
+      url.username = ""
+      url.password = ""
       const options = { ...init }
-      Object.defineProperty(options, "proxy", { value: proxy, enumerable: true })
+      // Send credentials explicitly: Bun can fail to connect when the proxy URL contains only a username.
+      Object.defineProperty(options, "proxy", {
+        value: authorization ? { url: url.toString(), headers: { "Proxy-Authorization": authorization } } : proxy,
+        enumerable: true,
+      })
       return globalThis.fetch(input, options)
     }
     if (process.versions.bun && !proxyVariables.some((key) => process.env[key])) return globalThis.fetch(input, init)

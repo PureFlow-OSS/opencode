@@ -11,7 +11,7 @@ export default {
 
 function FormStory(props: { name: string; config: Mcp.ServerConfig; preset?: boolean }) {
   const dialog = useDialog()
-  const [state, setState] = createStore({ saved: "" })
+  const [state, setState] = createStore({ saved: "", config: props.config })
   return (
     <>
       <Button
@@ -19,10 +19,11 @@ function FormStory(props: { name: string; config: Mcp.ServerConfig; preset?: boo
           dialog.show(() => (
             <DialogMcpForm
               name={props.name}
-              config={props.config}
+              config={state.config}
               preset={props.preset}
               existingNames={new Set([props.name])}
               onSave={async (name, config) => {
+                setState("config", config)
                 setState("saved", JSON.stringify({ name, config }))
               }}
             />
@@ -76,6 +77,19 @@ export const RemoteWithoutOauth = {
     <FormStory
       name="Company PAT"
       config={{ type: "remote", url: "https://mcp.example/pat", headers: { "X-ADO-PAT": "test-token" } }}
+    />
+  ),
+}
+
+export const RemoteWithOauth = {
+  render: () => (
+    <FormStory
+      name="Company CRM"
+      config={{
+        type: "remote",
+        url: "https://mcp.example/crm",
+        oauth: { client_id: "crm-client", client_secret: "crm-secret", scope: "read", callback_port: 23456 },
+      }}
     />
   ),
 }

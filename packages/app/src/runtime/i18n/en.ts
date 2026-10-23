@@ -368,6 +368,11 @@ export const dict = {
   "settings.mcp.form.oauthClientSecret": "Client secret",
   "settings.mcp.form.oauthScope": "Scope",
   "settings.mcp.form.oauthScopePlaceholder": "read write",
+  "settings.mcp.form.oauthRedirectUri": "OAuth Redirect URI",
+  "settings.mcp.form.oauthRedirectUriDescription":
+    "OpenCode generates a fixed callback URL. Register this exact URL with your OAuth provider. You can edit it or clear it to use a free port.",
+  "settings.mcp.form.error.oauthRedirectUri":
+    "Use an HTTP URL with 127.0.0.1 and an explicit port, without credentials, a query or a fragment.",
   "settings.mcp.form.enabled": "Enabled",
   "settings.mcp.form.enabledDescription": "Start this MCP server automatically",
   "settings.mcp.form.error.nameRequired": "Name is required",
