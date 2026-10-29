@@ -1,6 +1,7 @@
 import type { IntegrationOAuthMethodRegistration } from "@opencode/plugin/effect/integration"
 import type { Context } from "@opencode/plugin/effect/plugin"
 import { define } from "@opencode/plugin/effect/plugin"
+import { HttpProxy } from "@opencode/util/http-proxy"
 // import { Deferred, Duration, Effect, Option, Schema, Semaphore, Stream } from "effect"
 import { Deferred, Effect, Option, Schema, Semaphore, Stream } from "effect"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http"
@@ -467,8 +468,8 @@ export function verifyIDToken(
 ) {
   return Effect.tryPromise({
     try: async () => {
-      const { createRemoteJWKSet, jwtVerify } = await import("jose")
-      const { payload } = await jwtVerify(token, createRemoteJWKSet(jwksURL), {
+      const { createRemoteJWKSet, customFetch, jwtVerify } = await import("jose")
+      const { payload } = await jwtVerify(token, createRemoteJWKSet(jwksURL, { [customFetch]: HttpProxy.fetch }), {
         issuer,
         audience: clientID,
         algorithms: ["RS256"],
@@ -484,7 +485,7 @@ export function verifyIDToken(
 function request<A>(url: string, init: RequestInit) {
   return Effect.tryPromise({
     try: async (signal) => {
-      const response = await fetch(url, { ...init, signal })
+      const response = await HttpProxy.fetch(url, { ...init, signal })
       if (!response.ok) throw new Error(`Request failed: ${response.status}`)
       return response.json() as Promise<A>
     },

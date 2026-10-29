@@ -6,6 +6,8 @@ Release notes for OpenCode V2, newest first.
 
 ### Highlights
 
+- **Corporate OAuth Proxy**: Codex and ChatGPT sign-in, token renewal and signing-key downloads now use the configured proxy. Proxy environment variables retain priority over the anonymous corporate default, including for remote MCP connections.
+
 - **Windows Packaging Configuration**: Build entry points now consistently load the corporate Electron Builder configuration, honor the selected output directory and copy the changelog there. Previous release folders are excluded from the application archive.
 
 - **Windows CLI Command**: The installer registers `opencode` through a console entry point under `C:\Entwicklung\OpenCode\bin` and the user PATH, without requiring Node.js. Updates retain registration; uninstall removes its own PATH entry.

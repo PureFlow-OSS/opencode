@@ -34,6 +34,8 @@ import { location } from "../fixture/location"
 import { tmpdir } from "../fixture/tmpdir"
 import { testEffect } from "../lib/effect"
 import { parse } from "jsonc-parser"
+import { HttpProxy } from "@opencode/util/http-proxy"
+import { withEnv } from "../fixture/env"
 
 const it = testEffect(Layer.empty)
 const itWithPermissions = process.platform === "win32" || process.getuid?.() === 0 ? it.live.skip : it.live
@@ -267,6 +269,73 @@ describe("Config", () => {
     }
     expect(migrateV1(corporate)).toEqual(corporate)
   })
+
+  it.live("keeps authenticated environment proxies ahead of the default while honoring explicit settings", () =>
+    Effect.forEach(
+      [
+        {
+          env: { HTTPS_PROXY: "http://user:password@env.example:8080" },
+          expected: "http://user:password@env.example:8080",
+        },
+        { env: { https_proxy: "http://user@lower.example:8080" }, expected: "http://user@lower.example:8080" },
+        {
+          env: { ALL_PROXY: "http://user:password@all.example:8080" },
+          expected: "http://user:password@all.example:8080",
+        },
+        { env: {}, expected: "http://webgwooe.rbgooe.at:8080" },
+        {
+          env: { HTTPS_PROXY: "http://env.example:8080" },
+          http_proxy: "http://explicit:password@config.example:8080",
+          expected: "http://explicit:password@config.example:8080",
+        },
+        { env: { HTTPS_PROXY: "http://env.example:8080" }, use_http_proxy: false, expected: undefined },
+      ],
+      (input) =>
+        withEnv(
+          {
+            ...Object.fromEntries(
+              [
+                "HTTP_PROXY",
+                "http_proxy",
+                "HTTPS_PROXY",
+                "https_proxy",
+                "ALL_PROXY",
+                "all_proxy",
+                "NO_PROXY",
+                "no_proxy",
+              ].map((key) => [key, undefined]),
+            ),
+          },
+          () =>
+            withEnv(input.env, () =>
+              Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
+                Effect.flatMap((tmp) =>
+                  Effect.gen(function* () {
+                    yield* Effect.promise(async () => {
+                      await fs.mkdir(path.join(tmp.path, "global"))
+                      await fs.writeFile(
+                        path.join(tmp.path, "global/opencode.json"),
+                        JSON.stringify({
+                          use_http_proxy: input.use_http_proxy ?? true,
+                          ...(input.http_proxy ? { http_proxy: input.http_proxy } : {}),
+                        }),
+                      )
+                    })
+                    yield* Effect.gen(function* () {
+                      const config = yield* Config.Service
+                      yield* config.entries()
+                      expect(HttpProxy.proxyFor("https://auth.openai.com/oauth/token")).toBe(input.expected)
+                      expect(HttpProxy.proxyFor("https://mcp.hubspot.com/mcp")).toBe(input.expected)
+                      expect(HttpProxy.proxyFor("http://10.53.7.23/v1/models")).toBeUndefined()
+                      expect(HttpProxy.proxyFor("http://localhost:1455/auth/callback")).toBeUndefined()
+                    }).pipe(Effect.provide(testLayer(tmp.path)))
+                  }),
+                ),
+              ),
+            ),
+        ),
+    ).pipe(Effect.ensuring(Effect.sync(() => HttpProxy.configure({})))),
+  )
 
   it.live("authenticates central defaults without overriding local or system configuration", () =>
     Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(

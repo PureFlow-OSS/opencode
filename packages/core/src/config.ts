@@ -421,7 +421,14 @@ export const layer = (options?: Options) =>
           aifactory_host:
             typeof providerURL === "string" && providerURL.trim() ? providerURL : corporate.current.aifactory_host,
           use_http_proxy: corporate.current.use_http_proxy ?? true,
-          http_proxy: corporate.current.http_proxy || "http://webgwooe.rbgooe.at:8080",
+          // Keep authenticated environment proxies ahead of the anonymous corporate fallback.
+          http_proxy:
+            corporate.current.http_proxy ||
+            (["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"].some(
+              (key) => process.env[key],
+            )
+              ? undefined
+              : "http://webgwooe.rbgooe.at:8080"),
         })
         localEntries.current = local
         if (options?.global === false) return local
