@@ -7,6 +7,29 @@ import { optional } from "./schema.js"
 export const ID = Schema.String.pipe(Schema.brand("Plugin.ID"), Schema.annotate({ identifier: "Plugin.ID" }))
 export type ID = typeof ID.Type
 
+/** A registry package, optionally pinned to a version or dist-tag; never a local path or URL. */
+export const Package = Schema.String.check(
+  Schema.isMaxLength(256),
+  Schema.isPattern(/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*(?:@[a-zA-Z0-9][a-zA-Z0-9.+_-]*)?(?![\s\S])/),
+).annotate({ identifier: "Plugin.Package" })
+export type Package = typeof Package.Type
+
+export interface StoreItem extends Schema.Schema.Type<typeof StoreItem> {}
+export const StoreItem = Schema.Struct({
+  name: Schema.NonEmptyString,
+  package: Package,
+  description: Schema.String.pipe(optional),
+}).annotate({ identifier: "Plugin.StoreItem" })
+
+export interface Catalog extends Schema.Schema.Type<typeof Catalog> {}
+export const Catalog = Schema.Struct({
+  store: Schema.Array(StoreItem),
+  /** False when the updater feed is unavailable; local removals remain possible. */
+  available: Schema.Boolean,
+  /** Global package declarations only, excluding plugin options and project/managed configuration. */
+  packages: Schema.Array(Schema.String),
+}).annotate({ identifier: "Plugin.Catalog" })
+
 export const Source = Schema.Union([
   Schema.Struct({ type: Schema.Literal("builtin") }),
   Schema.Struct({

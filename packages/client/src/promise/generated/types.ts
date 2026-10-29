@@ -33,6 +33,8 @@ export type AgentColor = string
 
 export type PermissionEffect = "allow" | "deny" | "ask"
 
+export type PluginPackage = string
+
 export type PluginID = string
 
 export type PluginSource =
@@ -421,6 +423,8 @@ export type ConfigModelVariantSettings = { compaction?: ProviderCompaction; enco
 }
 
 export type PermissionRule = { action: string; resource: string; effect: PermissionEffect }
+
+export type PluginStoreItem = { name: string; package: PluginPackage; description?: string }
 
 export type PluginInfo = { id?: PluginID; source: PluginSource; features: PluginFeatures; state: PluginState }
 
@@ -1085,6 +1089,8 @@ export type ModelVariant = {
 }
 
 export type PermissionRuleset = Array<PermissionRule>
+
+export type PluginCatalog = { store: Array<PluginStoreItem>; available: boolean; packages: Array<string> }
 
 export type UsageLimitsBudget = {
   id: string
@@ -3243,6 +3249,10 @@ export type AgentGetInput = {
 
 export type AgentGetOutput = { location: LocationPublicRef; data: AgentInfo }
 
+export type PluginCatalogInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+
+export type PluginCatalogOutput = { location: LocationPublicRef; data: PluginCatalog }
+
 export type PluginListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
 
 export type PluginListOutput = { location: LocationPublicRef; data: Array<PluginInfo> }
@@ -4748,6 +4758,7 @@ export type ConfigGetOutput = Array<ConfigEntry>
 export type ConfigShellsOutput = Array<ConfigShellOption>
 
 export type ExperimentalConfigUpdateInput = {
+  readonly plugins?: { readonly [x: string]: boolean } | undefined
   readonly shell?: string | null | undefined
   readonly mcp?:
     | {

@@ -1,5 +1,13 @@
 import { Injectable } from "@angular/core"
 
+export type PluginStoreItem = {
+  name: string
+  package: string
+  description?: string | null
+  enabled: boolean
+  updatedAt?: string
+}
+
 type ReleaseRecord = {
   id: string
   version: string
@@ -224,9 +232,7 @@ export class ApiService {
     const form = new FormData()
     form.set("archive", payload.archive)
     if (payload.notes) form.set("notes", payload.notes)
-    return this.readJson<ReleaseRecord>(
-      await fetch("/opencode/admin/releases/upload", { method: "POST", body: form }),
-    )
+    return this.readJson<ReleaseRecord>(await fetch("/opencode/admin/releases/upload", { method: "POST", body: form }))
   }
 
   async promoteRelease(id: string) {
@@ -238,15 +244,19 @@ export class ApiService {
   }
 
   async searchTesters(term: string) {
-    return this.readJson<TesterSearchResponse>(await fetch(`/opencode/admin/testers/search?q=${encodeURIComponent(term)}`, { cache: "no-store" }))
+    return this.readJson<TesterSearchResponse>(
+      await fetch(`/opencode/admin/testers/search?q=${encodeURIComponent(term)}`, { cache: "no-store" }),
+    )
   }
 
   async saveTesters(testers: Testers) {
-    return this.readJson<Testers>(await fetch("/opencode/admin/testers", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(testers),
-    }))
+    return this.readJson<Testers>(
+      await fetch("/opencode/admin/testers", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(testers),
+      }),
+    )
   }
 
   async stopReleaseChannel(channel: ReleaseChannel) {
@@ -289,7 +299,14 @@ export class ApiService {
     }))
   }
 
-  async createFeedback(payload: { channel: string; releaseId?: string; userName?: string; userEmail?: string; rating: string; message: string }) {
+  async createFeedback(payload: {
+    channel: string
+    releaseId?: string
+    userName?: string
+    userEmail?: string
+    rating: string
+    message: string
+  }) {
     return fetch("/opencode/admin/feedback", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -298,11 +315,15 @@ export class ApiService {
   }
 
   async listModelCards(channel: ModelChannel = "normal") {
-    return this.readJson<ModelCardsResponse>(await fetch(`/opencode/admin/modelcards?channel=${channel}`, { cache: "no-store" }))
+    return this.readJson<ModelCardsResponse>(
+      await fetch(`/opencode/admin/modelcards?channel=${channel}`, { cache: "no-store" }),
+    )
   }
 
   async getModelLimitsReport(channel: ModelChannel) {
-    return this.readJson<ModelLimitsReport>(await fetch(`/opencode/admin/model-limits/report?channel=${channel}`, { cache: "no-store" }))
+    return this.readJson<ModelLimitsReport>(
+      await fetch(`/opencode/admin/model-limits/report?channel=${channel}`, { cache: "no-store" }),
+    )
   }
 
   async cleanupModelLimits(channel: ModelChannel, patterns: string[]) {
@@ -322,41 +343,54 @@ export class ApiService {
   }
 
   async saveModelSettings(model: string, channel: ModelChannel, settings: ModelSettings) {
-    return this.readJson<ModelSettings>(await fetch(`/opencode/admin/model-settings?channel=${channel}&model=${encodeURIComponent(model)}`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(settings),
-    }))
+    return this.readJson<ModelSettings>(
+      await fetch(`/opencode/admin/model-settings?channel=${channel}&model=${encodeURIComponent(model)}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(settings),
+      }),
+    )
   }
 
   async syncModelContext(model: string, channel: ModelChannel) {
-    return this.readJson<{ context: number }>(await fetch(`/opencode/admin/model-settings/sync-context?channel=${channel}&model=${encodeURIComponent(model)}`, {
-      method: "POST",
-    }))
+    return this.readJson<{ context: number }>(
+      await fetch(`/opencode/admin/model-settings/sync-context?channel=${channel}&model=${encodeURIComponent(model)}`, {
+        method: "POST",
+      }),
+    )
   }
 
   async resetModelSettings(model: string, channel: ModelChannel) {
-    const response = await fetch(`/opencode/admin/model-settings?channel=${channel}&model=${encodeURIComponent(model)}`, { method: "DELETE" })
+    const response = await fetch(
+      `/opencode/admin/model-settings?channel=${channel}&model=${encodeURIComponent(model)}`,
+      { method: "DELETE" },
+    )
     if (response.status === 404) throw new Error(`No exact ${channel} override exists for ${model}`)
     if (!response.ok) throw new Error(await response.text())
   }
 
   async promoteModelSettings(model: string, channel: "ai-gilde" | "normal") {
-    return this.readJson<ModelSettingsPromotionResult>(await fetch(`/opencode/admin/model-settings/promote?model=${encodeURIComponent(model)}&channel=${channel}`, {
-      method: "POST",
-    }))
+    return this.readJson<ModelSettingsPromotionResult>(
+      await fetch(`/opencode/admin/model-settings/promote?model=${encodeURIComponent(model)}&channel=${channel}`, {
+        method: "POST",
+      }),
+    )
   }
 
   async getProviderSettings(channel: ModelChannel) {
-    return this.readJson<ProviderSettings>(await fetch(`/opencode/admin/provider-settings?channel=${channel}`, { cache: "no-store" }))
+    return this.readJson<ProviderSettings>(
+      await fetch(`/opencode/admin/provider-settings?channel=${channel}`, { cache: "no-store" }),
+    )
   }
 
   async saveProviderSettings(channel: ModelChannel, settings: ProviderSettings) {
-    return this.readJson<ProviderSettings>(await fetch(`/opencode/admin/provider-settings?channel=${channel}`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(settings),
-    }))
+    return this.readJson<ProviderSettings>(
+      await fetch(`/opencode/admin/provider-settings?channel=${channel}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(settings),
+      }),
+    )
   }
 
   async listMcps(channel: "normal" | "beta") {
@@ -374,12 +408,33 @@ export class ApiService {
   }
 
   async deleteMcp(channel: "normal" | "beta", name: string) {
-    const response = await fetch(`/opencode/admin/mcp/${encodeURIComponent(name)}?channel=${channel}`, { method: "DELETE" })
+    const response = await fetch(`/opencode/admin/mcp/${encodeURIComponent(name)}?channel=${channel}`, {
+      method: "DELETE",
+    })
     if (!response.ok) throw new Error(await response.text())
   }
 
   async listMcpStore() {
     return this.readJson<McpStoreItem[]>(await fetch("/opencode/admin/mcp-store", { cache: "no-store" }))
+  }
+
+  async listPluginStore() {
+    return this.readJson<PluginStoreItem[]>(await fetch("/opencode/admin/plugin-store", { cache: "no-store" }))
+  }
+
+  async savePluginStoreItem(name: string, item: PluginStoreItem) {
+    return this.readJson<{ name: string }>(
+      await fetch(`/opencode/admin/plugin-store/${encodeURIComponent(name)}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(item),
+      }),
+    )
+  }
+
+  async deletePluginStoreItem(name: string) {
+    const response = await fetch(`/opencode/admin/plugin-store/${encodeURIComponent(name)}`, { method: "DELETE" })
+    if (!response.ok) throw new Error(await response.text())
   }
 
   async saveMcpStoreItem(name: string, item: Omit<McpStoreItem, "updatedAt">) {
@@ -408,12 +463,14 @@ function parseFeedbackAttachments(value: string | null): FeedbackAttachment[] {
       const value = attachment as { name?: unknown; type?: unknown; data?: unknown }
       if (typeof value.name !== "string" || typeof value.type !== "string" || typeof value.data !== "string") return []
       if (!/^[A-Za-z0-9+/]+={0,2}$/.test(value.data)) return []
-      return [{
-        name: value.name,
-        type: value.type,
-        dataUrl: `data:${value.type};base64,${value.data}`,
-        image: value.type.startsWith("image/"),
-      }]
+      return [
+        {
+          name: value.name,
+          type: value.type,
+          dataUrl: `data:${value.type};base64,${value.data}`,
+          image: value.type.startsWith("image/"),
+        },
+      ]
     })
   } catch {
     return []

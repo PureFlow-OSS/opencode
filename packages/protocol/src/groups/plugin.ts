@@ -7,6 +7,22 @@ import { LocationQuery, locationQueryOpenApi } from "./location.js"
 
 export const PluginGroup = HttpApiGroup.make("server.plugin")
   .add(
+    HttpApiEndpoint.get("plugin.catalog", "/api/plugin/catalog", {
+      query: LocationQuery,
+      success: Location.response(Plugin.Catalog),
+      error: ServiceUnavailableError,
+    })
+      .annotateMerge(locationQueryOpenApi)
+      .annotateMerge(
+        OpenApi.annotations({
+          identifier: "plugin.catalog",
+          summary: "List optional enterprise plugin packages",
+          description:
+            "Read the updater-managed plugin catalog and global package declarations without private options.",
+        }),
+      ),
+  )
+  .add(
     HttpApiEndpoint.get("plugin.list", "/api/plugin", {
       query: LocationQuery,
       success: Location.response(Schema.Array(Plugin.Info)),

@@ -1,5 +1,6 @@
 import { Plugin } from "@opencode/core/plugin"
 import { PluginUpdate } from "@opencode/core/plugin/update"
+import { ConfigManagedPlugin } from "@opencode/core/config/managed-plugin"
 import { InvalidRequestError, PluginNotFoundError, ServiceUnavailableError } from "@opencode/protocol/errors"
 import { Cause, Effect, Exit } from "effect"
 import { HttpApiBuilder } from "effect/http-api"
@@ -8,6 +9,19 @@ import { response } from "../location"
 
 export const PluginHandler = HttpApiBuilder.group(Api, "server.plugin", (handlers) =>
   handlers
+    .handle("plugin.catalog", () =>
+      response(
+        ConfigManagedPlugin.catalogEffect().pipe(
+          Effect.mapError(
+            () =>
+              new ServiceUnavailableError({
+                message: "The plugin catalog or global plugin configuration could not be loaded.",
+                service: "plugin",
+              }),
+          ),
+        ),
+      ),
+    )
     .handle("plugin.list", () =>
       Effect.gen(function* () {
         return yield* response(Plugin.Service.use((plugin) => plugin.list()))

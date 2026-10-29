@@ -3,41 +3,48 @@
     <div class="hero-copy">
       <p class="eyebrow">OpenCode Updater</p>
       <h1>Admin Console</h1>
-      <p class="lede">
-        One screen per job. Upload ZIP into beta, then promote releases channel by channel.
-      </p>
+      <p class="lede">One screen per job. Upload ZIP into beta, then promote releases channel by channel.</p>
       <nav class="nav">
         <button type="button" [class.active]="page === 'upload'" (click)="show('upload')">ZIP Upload</button>
         <button type="button" [class.active]="page === 'releases'" (click)="show('releases')">Releases</button>
-        <button type="button" [class.active]="page === 'model-status'" (click)="show('model-status')">Model Status</button>
+        <button type="button" [class.active]="page === 'model-status'" (click)="show('model-status')">
+          Model Status
+        </button>
         <button type="button" [class.active]="page === 'mcp'" (click)="show('mcp')">MCP</button>
         <button type="button" [class.active]="page === 'mcp-store'" (click)="show('mcp-store')">MCP Store</button>
+        <button type="button" [class.active]="page === 'plugin-store'" (click)="show('plugin-store')">
+          Plugin Store
+        </button>
         <button type="button" [class.active]="page === 'testers'" (click)="show('testers')">Testers</button>
       </nav>
     </div>
   </section>
 
-  @if (page === 'upload') {
+  @if (page === "upload") {
     <section class="single">
       <app-upload-panel />
     </section>
-  } @else if (page === 'releases') {
+  } @else if (page === "releases") {
     <section class="single">
       <app-audit-panel />
     </section>
-  } @else if (page === 'model-status') {
+  } @else if (page === "model-status") {
     <section class="single">
       <app-model-status-panel />
     </section>
-  } @else if (page === 'mcp') {
+  } @else if (page === "mcp") {
     <section class="single">
       <app-mcp-panel />
     </section>
-  } @else if (page === 'mcp-store') {
+  } @else if (page === "mcp-store") {
     <section class="single">
       <app-mcp-store-panel />
     </section>
-  } @else if (page === 'testers') {
+  } @else if (page === "plugin-store") {
+    <section class="single">
+      <app-plugin-store-panel />
+    </section>
+  } @else if (page === "testers") {
     <section class="single">
       <app-testers-panel />
     </section>

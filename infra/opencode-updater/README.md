@@ -2,7 +2,19 @@
 
 Hardcoded route base: `opencode`
 
-Endpoints:
+## Plugin Store
+
+Manage optional plugins in the admin UI's **Plugin Store** tab. Entries contain a unique name, an npm package (optionally pinned to a version or dist-tag), a description and a visibility switch. The store is shared across rollout channels, like the MCP Store.
+
+- Public catalog: `GET /opencode/plugin-store.json` (visible entries only).
+- Administration: `GET /opencode/admin/plugin-store`, `PUT /opencode/admin/plugin-store/{name}`, `DELETE /opencode/admin/plugin-store/{name}`.
+- Entries persist in `UpdaterPluginStore` inside `/app/data/feedback.db`, using the existing data volume. No Compose change is required.
+- OpenCode reads the catalog through its configured updater, with the existing proxy and AI Factory authentication support, and displays it under **Extensions → Plugins**.
+- Installation is voluntary and changes the user's global configuration. Version changes retain options and activation order. Removing or hiding a catalog entry does not uninstall existing packages; users can still remove their global installations.
+- Plugin changes reload through the existing configuration watcher. The UI asks before applying changes while agent actions are running. Project and managed declarations remain separate from global installation.
+- Local removals remain available when the catalog server cannot be reached. Registry package names and versions/dist-tags are supported; local paths and download URLs are rejected.
+
+## Endpoints
 
 - `GET /opencode/version`
 - `GET /opencode/url`

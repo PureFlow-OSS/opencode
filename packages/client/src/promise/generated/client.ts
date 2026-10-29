@@ -10,6 +10,8 @@ import type {
   AgentListOutput,
   AgentGetInput,
   AgentGetOutput,
+  PluginCatalogInput,
+  PluginCatalogOutput,
   PluginListInput,
   PluginListOutput,
   PluginGuiInput,
@@ -536,6 +538,18 @@ export function make(options: ClientOptions) {
         ),
     },
     plugin: {
+      catalog: (input?: PluginCatalogInput, requestOptions?: RequestOptions) =>
+        request<PluginCatalogOutput>(
+          {
+            method: "GET",
+            path: `/api/plugin/catalog`,
+            query: { location: input?.["location"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
       list: (input?: PluginListInput, requestOptions?: RequestOptions) =>
         request<PluginListOutput>(
           {
@@ -1606,7 +1620,7 @@ export function make(options: ClientOptions) {
             {
               method: "PATCH",
               path: `/api/experimental/config`,
-              body: { shell: input?.["shell"], mcp: input?.["mcp"] },
+              body: { plugins: input?.["plugins"], shell: input?.["shell"], mcp: input?.["mcp"] },
               successStatus: 204,
               declaredStatuses: [400, 401, 404],
               empty: true,

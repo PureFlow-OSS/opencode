@@ -4,7 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
-test("tester search and MCP Store OAuth survive the API and stored configuration", async () => {
+test("tester search, MCP OAuth and the plugin store survive the API and stored configuration", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "opencode-admin-restoration-"))
   const seen: string[] = []
   const queries: string[] = []
@@ -151,6 +151,41 @@ test("tester search and MCP Store OAuth survive the API and stored configuration
     expect(await (await request("/mcp-store.json")).json()).toContainEqual(
       expect.objectContaining({ name: entry.name, oauthRequired: false }),
     )
+    const plugin = { name: "team-tools", package: "@company/tools@1.2.3", description: "Team tools", enabled: true }
+    expect((await request("/admin/plugin-store/team-tools", put(plugin))).status).toBe(200)
+    expect(await (await request("/plugin-store.json")).json()).toEqual([
+      { name: "team-tools", package: "@company/tools@1.2.3", description: "Team tools" },
+    ])
+    expect(await (await request("/admin/plugin-store")).json()).toContainEqual(expect.objectContaining(plugin))
+    expect((await request("/admin/plugin-store/team-tools", put({ ...plugin, enabled: false }))).status).toBe(200)
+    expect(await (await request("/plugin-store.json")).json()).toEqual([])
+    expect(await (await request("/admin/plugin-store")).json()).toContainEqual(
+      expect.objectContaining({ enabled: false }),
+    )
+    expect(
+      (await request("/admin/plugin-store/team-tools", put({ ...plugin, package: "file:///C:/plugin" }))).status,
+    ).toBe(400)
+    expect(
+      (await request("/admin/plugin-store/team-tools", put({ ...plugin, package: "@company/tools@2.0.0" }))).status,
+    ).toBe(200)
+    const pluginDb = new Database(path.join(directory, "data", "feedback.db"), { readonly: true })
+    try {
+      expect(
+        JSON.parse(
+          pluginDb
+            .query<{ Config: string }, []>("SELECT Config FROM UpdaterPluginStore WHERE Name = 'team-tools'")
+            .get()!.Config,
+        ).package,
+      ).toBe("@company/tools@2.0.0")
+    } finally {
+      pluginDb.close()
+    }
+    expect((await request("/admin/plugin-store/team-tools", { method: "DELETE" })).status).toBe(204)
+    expect(await (await request("/plugin-store.json")).json()).toEqual([])
+    expect(await (await request("/admin/plugin-store")).json()).toEqual([])
+    // Re-adding a deleted entry restores the same catalog identity.
+    expect((await request("/admin/plugin-store/team-tools", put(plugin))).status).toBe(200)
+    expect((await (await request("/plugin-store.json")).json()).length).toBe(1)
   } finally {
     server.kill()
     await server.exited

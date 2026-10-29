@@ -1,0 +1,113 @@
+<article class="card store-card">
+  <header class="panel-header">
+    <div>
+      <p class="panel-kicker">Plugin Store</p>
+      <h2>Plugin Store</h2>
+      <p>Offer optional npm plugins in OpenCode. Users choose which packages to install globally.</p>
+    </div>
+    <button
+      type="button"
+      class="secondary"
+      (click)="edit()"
+      [disabled]="saveMutation.isPending() || deleteMutation.isPending()"
+    >
+      + Add entry
+    </button>
+  </header>
+  @if (editing() !== undefined) {
+    <form class="store-form" (submit)="submit($event)">
+      <div class="form-grid">
+        <label
+          >Entry name
+          <input
+            name="name"
+            [(ngModel)]="draft.name"
+            [readonly]="editing() !== ''"
+            placeholder="for example, team-tools"
+            required
+            maxlength="128"
+          />
+        </label>
+        <label
+          >npm package and version
+          <input
+            name="package"
+            [(ngModel)]="draft.package"
+            placeholder="@company/opencode-tools@1.2.3"
+            required
+            maxlength="256"
+          />
+        </label>
+        <label class="full-width"
+          >Description
+          <textarea
+            name="description"
+            [(ngModel)]="draft.description"
+            placeholder="What this plugin provides"
+            maxlength="4000"
+          ></textarea>
+        </label>
+        <label class="toggle full-width">
+          <input name="enabled" [(ngModel)]="draft.enabled" type="checkbox" />
+          <span
+            ><strong>Visible in store</strong
+            ><small
+              >Hiding an entry keeps existing installations. Publishing never installs packages automatically.</small
+            ></span
+          >
+        </label>
+      </div>
+      <div class="form-actions">
+        <button type="submit" [disabled]="saveMutation.isPending() || deleteMutation.isPending()">
+          {{ saveMutation.isPending() ? "Saving…" : "Save entry" }}
+        </button>
+        <button type="button" class="secondary" (click)="cancel()" [disabled]="saveMutation.isPending()">Cancel</button>
+      </div>
+    </form>
+  }
+  @if (error() || store.error()) {
+    <p class="message error">{{ error() || store.error()?.message }}</p>
+  }
+  @if (status()) {
+    <p class="message" role="status">{{ status() }}</p>
+  }
+  <div class="store-list">
+    @if (store.isPending()) {
+      <div class="empty">Loading plugin store…</div>
+    } @else if (!store.isError() && !store.data()?.length) {
+      <div class="empty">No plugin store entries yet.</div>
+    }
+    @for (item of store.data() ?? []; track item.name) {
+      <section class="store-row" [class.off]="!item.enabled">
+        <div class="store-copy">
+          <div>
+            <strong>{{ item.name }}</strong
+            ><span class="badge" [class.muted]="!item.enabled">{{ item.enabled ? "Visible" : "Hidden" }}</span>
+          </div>
+          <code>{{ item.package }}</code>
+          @if (item.description) {
+            <small>{{ item.description }}</small>
+          }
+        </div>
+        <div class="row-actions">
+          <button
+            type="button"
+            class="secondary"
+            (click)="edit(item)"
+            [disabled]="saveMutation.isPending() || deleteMutation.isPending()"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            class="danger"
+            (click)="remove(item.name)"
+            [disabled]="saveMutation.isPending() || deleteMutation.isPending()"
+          >
+            Remove
+          </button>
+        </div>
+      </section>
+    }
+  </div>
+</article>

@@ -16,6 +16,8 @@ import type {
   AgentListOutput,
   AgentGetInput,
   AgentGetOutput,
+  PluginCatalogInput,
+  PluginCatalogOutput,
   PluginListInput,
   PluginListOutput,
   PluginGuiInput,
@@ -384,6 +386,11 @@ const adaptGroupAgent = (raw: RawClient["server.agent"]) => ({
   get: EndpointAgentGet(raw),
 })
 
+const EndpointPluginCatalog = (raw: RawClient["server.plugin"]) => (input?: PluginCatalogInput) =>
+  preserveEffect<PluginCatalogOutput>()(
+    raw["plugin.catalog"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
 const EndpointPluginList = (raw: RawClient["server.plugin"]) => (input?: PluginListInput) =>
   preserveEffect<PluginListOutput>()(
     raw["plugin.list"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
@@ -411,6 +418,7 @@ const EndpointPluginUpdate = (raw: RawClient["server.plugin"]) => (input: Plugin
   )
 
 const adaptGroupPlugin = (raw: RawClient["server.plugin"]) => ({
+  catalog: EndpointPluginCatalog(raw),
   list: EndpointPluginList(raw),
   gui: EndpointPluginGui(raw),
   check: EndpointPluginCheck(raw),
@@ -1875,9 +1883,9 @@ const adaptGroupConfig = (raw: RawClient["server.config"]) => ({
 
 const EndpointExperimentalConfigUpdate = (raw: RawClient["server.config"]) => (input?: ExperimentalConfigUpdateInput) =>
   preserveEffect<ExperimentalConfigUpdateOutput>()(
-    raw["config.update"]({ payload: { shell: input?.["shell"], mcp: input?.["mcp"] } }).pipe(
-      Effect.mapError(mapClientError),
-    ),
+    raw["config.update"]({
+      payload: { plugins: input?.["plugins"], shell: input?.["shell"], mcp: input?.["mcp"] },
+    }).pipe(Effect.mapError(mapClientError)),
   )
 
 const adaptGroupExperimentalConfig = (raw: RawClient["server.config"]) => ({

@@ -43,6 +43,7 @@ builder.Services.AddSingleton<UpdaterRolloutResolver>();
 builder.Services.AddSingleton<ModelCardStore>();
 builder.Services.AddSingleton<McpConfigStore>();
 builder.Services.AddSingleton<McpStoreStore>();
+builder.Services.AddSingleton<PluginStoreStore>();
 var modelCardSyncSeconds = Math.Max(
   60,
   new ConfigurationBuilder()
@@ -761,6 +762,29 @@ app.MapGet("/opencode/provider-config.json", async (HttpRequest request, Updater
 app.MapGet("/opencode/mcp-store.json", async (McpStoreStore store, CancellationToken cancellationToken) =>
   Results.Json(await store.ListPublicAsync(cancellationToken)));
 
+app.MapGet("/opencode/plugin-store.json", async (PluginStoreStore store, CancellationToken cancellationToken) =>
+  Results.Json((await store.ListAsync(cancellationToken))
+    .Where(item => item.Enabled)
+    .Select(item => new { name = item.Name, package = item.Package, description = item.Description ?? "" })));
+
+app.MapGet("/opencode/admin/plugin-store", async (PluginStoreStore store, CancellationToken cancellationToken) =>
+  Results.Json((await store.ListAsync(cancellationToken)).OrderByDescending(item => item.UpdatedAt)));
+
+app.MapPut("/opencode/admin/plugin-store/{name}", async (string name, PluginStoreOptions body, PluginStoreStore store, CancellationToken cancellationToken) =>
+{
+  var error = PluginStoreStore.Validate(name, body);
+  if (error is not null) return Results.BadRequest(new { error });
+  await store.SetAsync(name, body, cancellationToken);
+  return Results.Ok(new { name = name.Trim() });
+});
+
+app.MapDelete("/opencode/admin/plugin-store/{name}", async (string name, PluginStoreStore store, CancellationToken cancellationToken) =>
+{
+  if (string.IsNullOrWhiteSpace(name)) return Results.BadRequest(new { error = "Store entry name is required" });
+  await store.DeleteAsync(name, cancellationToken);
+  return Results.NoContent();
+});
+
 app.MapGet("/opencode/admin/mcp", async (string? channel, UpdaterConfigStore configStore, McpConfigStore mcps, CancellationToken cancellationToken) =>
 {
   if (UpdaterChannelInfo.TryParse(channel) is not { } selectedChannel)
@@ -1109,6 +1133,12 @@ static async Task EnsureAdminTablesAsync(DbConnection connection, IWebHostEnviro
     );
 
     CREATE TABLE IF NOT EXISTS UpdaterMcpStore (
+      Name TEXT PRIMARY KEY NOT NULL,
+      Config TEXT NOT NULL,
+      Deleted INTEGER NOT NULL DEFAULT 0,
+      UpdatedAt TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS UpdaterPluginStore (
       Name TEXT PRIMARY KEY NOT NULL,
       Config TEXT NOT NULL,
       Deleted INTEGER NOT NULL DEFAULT 0,

@@ -4,14 +4,23 @@ import { AuditPanelComponent } from "./audit-panel.component"
 import { ModelStatusPanelComponent } from "./model-status-panel.component"
 import { McpPanelComponent } from "./mcp-panel.component"
 import { McpStorePanelComponent } from "./mcp-store-panel.component"
+import { PluginStorePanelComponent } from "./plugin-store-panel.component"
 import { TestersPanelComponent } from "./testers-panel.component"
 
-type Page = "upload" | "releases" | "model-status" | "mcp" | "mcp-store" | "testers"
+type Page = "upload" | "releases" | "model-status" | "mcp" | "mcp-store" | "plugin-store" | "testers"
 
 @Component({
   selector: "app-root",
   standalone: true,
-  imports: [UploadPanelComponent, AuditPanelComponent, ModelStatusPanelComponent, McpPanelComponent, McpStorePanelComponent, TestersPanelComponent],
+  imports: [
+    UploadPanelComponent,
+    AuditPanelComponent,
+    ModelStatusPanelComponent,
+    McpPanelComponent,
+    McpStorePanelComponent,
+    PluginStorePanelComponent,
+    TestersPanelComponent,
+  ],
   templateUrl: "./app.component.html",
   styleUrl: "./app.component.css",
 })

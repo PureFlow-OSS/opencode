@@ -96,6 +96,10 @@ export interface AgentApi<E = never> {
   readonly get: AgentGetOperation<E>
 }
 
+export type PluginCatalogInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+export type PluginCatalogOutput = { readonly location: Location.PublicRef; readonly data: Plugin.Catalog }
+export type PluginCatalogOperation<E = never> = (input?: PluginCatalogInput) => Effect.Effect<PluginCatalogOutput, E>
+
 export type PluginListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
 export type PluginListOutput = { readonly location: Location.PublicRef; readonly data: ReadonlyArray<Plugin.Info> }
 export type PluginListOperation<E = never> = (input?: PluginListInput) => Effect.Effect<PluginListOutput, E>
@@ -122,6 +126,7 @@ export type PluginUpdateOutput = void
 export type PluginUpdateOperation<E = never> = (input: PluginUpdateInput) => Effect.Effect<PluginUpdateOutput, E>
 
 export interface PluginApi<E = never> {
+  readonly catalog: PluginCatalogOperation<E>
   readonly list: PluginListOperation<E>
   readonly gui: PluginGuiOperation<E>
   readonly check: PluginCheckOperation<E>
@@ -2700,6 +2705,7 @@ export interface ConfigApi<E = never> {
 }
 
 export type ExperimentalConfigUpdateInput = {
+  readonly plugins?: { readonly [x: Plugin.Package]: boolean }
   readonly shell?: string | null
   readonly mcp?: { readonly servers: { readonly [x: string]: Mcp.LocalConfig | Mcp.RemoteConfig | null } }
 }

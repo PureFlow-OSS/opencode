@@ -95,6 +95,110 @@ const provider = {
 }
 
 describe("Config", () => {
+  it.live("atomically installs, upgrades and removes global packages while retaining options and legacy entries", () =>
+    Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
+      Effect.flatMap((tmp) =>
+        Effect.gen(function* () {
+          const global = path.join(tmp.path, "global")
+          const file = path.join(global, "opencode.jsonc")
+          yield* Effect.promise(async () => {
+            await fs.mkdir(global)
+            await fs.writeFile(
+              file,
+              `{
+            // retain deployment notes and plugin options
+            "shell": "keep-shell",
+            "plugin": ["legacy-package@1.0.0"],
+            "plugins": [{"package":"@company/tools@1.0.0","options":{"token":"private"}}, "tools/read"]
+          }`,
+            )
+          })
+          yield* Effect.gen(function* () {
+            const config = yield* Config.Service
+            yield* Effect.all(
+              [
+                config.update!({ plugins: { "@company/tools@2.0.0": true } }),
+                config.update!({ plugins: { "other-plugin@latest": true } }),
+              ],
+              { concurrency: 2 },
+            )
+            expect(yield* config.globalPlugins!()).toEqual([
+              "legacy-package@1.0.0",
+              "@company/tools@2.0.0",
+              "other-plugin@latest",
+            ])
+            const text = yield* Effect.promise(() => fs.readFile(file, "utf8"))
+            expect(text).toContain("// retain deployment notes")
+            expect(parse(text)).toEqual({
+              shell: "keep-shell",
+              plugins: [
+                { package: "legacy-package@1.0.0" },
+                { package: "@company/tools@2.0.0", options: { token: "private" } },
+                "tools/read",
+                { package: "other-plugin@latest" },
+              ],
+            })
+            yield* Effect.promise(() =>
+              fs.writeFile(file, text.replace('"token": "private"', '// preserve token notes\n"token": "private"')),
+            )
+            yield* config.update!({ plugins: { "@company/tools@3.0.0": true } })
+            const upgraded = yield* Effect.promise(() => fs.readFile(file, "utf8"))
+            expect(upgraded).toContain("// preserve token notes")
+            expect(parse(upgraded).plugins[1]).toEqual({
+              package: "@company/tools@3.0.0",
+              options: { token: "private" },
+            })
+            yield* config.update!({ plugins: { "@company/tools@3.0.0": false } })
+            expect(yield* config.globalPlugins!()).toEqual(["legacy-package@1.0.0", "other-plugin@latest"])
+          }).pipe(Effect.provide(testLayer(tmp.path, global)))
+        }),
+      ),
+    ),
+  )
+
+  it.live("adds the first package, reconciles duplicate versions and refuses malformed global configuration", () =>
+    Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
+      Effect.flatMap((tmp) =>
+        Effect.gen(function* () {
+          const global = path.join(tmp.path, "global")
+          const file = path.join(global, "opencode.jsonc")
+          yield* Effect.promise(async () => {
+            await fs.mkdir(global)
+            await fs.writeFile(file, "{}")
+          })
+          yield* Effect.gen(function* () {
+            const config = yield* Config.Service
+            yield* config.update!({ plugins: { "new-plugin@latest": true } })
+            expect(parse(yield* Effect.promise(() => fs.readFile(file, "utf8"))).plugins).toEqual([
+              { package: "new-plugin@latest" },
+            ])
+            yield* Effect.promise(() =>
+              fs.writeFile(
+                file,
+                JSON.stringify({
+                  plugins: [
+                    { package: "@company/tools@1.0.0", options: { selected: "old" } },
+                    "opencode.tools.read",
+                    { package: "@company/tools@2.0.0", options: { selected: "keep" } },
+                  ],
+                }),
+              ),
+            )
+            yield* config.update!({ plugins: { "@company/tools@3.0.0": true } })
+            expect(parse(yield* Effect.promise(() => fs.readFile(file, "utf8"))).plugins).toEqual([
+              "opencode.tools.read",
+              { package: "@company/tools@3.0.0", options: { selected: "keep" } },
+            ])
+            const malformed = '{"plugins": ['
+            yield* Effect.promise(() => fs.writeFile(file, malformed))
+            yield* config.update!({ plugins: { "new-plugin@latest": true } }).pipe(Effect.flip)
+            expect(yield* Effect.promise(() => fs.readFile(file, "utf8"))).toBe(malformed)
+          }).pipe(Effect.provide(testLayer(tmp.path, global)))
+        }),
+      ),
+    ),
+  )
+
   it.live("persists MCP server patches without losing comments, shell or concurrent server changes", () =>
     Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
       Effect.flatMap((tmp) =>
@@ -595,15 +699,19 @@ describe("Config", () => {
           const credentialNode = makeGlobalNode({
             service: Credential.Service,
             layer: Layer.mock(Credential.Service)({
-              list: () =>
-                Effect.succeed([
-                  new Credential.Info({
-                    id: Credential.ID.create(),
-                    integrationID,
-                    label: "default",
-                    value: Credential.Key.make({ type: "key", key: "secret" }),
-                  }),
-                ]),
+              list: (requested) =>
+                Effect.succeed(
+                  requested === integrationID
+                    ? [
+                        new Credential.Info({
+                          id: Credential.ID.create(),
+                          integrationID,
+                          label: "default",
+                          value: Credential.Key.make({ type: "key", key: "secret" }),
+                        }),
+                      ]
+                    : [],
+                ),
             }),
             deps: [],
           })

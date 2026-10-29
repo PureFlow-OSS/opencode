@@ -15,6 +15,7 @@ import { SettingsList } from "@/settings/list"
 import { pluginLabel, pluginRepairContext } from "@/providers/catalog/plugin"
 import { useTabs } from "@/shell/tabs/tabs"
 import { SettingsMcp } from "@/settings/mcp/mcp"
+import { SettingsPluginStore } from "@/settings/plugins/store"
 import type { SettingsView } from "@/settings/surface"
 import type { PluginInfo } from "@opencode/client"
 import "@/settings/settings.css"
@@ -116,6 +117,7 @@ export const SettingsExtensions: Component<{
                 )}
               </For>
             </div>
+            <SettingsPluginStore onChanged={() => void refetch()} />
           </Tabs.Content>
 
           <Tabs.Content value="skills">

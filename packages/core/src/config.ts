@@ -15,6 +15,8 @@ import { Location } from "./location.js"
 import { AbsolutePath } from "./schema.js"
 import { ConfigVariable } from "./config/variable.js"
 import { ConfigNormalize } from "./config/normalize.js"
+import { ConfigPlugin } from "@opencode/schema/config/plugin"
+import { Plugin } from "@opencode/schema/plugin"
 import { ConfigDiscovery } from "./config/discovery.js"
 import { ConfigWatch } from "./config/watch.js"
 import { ConfigIntegration } from "./config/integration.js"
@@ -83,6 +85,8 @@ export interface Interface {
   readonly changes: () => Stream.Stream<Watcher.Update>
   /** Updates supported global config fields while preserving unrelated JSONC content. */
   readonly update?: (patch: Patch) => Effect.Effect<void, FSUtil.Error>
+  /** Registry declarations in the writable global document, without private plugin options. */
+  readonly globalPlugins?: () => Effect.Effect<readonly string[], FSUtil.Error>
   /**
    * Replaces, or clears with `undefined`, the document an integration connection contributes. It loads right after
    * managed policies: its settings layer below remote, user, and project config, while its policies outrank theirs.
@@ -534,13 +538,17 @@ export const layer = (options?: Options) =>
       )
       yield* reloadLock.withPermit(reconcile(initial))
 
+      const globalDocument = Effect.fn("Config.globalDocument")(function* () {
+        const directory = initial.global ?? AbsolutePath.make(globalService.config)
+        const candidates = ConfigDiscovery.names.map((name) => path.join(directory, name))
+        const filepath = (yield* Effect.filter(candidates, fs.isFile)).at(-1) ?? path.join(directory, "opencode.jsonc")
+        const text = (yield* fs.readFileStringSafe(filepath)) ?? "{}\n"
+        return { filepath, text }
+      })
+
       const update = Effect.fn("Config.update")(
         function* (patch: Patch) {
-          const directory = initial.global ?? AbsolutePath.make(globalService.config)
-          const candidates = ConfigDiscovery.names.map((name) => path.join(directory, name))
-          const filepath =
-            (yield* Effect.filter(candidates, fs.isFile)).at(-1) ?? path.join(directory, "opencode.jsonc")
-          const text = (yield* fs.readFileStringSafe(filepath)) ?? "{}\n"
+          const { filepath, text } = yield* globalDocument()
           const updated = yield* Effect.try({
             try: () => {
               const errors: ParseError[] = []
@@ -548,6 +556,7 @@ export const layer = (options?: Options) =>
               if (errors.length || !isRecord(input)) throw new Error("Cannot update malformed global configuration")
               const mcp = isRecord(input.mcp) ? input.mcp : undefined
               const changes = [
+                ...(patch.plugins ? globalPluginChanges(input, globalPluginEntries(text), patch.plugins) : []),
                 ...("shell" in patch ? [{ path: ["shell"], value: patch.shell ?? undefined }] : []),
                 ...Object.entries(patch.mcp?.servers ?? {}).flatMap(([name, config]) => [
                   // Remove a matching V1 entry too, without treating the native "servers" container as a server.
@@ -577,6 +586,14 @@ export const layer = (options?: Options) =>
       )
 
       return Service.of({
+        globalPlugins: Effect.fn("Config.globalPlugins")(function* () {
+          const document = yield* globalDocument()
+          return yield* Effect.try({
+            try: () =>
+              globalPluginEntries(document.text).flatMap((entry) => (typeof entry === "string" ? [] : [entry.package])),
+            catch: (cause) => new FSUtil.FileSystemError({ method: "config.globalPlugins", cause }),
+          })
+        }),
         corporate: () => Effect.succeed(corporate.current),
         localEntries: () => Effect.succeed(localEntries.current),
         entries: Effect.fnUntraced(function* () {
@@ -620,3 +637,77 @@ export function configured(options?: Options) {
 }
 
 export const node = configured()
+
+function globalPluginEntries(text: string) {
+  const errors: ParseError[] = []
+  const input: unknown = parse(text, errors, { allowTrailingComma: true })
+  if (errors.length) throw new Error("Cannot update malformed global configuration")
+  const result = ConfigNormalize.normalize(input)
+  if (
+    result.type === "rejected" ||
+    result.diagnostics.some((item) => item.path[0] === "plugins" || item.path[0] === "plugin")
+  )
+    throw new Error("Cannot update invalid global plugin declarations")
+  return Schema.decodeUnknownSync(ConfigPlugin.Plugins)(result.encoded.plugins ?? []).map((entry) =>
+    typeof entry === "string" && Schema.is(Plugin.Package)(entry) && !entry.startsWith("opencode.")
+      ? { package: entry }
+      : entry,
+  )
+}
+
+type GlobalConfigChange = { path: (string | number)[]; value: unknown }
+
+function globalPluginChanges(
+  input: Record<string, unknown>,
+  packages: ReturnType<typeof globalPluginEntries>,
+  patch: NonNullable<Patch["plugins"]>,
+): GlobalConfigChange[] {
+  const changes = new Map(
+    Object.entries(patch).map(([target, enabled]) => [target.replace(/@[^/@]+$/, ""), { target, enabled }]),
+  )
+  const positions = new Map(
+    packages.flatMap((entry, index) =>
+      typeof entry === "string" ? [] : [[entry.package.replace(/@[^/@]+$/, ""), index] as const],
+    ),
+  )
+  const additions = Array.from(changes).flatMap(([name, change]) =>
+    change.enabled && !positions.has(name) ? [{ package: change.target }] : [],
+  )
+
+  // Legacy declarations move to the native array once; native updates retain ordering and JSONC comments.
+  if (input.plugin !== undefined)
+    return [
+      { path: ["plugin"], value: undefined },
+      {
+        path: ["plugins"],
+        value: [
+          ...packages.flatMap<ConfigPlugin.Plugin>((entry, index) => {
+            if (typeof entry === "string") return [entry]
+            const name = entry.package.replace(/@[^/@]+$/, "")
+            const change = changes.get(name)
+            if (!change) return [entry]
+            return change.enabled && positions.get(name) === index ? [{ ...entry, package: change.target }] : []
+          }),
+          ...additions,
+        ],
+      },
+    ]
+
+  const native = Array.isArray(input.plugins) ? input.plugins : []
+  return [
+    // Descending removals preserve the indices of entries still to be edited.
+    ...packages
+      .flatMap<GlobalConfigChange>((entry, index) => {
+        if (typeof entry === "string") return []
+        const name = entry.package.replace(/@[^/@]+$/, "")
+        const change = changes.get(name)
+        if (!change) return []
+        if (!change.enabled || positions.get(name) !== index) return [{ path: ["plugins", index], value: undefined }]
+        return isRecord(native[index])
+          ? [{ path: ["plugins", index, "package"], value: change.target }]
+          : [{ path: ["plugins", index], value: { ...entry, package: change.target } }]
+      })
+      .toReversed(),
+    ...additions.map((entry) => ({ path: ["plugins", -1], value: entry })),
+  ]
+}

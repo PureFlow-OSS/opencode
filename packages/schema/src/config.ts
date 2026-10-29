@@ -14,6 +14,7 @@ import { ConfigLSP } from "./config/lsp.js"
 import { ConfigMCP } from "./config/mcp.js"
 import { ConfigModel } from "./config/model.js"
 import { ConfigPlugin } from "./config/plugin.js"
+import { Plugin } from "./plugin.js"
 import { ConfigPolicy } from "./config/policy.js"
 import { ConfigProvider } from "./config/provider.js"
 import { ConfigReference } from "./config/reference.js"
@@ -132,6 +133,8 @@ export const Corporate = Schema.Struct({
 export type Corporate = typeof Corporate.Type
 
 export const Patch = Schema.Struct({
+  /** Add/upgrade registry packages with true, or remove their global declarations with false. */
+  plugins: Schema.optionalKey(Schema.Record(Plugin.Package, Schema.Boolean)),
   shell: Schema.optionalKey(Schema.NullOr(Schema.String)),
   mcp: Schema.optionalKey(
     Schema.Struct({
