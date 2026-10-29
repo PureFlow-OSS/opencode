@@ -6,6 +6,7 @@ import os from "node:os"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import type { Configuration } from "electron-builder"
+import { Predicate } from "effect"
 import { getConfig } from "./electron-builder.config"
 import { CLI_BINARIES, nodePtyPackage } from "./script/utils"
 
@@ -125,7 +126,17 @@ test("shared packaging defaults", async () => {
   expect(config.nsis?.oneClick).toBe(false)
   expect(config.nsis?.allowToChangeInstallationDirectory).toBe(false)
   expect(config.extraResources).toEqual([
-    { from: "resources/", to: "", filter: ["opencode-cli", "opencode-cli.exe", "opencode-cli.version"] },
+    {
+      from: "resources/",
+      to: "",
+      filter: [
+        "opencode-cli",
+        "opencode-cli.exe",
+        "opencode-cli.version",
+        "windows/cli-path.ps1",
+        "windows/cli-path.psm1",
+      ],
+    },
     {
       from: "build/updater-helper/win-x64/",
       to: "updater-helper/",
@@ -136,6 +147,23 @@ test("shared packaging defaults", async () => {
   expect(load("dev", "aarch64-apple-darwin").extraResources).toEqual([
     { from: "resources/", to: "", filter: ["opencode-cli", "opencode-cli.exe", "opencode-cli.version"] },
   ])
+})
+
+test("the Windows CLI registration scripts are included as installer resources", () => {
+  const resources = load("prod", "windows-x64").extraResources
+
+  if (!Array.isArray(resources)) throw new Error("Missing extra resources")
+  const entry = resources.find((item) => !Predicate.isString(item) && item.from === "resources/")
+
+  if (!entry || Predicate.isString(entry)) throw new Error("Missing CLI resources")
+  const dir = path.join(import.meta.dirname, "resources")
+  const filter = new FileMatcher(dir, "", (value: string) => value, entry.filter).createFilter()
+  expect(filter(path.join(dir, "windows"), statSync(path.join(dir, "windows")))).toBe(true)
+
+  for (const name of ["windows/cli-path.ps1", "windows/cli-path.psm1"]) {
+    const file = path.join(dir, name)
+    expect(filter(file, statSync(file)), name).toBe(true)
+  }
 })
 
 test("the output directory can be overridden for local builds", () => {

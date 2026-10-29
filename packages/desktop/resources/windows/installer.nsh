@@ -1,8 +1,5 @@
-; electron-builder names a one-click per-user install directory after the package name, which every
-; channel shares, so OpenCode, OpenCode Beta and OpenCode Dev all installed into one "@opencodedesktop"
-; directory and each channel's installer and uninstaller replaced or deleted the others' files.
-; Each channel now installs into a directory named after its app ID, like its data directory.
-; Only the installer moves, and NSIS rejects a variable that the uninstaller build never sets.
+; Corporate policy requires executables below C:\Entwicklung. Keep GUI and console entry points
+; separate: adding the GUI directory to PATH would make opencode launch OpenCode.exe instead of the CLI.
 !ifndef BUILD_UNINSTALLER
   Var /GLOBAL sharedInstallDir
 !endif
@@ -23,6 +20,40 @@
   nsExec::ExecToLog '"$SYSDIR\icacls.exe" "$INSTDIR" /grant "*S-1-15-2-2:(OI)(CI)(RX)"'
   Pop $0
   !insertmacro leaveSharedInstall
+  !insertmacro installCliCommand
+!macroend
+
+!macro cliUserPath ACTION
+  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$INSTDIR\resources\windows\cli-path.ps1" -Action ${ACTION} -Directory "$INSTDIR\bin"'
+  Pop $0
+  Pop $1
+  ${If} $0 != 0
+    DetailPrint "$1"
+    SetErrorLevel 1
+    Abort
+  ${EndIf}
+  System::Call 'user32::SendMessageTimeoutW(p 0xffff, i 0x1a, p 0, w "Environment", i 2, i 5000, *p .r0)'
+!macroend
+
+!macro installCliCommand
+  ClearErrors
+  CreateDirectory "$INSTDIR\bin"
+  ${If} ${Errors}
+    SetErrorLevel 1
+    Abort
+  ${EndIf}
+  Delete "$INSTDIR\bin\opencode.exe"
+  ; A hard link preserves the signed console binary without storing a second large copy.
+  System::Call 'kernel32::CreateHardLinkW(w "$INSTDIR\bin\opencode.exe", w "$INSTDIR\resources\opencode-cli.exe", p 0) i .r0'
+  ${If} $0 == 0
+    ClearErrors
+    CopyFiles /SILENT "$INSTDIR\resources\opencode-cli.exe" "$INSTDIR\bin\opencode.exe"
+    ${If} ${Errors}
+      SetErrorLevel 1
+      Abort
+    ${EndIf}
+  ${EndIf}
+  !insertmacro cliUserPath Install
 !macroend
 
 ; Removes this channel's files from the shared directory, and the directory with the files every
@@ -47,6 +78,7 @@
 
 !macro customUnInstall
   ${IfNot} ${isUpdated}
+    !insertmacro cliUserPath Uninstall
     !insertmacro removeStagedUpdates $INSTDIR
   ${EndIf}
 !macroend

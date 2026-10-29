@@ -151,7 +151,12 @@ const getBase = (appId: string): Configuration => {
       {
         from: "resources/",
         to: "",
-        filter: ["opencode-cli", "opencode-cli.exe", "opencode-cli.version"],
+        filter: [
+          "opencode-cli",
+          "opencode-cli.exe",
+          "opencode-cli.version",
+          ...(target.os === "win32" ? ["windows/cli-path.ps1", "windows/cli-path.psm1"] : []),
+        ],
       },
       ...(target.os === "win32"
         ? [

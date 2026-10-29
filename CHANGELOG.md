@@ -6,6 +6,8 @@ Release notes for OpenCode V2, newest first.
 
 ### Highlights
 
+- **Windows CLI Command**: The installer registers `opencode` through a console entry point under `C:\Entwicklung\OpenCode\bin` and the user PATH, without requiring Node.js. Updates retain registration; uninstall removes its own PATH entry.
+
 - **Corporate Plugin Store**: Manage optional npm plugin packages and their visibility in the updater admin UI, and install or remove them under Extensions → Plugins. Version changes preserve options and order; changes during active agent work require confirmation.
 
 - **Image Generation by Default**: When a connected provider supports image models, agents can now use `experimental_image_generate` without additional configuration. Set its preferred model through `experimental.image_generate.model`. ([#60258](https://github.com/anomalyco/opencode/pull/60258))

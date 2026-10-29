@@ -9,6 +9,14 @@ bun install
 bun dev
 ```
 
+## Windows CLI command
+
+The corporate Windows installer creates `C:\Entwicklung\OpenCode\bin\opencode.exe` from the bundled console CLI and puts that directory first in the current user's PATH. It uses a hard link where supported, with a copy fallback. No Node.js installation is needed.
+
+Open a fresh terminal after installation (restart an existing Windows Terminal host if it still has the old environment), then run `opencode --version` or `Get-Command opencode`. The GUI directory itself is not added, so the command resolves to the console entry point.
+
+Registration preserves unrelated PATH entries, `%VARIABLE%` references, Unicode and the registry string type. Upgrades retain the entry; a normal uninstall removes only this installation's CLI directory from the user PATH. The machine PATH is left unchanged.
+
 ## Build
 
 `bun run build` prepares `resources/` (icons, metainfo and the bundled CLI) and builds the app into `out/`.
