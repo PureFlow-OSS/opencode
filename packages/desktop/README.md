@@ -19,6 +19,10 @@ Registration preserves unrelated PATH entries, `%VARIABLE%` references, Unicode 
 
 ## Build
 
+For a local corporate Windows installer, run `script/package-desktop-electron-win.ps1` from the repository root. `OPENCODE_ELECTRON_OUTPUT_DIR` selects its output directory (relative to `packages/desktop`, or an absolute path); the default is `dist`. The same resolved directory receives `changelog.md`.
+
+`package:win` explicitly loads `electron-builder.config.ts`, and `package.json` also declares that configuration for direct electron-builder calls. The configured allowlist packages `out/`, selected resources and runtime dependencies; previous `dist-*` releases and the embedded CLI do not belong inside `app.asar`. The CLI is shipped separately as an extra resource.
+
 `bun run build` prepares `resources/` (icons, metainfo and the bundled CLI) and builds the app into `out/`.
 `bun run pack` then packages it, unsigned, into `dist/desktop/` at the repository root: a `.app` tarball on macOS,
 the unpacked app on Windows, and AppImage/deb/rpm on Linux. The release workflow signs and notarizes afterwards.

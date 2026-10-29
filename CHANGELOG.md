@@ -6,6 +6,8 @@ Release notes for OpenCode V2, newest first.
 
 ### Highlights
 
+- **Windows Packaging Configuration**: Build entry points now consistently load the corporate Electron Builder configuration, honor the selected output directory and copy the changelog there. Previous release folders are excluded from the application archive.
+
 - **Windows CLI Command**: The installer registers `opencode` through a console entry point under `C:\Entwicklung\OpenCode\bin` and the user PATH, without requiring Node.js. Updates retain registration; uninstall removes its own PATH entry.
 
 - **Corporate Plugin Store**: Manage optional npm plugin packages and their visibility in the updater admin UI, and install or remove them under Extensions → Plugins. Version changes preserve options and order; changes during active agent work require confirmation.

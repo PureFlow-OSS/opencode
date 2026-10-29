@@ -24,6 +24,14 @@ $desktopPackage = Get-Content (Join-Path $desktopDirectory "package.json") -Raw 
 $originalOpenCodeVersion = $env:OPENCODE_VERSION
 $originalOpenCodeCliDist = $env:OPENCODE_CLI_DIST
 $originalOpenCodeTarget = $env:OPENCODE_TARGET
+$originalOutputDirectory = $env:OPENCODE_ELECTRON_OUTPUT_DIR
+$outputDirectory = if ([string]::IsNullOrWhiteSpace($originalOutputDirectory)) {
+  Join-Path $desktopDirectory "dist"
+} elseif ([IO.Path]::IsPathRooted($originalOutputDirectory.Trim())) {
+  [IO.Path]::GetFullPath($originalOutputDirectory.Trim())
+} else {
+  [IO.Path]::GetFullPath((Join-Path $desktopDirectory $originalOutputDirectory.Trim()))
+}
 $openCodeVersionWasSetByScript = $false
 $openCodeCliDistWasSetByScript = $false
 if (-not $originalOpenCodeVersion) {
@@ -33,6 +41,8 @@ if (-not $originalOpenCodeVersion) {
 
 Push-Location $desktopDirectory
 try {
+  # The packager and changelog copy must use the same directory, resolved before either build runs.
+  $env:OPENCODE_ELECTRON_OUTPUT_DIR = $outputDirectory
   if ($SkipCliBuild -and -not $env:OPENCODE_CLI_DIST) {
     throw "-SkipCliBuild requires OPENCODE_CLI_DIST to point to an existing CLI distribution"
   }
@@ -63,19 +73,11 @@ try {
 
   $env:OPENCODE_TARGET = "windows-x64"
   Invoke-Bun @("build")
-  Invoke-Bun @(
-    "package:win",
-    "--",
-    "--publish", "never",
-    "-c.extraMetadata.version=$env:OPENCODE_VERSION"
-  )
+  # package:win explicitly loads electron-builder.config.ts, which reads version/output from the environment.
+  Invoke-Bun @("package:win")
 
-  $outputDirectory = if ([string]::IsNullOrWhiteSpace($env:OPENCODE_ELECTRON_OUTPUT_DIR)) {
-    Join-Path $desktopDirectory "dist"
-  } elseif ([IO.Path]::IsPathRooted($env:OPENCODE_ELECTRON_OUTPUT_DIR.Trim())) {
-    [IO.Path]::GetFullPath($env:OPENCODE_ELECTRON_OUTPUT_DIR.Trim())
-  } else {
-    [IO.Path]::GetFullPath((Join-Path $desktopDirectory $env:OPENCODE_ELECTRON_OUTPUT_DIR.Trim()))
+  if (-not (Test-Path -LiteralPath (Join-Path $outputDirectory "opencode-desktop-win-x64.exe") -PathType Leaf)) {
+    throw "The configured Windows installer was not produced in $outputDirectory. Check the loaded electron-builder configuration."
   }
   Copy-Item -LiteralPath (Join-Path $desktopDirectory "../../CHANGELOG.md") -Destination (Join-Path $outputDirectory "changelog.md") -Force
 
@@ -84,6 +86,7 @@ try {
 finally {
   Pop-Location
   [Environment]::SetEnvironmentVariable("OPENCODE_TARGET", $originalOpenCodeTarget, "Process")
+  [Environment]::SetEnvironmentVariable("OPENCODE_ELECTRON_OUTPUT_DIR", $originalOutputDirectory, "Process")
   if ($openCodeVersionWasSetByScript) {
     [Environment]::SetEnvironmentVariable("OPENCODE_VERSION", $originalOpenCodeVersion, "Process")
   }
