@@ -12,6 +12,7 @@ export default {
 function FormStory(props: { name: string; config: Mcp.ServerConfig; preset?: boolean }) {
   const dialog = useDialog()
   const [state, setState] = createStore({ saved: "", config: props.config })
+
   return (
     <>
       <Button

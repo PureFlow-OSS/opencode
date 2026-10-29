@@ -28,9 +28,11 @@ export function serverRows(input: { entries: readonly ConfigEntry[]; catalog: Ma
   const names = [...new Set([...Object.keys(configured), ...Object.keys(input.catalog.managed)])]
 
   const rows = names
+    .values()
     .map((name): ServerRow | undefined => {
       const managed = input.catalog.managed[name]
       const config = configured[name]
+
       if (managed)
         return {
           name,
@@ -40,9 +42,12 @@ export function serverRows(input: { entries: readonly ConfigEntry[]; catalog: Ma
           locked: managed.locked ?? true,
           auth: managed.auth,
         }
+
       if (config) return { name, source: "local" as const, config, locked: false }
     })
     .filter((row): row is ServerRow => row !== undefined)
+    .toArray()
+
   return rows.toSorted((a, b) => a.name.localeCompare(b.name))
 }
 
@@ -51,6 +56,7 @@ export function patValue(row: ServerRow) {
   const header = row.auth.header ?? "Authorization"
   const prefix = row.auth.prefix ?? ""
   const value = row.override.headers?.[header] ?? ""
+
   return prefix && value.startsWith(prefix) ? value.slice(prefix.length) : value
 }
 
@@ -58,7 +64,9 @@ export function patConfig(row: ServerRow, token: string): Mcp.RemoteConfig | und
   if (row.source !== "managed" || row.config.type !== "remote" || row.auth?.type !== "pat") return
   const header = row.auth.header ?? "Authorization"
   const prefix = row.auth.prefix ?? ""
-  const headers = { ...(row.config.headers ?? {}), ...(row.override?.type === "remote" ? row.override.headers : {}) }
+  const override = row.override?.type === "remote" ? row.override.headers : undefined
+  const headers = { ...row.config.headers, ...override }
+
   return { ...row.config, headers: { ...headers, [header]: `${prefix}${token}` } }
 }
 
@@ -75,6 +83,7 @@ export function storeConfig(item: Mcp.StoreItem): Mcp.RemoteConfig {
 export function isValidRemoteUrl(value: string) {
   try {
     const url = new URL(value)
+
     return url.protocol === "http:" || url.protocol === "https:"
   } catch {
     return false
@@ -83,5 +92,6 @@ export function isValidRemoteUrl(value: string) {
 
 export function subtitle(row: ServerRow) {
   const config = row.override ?? row.config
+
   return config.type === "local" ? config.command.join(" ") : config.url
 }

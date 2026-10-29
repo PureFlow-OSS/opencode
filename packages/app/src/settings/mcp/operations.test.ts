@@ -3,6 +3,7 @@ import type { Mcp } from "@opencode/schema/mcp"
 import { createMcpOperations, isMcpNotFound } from "./operations"
 
 const calls: string[] = []
+
 const push = (call: string) => {
   calls.push(call)
 }

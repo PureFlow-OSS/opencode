@@ -10,7 +10,7 @@ import { AiFactoryPlugin, OpenCodeDocument } from "@opencode/core/plugin/provide
 import { ProviderPlugins } from "@opencode/core/plugin/provider"
 import { Provider } from "@opencode/core/provider"
 import { SessionUsage } from "@opencode/core/session/usage"
-import { Usage } from "@opencode/ai"
+import { Usage } from "@opencode/ai/effect"
 import { Document, Info } from "@opencode/schema/config"
 import { describe, expect, test } from "bun:test"
 import { Effect, Layer, Schema } from "effect"

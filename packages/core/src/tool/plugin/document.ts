@@ -2,7 +2,7 @@ export * as DocumentTools from "./document.js"
 
 import { define } from "@opencode/plugin/effect/plugin"
 import type { SessionRequest } from "@opencode/plugin/effect/session"
-import { LanguageModel, LLM, LLMClient, Media, Message, ToolFailure, type ContentPart } from "@opencode/ai"
+import { LanguageModel, LLM, LLMClient, Media, Message, ToolFailure, type ContentPart } from "@opencode/ai/effect"
 import { Global } from "@opencode/util/global"
 import { Effect, Option, Schema } from "effect"
 import path from "node:path"

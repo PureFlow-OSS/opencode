@@ -8,6 +8,7 @@ const servers: ReturnType<typeof Bun.serve>[] = []
 function server(statuses: MigrationV1StatusOutput[]) {
   let request = 0
   const requested: MigrationV1StatusOutput[] = []
+
   const local = Bun.serve({
     port: 0,
     fetch(served) {
@@ -17,6 +18,7 @@ function server(statuses: MigrationV1StatusOutput[]) {
       const index = request++
       const status = statuses[Math.min(index, statuses.length - 1)]
       requested.push(status)
+
       return Response.json(status)
     },
   })
@@ -43,6 +45,7 @@ describe("renderer migration gating", () => {
       { status: "running", progress: { label: "Migrating sessions" } },
       { status: "completed" },
     ])
+
     servers.push(local.local)
 
     await awaitMigrationCompleted(serverData(local.local.url.toString()), new AbortController().signal)
@@ -64,13 +67,16 @@ describe("renderer migration gating", () => {
 
   test("stops polling when the caller aborts", async () => {
     const firstRequest = Promise.withResolvers<void>()
+
     const local = Bun.serve({
       port: 0,
       fetch(served) {
         firstRequest.resolve()
+
         return Response.json({ status: "running", progress: { label: "Migrating sessions" } })
       },
     })
+
     servers.push(local)
 
     const abort = new AbortController()

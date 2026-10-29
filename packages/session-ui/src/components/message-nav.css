@@ -162,7 +162,7 @@
 
 [data-slot="message-nav-title-preview"] {
   font-size: 14px; /* text-14-regular */
-  color: var(--text-base);
+  color: var(--v2-text-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -170,7 +170,7 @@
   text-align: left;
 
   &[data-active] {
-    color: var(--text-strong);
+    color: var(--v2-text-text-base);
     font-weight: 500;
   }
 }
@@ -188,7 +188,7 @@
 }
 
 [data-slot="message-nav-item"]:active [data-slot="message-nav-title-preview"] {
-  color: var(--text-base);
+  color: var(--v2-text-text-muted);
 }
 
 @media (prefers-reduced-motion: reduce) {

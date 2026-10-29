@@ -14,6 +14,7 @@ export const Extensions = {
     const [subtab, setSubtab] = createSignal<SettingsView["subtab"]>("mcps")
     const releaseCatalog = deferMcpCatalog()
     setMcpActivity({ running: false, writes: [] })
+
     return (
       <QueryClientProvider client={new QueryClient()}>
         <button onClick={releaseCatalog}>Load MCP catalog</button>

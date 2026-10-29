@@ -1,5 +1,5 @@
 import { define } from "@opencode/plugin/effect/plugin"
-import { isRecord } from "@opencode/ai/utils/record"
+import { isRecord } from "@opencode/util/record"
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http"
 import { Bus } from "../../bus.js"
 import { Config } from "../../config.js"

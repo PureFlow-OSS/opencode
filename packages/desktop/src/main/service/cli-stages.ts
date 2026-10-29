@@ -29,18 +29,21 @@ export const stageCli = Effect.fn("DesktopCli.install")(function* (
 // Each version and architecture stages its own copy of the CLI, and only the current one is ever started
 // again: a downgrade stages its copy anew. Windows refuses to delete an executable that has not exited yet,
 // so a failed removal is logged and retried on the next launch.
-export const cleanStages = Effect.fn("DesktopCli.cleanStages")(function* (binary: string) {
+export const cleanStages = Effect.fn("DesktopCli.cleanStages")(function* (
+  binary: string,
+  options?: { readonly keep?: ReadonlyArray<string> },
+) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const current = path.dirname(binary)
   const root = path.dirname(current)
+  const keep = new Set([path.basename(current), ...(options?.keep ?? [])])
   const entries = yield* fs.readDirectory(root)
   yield* Effect.forEach(
     entries,
     Effect.fnUntraced(function* (entry) {
+      if (keep.has(entry) || options?.keep?.some((stage) => entry.startsWith(stage + "-"))) return
       const target = path.join(root, entry)
-
-      if (target === current) return
       const stat = yield* fs.stat(target).pipe(Effect.orElseSucceed(() => undefined))
 
       if (stat?.type !== "Directory") return

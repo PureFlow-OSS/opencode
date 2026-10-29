@@ -25,6 +25,7 @@ const selection = Schema.decodeUnknownSync(ConfigModel.Selection)
 const storedCredentialLayer = Layer.succeed(
   Credential.Service,
   Credential.Service.of({
+    lock: (_id, operation) => operation,
     all: () => Effect.die("unused Credential.all"),
     list: (integrationID) =>
       integrationID === "aifactory"

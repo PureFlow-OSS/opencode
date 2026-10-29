@@ -1,4 +1,4 @@
-import { expect, story } from "../../storybook/playwright/story"
+import { expect, story } from "../../stories/playwright/story"
 
 story("embeds MCP management and the store in the native extensions tab", async ({ mount, page }) => {
   const component = await mount("settings-mcp--extensions")

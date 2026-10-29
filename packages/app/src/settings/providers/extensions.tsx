@@ -1,32 +1,37 @@
-import { Component, For, Show, createEffect, createMemo, createResource, onCleanup } from "solid-js"
+import { Component, For, createEffect, createResource, onCleanup, type JSX } from "solid-js"
+import { useDialog } from "@opencode/ui/context/dialog"
+import { Icon } from "@opencode/ui/icon"
 import { Button } from "@opencode/ui/button"
 import { Dialog, DialogFooter, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
-import { Icon } from "@opencode/ui/icon"
-import { useDialog } from "@opencode/ui/context/dialog"
 import { Tabs } from "@opencode/ui/tabs"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useServerSDK } from "@/runtime/server/client"
-import { useData, useServer } from "@/runtime/server/current"
-import { pluginLabel, pluginRepairContext } from "@/providers/catalog/plugin"
+import { ServerConnection } from "@/runtime/server/registry"
+import { ExtensionPlugins } from "@/runtime/plugin/extension-plugins"
 import { ExternalLink } from "@/runtime/platform/external-link"
-import { useTabs } from "@/shell/tabs/tabs"
+import { usePlatform } from "@/runtime/platform/platform"
+import { useData, useServer } from "@/runtime/server/current"
 import { SettingsList } from "@/settings/list"
+import { pluginLabel, pluginRepairContext } from "@/providers/catalog/plugin"
+import { useTabs } from "@/shell/tabs/tabs"
 import { SettingsMcp } from "@/settings/mcp/mcp"
 import type { SettingsView } from "@/settings/surface"
 import type { PluginInfo } from "@opencode/client"
-import { ServerConnection } from "@/runtime/server/registry"
 import "@/settings/settings.css"
+import "@/shell/search-list.css"
 
 export const SettingsExtensions: Component<{
+  directory?: string
   subtab?: SettingsView["subtab"]
   onSubtab: (value: SettingsView["subtab"]) => void
+  headerAction?: JSX.Element
 }> = (props) => {
   const language = useLanguage()
   const dialog = useDialog()
   const serverSdk = useServerSDK()
   const data = useData()
+  const platform = usePlatform()
 
-  // Reading `.latest` rethrows a failed fetch, so these lists fall back to empty instead of crashing the page.
   const [pluginList, { refetch }] = createResource(
     () => serverSdk.connection.status() === "connected",
     () =>
@@ -37,13 +42,9 @@ export const SettingsExtensions: Component<{
     { initialValue: [] },
   )
 
-  const plugins = createMemo(() =>
-    pluginList.state === "ready" || pluginList.state === "refreshing"
-      ? pluginList.latest.filter((plugin) => plugin.source.type !== "builtin")
-      : [],
-  )
-
   onCleanup(serverSdk.event.on("plugin.updated", () => void refetch()))
+  // The desktop window runs the GUIs of its own server's plugins, so only that server's rows control them.
+  const own = () => !!platform.plugins && ServerConnection.builtin(serverSdk.server)
 
   createEffect(() => {
     if (serverSdk.connection.status() !== "connected") return
@@ -55,10 +56,11 @@ export const SettingsExtensions: Component<{
     <>
       <div class="settings-tab-header">
         <div class="settings-tab-header-row">
-          <div class="flex flex-col gap-1">
+          <div class="flex min-w-0 flex-col gap-1">
             <h2 class="settings-tab-title">{language.t("settings.tab.extensions")}</h2>
             <span class="text-11-regular text-v2-text-text-muted">{language.t("settings.extensions.description")}</span>
           </div>
+          <div class="settings-tab-header-actions">{props.headerAction}</div>
         </div>
       </div>
 
@@ -91,41 +93,28 @@ export const SettingsExtensions: Component<{
                   {language.t("settings.extensions.manageConfig")}
                 </span>
               </div>
-              <SettingsList variant="catalog">
-                <For each={plugins()}>
-                  {(plugin) => (
-                    <div class="settings-extension-row">
-                      <div class="settings-extension-lead">
-                        <Icon name="cube" class="text-v2-icon-icon-muted shrink-0" />
-                        <div class="flex min-w-0 flex-col gap-0.5">
-                          <span class="settings-extension-name truncate">{pluginLabel(plugin)}</span>
-                          <Show when={plugin.state.status === "failed"}>
-                            <span class="text-11-regular text-v2-state-fg-danger">
-                              {language.t("settings.extensions.plugin.failed")}
-                            </span>
-                            <span class="truncate text-11-regular text-v2-text-text-muted">
-                              {pluginRepairContext(plugin, data.location.default().directory)?.error}
-                            </span>
-                          </Show>
-                        </div>
-                      </div>
-                      <Show when={plugin.state.status === "failed"}>
-                        <Button
-                          size="small"
-                          variant="neutral"
-                          onClick={() => {
-                            const directory = data.location.default().directory
-
-                            dialog.show(() => <DialogPluginRepair directory={directory} plugin={plugin} />)
-                          }}
-                        >
-                          {language.t("settings.extensions.plugin.repair")}
-                        </Button>
-                      </Show>
-                    </div>
-                  )}
-                </For>
-              </SettingsList>
+              <ExtensionPlugins plugins={pluginList.latest ?? []} own={own()} />
+              <For
+                each={(pluginList.latest ?? []).filter(
+                  (plugin) => plugin.source.type !== "builtin" && plugin.state.status === "failed",
+                )}
+              >
+                {(plugin) => (
+                  <div class="settings-extension-row">
+                    <span class="settings-extension-name">{pluginLabel(plugin)}</span>
+                    <Button
+                      variant="neutral"
+                      onClick={() =>
+                        dialog.show(() => (
+                          <DialogPluginRepair directory={data.location.default().directory} plugin={plugin} />
+                        ))
+                      }
+                    >
+                      {language.t("settings.extensions.plugin.repair")}
+                    </Button>
+                  </div>
+                )}
+              </For>
             </div>
           </Tabs.Content>
 
@@ -135,7 +124,7 @@ export const SettingsExtensions: Component<{
                 <span class="settings-extension-heading text-13-medium">
                   {language.t("settings.extensions.availableAll")}
                 </span>
-                <ExternalLink class="settings-extension-link text-13-regular" href="https://opencode.ai/docs/skills/">
+                <ExternalLink class="settings-extension-link text-13-regular" href="https://opencode.ai/v2/docs/skills">
                   {language.t("settings.extensions.addSkills")}
                 </ExternalLink>
               </div>

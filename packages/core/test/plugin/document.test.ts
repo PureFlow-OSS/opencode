@@ -1,6 +1,6 @@
 import { describe, expect } from "bun:test"
 import { PDFDocument } from "@napi-rs/canvas"
-import { Message, Media } from "@opencode/ai"
+import { Message, Media } from "@opencode/ai/effect"
 import { Agent } from "@opencode/core/agent"
 import { Config } from "@opencode/core/config"
 import { Model } from "@opencode/core/model"

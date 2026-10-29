@@ -2,10 +2,9 @@ import type { AgentListOutput, ModelListOutput, ProviderListOutput } from "@open
 import type { Agent, Project, Provider, ProviderListResponse } from "@/runtime/server/types"
 import type { Project as CurrentProject } from "@opencode/client/promise"
 import { unwrap } from "solid-js/store"
+import { Predicate } from "effect"
 
 export { pathKey as directoryKey, type PathKey as DirectoryKey } from "@/workspaces/path-key"
-
-export const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
 const providerCatalogs = new WeakMap<
   ProviderListOutput["data"],
@@ -13,28 +12,31 @@ const providerCatalogs = new WeakMap<
 >()
 
 export function normalizeAgentList(input: AgentListOutput["data"] | Agent[]): Agent[] {
-  if (input.every((agent) => !("request" in agent))) return input as Agent[]
+  return input.map((agent) => {
+    if (!("request" in agent)) return agent
 
-  return (input as AgentListOutput["data"]).map((agent) => ({
-    name: agent.id,
-    description: agent.description,
-    mode: agent.mode,
-    hidden: agent.hidden,
-    temperature:
-      typeof agent.request.settings.temperature === "number" ? agent.request.settings.temperature : undefined,
-    topP: typeof agent.request.settings.topP === "number" ? agent.request.settings.topP : undefined,
-    color: agent.color,
-    permission: agent.permissions.map((rule) => ({
-      permission: rule.action,
-      pattern: rule.resource,
-      action: rule.effect,
-    })),
-    model: agent.model && { providerID: agent.model.providerID, modelID: agent.model.id },
-    variant: agent.model?.variant,
-    prompt: agent.system,
-    options: agent.request.settings,
-    steps: agent.steps,
-  }))
+    return {
+      name: agent.id,
+      description: agent.description,
+      mode: agent.mode,
+      hidden: agent.hidden,
+      temperature: Predicate.isNumber(agent.request.settings.temperature)
+        ? agent.request.settings.temperature
+        : undefined,
+      topP: Predicate.isNumber(agent.request.settings.topP) ? agent.request.settings.topP : undefined,
+      color: agent.color,
+      permission: agent.permissions.map((rule) => ({
+        permission: rule.action,
+        pattern: rule.resource,
+        action: rule.effect,
+      })),
+      model: agent.model && { providerID: agent.model.providerID, modelID: agent.model.id },
+      variant: agent.model?.variant,
+      prompt: agent.system,
+      options: agent.request.settings,
+      steps: agent.steps,
+    }
+  })
 }
 
 export function normalizeProviderList(

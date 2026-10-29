@@ -4,6 +4,7 @@ import { directoryKey, normalizeAgentList, normalizeProjectInfo, normalizeProvid
 
 describe("normalizeAgentList", () => {
   test("adapts current agents to the app agent shape", () => {
+    // SAFETY: this fixture provides every agent field consumed by normalizeAgentList.
     const result = normalizeAgentList([
       {
         id: "build",
@@ -16,6 +17,7 @@ describe("normalizeAgentList", () => {
         system: "Build software",
         permissions: [{ action: "read", resource: "*", effect: "allow" }],
       },
+      // SAFETY: these controlled fixtures set every field read by the catalog normalizer; unrelated API fields are omitted.
     ] as AgentListOutput["data"])
 
     expect(result).toEqual([
@@ -40,7 +42,9 @@ describe("normalizeAgentList", () => {
 
 describe("normalizeProviderList", () => {
   test("groups current models into the app provider catalog", () => {
+    // SAFETY: these fixtures provide every provider and model field consumed by normalizeProviderList.
     const result = normalizeProviderList(
+      // SAFETY: these controlled fixtures set every field read by the catalog normalizer; unrelated API fields are omitted.
       [{ id: "openai", name: "OpenAI", package: "@ai-sdk/openai" }] as ProviderListOutput["data"],
       [
         {
@@ -82,6 +86,7 @@ describe("normalizeProviderList", () => {
           enabled: true,
           limit: { context: 1, output: 1 },
         },
+        // SAFETY: these controlled fixtures set every field read by the catalog normalizer; unrelated API fields are omitted.
       ] as ModelListOutput["data"],
     )
 
@@ -102,8 +107,11 @@ describe("normalizeProviderList", () => {
 describe("normalizeProjectInfo", () => {
   test("keeps the project VCS backend", () => {
     const project = { id: "prj", canonical: "/repo", time: { created: 1, updated: 1, active: 1 }, sandboxes: [] }
+    // SAFETY: these controlled fixtures set every field read by the catalog normalizer; unrelated API fields are omitted.
     expect(normalizeProjectInfo({ ...project, vcs: "git" } as Project).vcs).toBe("git")
+    // SAFETY: these controlled fixtures set every field read by the catalog normalizer; unrelated API fields are omitted.
     expect(normalizeProjectInfo({ ...project, vcs: "hg" } as Project).vcs).toBe("hg")
+    // SAFETY: these controlled fixtures set every field read by the catalog normalizer; unrelated API fields are omitted.
     expect(normalizeProjectInfo(project as Project).vcs).toBeUndefined()
   })
 })

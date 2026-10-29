@@ -1,6 +1,6 @@
 export * as ConfigManaged from "./managed.js"
 
-import { isRecord } from "@opencode/ai/utils/record"
+import { isRecord } from "@opencode/util/record"
 import { HttpProxy } from "@opencode/util/http-proxy"
 import { Option, Schema } from "effect"
 
@@ -79,3 +79,7 @@ export async function readProviderConfig(
   cache.set(`${url}|${key}`, { until: Date.now() + 300_000, payload })
   return payload
 }
+import { Config } from "@opencode/schema/config"
+
+/** A document from managed configuration: the system config directory or MDM managed preferences. */
+export class Document extends Config.Document.extend<Document>("Config.ManagedDocument")({}) {}

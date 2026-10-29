@@ -39,6 +39,7 @@ export const SettingsMcp: Component = () => {
   const connected = () => serverSdk.connection.status() === "connected"
   const directory = () => data.location.default().directory
   const ref = () => (directory() ? { directory: directory() } : undefined)
+
   const refresh = async () => {
     await Promise.all([config.refetch(), catalog.refetch()])
     data.location.mcp.server.invalidate(ref())
@@ -46,10 +47,13 @@ export const SettingsMcp: Component = () => {
     data.location.mcp.resource.invalidate(ref())
     await data.location.mcp.resource.sync(ref()).catch(() => undefined)
   }
+
   const sessionRunning = () => data.session.active().length > 0
+
   const confirmDisruption = () => {
     if (!sessionRunning()) return Promise.resolve(true)
     const id = `mcp-disruption-${++dialogID}`
+
     return new Promise<boolean>((resolve) => {
       void dialog.push(
         () => (
@@ -91,9 +95,10 @@ export const SettingsMcp: Component = () => {
       if (input.config) {
         return await operations.save(input.name, input.config, { disrupts: input.disrupts })
       }
+
       return await operations.remove(input.name)
     },
-    onError: (error: unknown) =>
+    onError: (error) =>
       showToast({
         variant: "error",
         title: language.t("common.requestFailed"),
@@ -110,20 +115,26 @@ export const SettingsMcp: Component = () => {
           : (catalog.data?.data ?? { managed: {}, store: [] }),
     }),
   )
+
   const status = (name: string) => data.location.mcp.server.list(ref())?.find((server) => server.name === name)?.status
+
   const changeConnection = async (name: string, enabled: boolean) => {
     if (toggle.isPending || persist.isPending) return
+
     if (status(name)?.status === "connected" && !(await confirmDisruption())) return
     toggle.mutate({ name, enabled })
   }
+
   const rowsByName = createMemo(() => new Map(rows().map((row) => [row.name, row])))
   const catalogUnavailable = () => catalog.isPending || catalog.isError
+
   const storeItems = createMemo(() =>
     catalogUnavailable() ? [] : (catalog.data?.data.store ?? []).toSorted((a, b) => a.name.localeCompare(b.name)),
   )
 
   const saveForm = async (name: string, configValue: Mcp.ServerConfig, disrupts = false) => {
     const saved = await persist.mutateAsync({ name, config: configValue, disrupts })
+
     if (!saved) return false
     showToast({
       variant: "success",
@@ -134,26 +145,33 @@ export const SettingsMcp: Component = () => {
 
   const savePat = async (row: ReturnType<typeof rows>[number], token: string) => {
     const configValue = patConfig(row, token)
+
     if (!configValue) return false
     const saved = await persist.mutateAsync({ name: row.name, config: configValue, disrupts: true })
+
     if (!saved) return false
     const runtimeStatus = status(row.name)
+
     if (runtimeStatus?.status === "connected") {
       showToast({
         variant: "success",
         title: language.t("settings.mcp.toast.connected.title"),
         description: language.t("settings.mcp.toast.connected.description", { name: row.name }),
       })
+
       return true
     }
+
     if (runtimeStatus?.status === "failed" || runtimeStatus?.status === "needs_auth") {
       showToast({
         variant: "error",
         title: language.t("common.requestFailed"),
         description: runtimeStatus.error,
       })
+
       return true
     }
+
     showToast({
       variant: "success",
       title: language.t("settings.mcp.toast.saved.title"),
@@ -164,6 +182,7 @@ export const SettingsMcp: Component = () => {
   const remove = async (row: ReturnType<typeof rows>[number]) => {
     if (row.source !== "local") return false
     const removed = await persist.mutateAsync({ name: row.name, config: null })
+
     if (!removed) return false
     showToast({
       variant: "success",

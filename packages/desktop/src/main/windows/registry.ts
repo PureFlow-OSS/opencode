@@ -1,6 +1,10 @@
 // Tracks open windows and the persisted window id list used to restore
 // windows (and their per-window persisted state) across app launches.
+import { Predicate } from "effect"
+
 export function createWindowRegistry<W>(persistence: {
+  // SAFETY: persisted JSON is untrusted; persisted() checks the array and validates every nonempty string ID.
+  // eslint-disable-next-line anti-slop/no-unknown-returns
   read: () => unknown
   write: (ids: string[]) => void
 }) {
@@ -13,7 +17,7 @@ export function createWindowRegistry<W>(persistence: {
 
     if (!Array.isArray(value)) return []
 
-    return [...new Set(value.filter((id): id is string => typeof id === "string" && id.length > 0))]
+    return [...new Set(value.filter((id): id is string => Predicate.isString(id) && id.length > 0))]
   }
 
   return {

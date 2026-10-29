@@ -1,5 +1,6 @@
 export * as PersistentPty from "./index.js"
 
+import { stat } from "node:fs/promises"
 import path from "node:path"
 import { Context, Effect, Layer, Schema } from "effect"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
@@ -57,6 +58,11 @@ export class NotFoundError extends Schema.TaggedError<NotFoundError>()("Persiste
   ptyID: Pty.ID,
 }) {}
 
+export class InvalidCwdError extends Schema.TaggedError<InvalidCwdError>()("PersistentPty.InvalidCwdError", {
+  cwd: Schema.String,
+  message: Schema.String,
+}) {}
+
 export interface Interface {
   readonly list: (sessionID?: Session.ID) => Effect.Effect<Info[], UnavailableError>
   readonly get: (id: Pty.ID) => Effect.Effect<Info, NotFoundError | UnavailableError>
@@ -71,7 +77,7 @@ export interface Interface {
       readonly cols?: number
       readonly rows?: number
     },
-  ) => Effect.Effect<Info, UnavailableError>
+  ) => Effect.Effect<Info, InvalidCwdError | UnavailableError>
   readonly write: (
     id: Pty.ID,
     data: string,
@@ -158,13 +164,22 @@ const makeLayer = (options: Options = {}) =>
         sessionID: Session.ID,
         input: Parameters<Interface["create"]>[1],
       ) {
+        const cwd = path.resolve(input.cwd ?? "/")
+        // opencode-pty's PTY library silently falls back to $HOME when the cwd is not a directory.
+        const directory = yield* Effect.promise(() =>
+          stat(cwd).then(
+            (info) => info.isDirectory(),
+            () => false,
+          ),
+        )
+        if (!directory) return yield* new InvalidCwdError({ cwd, message: `cwd is not a directory: ${cwd}` })
         const response = yield* request(
           daemon,
           {
             op: "create",
             program: input.command ?? ShellSelect.environment(global.bin),
             args: input.args,
-            cwd: input.cwd ?? path.resolve("/"),
+            cwd,
             title: input.title,
             group_id: sessionID,
             env: input.env,
@@ -337,7 +352,7 @@ const makeLayer = (options: Options = {}) =>
             },
           })
           .pipe(Effect.mapError(unavailable))
-        if (attachment.role === "controller") current.set(Session.ID.make(attachment.terminal.group_id), id)
+        if (attachment.role === "controller") current.set(attachment.terminal.group_id, id)
         return {
           info: toInfo(attachment.terminal),
           role: attachment.role,
@@ -400,7 +415,7 @@ function toInfo(value: WireTerminal): Info {
       pid: value.pid ?? 0,
       ...(status === "exited" ? { exitCode: value.lifecycle.exit_code ?? undefined } : {}),
     }),
-    sessionID: Session.ID.make(value.group_id),
+    sessionID: value.group_id,
     foregroundProcess: value.foreground_process,
     size: { cols: value.cols, rows: value.rows },
     output: { head: value.output_head, tail: value.output_tail },

@@ -9,6 +9,7 @@ import { Show, For, type Component } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import type { Mcp } from "@opencode/schema/mcp"
 import { useLanguage } from "@/runtime/i18n/language"
+import { formatServerError } from "@/runtime/server/errors"
 import { isValidRemoteUrl } from "./model"
 
 type HeaderRow = { key: string; value: string; error?: string }
@@ -22,6 +23,7 @@ const headersFromRecord = (record?: Record<string, string>) =>
 
 const headersToRecord = (rows: readonly HeaderRow[]) => {
   const headers = Object.fromEntries(rows.flatMap((row) => (row.key.trim() ? [[row.key.trim(), row.value]] : [])))
+
   return Object.keys(headers).length ? headers : undefined
 }
 
@@ -37,36 +39,46 @@ function commandArgs(command: string) {
   let argument = ""
   let quote: string | undefined
   let started = false
+
   for (let index = 0; index < command.length; index++) {
     const character = command[index]
+
     if (quote) {
       if (character === quote) {
         quote = undefined
         continue
       }
+
       if (quote === '"' && character === "\\" && ['"', "\\"].includes(command[index + 1])) {
         argument += command[++index]
         continue
       }
+
       argument += character
       continue
     }
+
     if (character === '"' || character === "'") {
       quote = character
       started = true
       continue
     }
+
     if (/\s/.test(character)) {
       if (started) args.push(argument)
       argument = ""
       started = false
       continue
     }
+
     argument += character
     started = true
   }
+
   if (quote) return
+
   if (started) args.push(argument)
+
   return args
 }
 
@@ -120,31 +132,38 @@ export const DialogMcpForm: Component<{
   const validate = () => {
     const name = form.name.trim()
     let nameError: string | undefined
+
     if (!name) nameError = language.t("settings.mcp.form.error.nameRequired")
+
     if (!editing() && name && props.existingNames?.has(name))
       nameError = language.t("settings.mcp.form.error.nameTaken")
     setForm("nameError", nameError)
 
     const command = form.type === "local" ? commandArgs(form.command) : undefined
+
     const commandError =
       form.type !== "local"
         ? undefined
         : !form.command.trim() || !command?.[0]
           ? language.t(command ? "settings.mcp.form.error.commandRequired" : "settings.mcp.form.error.commandFormat")
           : undefined
+
     setForm("commandError", commandError)
 
     const url = form.url.trim()
+
     const urlError =
       form.type === "remote" && !url
         ? language.t("settings.mcp.form.error.urlRequired")
         : form.type === "remote" && url && !isValidRemoteUrl(url)
           ? language.t("settings.mcp.form.error.urlFormat")
           : undefined
+
     setForm("urlError", urlError)
 
     const redirectUri = form.oauth.redirect_uri.trim()
     const redirect = URL.parse(redirectUri)
+
     const redirectError =
       form.type === "remote" &&
       form.oauthEnabled &&
@@ -160,6 +179,7 @@ export const DialogMcpForm: Component<{
         redirect.hash)
         ? language.t("settings.mcp.form.error.oauthRedirectUri")
         : undefined
+
     setForm("redirectError", redirectError)
 
     let headerError = false
@@ -168,17 +188,23 @@ export const DialogMcpForm: Component<{
       headerError ||= invalid
       setForm("headers", index, "error", invalid ? language.t("settings.mcp.form.error.headerRequired") : undefined)
     })
+
     if (nameError || commandError || urlError || redirectError || headerError) return
 
     if (form.type === "local") {
+      const previous = props.config?.type === "local" ? props.config : undefined
+
       return {
-        ...(props.config?.type === "local" ? props.config : {}),
+        ...previous,
         type: "local" as const,
         command: command ?? [],
         disabled: form.disabled,
       }
     }
-    const previousOAuth = props.config?.type === "remote" ? props.config.oauth || undefined : undefined
+
+    const previousRemote = props.config?.type === "remote" ? props.config : undefined
+    const previousOAuth = previousRemote?.oauth || undefined
+
     const oauth = form.oauthEnabled
       ? {
           ...previousOAuth,
@@ -190,8 +216,9 @@ export const DialogMcpForm: Component<{
           callback_port: redirectUri ? undefined : previousOAuth?.callback_port,
         }
       : (false as const)
+
     return {
-      ...(props.config?.type === "remote" ? props.config : {}),
+      ...previousRemote,
       type: "remote" as const,
       url,
       headers: headersToRecord(form.headers),
@@ -202,10 +229,13 @@ export const DialogMcpForm: Component<{
 
   const submit = async (event: SubmitEvent) => {
     event.preventDefault()
+
     if (props.saving) return
     const config = validate()
+
     if (!config) return
     const dialogID = dialog.active?.id
+
     if ((await props.onSave(form.name.trim(), config)) === false) return
     dialog.close(dialogID)
   }
@@ -308,8 +338,10 @@ export const DialogMcpForm: Component<{
                             produce((rows) => {
                               if (rows.length === 1) {
                                 rows[0] = headerRow()
+
                                 return
                               }
+
                               rows.splice(index(), 1)
                             }),
                           )
@@ -419,8 +451,10 @@ export const DialogMcpPat: Component<{
           onSubmit={async (event) => {
             event.preventDefault()
             const value = token.value.trim()
+
             if (!value || props.saving) return
             const dialogID = dialog.active?.id
+
             if ((await props.onSave(value)) === false) return
             dialog.close(dialogID)
           }}
@@ -442,7 +476,7 @@ export const DialogMcpPat: Component<{
   )
 }
 
-export const renderMcpError = (error: unknown) => (error instanceof Error ? error.message : String(error))
+export const renderMcpError = formatServerError
 
 export const DialogMcpDisruption: Component<{
   onDecision: (approved: boolean) => void

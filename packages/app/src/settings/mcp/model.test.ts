@@ -40,6 +40,7 @@ describe("MCP settings rows", () => {
 
   test("keeps a user PAT override separate from the managed base", () => {
     const override = { ...managed.config, headers: { "x-company": "value", Authorization: "Bearer token" } }
+
     const rows = serverRows({
       entries: [entry({ enterprise: override })],
       catalog: { managed: { enterprise: managed }, store: [] },
@@ -55,13 +56,16 @@ describe("MCP settings rows", () => {
 
   test("keeps native OAuth fields with a scope", () => {
     const remote = managed.config.type === "remote" ? managed.config : undefined
+
     if (!remote) throw new Error("managed fixture must be remote")
+
     const oauth = {
       client_id: "client",
       scope: "read",
       callback_port: 4300,
       redirect_uri: "https://example.com/callback",
     }
+
     const rows = serverRows({
       entries: [entry({ enterprise: { ...remote, oauth } })],
       catalog: { managed: { enterprise: managed }, store: [] },

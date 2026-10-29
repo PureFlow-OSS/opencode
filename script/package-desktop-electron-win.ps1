@@ -11,8 +11,8 @@ function Invoke-Bun {
     [string[]] $Arguments
   )
 
-  & bunx --bun bun@1.4.2 --bun run @Arguments
-  if ($LASTEXITCODE -ne 0) { throw "Bun 1.4.2 exited with status $LASTEXITCODE" }
+  & bunx --bun bun@1.4.4 --bun run @Arguments
+  if ($LASTEXITCODE -ne 0) { throw "Bun 1.4.4 exited with status $LASTEXITCODE" }
 }
 
 $desktopDirectory = (Resolve-Path $WorkingDirectory).Path
@@ -23,6 +23,7 @@ if (-not (Test-Path (Join-Path $desktopDirectory "electron-builder.config.ts") -
 $desktopPackage = Get-Content (Join-Path $desktopDirectory "package.json") -Raw | ConvertFrom-Json
 $originalOpenCodeVersion = $env:OPENCODE_VERSION
 $originalOpenCodeCliDist = $env:OPENCODE_CLI_DIST
+$originalOpenCodeTarget = $env:OPENCODE_TARGET
 $openCodeVersionWasSetByScript = $false
 $openCodeCliDistWasSetByScript = $false
 if (-not $originalOpenCodeVersion) {
@@ -39,9 +40,9 @@ try {
   if (-not $SkipCliBuild -and -not $env:OPENCODE_CLI_DIST) {
     $packagesDirectory = (Resolve-Path (Join-Path $desktopDirectory "..")).Path
     $cliDistribution = Join-Path $packagesDirectory "cli/.cache/local-desktop"
+    $env:OPENCODE_TARGET = "windows-x64-baseline"
     Invoke-Bun @(
       "../cli/script/build.ts",
-      "--target=opencode-windows-x64-baseline",
       "--skip-install",
       "--outdir=$cliDistribution"
     )
@@ -60,6 +61,7 @@ try {
     throw "Bundled CLI version $($cliPackage.version) does not match desktop version $env:OPENCODE_VERSION"
   }
 
+  $env:OPENCODE_TARGET = "windows-x64"
   Invoke-Bun @("build")
   Invoke-Bun @(
     "package:win",
@@ -81,6 +83,7 @@ try {
 }
 finally {
   Pop-Location
+  [Environment]::SetEnvironmentVariable("OPENCODE_TARGET", $originalOpenCodeTarget, "Process")
   if ($openCodeVersionWasSetByScript) {
     [Environment]::SetEnvironmentVariable("OPENCODE_VERSION", $originalOpenCodeVersion, "Process")
   }

@@ -4,6 +4,7 @@ import { app } from "electron"
 import type { Endpoint } from "@opencode/client/service"
 import { cliBuildID } from "./cli-build"
 import { serviceRegistrationFile } from "./service-registration"
+import { CHANNEL } from "../constants"
 
 // The main thread idles between showing the first window and evaluating the main bundle, waiting
 // for the renderer's asset requests. That slot is long enough to find out whether a compatible
@@ -16,9 +17,9 @@ let buildID: Promise<string> | undefined
 
 export function startSidecarProbe() {
   if (!app.isPackaged) return
-  const version = bundledVersion()
+  const version = CHANNEL === "beta" ? undefined : bundledVersion()
 
-  if (!version) return
+  if (version === "") return
   buildID = cliBuildID(
     path.join(process.resourcesPath, process.platform === "win32" ? "opencode-cli.exe" : "opencode-cli"),
   )

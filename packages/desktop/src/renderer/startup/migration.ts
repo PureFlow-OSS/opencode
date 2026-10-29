@@ -5,12 +5,13 @@ export async function awaitMigrationCompleted(server: ServerReadyData, signal: A
   const client = OpenCode.make({ baseUrl: server.url })
 
   while (true) {
-    const status = await client.migration.v1.status({ signal }).catch((error: unknown) => {
+    const status = await client.migration.v1.status({ signal }).catch((error) => {
       if (signal.aborted) throw signal.reason
       throw error
     })
 
     if (status.status === "completed") return
+
     if (status.status === "error") throw new Error(status.error)
 
     await wait(1_000, signal).catch((error) => {
@@ -30,6 +31,7 @@ function wait(delay: number, signal: AbortSignal) {
     function done() {
       clearTimeout(timer)
       signal.removeEventListener("abort", done)
+
       if (signal.aborted) reject(signal.reason)
       else resolve()
     }

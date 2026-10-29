@@ -18,11 +18,12 @@ export const FileSource = Schema.Union([
   .annotate({ identifier: "Prompt.FileSource" })
 export type FileSource = typeof FileSource.Type
 
+// The canonical pattern backtracks on large inputs, so it only supplies metadata (OpenAPI, errors) while an equivalent linear check runs.
 export const Base64 = Schema.String.check(
   // JavaScriptCore rejects large valid inputs with the nested quartet regex.
   // Check length separately at runtime and retain the exact wire constraint.
-  Schema.makeFilter<string>(
-    (value) => value.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}(?![\s\S])/u.test(value),
+  Schema.makeFilter(
+    (value: string) => value.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}(?![\s\S])/u.test(value),
     Schema.isPattern(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u).annotations,
   ),
 ).annotate({ identifier: "Prompt.Base64" })
@@ -51,6 +52,32 @@ export const FileAttachment = Schema.Struct({
         }),
     })),
   )
+
+/** `media:` and the lowercase hex SHA-256 of a stored blob's bytes. Names no server route. */
+export const MediaRef = Schema.String.check(Schema.isPattern(/^media:[0-9a-f]{64}$/)).annotate({
+  identifier: "Prompt.MediaRef",
+})
+export type MediaRef = typeof MediaRef.Type
+
+const { data: _, ...fileAttachmentFields } = FileAttachment.fields
+
+/**
+ * An attachment whose bytes stay on the server, sent to clients that opt in with the experimental `experimental-media-uri`
+ * capability. Fetch the bytes from `GET /api/experimental/media/:hash`.
+ */
+export interface MediaFileAttachment extends Schema.Schema.Type<typeof MediaFileAttachment> {}
+export const MediaFileAttachment = Schema.Struct({
+  ...fileAttachmentFields,
+  uri: MediaRef,
+  bytes: Schema.Int.pipe(optional),
+  width: Schema.Int.pipe(optional),
+  height: Schema.Int.pipe(optional),
+}).annotate({ identifier: "Prompt.MediaFileAttachment" })
+
+export const Attachment = Schema.Union([FileAttachment, MediaFileAttachment]).annotate({
+  identifier: "Prompt.Attachment",
+})
+export type Attachment = typeof Attachment.Type
 
 export interface AgentAttachment extends Schema.Schema.Type<typeof AgentAttachment> {}
 export const AgentAttachment = Schema.Struct({

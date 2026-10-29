@@ -1,4 +1,4 @@
-import { expect, story } from "../../storybook/playwright/story"
+import { expect, story } from "../../stories/playwright/story"
 
 story("generates, saves and edits a fixed OAuth redirect URI", async ({ mount, page }) => {
   const component = await mount("settings-mcp-dialogs--remote-with-oauth")

@@ -15,7 +15,6 @@ export const pageIcons = {
   mcp: "mcp",
   servers: "server",
   experimental: "flask",
-  "gui-extensions": "extensions",
   about: "info",
 } as const satisfies Record<SettingsRootTab, IconProps["name"]>
 
@@ -32,6 +31,5 @@ export const pageLabels = {
   mcp: "settings.tab.mcp",
   servers: "settings.section.server",
   experimental: "settings.tab.experimental",
-  "gui-extensions": "settings.guiExtensions.title",
   about: "settings.tab.about",
 } as const satisfies Record<SettingsRootTab, Parameters<ReturnType<typeof useLanguage>["t"]>[0]>

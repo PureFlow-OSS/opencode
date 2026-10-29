@@ -2,7 +2,7 @@ export * as PatchTool from "./patch.js"
 
 import type { Context } from "@opencode/plugin/effect/plugin"
 import type { SessionHooks } from "@opencode/plugin/effect/session"
-import { ToolFailure } from "@opencode/ai"
+import { ToolFailure } from "@opencode/ai/effect"
 import { FileDiff } from "@opencode/schema/file-diff"
 import { Effect, Result, Schema } from "effect"
 import { Bom } from "@opencode/util/bom"
@@ -117,7 +117,7 @@ export const Plugin = {
                 return yield* new ToolFailure({ message: "patch rejected: empty patch" })
               }
               const prepared: Prepared[] = []
-              const updates = new Map<string, { content: string; encoding: Bom.Encoding }>()
+              const updates = new Map<string, { content: string; encoding: Bom.Encoding } | null>()
               const resolveTarget = Effect.fnUntraced(function* (value: string) {
                 const target = yield* access.resolve({ path: value, kind: "file" })
                 if (!target.externalDirectory) return target
@@ -143,32 +143,50 @@ export const Plugin = {
                       before: "",
                       after: Bom.split(content).text,
                     })
+                    updates.set(target.absolute, { content, encoding: "utf-8" })
                     return
                   }
                   if (hunk.type === "delete") {
-                    const content = yield* FileMutation.readText(environment.files, target.absolute).pipe(
-                      Effect.mapError(
-                        (error) =>
-                          new ToolFailure({
-                            message: `patch verification failed: Failed to delete ${target.resource}: ${errorMessage(error)}`,
-                          }),
-                      ),
-                    )
-                    prepared.push({ ...hunk, target, before: content.text, after: "" })
+                    const previous = updates.get(target.absolute)
+                    if (previous === null) {
+                      return yield* new ToolFailure({
+                        message: `patch verification failed: Failed to delete ${target.resource}: file does not exist`,
+                      })
+                    }
+                    const before =
+                      previous !== undefined
+                        ? Bom.split(previous.content).text
+                        : (yield* FileMutation.readText(environment.files, target.absolute).pipe(
+                            Effect.mapError(
+                              (error) =>
+                                new ToolFailure({
+                                  message: `patch verification failed: Failed to delete ${target.resource}: ${errorMessage(error)}`,
+                                }),
+                            ),
+                          )).text
+                    prepared.push({ ...hunk, target, before, after: "" })
+                    updates.set(target.absolute, null)
                     return
                   }
                   const previous = updates.get(target.absolute)
-                  const source = previous ?? (yield* Effect.gen(function* () {
-                    const content = yield* FileMutation.readText(environment.files, target.absolute).pipe(
-                      Effect.mapError(
-                        (error) =>
-                          new ToolFailure({
-                            message: `patch verification failed: Failed to read file to update ${target.absolute}: ${errorMessage(error)}`,
-                          }),
-                      ),
-                    )
-                    return { content: Bom.join(content.text, content.bom), encoding: content.encoding }
-                  }))
+                  if (previous === null) {
+                    return yield* new ToolFailure({
+                      message: `patch verification failed: Failed to read file to update ${target.absolute}: file does not exist`,
+                    })
+                  }
+                  const source =
+                    previous ??
+                    (yield* Effect.gen(function* () {
+                      const content = yield* FileMutation.readText(environment.files, target.absolute).pipe(
+                        Effect.mapError(
+                          (error) =>
+                            new ToolFailure({
+                              message: `patch verification failed: Failed to read file to update ${target.absolute}: ${errorMessage(error)}`,
+                            }),
+                        ),
+                      )
+                      return { content: Bom.join(content.text, content.bom), encoding: content.encoding }
+                    }))
                   const original = source.content
                   const before = Bom.split(original).text
                   const update = yield* Effect.try({
@@ -177,7 +195,8 @@ export const Plugin = {
                   })
                   const content = Patch.joinBom(withSourceLineEndings(original, update.content), update.bom)
                   const bytes = yield* encodePatch(content, source.encoding)
-                  const moveTarget = hunk.movePath ? yield* resolveTarget(hunk.movePath) : undefined
+                  const move = hunk.movePath ? yield* resolveTarget(hunk.movePath) : undefined
+                  const moveTarget = move && move.absolute !== target.absolute ? move : undefined
                   prepared.push({
                     ...hunk,
                     target,
@@ -188,7 +207,12 @@ export const Plugin = {
                     after: update.content,
                     moveTarget,
                   })
-                  if (!moveTarget) updates.set(target.absolute, { content, encoding: source.encoding })
+                  if (moveTarget) {
+                    updates.set(target.absolute, null)
+                    updates.set(moveTarget.absolute, { content, encoding: source.encoding })
+                  } else {
+                    updates.set(target.absolute, { content, encoding: source.encoding })
+                  }
                 }).pipe(
                   Effect.mapError((error) =>
                     error instanceof ToolFailure
@@ -264,7 +288,7 @@ export const Plugin = {
               )
               const formatted = new Map<string, string>()
               yield* Effect.forEach(
-                [...new Set(applied.filter((item) => item.type !== "delete").map((item) => item.target))],
+                [...updates.entries()].flatMap(([target, value]) => (value === null ? [] : [target])),
                 (target) =>
                   Effect.gen(function* () {
                     const current = yield* FileMutation.readText(environment.files, target).pipe(
@@ -278,9 +302,7 @@ export const Plugin = {
                             target,
                             current.bom,
                             current.encoding,
-                          ).pipe(
-                            Effect.mapError((error) => fail(`Failed to sync ${target}`, error)),
-                          )
+                          ).pipe(Effect.mapError((error) => fail(`Failed to sync ${target}`, error)))
                         : current.text,
                     )
                   }),
@@ -335,10 +357,10 @@ function errorMessage(error: unknown) {
 
 /** Preserve the source's dominant line ending when the shared patch engine emits its LF view. */
 const withSourceLineEndings = (source: string, content: string) => {
-  const sourceCrlf = source.split('\r\n').length - 1
-  const sourceLf = source.split('\n').length - 1 - sourceCrlf
+  const sourceCrlf = source.split("\r\n").length - 1
+  const sourceLf = source.split("\n").length - 1 - sourceCrlf
   if (sourceCrlf <= sourceLf) return content
-  return content.replaceAll('\n', '\r\n')
+  return content.replaceAll("\n", "\r\n")
 }
 
 const encodePatch = (content: string, encoding: Bom.Encoding) =>
