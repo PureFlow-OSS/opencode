@@ -1,5 +1,10 @@
 ; Corporate policy requires executables below C:\Entwicklung. Keep GUI and console entry points
 ; separate: adding the GUI directory to PATH would make opencode launch OpenCode.exe instead of the CLI.
+; Temporarily opt-in while investigating post-extraction installer aborts in corporate environments.
+!ifndef OPENCODE_REGISTER_CLI
+  !define OPENCODE_REGISTER_CLI 0
+!endif
+
 !ifndef BUILD_UNINSTALLER
   Var /GLOBAL sharedInstallDir
 !endif
@@ -20,7 +25,9 @@
   nsExec::ExecToLog '"$SYSDIR\icacls.exe" "$INSTDIR" /grant "*S-1-15-2-2:(OI)(CI)(RX)"'
   Pop $0
   !insertmacro leaveSharedInstall
-  !insertmacro installCliCommand
+  !if ${OPENCODE_REGISTER_CLI} != 0
+    !insertmacro installCliCommand
+  !endif
 !macroend
 
 !macro cliUserPath ACTION
@@ -78,7 +85,9 @@
 
 !macro customUnInstall
   ${IfNot} ${isUpdated}
-    !insertmacro cliUserPath Uninstall
+    !if ${OPENCODE_REGISTER_CLI} != 0
+      !insertmacro cliUserPath Uninstall
+    !endif
     !insertmacro removeStagedUpdates $INSTDIR
   ${EndIf}
 !macroend

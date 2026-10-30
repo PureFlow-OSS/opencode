@@ -11,11 +11,9 @@ bun dev
 
 ## Windows CLI command
 
-The corporate Windows installer creates `C:\Entwicklung\OpenCode\bin\opencode.exe` from the bundled console CLI and puts that directory first in the current user's PATH. It uses a hard link where supported, with a copy fallback. No Node.js installation is needed.
+Automatic CLI command registration is temporarily disabled while investigating installer aborts after extraction. New installers skip creating `bin\opencode.exe` and skip the PowerShell PATH registration/removal hooks. Existing command files and PATH entries are preserved. The bundled `resources\opencode-cli.exe` remains available to the app.
 
-Open a fresh terminal after installation (restart an existing Windows Terminal host if it still has the old environment), then run `opencode --version` or `Get-Command opencode`. The GUI directory itself is not added, so the command resolves to the console entry point.
-
-Registration preserves unrelated PATH entries, `%VARIABLE%` references, Unicode and the registry string type. Upgrades retain the entry; a normal uninstall removes only this installation's CLI directory from the user PATH. The machine PATH is left unchanged.
+The NSIS include defaults `OPENCODE_REGISTER_CLI` to `0`; defining it as `1` before inclusion restores registration and its uninstall cleanup. When enabled, the installer creates `C:\Entwicklung\OpenCode\bin\opencode.exe` from the bundled signed CLI using a hard link with a copy fallback and registers that directory in the current user's PATH, preserving unrelated entries and their registry string type.
 
 ## Update diagnostics
 

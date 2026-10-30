@@ -134,7 +134,7 @@ ConvertTo-Json -InputObject $results -Depth 4 -Compress
 )
 
 test.skipIf(process.platform !== "win32")(
-  "NSIS compiles the actual CLI registration and uninstall hooks without executing an installer",
+  "NSIS skips CLI registration by default and compiles the opt-in hooks without executing an installer",
   async () => {
     const { getMakeNsisPath, getNsisPluginsPath } = await import("app-builder-lib/out/toolsets/windows")
     const { nsisTemplatesDir } = await import("app-builder-lib/out/targets/nsis/nsisUtil")
@@ -147,12 +147,13 @@ test.skipIf(process.platform !== "win32")(
     flags.flags(["updated"])
 
     try {
-      const script = path.join(dir, "compile.nsi")
-      await Bun.write(
-        script,
-        `Unicode true
+      for (const enabled of [false, true]) {
+        const script = path.join(dir, `compile-${enabled}.nsi`)
+        await Bun.write(
+          script,
+          `Unicode true
 RequestExecutionLevel user
-OutFile "${path.join(dir, "compile-only.exe")}"
+OutFile "${path.join(dir, `compile-only-${enabled}.exe`)}"
 !addplugindir /x86-unicode "${path.join(plugins, "x86-unicode")}"
 !addincludedir "${path.join(nsisTemplatesDir, "include")}"
 !include LogicLib.nsh
@@ -162,7 +163,21 @@ ${flags.build()}
 !define APP_ID "ai.opencode.desktop"
 !define UNINSTALL_FILENAME "Uninstall OpenCode.exe"
 !define SHORTCUT_NAME "OpenCode"
+${enabled ? "!define OPENCODE_REGISTER_CLI 1" : ""}
 !include "${config.nsis?.include}"
+${
+  enabled
+    ? ""
+    : `; Fail compilation if either real lifecycle hook attempts CLI registration.
+!macroundef installCliCommand
+!macro installCliCommand
+  !error "CLI command creation must be disabled by default"
+!macroend
+!macroundef cliUserPath
+!macro cliUserPath ACTION
+  !error "CLI PATH changes must be disabled by default"
+!macroend`
+}
 Section
 !insertmacro customInstall
 SectionEnd
@@ -170,21 +185,22 @@ Section Uninstall
 !insertmacro customUnInstall
 SectionEnd
 `,
-      )
+        )
 
-      const child = Bun.spawn([compiler.path, script], {
-        env: { ...process.env, ...compiler.env },
-        stdout: "pipe",
-        stderr: "pipe",
-      })
+        const child = Bun.spawn([compiler.path, script], {
+          env: { ...process.env, ...compiler.env },
+          stdout: "pipe",
+          stderr: "pipe",
+        })
 
-      const [stdout, stderr, code] = await Promise.all([
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
-        child.exited,
-      ])
+        const [stdout, stderr, code] = await Promise.all([
+          new Response(child.stdout).text(),
+          new Response(child.stderr).text(),
+          child.exited,
+        ])
 
-      expect(code, stdout + stderr).toBe(0)
+        expect(code, stdout + stderr).toBe(0)
+      }
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
