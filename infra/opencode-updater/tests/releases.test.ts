@@ -114,6 +114,30 @@ foreach ($version in @('1.0.0','1.0.1','1.0.2')) {
     const uploaded = await upload("1.0.0")
     expect(uploaded.status).toBe(200)
     const release = await uploaded.json()
+    const complete = await request("/feed/installer.exe", { headers: headers("beta") })
+    expect(complete.status).toBe(200)
+    expect(complete.headers.get("accept-ranges")).toBe("bytes")
+    expect(await complete.text()).toBe("installer-1.0.0")
+    for (const [range, content, contentRange] of [
+      ["bytes=0-3", "inst", "bytes 0-3/15"],
+      ["bytes=10-", "1.0.0", "bytes 10-14/15"],
+      ["bytes=-5", "1.0.0", "bytes 10-14/15"],
+    ]) {
+      const partial = await request("/feed/installer.exe", { headers: { ...headers("beta"), range } })
+      expect(partial.status).toBe(206)
+      expect(partial.headers.get("content-range")).toBe(contentRange)
+      expect(await partial.text()).toBe(content)
+    }
+    const unsatisfied = await request("/feed/installer.exe", {
+      headers: { ...headers("beta"), range: "bytes=100-200" },
+    })
+    expect(unsatisfied.status).toBe(416)
+    expect(unsatisfied.headers.get("content-range")).toBe("bytes */15")
+    const changed = await request("/feed/installer.exe", {
+      headers: { ...headers("beta"), range: "bytes=0-3", "if-range": '"old-release"' },
+    })
+    expect(changed.status).toBe(200)
+    expect(await changed.text()).toBe("installer-1.0.0")
     const db = new Database(path.join(directory, "data/feedback.db"))
     try {
       db.exec(

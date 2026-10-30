@@ -4,6 +4,7 @@ import { Command, SettingsPage, TitlebarItem, type SetupContext, type Plugin } f
 import { onIdle } from "@opencode/plugin/gui/builtin"
 import { Updater } from "@opencode/plugin/gui/updater"
 import { updaterAction } from "./action"
+import { progressDescription, progressLabel } from "./progress"
 import type definition from "./index"
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
@@ -52,15 +53,16 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     const current = state()
     const installing = current?.status === "installing"
     const ready = current?.status === "ready" || current?.status === "download-required"
+    const active = current?.status === "checking" || current?.status === "downloading"
 
-    if (!ready && !installing) return
+    if (!ready && !installing && !active) return
 
     return {
       id: "update",
-      label: ctx.t("status.label"),
-      title: ctx.t(updaterAction(current).label),
-      busy: installing,
-      run: () => act("install"),
+      label: active ? progressLabel(ctx, current) : ctx.t("status.label"),
+      title: [progressLabel(ctx, current), progressDescription(ctx, current)].filter(Boolean).join(" · "),
+      busy: installing || active,
+      run: ready ? () => act("install") : undefined,
     }
   })
 

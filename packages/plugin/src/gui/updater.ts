@@ -1,6 +1,17 @@
 import { Schema } from "effect"
 import { Ipc } from "./core.js"
 
+/** Current transfer or preparation phase; byte counts describe the actual network transfer. */
+export const UpdaterProgress = Schema.Struct({
+  phase: Schema.Literals(["download", "verify", "unpack"]),
+  percent: Schema.optional(Schema.Number),
+  transferred: Schema.optional(Schema.Number),
+  total: Schema.optional(Schema.Number),
+  bytesPerSecond: Schema.optional(Schema.Number),
+})
+
+export type UpdaterProgress = typeof UpdaterProgress.Type
+
 /**
  * The updater's state, the same in every window.
  * - `disabled`: this build does not update itself.
@@ -17,7 +28,11 @@ export const UpdaterState = Schema.Union([
   Schema.Struct({ status: Schema.Literal("disabled") }),
   Schema.Struct({ status: Schema.Literal("idle") }),
   Schema.Struct({ status: Schema.Literal("checking") }),
-  Schema.Struct({ status: Schema.Literal("downloading"), version: Schema.String }),
+  Schema.Struct({
+    status: Schema.Literal("downloading"),
+    version: Schema.String,
+    progress: Schema.optional(UpdaterProgress),
+  }),
   Schema.Struct({ status: Schema.Literal("ready"), version: Schema.String }),
   Schema.Struct({ status: Schema.Literal("download-required"), version: Schema.String }),
   Schema.Struct({ status: Schema.Literal("up-to-date") }),

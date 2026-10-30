@@ -1,5 +1,5 @@
 import { Deferred, Effect, Exit, Fiber, Match } from "effect"
-import type { UpdaterState } from "@opencode/plugin/gui/updater"
+import type { UpdaterProgress, UpdaterState } from "@opencode/plugin/gui/updater"
 
 type UpdateTarget =
   | { readonly mode: "restart"; readonly version: string }
@@ -7,7 +7,10 @@ type UpdateTarget =
 
 export type Platform = {
   readonly checkForUpdate: Effect.Effect<UpdateTarget | undefined, unknown>
-  readonly stageUpdate: (options: { readonly differential: boolean }) => Effect.Effect<unknown, unknown>
+  readonly stageUpdate: (options: {
+    readonly differential: boolean
+    readonly onProgress: (progress: UpdaterProgress) => void
+  }) => Effect.Effect<unknown, unknown>
   /** Starts quitAndInstall; succeeds once the app begins quitting for the update. */
   readonly installAndRestart: Effect.Effect<void, unknown>
   readonly externalInstall?: (url: string) => Effect.Effect<void, unknown>
@@ -34,7 +37,13 @@ export const make = Effect.fn("Updater.make")(function* (dependencies: Dependenc
   let installing: Deferred.Deferred<void, unknown> | undefined
 
   const transition = (next: UpdaterState) => {
-    runFork(Effect.logInfo("updater state changed", { from: state.status, to: next.status }))
+    if (state.status !== next.status)
+      runFork(
+        Effect.logInfo("updater state changed", {
+          from: state.status,
+          to: next.status,
+        }, next),
+      )
     state = next
     dependencies.changed(state)
 
@@ -55,7 +64,12 @@ export const make = Effect.fn("Updater.make")(function* (dependencies: Dependenc
           staged: downloaded,
           version,
         })
-      yield* platform.stageUpdate({ differential: !downloaded })
+      yield* platform.stageUpdate({
+        differential: !downloaded,
+        onProgress: (progress) => {
+          if (state.status === "downloading" && state.version === version) transition({ ...state, progress })
+        },
+      })
       downloaded = version
       yield* dependencies.persistence.set({ version })
     })

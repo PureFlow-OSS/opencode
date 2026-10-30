@@ -6,6 +6,8 @@ Release notes for OpenCode V2, newest first.
 
 ### Highlights
 
+- **Update Progress**: Restored the update indicator during checks and downloads, with percentage, transferred bytes, speed and preparation phases in settings. Added periodic download logs and optional packaged console logging. Updater feeds now support single-byte-range requests; clients select compatible differential downloads.
+
 - **Corporate OAuth Proxy**: Codex and ChatGPT sign-in, token renewal and signing-key downloads now use the configured proxy. Proxy environment variables retain priority over the anonymous corporate default, including for remote MCP connections.
 
 - **Windows Packaging Configuration**: Build entry points now consistently load the corporate Electron Builder configuration, honor the selected output directory and copy the changelog there. Previous release folders are excluded from the application archive.

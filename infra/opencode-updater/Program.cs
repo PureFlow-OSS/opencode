@@ -903,11 +903,10 @@ static string BuildFeedUrl(UpdaterRollout rollout, HttpRequest request)
 }
 
 
-static async Task<IResult> LocalFileAsync(HttpContext context, string path)
+static Task<IResult> LocalFileAsync(HttpContext context, string path)
 {
   var extension = Path.GetExtension(path).ToLowerInvariant();
-  context.Response.StatusCode = StatusCodes.Status200OK;
-  context.Response.ContentType = extension switch
+  var contentType = extension switch
   {
     ".yml" => "text/yaml; charset=utf-8",
     ".json" => "application/json; charset=utf-8",
@@ -916,12 +915,10 @@ static async Task<IResult> LocalFileAsync(HttpContext context, string path)
     ".exe" => "application/octet-stream",
     _ => "application/octet-stream",
   };
-  context.Response.ContentLength = new FileInfo(path).Length;
-
-  await using var stream = File.OpenRead(path);
-  await stream.CopyToAsync(context.Response.Body, context.RequestAborted);
-
-  return Results.Empty;
+  var file = new FileInfo(path);
+  return Task.FromResult(Results.File(path, contentType, lastModified: file.LastWriteTimeUtc,
+    entityTag: new Microsoft.Net.Http.Headers.EntityTagHeaderValue($"\"{file.Length:x}-{file.LastWriteTimeUtc.Ticks:x}\""),
+    enableRangeProcessing: true));
 }
 
 static async Task<string> ComputeSha256Async(IFormFile file, CancellationToken cancellationToken)

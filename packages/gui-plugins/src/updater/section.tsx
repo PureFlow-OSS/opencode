@@ -1,16 +1,23 @@
 import { Show, createMemo, type JSX } from "solid-js"
 import { Button } from "@opencode/ui/button"
 import { Switch } from "@opencode/ui/switch"
-import { Spinner } from "@opencode/ui/spinner"
+import { Loader } from "@opencode/ui/loader"
 import { usePlugin } from "@opencode/plugin/gui"
 import { updaterAction } from "./action"
 import type { UpdaterState } from "@opencode/plugin/gui/updater"
 import type definition from "./index"
+import { progressDescription, progressLabel } from "./progress"
 
 export default function UpdatesSection(props: { state: () => UpdaterState | undefined; run: () => void }) {
   const ctx = usePlugin<typeof definition>()
   const releaseNotes = ctx.stores.releaseNotes
   const action = createMemo(() => updaterAction(props.state()))
+
+  const downloading = createMemo(() => {
+    const state = props.state()
+
+    return state?.status === "downloading" ? state : undefined
+  })
 
   const checkDescription = createMemo(() => {
     const state = props.state()
@@ -19,7 +26,7 @@ export default function UpdatesSection(props: { state: () => UpdaterState | unde
 
     if (state.status === "disabled") return ctx.t("check.disabled")
 
-    return ctx.t("check.description")
+    return progressDescription(ctx, state) ?? ctx.t("check.description")
   })
 
   return (
@@ -50,11 +57,27 @@ export default function UpdatesSection(props: { state: () => UpdaterState | unde
             onClick={() => props.run()}
           >
             <Show when={action().busy}>
-              <Spinner class="size-3.5" />
+              <Loader class="size-3.5" />
             </Show>
-            {ctx.t(action().label)}
+            {progressLabel(ctx, props.state())}
           </Button>
         </Row>
+        <Show when={downloading()}>
+          {(state) => (
+            <div class="px-5 pb-4" data-slot="update-download-progress" role="status" aria-live="polite">
+              <div
+                class="h-1.5 w-full overflow-hidden rounded-full bg-v2-background-bg-deep"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={state().progress?.percent}
+                aria-label={ctx.t("action.downloading")}
+              >
+                <div class="h-full bg-v2-icon-icon-accent" style={{ width: `${state().progress?.percent ?? 0}%` }} />
+              </div>
+            </div>
+          )}
+        </Show>
       </div>
     </div>
   )

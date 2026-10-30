@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { Effect, Exit, Scope } from "effect"
-import type { UpdaterState } from "@opencode/plugin/gui/updater"
+import { UpdaterState, type UpdaterProgress } from "@opencode/plugin/gui/updater"
+import { Schema } from "effect"
 import { make, type Dependencies } from "./machine"
 
 const scopes: Scope.Closeable[] = []
@@ -17,7 +18,7 @@ async function setup(input?: {
   ready?: { version: string }
   /** The release each platform check finds, in order; the last one repeats. "offline" fails the check. */
   checks?: readonly string[]
-  stage?: () => Promise<void>
+  stage?: (publish: (progress: UpdaterProgress) => void) => Promise<void>
   install?: () => Promise<void>
   external?: boolean
   open?: () => Promise<void>
@@ -47,7 +48,7 @@ async function setup(input?: {
       stageUpdate: (options) =>
         Effect.tryPromise(async () => {
           calls.push(options.differential ? "download" : "download:full")
-          await input?.stage?.()
+          await input?.stage?.(options.onProgress)
         }),
       installAndRestart: Effect.suspend(() => {
         calls.push(`install:${store.ready?.version}`)
@@ -103,6 +104,31 @@ async function setup(input?: {
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 describe("updater", () => {
+  test("publishes live progress through the IPC schema and ignores late progress after the update is ready", async () => {
+    const held = Promise.withResolvers<void>()
+    const callback = Promise.withResolvers<(progress: UpdaterProgress) => void>()
+
+    const app = await setup({
+      stage: async (publish) => {
+        callback.resolve(publish)
+        publish({ phase: "download", percent: 25, transferred: 250, total: 1000, bytesPerSecond: 50 })
+        await held.promise
+      },
+    })
+
+    const publish = await callback.promise
+    expect(Schema.decodeUnknownSync(UpdaterState)(app.state())).toMatchObject({
+      status: "downloading",
+      version: "2.0.0",
+      progress: { percent: 25, bytesPerSecond: 50, transferred: 250, total: 1000 },
+    })
+    publish({ phase: "unpack" })
+    expect(app.state()).toMatchObject({ status: "downloading", progress: { phase: "unpack" } })
+    held.resolve()
+    await app.start()
+    publish({ phase: "download", percent: 99 })
+    expect(app.state()).toEqual({ status: "ready", version: "2.0.0" })
+  })
   // The launch check, then one silent re-check per further entry in `checks`. `rechecks` lists the states the
   // re-checks published: a ready or offered update never leaves the screen while one runs.
   test.each([

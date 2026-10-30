@@ -10,7 +10,7 @@ test.skipIf(process.platform !== "win32")(
   "custom Windows cache supports real Electron update checks and downloads",
   async () => {
     const directory = await mkdtemp(path.join(tmpdir(), "opencode-updater-http-"))
-    const installer = Buffer.from("Regression fixture; never executed")
+    const installer = Buffer.from("Regression fixture; never executed".repeat(32768))
     const requests: Array<{ path: string; key: string | null }> = []
 
     const server = createServer((request, response) => {
@@ -18,7 +18,24 @@ test.skipIf(process.platform !== "win32")(
 
       requests.push({ path: url.pathname, key: request.headersDistinct["x-opencode-aifactory-api-key"]?.[0] ?? null })
 
-      if (url.pathname === "/installer.exe") return void response.end(installer)
+      if (url.pathname === "/installer.exe") {
+        response.setHeader("Content-Length", installer.length)
+        let offset = 0
+
+        const timer = setInterval(() => {
+          response.write(installer.subarray(offset, offset + 65536))
+          offset += 65536
+
+          if (offset >= installer.length) {
+            clearInterval(timer)
+            response.end()
+          }
+        }, 80)
+
+        response.on("close", () => clearInterval(timer))
+
+        return
+      }
 
       response.end(
         `version: 2.1.3\nfiles:\n  - url: installer.exe\n    sha512: ${createHash("sha512").update(installer).digest("base64")}\n    size: ${installer.length}\n`,
@@ -54,6 +71,7 @@ import("./check.mjs").catch((error) => { console.error(error); app.exit(1) })
 import { app } from "electron"
 import { windowsUpdater } from ${JSON.stringify(path.join(import.meta.dir, "client.ts"))}
 import { updateAppAdapter } from ${JSON.stringify(path.join(import.meta.dir, "cache.ts"))}
+import { downloadUpdate } from ${JSON.stringify(path.join(import.meta.dir, "download.ts"))}
 async function run() {
   await app.whenReady()
   const client = windowsUpdater(updateAppAdapter({
@@ -74,7 +92,14 @@ async function run() {
   await client.netSession.setProxy({ mode: "direct" })
   const result = await client.checkForUpdates()
   if (result?.updateInfo.version !== "2.1.3") throw new Error("Unexpected update metadata")
-  const files = await client.downloadUpdate()
+  const progress = []
+  const messages = []
+  const listeners = client.listenerCount("download-progress")
+  const files = await downloadUpdate(client, (value) => progress.push(value), (message) => messages.push(message))
+  if (!progress.some((value) => value.total === ${installer.length} && value.transferred > 0 && value.bytesPerSecond > 0)) throw new Error("Missing actual transfer metrics")
+  if (progress.at(-1)?.phase !== "verify") throw new Error("Missing verification phase")
+  if (client.listenerCount("download-progress") !== listeners) throw new Error("Leaked download listener")
+  if (!messages.includes("update download started") || !messages.includes("update download progress") || !messages.includes("update download verified")) throw new Error("Missing download phase logs")
   console.log(JSON.stringify({ version: result.updateInfo.version, installer: files[0] }))
 }
 run().then(() => app.exit(0), (error) => { console.error(error); app.exit(1) })

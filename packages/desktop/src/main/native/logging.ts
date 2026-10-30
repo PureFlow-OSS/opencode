@@ -2,7 +2,7 @@ export * as DesktopLogging from "./logging"
 
 import log from "electron-log/main.js"
 import { app, crashReporter, netLog, shell } from "electron"
-import { Context, Effect, FileSystem, Layer, Logger, Option, Path, References, Stream } from "effect"
+import { Context, Effect, FileSystem, Layer, Logger, Option, Path, References, Schema, Stream } from "effect"
 import { homedir } from "node:os"
 import { VERSION } from "../constants"
 import { marks } from "../lifecycle/marks"
@@ -65,14 +65,14 @@ const nativeLogger = Logger.make((options) => {
   try {
     if (!run) return
     const entry = Logger.formatStructured.log(options)
-    const scope = typeof entry.annotations.scope === "string" ? entry.annotations.scope : "main"
+    const scope = Option.getOrElse(Schema.decodeUnknownOption(Schema.String)(entry.annotations.scope), () => "main")
     const annotations = Object.fromEntries(Object.entries(entry.annotations).filter(([key]) => key !== "scope"))
 
-    const context = {
-      ...(Object.keys(annotations).length === 0 ? {} : { annotations }),
-      ...(Object.keys(entry.spans).length === 0 ? {} : { spans: entry.spans }),
-      ...(entry.cause === undefined ? {} : { cause: entry.cause }),
-    }
+    const context = Object.fromEntries([
+      ["annotations", Object.keys(annotations).length ? annotations : undefined],
+      ["spans", Object.keys(entry.spans).length ? entry.spans : undefined],
+      ["cause", entry.cause],
+    ].filter(([, value]) => value !== undefined))
 
     const messages = Array.isArray(options.message) ? options.message : [options.message]
     log
@@ -160,7 +160,7 @@ function exportDebugLogsEffect(fs: FileSystem.FileSystem, path: Path.Path) {
         ...(yield* collect(fs, path, app.getPath("crashDumps"), "crashpad")),
       ]
 
-      const truncated = files.filter((file) => file.offset > 0).map((file) => file.name)
+      const truncated = files.flatMap((file) => file.offset > 0 ? [file.name] : [])
       yield* writeZip(fs, output, [
         { name: "manifest.json", data: Buffer.from(JSON.stringify({ ...manifest(path), truncated }, null, 2)) },
         ...files,
@@ -297,7 +297,7 @@ function writeZip(fs: FileSystem.FileSystem, output: string, entries: Entry[]) {
 }
 
 function initConsoleTransport() {
-  if (app.isPackaged) {
+  if (app.isPackaged && !process.argv.includes("--print-logs") && process.env.OPENCODE_DESKTOP_CONSOLE !== "1") {
     log.transports.console.level = false
 
     return
@@ -308,14 +308,10 @@ function initConsoleTransport() {
     try {
       writeConsole(options)
     } catch (err) {
-      if (!isBrokenPipe(err)) throw err
+      if (Option.isNone(Schema.decodeUnknownOption(Schema.Struct({ code: Schema.Literal("EPIPE") }))(err))) throw err
       log.transports.console.level = false
     }
   }
-}
-
-function isBrokenPipe(err: unknown) {
-  return typeof err === "object" && err !== null && "code" in err && err.code === "EPIPE"
 }
 
 export function scoped(name: string, effect: Effect.Effect<void>) {

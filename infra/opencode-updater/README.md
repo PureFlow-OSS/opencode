@@ -16,6 +16,8 @@ Manage optional plugins in the admin UI's **Plugin Store** tab. Entries contain 
 
 ## Endpoints
 
+Installer and blockmap responses support single HTTP byte ranges (`206`), unsatisfiable ranges (`416`), and conditional `If-Range` requests. Electron clients must use `useMultipleRangeRequest: false` for this ASP.NET file transport; multipart ranges are not supported. Older clients may still fall back to a complete download. The implementation uses ASP.NET's file results rather than copying the entire file for every request.
+
 - `GET /opencode/version`
 - `GET /opencode/url`
 - `GET /opencode/config`

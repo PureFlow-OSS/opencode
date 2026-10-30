@@ -11,6 +11,7 @@ import { Effect } from "effect"
 import { fetchCorporateUpdate, isUpdateNewer, type CorporateSettings } from "./corporate"
 import { updateAppAdapter, updateCacheDirectory } from "./cache"
 import { windowsUpdater } from "./client"
+import { downloadUpdate } from "./download"
 import type { Platform } from "./machine"
 
 const restartTimeout = 10_000
@@ -90,7 +91,7 @@ export const make = Effect.fn("Updater.platform")(function* (input: {
         const corporate = await fetchCorporateUpdate(settings, { apiKey })
 
         if (!isUpdateNewer(input.currentVersion, corporate.version)) return undefined
-        updateClient.setFeedURL({ provider: "generic", url: corporate.url })
+        updateClient.setFeedURL({ provider: "generic", url: corporate.url, useMultipleRangeRequest: false })
         updateClient.requestHeaders = apiKey
           ? { "User-Agent": userAgent, "X-OpenCode-AiFactory-Api-Key": apiKey }
           : { "User-Agent": userAgent }
@@ -130,27 +131,38 @@ export const make = Effect.fn("Updater.platform")(function* (input: {
   } satisfies Platform
 })
 
-function stageUpdate(windowsInstaller: WindowsInstaller, options: { readonly differential: boolean }) {
+function stageUpdate(windowsInstaller: WindowsInstaller, options: Parameters<Platform["stageUpdate"]>[0]) {
   if (process.platform !== "darwin")
-    return Effect.tryPromise({
-      try: async () => {
-        // Only the NSIS cache goes stale: macOS refreshes its cached zip with every download and AppImage reads the
-        // blockmap embedded in the running file. An emulated x64 install updates to the ARM64 installer, which cannot
-        // be patched from the cached x64 one.
-        updateClient.disableDifferentialDownload =
-          process.platform === "win32" && (!options.differential || app.runningUnderARM64Translation)
-        await updateClient.netSession.setProxy({ mode: "direct" })
+    return Effect.gen(function* () {
+      const log = Effect.runForkWith(yield* Effect.context())
+      yield* Effect.tryPromise({
+        try: async () => {
+          // Only the NSIS cache goes stale: macOS refreshes its cached zip with every download and AppImage reads the
+          // blockmap embedded in the running file. An emulated x64 install updates to the ARM64 installer, which cannot
+          // be patched from the cached x64 one.
+          updateClient.disableDifferentialDownload =
+            process.platform === "win32" && (!options.differential || app.runningUnderARM64Translation)
+          await updateClient.netSession.setProxy({ mode: "direct" })
 
-        const [installer] = await updateClient.downloadUpdate()
+          const [installer] = await downloadUpdate(updateClient, options.onProgress, (message, data) =>
+            log(Effect.logInfo(message, data)),
+          )
 
-        if (!installer) throw new Error("Windows updater did not download an installer")
+          if (!installer) throw new Error("Windows updater did not download an installer")
 
-        windowsInstaller.current = installer
+          windowsInstaller.current = installer
 
-        return [installer]
-      },
-      catch: (error) => error,
-    }).pipe(Effect.flatMap(unpackInstaller))
+          return [installer]
+        },
+        catch: (error) => error,
+      }).pipe(
+        Effect.flatMap((files) => {
+          options.onProgress({ phase: "unpack" })
+
+          return Effect.logInfo("preparing downloaded update").pipe(Effect.andThen(unpackInstaller(files)))
+        }),
+      )
+    })
 
   return Effect.callback<void, Error>((resume) => {
     const cleanup = () => {

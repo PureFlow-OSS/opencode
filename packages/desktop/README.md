@@ -17,6 +17,12 @@ Open a fresh terminal after installation (restart an existing Windows Terminal h
 
 Registration preserves unrelated PATH entries, `%VARIABLE%` references, Unicode and the registry string type. Upgrades retain the entry; a normal uninstall removes only this installation's CLI directory from the user PATH. The machine PATH is left unchanged.
 
+## Update diagnostics
+
+Update settings show transfer percentage, received/total MiB and KiB/s, followed by verification and installer preparation. The update indicator stays visible during checks and transfers. Native differential-download and fallback messages, periodic transfer metrics and preparation phases are written to the desktop profile's logs.
+
+Packaged builds also accept `OpenCode.exe --print-logs` (or `OPENCODE_DESKTOP_CONSOLE=1`) to mirror those logs to an attached console. The normal GUI launch keeps its existing console behavior.
+
 ## Build
 
 For a local corporate Windows installer, run `script/package-desktop-electron-win.ps1` from the repository root. `OPENCODE_ELECTRON_OUTPUT_DIR` selects its output directory (relative to `packages/desktop`, or an absolute path); the default is `dist`. The same resolved directory receives `changelog.md`.
