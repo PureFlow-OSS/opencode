@@ -60,6 +60,8 @@ export const loggedFetch = (fields: { readonly server: string; readonly director
       const grant = init?.body instanceof URLSearchParams ? init.body.get("grant_type") : undefined
       const operation = grant === "refresh_token" ? "refresh" : grant === "authorization_code" ? "exchange" : undefined
       const started = Date.now()
+      const proxy = HttpProxy.proxyFor(url)
+      const gateway = proxy ? new URL(proxy) : undefined
       return run(
         Effect.gen(function* () {
           if (operation) yield* Effect.logInfo("mcp oauth request started")
@@ -95,6 +97,9 @@ export const loggedFetch = (fields: { readonly server: string; readonly director
             requestID: crypto.randomUUID(),
             origin: new URL(url).origin,
             method: init?.method ?? "GET",
+            proxyOrigin: gateway?.origin,
+            proxyCredentials: Boolean(gateway?.username || gateway?.password),
+            runtime: process.versions.bun ? `bun/${process.versions.bun}` : `node/${process.versions.node}`,
             ...(operation ? { operation } : {}),
           }),
         ),

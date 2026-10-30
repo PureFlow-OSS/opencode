@@ -21,6 +21,8 @@ Update settings show transfer percentage, received/total MiB and KiB/s, followed
 
 Packaged builds also accept `OpenCode.exe --print-logs` (or `OPENCODE_DESKTOP_CONSOLE=1`) to mirror those logs to an attached console. The normal GUI launch keeps its existing console behavior.
 
+MCP HTTP failure logs include the destination origin, selected `proxyOrigin`, whether `proxyCredentials` are configured, and the backend `runtime`. Proxy usernames/passwords are excluded from these annotations. These fields distinguish an endpoint authentication response from a tunnel failure through a different proxy selection.
+
 ## Build
 
 For a local corporate Windows installer, run `script/package-desktop-electron-win.ps1` from the repository root. `OPENCODE_ELECTRON_OUTPUT_DIR` selects its output directory (relative to `packages/desktop`, or an absolute path); the default is `dist`. The same resolved directory receives `changelog.md`.

@@ -1,5 +1,5 @@
 import { expect } from "bun:test"
-import { Effect, Schedule } from "effect"
+import { Effect, Exit, Logger, Schedule } from "effect"
 import { ConfigMCP } from "@opencode/schema/config/mcp"
 import { HttpProxy } from "@opencode/util/http-proxy"
 import { Credential } from "@opencode/core/credential"
@@ -15,8 +15,41 @@ HttpProxy.configure({ use_http_proxy: true, http_proxy: process.env.FIXTURE_PROX
 
 await Effect.runPromise(
   Effect.gen(function* () {
+    if (process.env.FIXTURE_METHOD === "mcp-rejected") {
+      const entries: { message: unknown; annotations: unknown }[] = []
+      const send = yield* McpOAuth.loggedFetch({ server: "rejected-proxy-fixture" }).pipe(
+        Effect.provideService(
+          Logger.CurrentLoggers,
+          new Set([
+            Logger.make((entry) => {
+              entries.push({ message: entry.message, annotations: Logger.formatStructured.log(entry).annotations })
+            }),
+          ]),
+        ),
+      )
+      const result = yield* Effect.tryPromise(() => send("https://mcp.hubspot.com")).pipe(Effect.exit)
+      expect(Exit.isFailure(result)).toBe(true)
+      expect(entries).toHaveLength(1)
+      expect(entries[0]?.message).toContain("mcp http request failed")
+      expect(entries[0]?.annotations).toMatchObject({
+        server: "rejected-proxy-fixture",
+        origin: "https://mcp.hubspot.com",
+        proxyOrigin: new URL(process.env.FIXTURE_PROXY!).origin,
+        proxyCredentials: true,
+        runtime: `bun/${process.versions.bun}`,
+      })
+      expect(JSON.stringify(entries)).not.toContain("proxy%40user")
+      expect(JSON.stringify(entries)).not.toContain("proxy@user")
+      expect(JSON.stringify(entries)).not.toContain("p@ss:word")
+      return
+    }
     if (process.env.FIXTURE_METHOD === "mcp") {
       const send = yield* McpOAuth.loggedFetch({ server: "https-proxy-fixture" })
+      if (!new URL(process.env.FIXTURE_PROXY!).username) {
+        const challenge = yield* Effect.promise(() => send("https://mcp.hubspot.com/protected"))
+        expect(challenge.status).toBe(401)
+        expect(challenge.headers.get("WWW-Authenticate")).toContain("Bearer resource_metadata=")
+      }
       const discovery = yield* Effect.promise(() =>
         McpOAuth.configuredDiscovery({
           config: new ConfigMCP.Remote({

@@ -13,8 +13,10 @@ test.each([
     decoded: "proxy@user:p@ss:word",
   })),
   { method: "mcp", credentials: "proxy-user", decoded: "proxy-user:" },
+  { method: "mcp", credentials: "", decoded: "" },
+  { method: "mcp-rejected", credentials: "proxy%40user:p%40ss%3Aword", decoded: "proxy@user:p@ss:word" },
 ])(
-  "$method uses authenticated HTTPS CONNECT with $credentials",
+  "$method handles HTTPS CONNECT with credentials '$credentials'",
   async ({ method, credentials, decoded }) => {
     const directory = path.resolve(import.meta.dir, "../fixture/proxy")
     const keys = await generateKeyPair("RS256")
@@ -54,6 +56,11 @@ test.each([
             response_types_supported: ["code"],
           })
         if (url.pathname === "/redirect") return Response.redirect("https://oauth.hubspot.com/resource")
+        if (url.pathname === "/protected")
+          return new Response(null, {
+            status: 401,
+            headers: { "WWW-Authenticate": 'Bearer resource_metadata="https://mcp.hubspot.com/metadata"' },
+          })
         if (url.pathname === "/mcp" || url.pathname === "/resource")
           return Response.json({ authorization: request.headers.get("authorization") })
         if (url.pathname === "/api/accounts/deviceauth/usercode")
@@ -81,11 +88,11 @@ test.each([
         return new Response(null, { status: 404 })
       },
     })
-    const authorization = `Basic ${Buffer.from(decoded).toString("base64")}`
+    const authorization = credentials ? `Basic ${Buffer.from(decoded).toString("base64")}` : undefined
     const proxy = createServer((_request, response) => response.writeHead(405).end())
     proxy.on("connect", (request, socket, head) => {
       tunnels.push({ host: request.url ?? "", authorization: request.headers["proxy-authorization"] })
-      if (request.headers["proxy-authorization"] !== authorization) {
+      if (method === "mcp-rejected" || request.headers["proxy-authorization"] !== authorization) {
         socket.end(
           'HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm="fixture"\r\nContent-Length: 0\r\n\r\n',
         )
@@ -97,7 +104,7 @@ test.each([
         return
       }
       const upstream = connect(origin.port!, "127.0.0.1", () => {
-        socket.write("HTTP/1.1 200 Connection Established\r\n\r\n")
+        socket.write(`HTTP/${credentials ? "1.1" : "1.0"} 200 Connection Established\r\n\r\n`)
         upstream.write(head)
         upstream.pipe(socket)
         socket.pipe(upstream)
@@ -123,7 +130,7 @@ test.each([
           https_proxy: "http://127.0.0.1:9",
           NO_PROXY: "localhost,127.0.0.1",
           no_proxy: "localhost,127.0.0.1",
-          FIXTURE_PROXY: `http://${credentials}@127.0.0.1:${address.port}`,
+          FIXTURE_PROXY: `http://${credentials ? `${credentials}@` : ""}127.0.0.1:${address.port}`,
           FIXTURE_CONTROL: control.url.toString(),
           FIXTURE_METHOD: method,
         },
@@ -140,8 +147,19 @@ test.each([
       expect(tunnels.length).toBeGreaterThan(0)
       expect(tunnels.every((item) => item.authorization === authorization)).toBe(true)
       expect(requests.every((item) => item.proxy === null)).toBe(true)
+      if (method === "mcp-rejected") {
+        expect(requests).toHaveLength(0)
+        return
+      }
       if (method === "mcp") {
-        expect(requests.map((item) => item.path)).toEqual(["/metadata", "/mcp", "/token", "/redirect", "/resource"])
+        expect(requests.map((item) => item.path)).toEqual([
+          ...(credentials ? [] : ["/protected"]),
+          "/metadata",
+          "/mcp",
+          "/token",
+          "/redirect",
+          "/resource",
+        ])
         expect(requests.find((item) => item.path === "/mcp")?.authorization).toBe("Bearer resource-token")
         return
       }
