@@ -60,6 +60,7 @@ export const make = Effect.fn("Updater.platform")(function* (input: {
   readonly apiKey: () => Promise<string | undefined>
 }) {
   const userAgent = `opencode/${input.channel === "prod" ? "latest" : input.channel}/${app.getVersion()}/desktop`
+  const requestHeaders = { "User-Agent": userAgent, "X-OpenCode-Version": input.currentVersion }
   const windowsInstaller: WindowsInstaller = {}
 
   const runFork = Effect.runForkWith(yield* Effect.context())
@@ -70,7 +71,7 @@ export const make = Effect.fn("Updater.platform")(function* (input: {
     debug: (...args) => runFork(Effect.logDebug(...args)),
   }
   updateClient.channel = "latest"
-  updateClient.requestHeaders = { "User-Agent": userAgent }
+  updateClient.requestHeaders = requestHeaders
   updateClient.allowPrerelease = false
   updateClient.allowDowngrade = true
   updateClient.autoDownload = false
@@ -88,13 +89,13 @@ export const make = Effect.fn("Updater.platform")(function* (input: {
         const apiKey = await input.apiKey()
         const settings = await input.corporateSettings()
         HttpProxy.configure(settings)
-        const corporate = await fetchCorporateUpdate(settings, { apiKey })
+        const corporate = await fetchCorporateUpdate(settings, { apiKey, currentVersion: input.currentVersion })
 
         if (!isUpdateNewer(input.currentVersion, corporate.version)) return undefined
         updateClient.setFeedURL({ provider: "generic", url: corporate.url, useMultipleRangeRequest: false })
         updateClient.requestHeaders = apiKey
-          ? { "User-Agent": userAgent, "X-OpenCode-AiFactory-Api-Key": apiKey }
-          : { "User-Agent": userAgent }
+          ? { ...requestHeaders, "X-OpenCode-AiFactory-Api-Key": apiKey }
+          : requestHeaders
         await updateClient.netSession.setProxy({ mode: "direct" })
 
         const result = await updateClient.checkForUpdates()
@@ -103,6 +104,9 @@ export const make = Effect.fn("Updater.platform")(function* (input: {
           throw new Error(
             `Corporate update metadata does not match feed ${corporate.url}: expected ${corporate.version}, got none`,
           )
+
+        // Delivery can pause between the version preflight and the native manifest request.
+        if (!isUpdateNewer(input.currentVersion, result.updateInfo.version)) return undefined
 
         if (result.updateInfo.version !== corporate.version)
           throw new Error(

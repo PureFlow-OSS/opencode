@@ -111,11 +111,14 @@ export async function fetchCorporateUpdate(
   settings: CorporateSettings,
   options: {
     readonly apiKey?: string
+    readonly currentVersion?: string
     readonly fetchFn?: Fetch
   } = {},
 ) {
   const urls = corporateUrls(settings)
   const requestHeaders = headers({}, options.apiKey?.trim() || undefined)
+
+  if (options.currentVersion) requestHeaders.set("X-OpenCode-Version", options.currentVersion)
 
   const [version, url] = await Promise.all([
     fetchCorporateValue(urls.version, { headers: requestHeaders, fetchFn: options.fetchFn }),

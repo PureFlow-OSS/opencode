@@ -71,6 +71,7 @@ describe("corporate updater", () => {
       {},
       {
         apiKey: " secret ",
+        currentVersion: "2.1.2",
         fetchFn: (url, init) => {
           const request = new Request(url, init)
 
@@ -90,6 +91,7 @@ describe("corporate updater", () => {
     })
     expect(seen.map((item) => item.url.pathname)).toEqual(["/opencode/version", "/opencode/url"])
     expect(seen.map((item) => item.headers.get(API_KEY_HEADER))).toEqual(["secret", "secret"])
+    expect(seen.map((item) => item.headers.get("X-OpenCode-Version"))).toEqual(["2.1.2", "2.1.2"])
   })
 
   test("preserves a same-origin feed URL and query", async () => {

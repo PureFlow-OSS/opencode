@@ -6,6 +6,8 @@ Release notes for OpenCode V2, newest first.
 
 ### Highlights
 
+- **Paused Update Delivery**: Stopping a release stage now reports no available update instead of failing version checks with HTTP 503. Client-version metadata prevents downgrade offers, while installer delivery remains blocked.
+
 - **Per-MCP Proxy Switch**: Remote MCPs now connect directly by default. Enable "Use proxy" per server to use the central proxy settings for transport and backend OAuth requests. The setting is also available for managed MCPs and MCP Store entries in the updater admin UI.
 
 - **Update Progress**: Restored the update indicator during checks and downloads, with percentage, transferred bytes, speed and preparation phases in settings. Added periodic download logs and optional packaged console logging. Updater feeds now support single-byte-range requests; clients select compatible differential downloads.

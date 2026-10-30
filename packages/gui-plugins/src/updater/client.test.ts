@@ -18,6 +18,12 @@ test.skipIf(process.platform !== "win32")(
 
       requests.push({ path: url.pathname, key: request.headersDistinct["x-opencode-aifactory-api-key"]?.[0] ?? null })
 
+      if (url.pathname === "/paused/latest.yml") {
+        response.end("version: 2.1.2\nfiles: []\n")
+
+        return
+      }
+
       if (url.pathname === "/installer.exe") {
         response.setHeader("Content-Length", installer.length)
         let offset = 0
@@ -100,6 +106,14 @@ async function run() {
   if (progress.at(-1)?.phase !== "verify") throw new Error("Missing verification phase")
   if (client.listenerCount("download-progress") !== listeners) throw new Error("Leaked download listener")
   if (!messages.includes("update download started") || !messages.includes("update download progress") || !messages.includes("update download verified")) throw new Error("Missing download phase logs")
+  client.allowDowngrade = true
+  client.setFeedURL({ provider: "generic", url: ${JSON.stringify(`http://127.0.0.1:${address.port}/paused`)} })
+  let available = false
+  let upToDate = false
+  client.once("update-available", () => { available = true })
+  client.once("update-not-available", () => { upToDate = true })
+  const paused = await client.checkForUpdates()
+  if (paused?.updateInfo.version !== "2.1.2" || available || !upToDate) throw new Error("Paused delivery did not report up to date")
   console.log(JSON.stringify({ version: result.updateInfo.version, installer: files[0] }))
 }
 run().then(() => app.exit(0), (error) => { console.error(error); app.exit(1) })
@@ -148,6 +162,7 @@ run().then(() => app.exit(0), (error) => { console.error(error); app.exit(1) })
       expect(await Bun.file(result.installer).text()).toBe(installer.toString())
       expect(requests.some((request) => request.path === "/latest.yml")).toBe(true)
       expect(requests.some((request) => request.path === "/installer.exe")).toBe(true)
+      expect(requests.some((request) => request.path === "/paused/latest.yml")).toBe(true)
       expect(requests.every((request) => request.key === "regression-key")).toBe(true)
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()))

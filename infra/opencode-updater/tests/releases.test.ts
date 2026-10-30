@@ -170,14 +170,41 @@ foreach ($version in @('1.0.0','1.0.1','1.0.2')) {
     expect(await file(`${feed("normal")}/ai-gilde/latest.yml`).exists()).toBe(false)
     for (const channel of ["beta", "ai-gilde", "normal"]) {
       expect((await request(`/admin/releases/${channel}/stop`, { method: "POST" })).status).toBe(200)
-      for (const route of ["/version", "/url", "/latest.json", "/feed/latest.yml"])
-        expect((await request(route, { headers: headers(channel) })).status).toBe(503)
+      const paused = await request("/version", { headers: headers(channel) })
+      expect(paused.status).toBe(200)
+      expect(await paused.text()).toBe("0.0.0")
+      expect(paused.headers.get("cache-control")).toBe("no-store")
+      expect(paused.headers.get("X-OpenCode-Delivery-Stopped")).toBe("true")
+      const url = await request("/url", { headers: headers(channel) })
+      expect(url.status).toBe(200)
+      expect(await url.text()).toContain("/opencode/feed")
+      expect(await (await request("/config", { headers: headers(channel) })).json()).toMatchObject({
+        version: "0.0.0",
+        deliveryStopped: true,
+      })
+      const tauri = await request("/latest.json", { headers: headers(channel) })
+      expect(tauri.status).toBe(204)
+      expect(await tauri.text()).toBe("")
+      const manifest = await request("/feed/latest.yml", {
+        headers: { ...headers(channel), "User-Agent": "opencode/latest/2.1.2/desktop" },
+      })
+      expect(manifest.status).toBe(200)
+      expect(await manifest.text()).toBe("version: 2.1.2\nfiles: []\n")
+      for (const [extra, expected] of [
+        [{ "X-OpenCode-Version": "2.2.2", "User-Agent": "opencode/latest/2.1.2/desktop" }, "2.2.2"],
+        [{ "User-Agent": "OpenCode/1.14.37" }, "1.14.37"],
+        [{ "X-OpenCode-Version": "invalid", "User-Agent": "opencode/beta/2.2.2-beta.1/desktop" }, "2.2.2-beta.1"],
+      ] as const) {
+        expect(await (await request("/version", { headers: { ...headers(channel), ...extra } })).text()).toBe(expected)
+      }
+      expect((await request("/feed/latest.yml", { headers: headers(channel) })).status).toBe(204)
+      expect((await request("/feed/installer.exe", { headers: headers(channel) })).status).toBe(503)
       expect((await request("/provider-config.json", { headers: headers(channel) })).status).toBe(200)
     }
     server.process.kill()
     await server.process.exited
     server = start()
-    // Version delivery is paused, so readiness must use the independent admin endpoint.
+    // Readiness stays independent of release delivery state.
     const deadline = Date.now() + 20000
     while (
       !(await request("/admin/releases/status")

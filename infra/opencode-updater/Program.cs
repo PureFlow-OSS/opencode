@@ -709,7 +709,10 @@ app.MapGet("/opencode/version", async (HttpRequest request, UpdaterRolloutResolv
 {
   var rollout = await rolloutResolver.ResolveAsync(request, request.HttpContext.RequestAborted);
   if (await request.HttpContext.RequestServices.GetRequiredService<UpdaterChannelStateStore>().IsStoppedAsync(rollout.Channel))
-    return Results.Json(new { error = $"{UpdaterChannelName(rollout.Channel)} release delivery is stopped" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+  {
+    MarkDeliveryStopped(request.HttpContext.Response);
+    return Results.Text(UpdateClientVersion(request) ?? "0.0.0", "text/plain");
+  }
   return Results.Text(rollout.Version, "text/plain");
 });
 
@@ -717,20 +720,21 @@ app.MapGet("/opencode/url", async (HttpRequest request, UpdaterRolloutResolver r
 {
   var rollout = await rolloutResolver.ResolveAsync(request, request.HttpContext.RequestAborted);
   if (await request.HttpContext.RequestServices.GetRequiredService<UpdaterChannelStateStore>().IsStoppedAsync(rollout.Channel))
-    return Results.Json(new { error = $"{UpdaterChannelName(rollout.Channel)} release delivery is stopped" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    MarkDeliveryStopped(request.HttpContext.Response);
   return Results.Text(BuildFeedUrl(rollout, request), "text/plain");
 });
 
 app.MapGet("/opencode/config", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver) =>
 {
   var rollout = await rolloutResolver.ResolveAsync(request, request.HttpContext.RequestAborted);
-  if (request.HttpContext.RequestServices.GetRequiredService<UpdaterChannelStateStore>().IsStopped(rollout.Channel))
-    return Results.Json(new { error = "Release delivery is stopped" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+  var stopped = request.HttpContext.RequestServices.GetRequiredService<UpdaterChannelStateStore>().IsStopped(rollout.Channel);
+  if (stopped) MarkDeliveryStopped(request.HttpContext.Response);
   return Results.Json(new
   {
-    version = rollout.Version,
+    version = stopped ? UpdateClientVersion(request) ?? "0.0.0" : rollout.Version,
     url = BuildFeedUrl(rollout, request),
     motd = rollout.Options.Motd,
+    deliveryStopped = stopped,
   });
 });
 
@@ -738,7 +742,10 @@ app.MapGet("/opencode/latest.json", async (HttpContext context, LocalFeed feed, 
 {
   var rollout = await rolloutResolver.ResolveAsync(context.Request, context.RequestAborted);
   if (context.RequestServices.GetRequiredService<UpdaterChannelStateStore>().IsStopped(rollout.Channel))
-    return Results.Json(new { error = "Release delivery is stopped" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+  {
+    MarkDeliveryStopped(context.Response);
+    return Results.NoContent();
+  }
   if (feed.TryGet("latest.json", rollout.Channel, out var local)) return await LocalFileAsync(context, local);
   return Results.NotFound();
 });
@@ -856,17 +863,43 @@ app.MapGet("/opencode/modelcards.json", async (HttpRequest request, UpdaterRollo
 app.MapGet("/opencode/feed/{**asset}", async (HttpContext context, LocalFeed feed, UpdaterRolloutResolver rolloutResolver, string? asset) =>
 {
   var rollout = await rolloutResolver.ResolveAsync(context.Request, context.RequestAborted);
-  if (context.RequestServices.GetRequiredService<UpdaterChannelStateStore>().IsStopped(rollout.Channel))
-    return Results.Json(new { error = "Release delivery is stopped" }, statusCode: StatusCodes.Status503ServiceUnavailable);
   var resolvedAsset = (asset ?? "").TrimStart('/');
   if (string.IsNullOrWhiteSpace(resolvedAsset) || resolvedAsset.Contains("..", StringComparison.Ordinal))
     return Results.BadRequest();
+
+  if (context.RequestServices.GetRequiredService<UpdaterChannelStateStore>().IsStopped(rollout.Channel))
+  {
+    MarkDeliveryStopped(context.Response);
+    if (resolvedAsset is "latest.yml" or "latest-mac.yml" or "latest-linux.yml")
+    {
+      var current = UpdateClientVersion(context.Request);
+      // Equality prevents electron-updater's allowDowngrade mode from offering a synthetic older release.
+      if (current is null) return Results.NoContent();
+      return Results.Text($"version: {current}\nfiles: []\n", "text/yaml; charset=utf-8");
+    }
+    return Results.Json(new { error = "Release delivery is stopped" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+  }
 
   if (feed.TryGet(resolvedAsset, rollout.Channel, out var local)) return await LocalFileAsync(context, local);
   return Results.NotFound();
 });
 
 app.Run();
+
+static void MarkDeliveryStopped(HttpResponse response)
+{
+  response.Headers.CacheControl = "no-store";
+  response.Headers["X-OpenCode-Delivery-Stopped"] = "true";
+}
+
+static string? UpdateClientVersion(HttpRequest request)
+{
+  const string version = @"[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?";
+  var header = request.Headers["X-OpenCode-Version"].ToString();
+  if (Regex.IsMatch(header, $@"\A{version}\z")) return header;
+  var agent = Regex.Match(request.Headers.UserAgent.ToString(), $@"(?i)\bopencode/(?:[^/\s]+/)?(?<version>{version})(?:/|\s|$)");
+  return agent.Success ? agent.Groups["version"].Value : null;
+}
 
 static ProviderConfigOptions ApplyReasoningSettings(ProviderConfigOptions config)
 {

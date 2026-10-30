@@ -157,9 +157,17 @@ explicitly, with the database version still visible in the admin console.
 
 The Releases page offers manual promotion without feedback approval gates, plus
 Stop and Resume for each stage. `POST /opencode/admin/releases/{channel}/stop`
-and `/clear` persist delivery state. A stopped stage returns HTTP 503 for
-`/version`, `/url`, `/latest.json`, and `/feed/{asset}`; model configuration and
-MCP services remain available. Missing files otherwise return HTTP 404.
+and `/clear` persist delivery state. A stopped stage returns successful no-update
+responses: `/version` and `/config` report the installed version from the
+`X-OpenCode-Version` header or OpenCode User-Agent, falling back to `0.0.0` for
+older clients without version information. `/url` stays valid; `/config` also
+sets `deliveryStopped: true`. Tauri's `/latest.json` returns HTTP 204. Electron
+manifests return the client's own version and an empty file list when known,
+preventing a downgrade offer even with `allowDowngrade`; otherwise they return
+HTTP 204. Paused responses have `Cache-Control: no-store` and
+`X-OpenCode-Delivery-Stopped: true`. Actual release assets stay blocked with
+HTTP 503; model configuration and MCP services remain available. Missing files
+otherwise return HTTP 404.
 
 Feedback is deprecated: `/opencode/feedback` and `/opencode/admin/feedback`
 return `Deprecation: true`. Historical GET requests remain available; new writes
