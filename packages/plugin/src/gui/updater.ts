@@ -10,6 +10,7 @@ export const UpdaterProgress = Schema.Struct({
   bytesPerSecond: Schema.optional(Schema.Number),
 })
 
+/** Transfer metrics and preparation phase; see `UpdaterProgress`. */
 export type UpdaterProgress = typeof UpdaterProgress.Type
 
 /**
