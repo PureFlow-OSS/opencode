@@ -97,6 +97,7 @@ describe("MCP settings rows", () => {
     ).toEqual({
       url: "https://example.com/jira",
       type: "remote",
+      use_http_proxy: false,
       headers: { "x-company": "", "X-LiteLLM-API-Key": "" },
       oauth: false,
       disabled: false,
@@ -118,9 +119,16 @@ describe("MCP settings rows", () => {
     ).toEqual({
       type: "remote",
       url: "https://example.com/jira",
+      use_http_proxy: false,
       headers: { "x-company": "" },
       oauth,
       disabled: false,
     })
+  })
+
+  test.each([undefined, false, true])("preserves store proxy policy %s", (use_http_proxy) => {
+    expect(
+      storeConfig({ name: "MCP", url: "https://example.com", lockedHeaderNames: [], use_http_proxy }).use_http_proxy,
+    ).toBe(use_http_proxy === true)
   })
 })

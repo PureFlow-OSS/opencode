@@ -31,41 +31,59 @@ export const CLIENT_METADATA_URL = "https://opencode.ai/oauth/opencode/client.js
 // Refresh tokens rotate, so concurrent refreshes of the same token share one request or the second gets invalid_grant.
 const refreshes = new Map<string, ReturnType<FetchLike>>()
 
-const refreshKey = (url: string | URL, init: RequestInit | undefined) => {
+const refreshKey = (url: string | URL, init: RequestInit | undefined, useProxy: boolean) => {
   if (!(init?.body instanceof URLSearchParams) || init.body.get("grant_type") !== "refresh_token") return undefined
-  return [String(url), init.body.get("client_id") ?? "", init.body.get("refresh_token") ?? ""].join("\u0000")
+  return [String(useProxy), String(url), init.body.get("client_id") ?? "", init.body.get("refresh_token") ?? ""].join(
+    "\u0000",
+  )
 }
 
 // Bun's and Node's fetch types both apply here and the SDK's FetchLike wants Bun's Response, so the
 // overload is picked by annotation and clone() is pinned to the type it was called on.
-const base: FetchLike = (input, init) => HttpProxy.fetch(input, { ...init, timeout: false } as BunFetchRequestInit)
+const base = (
+  input: Parameters<FetchLike>[0],
+  init: Parameters<FetchLike>[1],
+  useProxy: boolean,
+): ReturnType<FetchLike> =>
+  (useProxy ? HttpProxy.fetch : HttpProxy.fetchDirect)(input, { ...init, timeout: false } as BunFetchRequestInit)
 const share = (pending: ReturnType<FetchLike>) => pending.then((response) => response.clone() as typeof response)
 
-const send: FetchLike = (url, init) => {
-  const key = refreshKey(url, init)
-  if (key === undefined) return base(url, init)
+const send = (
+  url: Parameters<FetchLike>[0],
+  init: Parameters<FetchLike>[1],
+  useProxy = false,
+): ReturnType<FetchLike> => {
+  const key = refreshKey(url, init, useProxy)
+  if (key === undefined) return base(url, init, useProxy)
   const current = refreshes.get(key)
   if (current) return share(current)
-  const pending = base(url, init).finally(() => {
+  const pending = base(url, init, useProxy).finally(() => {
     if (refreshes.get(key) === pending) refreshes.delete(key)
   })
   refreshes.set(key, pending)
   return share(pending)
 }
 
-export const loggedFetch = (fields: { readonly server: string; readonly directory?: string }) =>
+export const loggedFetch = (fields: {
+  readonly server: string
+  readonly directory?: string
+  readonly use_http_proxy?: boolean
+}) =>
   Effect.gen(function* () {
     const run = Effect.runPromiseWith(yield* Effect.context())
     const request: FetchLike = (url, init) => {
       const grant = init?.body instanceof URLSearchParams ? init.body.get("grant_type") : undefined
       const operation = grant === "refresh_token" ? "refresh" : grant === "authorization_code" ? "exchange" : undefined
       const started = Date.now()
-      const proxy = HttpProxy.proxyFor(url)
+      const proxy = fields.use_http_proxy === true ? HttpProxy.proxyFor(url) : undefined
       const gateway = proxy ? new URL(proxy) : undefined
       return run(
         Effect.gen(function* () {
           if (operation) yield* Effect.logInfo("mcp oauth request started")
-          const response = yield* Effect.tryPromise({ try: () => send(url, init), catch: (error) => error })
+          const response = yield* Effect.tryPromise({
+            try: () => send(url, init, fields.use_http_proxy === true),
+            catch: (error) => error,
+          })
           const result = { status: response.status, durationMs: Date.now() - started }
           if (operation && !response.ok) {
             const error = yield* Effect.tryPromise(async () => parseErrorResponse(await response.clone().text())).pipe(
@@ -163,7 +181,10 @@ export const provider = (options: Options): OAuthClientProvider => {
   return {
     redirectUrl,
     discoveryState: async () => {
-      discovery ??= await configuredDiscovery({ config: options.config, fetchFn: send })
+      discovery ??= await configuredDiscovery({
+        config: options.config,
+        fetchFn: (url, init) => send(url, init, options.config.use_http_proxy === true),
+      })
       return discovery
     },
     saveDiscoveryState: (state) => {
@@ -347,7 +368,9 @@ export const authorize = (input: {
     const run = Effect.runPromiseWith(context)
     const runFork = Effect.runForkWith(context)
     const credentials = yield* Credential.Service
-    const fetchFn = yield* loggedFetch({ server: input.name }).pipe(Effect.annotateLogs(fields))
+    const fetchFn = yield* loggedFetch({ server: input.name, use_http_proxy: input.config.use_http_proxy }).pipe(
+      Effect.annotateLogs(fields),
+    )
     yield* Effect.logInfo("mcp oauth authorization started", fields)
     const oauth = input.config.oauth || undefined
     const store = memoryStore()

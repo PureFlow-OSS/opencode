@@ -5,11 +5,16 @@ story("generates, saves and edits a fixed OAuth redirect URI", async ({ mount, p
   const edit = component.getByRole("button", { name: "Edit MCP server", exact: true })
   await edit.click()
   const dialog = page.getByRole("dialog")
+  const proxy = dialog.getByRole("switch", { name: "Use proxy", exact: true })
+  await expect(proxy).not.toBeChecked()
+  await proxy.focus()
+  await proxy.press("Space")
   const redirect = dialog.getByLabel("OAuth Redirect URI", { exact: true })
   await expect(redirect).toHaveValue("http://127.0.0.1:23456/mcp/oauth/callback")
   await dialog.getByRole("button", { name: "Save", exact: true }).click()
   await expect(dialog).toHaveCount(0)
   const saved = component.getByRole("status", { name: "Saved MCP configuration" })
+  expect(JSON.parse((await saved.textContent())!).config.use_http_proxy).toBe(true)
   expect(JSON.parse((await saved.textContent())!).config.oauth).toEqual({
     client_id: "crm-client",
     client_secret: "crm-secret",
@@ -17,6 +22,9 @@ story("generates, saves and edits a fixed OAuth redirect URI", async ({ mount, p
     redirect_uri: "http://127.0.0.1:23456/mcp/oauth/callback",
   })
   await edit.click()
+  await expect(proxy).toBeChecked()
+  await proxy.focus()
+  await proxy.press("Space")
   await expect(redirect).toHaveValue("http://127.0.0.1:23456/mcp/oauth/callback")
   await redirect.click()
   await expect(redirect).toBeFocused()
@@ -31,6 +39,7 @@ story("generates, saves and edits a fixed OAuth redirect URI", async ({ mount, p
   await redirect.fill(" http://127.0.0.1:19876/mcp/oauth/callback ")
   await dialog.getByRole("button", { name: "Save", exact: true }).click()
   await expect(dialog).toHaveCount(0)
+  expect(JSON.parse((await saved.textContent())!).config.use_http_proxy).toBe(false)
   expect(JSON.parse((await saved.textContent())!).config.oauth).toEqual({
     client_id: "crm-client",
     client_secret: "crm-secret",
@@ -91,6 +100,7 @@ story("saves an installed store server without treating its existing name as a d
     config: {
       type: "remote",
       url: "https://mcp.example/search",
+      use_http_proxy: false,
       headers: { "x-company-token": "previous-token" },
       oauth: false,
       codemode: false,

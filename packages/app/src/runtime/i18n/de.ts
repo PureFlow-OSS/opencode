@@ -3,6 +3,9 @@ import en from "./en"
 type Keys = keyof typeof en
 
 export const dict = {
+  "settings.mcp.form.proxy": "Proxy verwenden",
+  "settings.mcp.form.proxyDescription":
+    "Den konfigurierten Proxy für diesen MCP und seine OAuth-Anfragen verwenden. Ausgeschaltet wird direkt verbunden.",
   "common.color.orange": "orange",
   "common.color.yellow": "gelb",
   "common.color.cyan": "cyan",

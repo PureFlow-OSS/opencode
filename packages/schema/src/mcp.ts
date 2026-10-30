@@ -53,6 +53,9 @@ export class OAuthConfig extends Schema.Class<OAuthConfig>("Mcp.OAuthConfig")({
 export class RemoteConfig extends Schema.Class<RemoteConfig>("Mcp.RemoteConfig")({
   type: Schema.Literal("remote"),
   url: Schema.String,
+  use_http_proxy: Schema.Boolean.pipe(optional).annotate({
+    description: "Use the configured HTTP proxy for this server and its OAuth requests. Defaults to false.",
+  }),
   headers: Schema.Record(Schema.String, Schema.String).pipe(optional),
   oauth: Schema.Union([OAuthConfig, Schema.Literal(false)]).pipe(optional),
   disabled: Schema.Boolean.pipe(optional),
@@ -93,6 +96,7 @@ export const StoreItem = Schema.Struct({
   name: Schema.String,
   description: Schema.String.pipe(optional),
   url: Schema.String,
+  use_http_proxy: Schema.Boolean.pipe(optional),
   lockedHeaderNames: Schema.Array(Schema.String),
   headerPlaceholder: Schema.String.pipe(optional),
   oauthRequired: Schema.Boolean.pipe(optional).annotate({

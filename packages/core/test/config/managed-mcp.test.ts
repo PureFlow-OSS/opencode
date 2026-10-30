@@ -35,6 +35,7 @@ test("managed MCP parsing migrates V1 updater definitions", () => {
           type: "remote",
           url: "https://example.com/mcp",
           enabled: false,
+          use_http_proxy: true,
           timeout: 3000,
           oauth: {
             clientId: "client",
@@ -65,6 +66,7 @@ test("managed MCP parsing migrates V1 updater definitions", () => {
           redirect_uri: "https://example.com/callback",
         },
         disabled: true,
+        use_http_proxy: true,
         timeout: { startup: 3000, catalog: 3000, execution: 3000 },
       },
       locked: true,
@@ -201,12 +203,12 @@ test("MCP store decoding accepts updater header-name field", () => {
 test("MCP store decoding preserves the OAuth required flag", () => {
   expect(
     ConfigManagedMcp.store([
-      { name: "Required", url: "https://example.com/required", lockedHeaderNames: [], oauthRequired: true },
+      { name: "Required", url: "https://example.com/required", lockedHeaderNames: [], oauthRequired: true, use_http_proxy: true },
       { name: "Optional", url: "https://example.com/optional", lockedHeaderNames: [], oauthRequired: false },
       { name: "Default", url: "https://example.com/default", lockedHeaderNames: [] },
     ]),
   ).toStrictEqual([
-    { name: "Required", url: "https://example.com/required", lockedHeaderNames: [], oauthRequired: true },
+    { name: "Required", url: "https://example.com/required", lockedHeaderNames: [], oauthRequired: true, use_http_proxy: true },
     { name: "Optional", url: "https://example.com/optional", lockedHeaderNames: [], oauthRequired: false },
     { name: "Default", url: "https://example.com/default", lockedHeaderNames: [] },
   ])

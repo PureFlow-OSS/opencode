@@ -8,6 +8,7 @@ import { McpOAuth } from "@opencode/core/mcp/oauth"
 import { Cause, Effect, Exit } from "effect"
 import { hostEnvironmentLayer } from "./fixture/environment"
 import { HttpProxy } from "@opencode/util/http-proxy"
+import { withEnv } from "./fixture/env"
 
 const authServer = Bun.serve({ port: 0, fetch: () => new Response(null, { status: 404 }) })
 afterAll(() => authServer.stop(true))
@@ -30,7 +31,7 @@ test("routes MCP transport and OAuth requests through the configured corporate p
   url.username = "mcp-user"
   HttpProxy.configure({ use_http_proxy: true, http_proxy: url.toString() })
   try {
-    const fetch = await Effect.runPromise(McpOAuth.loggedFetch({ server: "proxy-check" }))
+    const fetch = await Effect.runPromise(McpOAuth.loggedFetch({ server: "proxy-check", use_http_proxy: true }))
     const response = await fetch("http://mcp-proxy-check.invalid/mcp", {
       headers: { authorization: "Bearer mcp-test" },
     })
@@ -52,6 +53,80 @@ const integrationID = Integration.ID.make("mcp_test")
 const methodID = Integration.MethodID.make("oauth")
 
 const remote = (url: string) => new ConfigMCP.Remote({ type: "remote", url, oauth: { client_id: "client" } })
+
+test("isolates direct MCP defaults, OAuth discovery and refreshes from proxy-enabled servers", async () => {
+  const pending = Promise.withResolvers<void>()
+  const tokens: string[] = []
+  const reply = (via: string) => async (request: Request) => {
+    const url = new URL(request.url)
+    if (url.pathname === "/metadata")
+      return Response.json({
+        issuer: url.origin,
+        authorization_endpoint: `${url.origin}/authorize`,
+        token_endpoint: `${url.origin}/${via}-token`,
+        response_types_supported: ["code"],
+      })
+    if (url.pathname === "/token") {
+      tokens.push(via)
+      if (tokens.length === 2) pending.resolve()
+      await pending.promise
+    }
+    return Response.json({ via })
+  }
+  // 127.0.0.2 stays local but is not a built-in proxy-bypass host, so the switch controls the route.
+  const origin = Bun.serve({ hostname: "127.0.0.2", port: 0, fetch: reply("direct") })
+  const proxy = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: reply("proxy") })
+  HttpProxy.configure({ use_http_proxy: true, http_proxy: proxy.url.href })
+  try {
+    await Effect.runPromise(
+      withEnv({ HTTP_PROXY: proxy.url.href, HTTPS_PROXY: proxy.url.href, NO_PROXY: "", no_proxy: "" }, () =>
+        Effect.gen(function* () {
+          const senders = yield* Effect.forEach([undefined, false, true], (use_http_proxy) =>
+            McpOAuth.loggedFetch({ server: `route-${use_http_proxy}`, use_http_proxy }),
+          )
+          const values = yield* Effect.promise(() =>
+            Promise.all(
+              senders.map(async (send, index) => {
+                expect(await (await send(origin.url)).json()).toEqual({ via: index === 2 ? "proxy" : "direct" })
+                const provider = McpOAuth.provider({
+                  config: new ConfigMCP.Remote({
+                    type: "remote",
+                    url: origin.url.href,
+                    use_http_proxy: [undefined, false, true][index],
+                    oauth: { auth_server_metadata_url: `${origin.url}metadata` },
+                  }),
+                  store: McpOAuth.memoryStore(),
+                })
+                const discovery = await provider.discoveryState?.()
+                expect(discovery?.authorizationServerMetadata?.token_endpoint).toBe(
+                  `${origin.url}${index === 2 ? "proxy" : "direct"}-token`,
+                )
+                return (
+                  await send(`${origin.url}token`, {
+                    method: "POST",
+                    body: new URLSearchParams({
+                      grant_type: "refresh_token",
+                      client_id: "client",
+                      refresh_token: "same-token",
+                    }),
+                    signal: AbortSignal.timeout(5000),
+                  })
+                ).json()
+              }),
+            ),
+          )
+          expect(values).toEqual([{ via: "direct" }, { via: "direct" }, { via: "proxy" }])
+          expect(tokens.toSorted()).toEqual(["direct", "proxy"])
+        }),
+      ),
+    )
+  } finally {
+    pending.resolve()
+    HttpProxy.configure({})
+    origin.stop(true)
+    proxy.stop(true)
+  }
+}, 30000)
 
 const credential = (input: { access: string; refresh: string; expires?: number; url: string }) =>
   new Credential.Info({
@@ -204,7 +279,12 @@ describe("MCP OAuth", () => {
       async fetch(request) {
         if (request.method !== "POST" || new URL(request.url).pathname !== "/token")
           return new Response(null, { status: 404 })
-        return Response.json({ access_token: "access", token_type: "Bearer", refresh_token: "refresh", expires_in: 3600 })
+        return Response.json({
+          access_token: "access",
+          token_type: "Bearer",
+          refresh_token: "refresh",
+          expires_in: 3600,
+        })
       },
     })
 

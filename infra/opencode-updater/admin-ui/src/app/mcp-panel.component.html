@@ -29,6 +29,10 @@
           </select>
         </label>
         @if (draft.type === 'remote') {
+          <label class="toggle full-width">
+            <input name="use_http_proxy" [(ngModel)]="draft.use_http_proxy" type="checkbox" />
+            <span><strong>Use proxy</strong><small>Use the configured proxy for this MCP and its OAuth requests. Off connects directly.</small></span>
+          </label>
           <label class="full-width">
             MCP URL
             <input name="url" [(ngModel)]="draft.url" type="url" placeholder="https://mcp.example.com/mcp" required />

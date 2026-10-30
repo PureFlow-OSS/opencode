@@ -74,6 +74,7 @@ export function storeConfig(item: Mcp.StoreItem): Mcp.RemoteConfig {
   return {
     type: "remote",
     url: item.url,
+    use_http_proxy: item.use_http_proxy === true,
     headers: Object.fromEntries(item.lockedHeaderNames.map((header) => [header, ""])),
     oauth: item.oauthRequired === true ? {} : false,
     disabled: false,

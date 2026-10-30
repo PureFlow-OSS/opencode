@@ -16,6 +16,8 @@ Manage optional plugins in the admin UI's **Plugin Store** tab. Entries contain 
 
 ## Endpoints
 
+Managed MCP definitions and MCP Store entries expose `use_http_proxy`, defaulting to `false`. Both admin forms offer a **Use proxy** checkbox. The public provider configuration and store catalog preserve the value; OpenCode adopts it when installing a store entry. Remote transport and backend OAuth requests stay direct unless explicitly enabled. Existing clients that do not support this field keep their previous routing behavior.
+
 Installer and blockmap responses support single HTTP byte ranges (`206`), unsatisfiable ranges (`416`), and conditional `If-Range` requests. Electron clients must use `useMultipleRangeRequest: false` for this ASP.NET file transport; multipart ranges are not supported. Older clients may still fall back to a complete download. The implementation uses ASP.NET's file results rather than copying the entire file for every request.
 
 - `GET /opencode/version`

@@ -86,56 +86,69 @@ export function proxyFor(input: string | URL) {
 }
 
 export const fetch: typeof globalThis.fetch = Object.assign(
-  async (input: Parameters<typeof globalThis.fetch>[0], init?: Parameters<typeof globalThis.fetch>[1]) => {
-    const proxy = proxyFor(input instanceof Request ? input.url : input.toString())
-    if (process.versions.bun && proxy) {
-      const url = new URL(proxy)
-      const authorization =
-        url.username || url.password
-          ? `Basic ${Buffer.from(`${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`).toString("base64")}`
-          : undefined
-      url.username = ""
-      url.password = ""
-      const options = { ...init }
-      // Send credentials explicitly: Bun can fail to connect when the proxy URL contains only a username.
-      Object.defineProperty(options, "proxy", {
-        value: authorization ? { url: url.toString(), headers: { "Proxy-Authorization": authorization } } : proxy,
-        enumerable: true,
-      })
-      return globalThis.fetch(input, options)
-    }
-    if (process.versions.bun && !proxyVariables.some((key) => process.env[key])) return globalThis.fetch(input, init)
-    // The explicit entrypoint avoids Bun's built-in "undici" shim, which delegates back to global fetch.
-    const { Agent, ProxyAgent, fetch } = await import("undici/index.js")
-    if (proxy && !agents.has(proxy)) agents.set(proxy, new ProxyAgent(proxy))
-    if (!proxy && !direct.agent) direct.agent = new Agent()
-    const options = { ...init }
-    Object.defineProperty(options, "duplex", { value: "half", enumerable: true })
-    const request = input instanceof Request ? new Request(input, options) : new Request(input.toString(), options)
-    // Keep fetch and dispatcher from the same undici version: Node's bundled fetch can use an older handler API.
-    // A direct dispatcher also bypasses Bun 1.4.2's inherited proxy environment without mutating process.env.
-    const response = await fetch(request.url, {
-      method: request.method,
-      headers: Object.fromEntries(request.headers),
-      body: request.body,
-      signal: request.signal,
-      redirect: request.redirect,
-      duplex: "half",
-      dispatcher: proxy ? agents.get(proxy) : direct.agent,
-    })
-    const result = new Response(response.body as ReadableStream<Uint8Array> | null, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: Array.from(response.headers),
-    })
-    Object.defineProperties(result, { url: { value: response.url }, redirected: { value: response.redirected } })
-    return result
-  },
-  {
-    preconnect: (url: string | URL, options?: { dns?: boolean; tcp?: boolean; http?: boolean; https?: boolean }) => {
-      const runtimeFetch = globalThis.fetch
-      if ("preconnect" in runtimeFetch && typeof runtimeFetch.preconnect === "function")
-        runtimeFetch.preconnect(url, options)
-    },
-  },
+  (input: Parameters<typeof globalThis.fetch>[0], init?: Parameters<typeof globalThis.fetch>[1]) =>
+    request(input, init, proxyFor(input instanceof Request ? input.url : input.toString())),
+  { preconnect },
 )
+
+/** Bypass configured and inherited proxies for this request without changing other concurrent requests. */
+export const fetchDirect: typeof globalThis.fetch = Object.assign(
+  (input: Parameters<typeof globalThis.fetch>[0], init?: Parameters<typeof globalThis.fetch>[1]) =>
+    request(input, init),
+  { preconnect },
+)
+
+async function request(
+  input: Parameters<typeof globalThis.fetch>[0],
+  init?: Parameters<typeof globalThis.fetch>[1],
+  proxy?: string,
+) {
+  if (process.versions.bun && proxy) {
+    const url = new URL(proxy)
+    const authorization =
+      url.username || url.password
+        ? `Basic ${Buffer.from(`${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`).toString("base64")}`
+        : undefined
+    url.username = ""
+    url.password = ""
+    const options = { ...init }
+    // Send credentials explicitly: Bun can fail to connect when the proxy URL contains only a username.
+    Object.defineProperty(options, "proxy", {
+      value: authorization ? { url: url.toString(), headers: { "Proxy-Authorization": authorization } } : proxy,
+      enumerable: true,
+    })
+    return globalThis.fetch(input, options)
+  }
+  if (process.versions.bun && !proxyVariables.some((key) => process.env[key])) return globalThis.fetch(input, init)
+  // The explicit entrypoint avoids Bun's built-in "undici" shim, which delegates back to global fetch.
+  const { Agent, ProxyAgent, fetch } = await import("undici/index.js")
+  if (proxy && !agents.has(proxy)) agents.set(proxy, new ProxyAgent(proxy))
+  if (!proxy && !direct.agent) direct.agent = new Agent()
+  const options = { ...init }
+  Object.defineProperty(options, "duplex", { value: "half", enumerable: true })
+  const request = input instanceof Request ? new Request(input, options) : new Request(input.toString(), options)
+  // Keep fetch and dispatcher from the same undici version: Node's bundled fetch can use an older handler API.
+  // A direct dispatcher also bypasses Bun 1.4.2's inherited proxy environment without mutating process.env.
+  const response = await fetch(request.url, {
+    method: request.method,
+    headers: Object.fromEntries(request.headers),
+    body: request.body,
+    signal: request.signal,
+    redirect: request.redirect,
+    duplex: "half",
+    dispatcher: proxy ? agents.get(proxy) : direct.agent,
+  })
+  const result = new Response(response.body as ReadableStream<Uint8Array> | null, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: Array.from(response.headers),
+  })
+  Object.defineProperties(result, { url: { value: response.url }, redirected: { value: response.redirected } })
+  return result
+}
+
+function preconnect(url: string | URL, options?: { dns?: boolean; tcp?: boolean; http?: boolean; https?: boolean }) {
+  const runtimeFetch = globalThis.fetch
+  if ("preconnect" in runtimeFetch && typeof runtimeFetch.preconnect === "function")
+    runtimeFetch.preconnect(url, options)
+}

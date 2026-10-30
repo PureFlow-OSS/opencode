@@ -2165,6 +2165,9 @@ sealed class ModalitiesOptions
 
 sealed class McpConfigOptions
 {
+  [JsonPropertyName("use_http_proxy")]
+  public bool UseHttpProxy { get; set; }
+
   [JsonPropertyName("type")]
   public string Type { get; set; } = "";
 
@@ -2231,6 +2234,9 @@ sealed class McpManagedAuthOptions
 
 sealed class McpStoreOptions
 {
+  [JsonPropertyName("use_http_proxy")]
+  public bool UseHttpProxy { get; set; }
+
   [JsonPropertyName("oauthRequired")]
   public bool OAuthRequired { get; set; }
 
@@ -2310,6 +2316,7 @@ sealed class McpStoreStore(IWebHostEnvironment env)
         headerNames = item.HeaderNames,
         headerPlaceholder = item.HeaderPlaceholder,
         oauthRequired = item.OAuthRequired,
+        use_http_proxy = item.UseHttpProxy,
       })
       .ToList();
   }
@@ -2331,6 +2338,7 @@ sealed class McpStoreStore(IWebHostEnvironment env)
       headerNames = config.HeaderNames,
       headerPlaceholder = config.HeaderPlaceholder,
       oauthRequired = config.OAuthRequired,
+      use_http_proxy = config.UseHttpProxy,
       enabled = config.Enabled,
     }));
     command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));

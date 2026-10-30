@@ -142,6 +142,7 @@ const api = {
             },
             {
               name: "Company OAuth",
+              use_http_proxy: true,
               url: "https://mcp.example/oauth",
               lockedHeaderNames: [],
               oauthRequired: true,
@@ -150,30 +151,41 @@ const api = {
         },
       }
     },
-    connect: async (input: { server: string }) => {
-      recordMcpWrite(`mcp.connect:${input.server}`)
-      setMcpStoryState(
-        "runtime",
-        mcpStoryState.runtime.map((server) =>
-          server.name === input.server ? { ...server, status: { status: "connected" } } : server,
-        ),
-      )
-      return { data: true }
-    },
-    disconnect: async (input: { server: string }) => {
-      recordMcpWrite(`mcp.disconnect:${input.server}`)
-      setMcpStoryState(
-        "runtime",
-        mcpStoryState.runtime.map((server) =>
-          server.name === input.server ? { ...server, status: { status: "disabled" } } : server,
-        ),
-      )
-      return { data: true }
+  },
+  experimental: {
+    mcp: {
+      connect: async (input: { server: string }) => {
+        recordMcpWrite(`mcp.connect:${input.server}`)
+        setMcpStoryState(
+          "runtime",
+          mcpStoryState.runtime.map((server) =>
+            server.name === input.server ? { ...server, status: { status: "connected" } } : server,
+          ),
+        )
+        return { data: true }
+      },
+      disconnect: async (input: { server: string }) => {
+        recordMcpWrite(`mcp.disconnect:${input.server}`)
+        setMcpStoryState(
+          "runtime",
+          mcpStoryState.runtime.map((server) =>
+            server.name === input.server ? { ...server, status: { status: "disabled" } } : server,
+          ),
+        )
+        return { data: true }
+      },
     },
   },
   plugin: {
     list: async () => ({
-      data: [{ id: "Storybook plugin", source: { type: "package", target: "@example/plugin" } }],
+      data: [
+        {
+          id: "Storybook plugin",
+          source: { type: "package", target: "@example/plugin" },
+          features: { server: true },
+          state: { status: "active" },
+        },
+      ],
     }),
   },
 }

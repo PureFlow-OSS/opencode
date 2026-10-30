@@ -7,6 +7,7 @@ import { ChannelPickerComponent } from "./channel-picker.component"
 type Channel = "normal" | "beta"
 
 type McpDraft = {
+  use_http_proxy: boolean
   name: string
   type: McpConfig["type"]
   enabled: boolean
@@ -24,6 +25,7 @@ type McpDraft = {
 }
 
 const emptyDraft = (): McpDraft => ({
+  use_http_proxy: false,
   name: "",
   type: "remote",
   enabled: true,
@@ -87,6 +89,7 @@ export class McpPanelComponent {
   edit(name: string, config: McpConfig) {
     this.editing = name
     this.draft = {
+      use_http_proxy: config.use_http_proxy ?? false,
       name,
       type: config.type,
       enabled: config.enabled !== false,
@@ -137,7 +140,7 @@ export class McpPanelComponent {
       ...(timeout ? { timeout } : {}),
       ...(headers ? { headers } : {}),
       ...(environment ? { environment } : {}),
-      ...(this.draft.type === "remote" ? { url: this.draft.url.trim() } : { command }),
+      ...(this.draft.type === "remote" ? { url: this.draft.url.trim(), use_http_proxy: this.draft.use_http_proxy } : { command }),
       ...(this.draft.usePat
         ? {
             auth: {

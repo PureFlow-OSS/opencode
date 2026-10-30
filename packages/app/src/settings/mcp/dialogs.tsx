@@ -87,6 +87,7 @@ type FormState = {
   type: "local" | "remote"
   command: string
   url: string
+  use_http_proxy: boolean
   headers: HeaderRow[]
   oauthEnabled: boolean
   oauth: { client_id: string; client_secret: string; scope: string; redirect_uri: string }
@@ -118,6 +119,7 @@ export const DialogMcpForm: Component<{
     type: props.config?.type ?? "local",
     command: props.config?.type === "local" ? formatCommand(props.config.command) : "",
     url: props.config?.type === "remote" ? props.config.url : "",
+    use_http_proxy: props.config?.type === "remote" && props.config.use_http_proxy === true,
     headers: headersFromRecord(props.config?.type === "remote" ? props.config.headers : undefined),
     oauthEnabled: props.config?.type === "remote" && !!props.config.oauth,
     oauth: {
@@ -221,6 +223,7 @@ export const DialogMcpForm: Component<{
       ...previousRemote,
       type: "remote" as const,
       url,
+      use_http_proxy: form.use_http_proxy,
       headers: headersToRecord(form.headers),
       oauth,
       disabled: form.disabled,
@@ -298,6 +301,13 @@ export const DialogMcpForm: Component<{
               validationState={form.urlError ? "invalid" : undefined}
               error={form.urlError}
             />
+            <Switch
+              checked={form.use_http_proxy}
+              onChange={(value) => setForm("use_http_proxy", value)}
+              description={language.t("settings.mcp.form.proxyDescription")}
+            >
+              {language.t("settings.mcp.form.proxy")}
+            </Switch>
             <div class="flex flex-col gap-2">
               <span class="text-13-medium">{language.t("settings.mcp.form.headers")}</span>
               <For each={form.headers}>

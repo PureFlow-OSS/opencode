@@ -4,6 +4,7 @@ import { injectMutation, injectQuery } from "@tanstack/angular-query-experimenta
 import { ApiService, McpStoreItem } from "./api.service"
 
 type StoreDraft = {
+  use_http_proxy: boolean
   oauthRequired: boolean
   name: string
   description: string
@@ -14,6 +15,7 @@ type StoreDraft = {
 }
 
 const emptyDraft = (): StoreDraft => ({
+  use_http_proxy: false,
   oauthRequired: false,
   name: "",
   description: "",
@@ -62,6 +64,7 @@ export class McpStorePanelComponent {
   edit(item: McpStoreItem) {
     this.editing.set(item.name)
     this.draft = {
+      use_http_proxy: item.use_http_proxy ?? false,
       oauthRequired: item.oauthRequired ?? false,
       name: item.name,
       description: item.description ?? "",
@@ -120,6 +123,7 @@ export class McpStorePanelComponent {
       {
         name,
         item: {
+          use_http_proxy: this.draft.use_http_proxy,
           oauthRequired: this.draft.oauthRequired,
           name,
           description: this.draft.description.trim() || null,

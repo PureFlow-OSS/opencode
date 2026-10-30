@@ -121,14 +121,21 @@ test("tester search, MCP OAuth and the plugin store survive the API and stored c
       url: "https://mcp.example.test/mcp",
       headerNames: [],
       oauthRequired: true,
+      use_http_proxy: true,
       enabled: true,
     }
-    expect((await request("/admin/mcp-store/oauth-server", put(entry))).status).toBe(200)
-    expect(await (await request("/admin/mcp-store")).json()).toContainEqual(
-      expect.objectContaining({ name: entry.name, oauthRequired: true }),
+    expect((await request("/admin/mcp-store/oauth-server", put({ ...entry, use_http_proxy: undefined }))).status).toBe(
+      200,
     )
     expect(await (await request("/mcp-store.json")).json()).toContainEqual(
-      expect.objectContaining({ name: entry.name, oauthRequired: true }),
+      expect.objectContaining({ name: entry.name, use_http_proxy: false }),
+    )
+    expect((await request("/admin/mcp-store/oauth-server", put(entry))).status).toBe(200)
+    expect(await (await request("/admin/mcp-store")).json()).toContainEqual(
+      expect.objectContaining({ name: entry.name, oauthRequired: true, use_http_proxy: true }),
+    )
+    expect(await (await request("/mcp-store.json")).json()).toContainEqual(
+      expect.objectContaining({ name: entry.name, oauthRequired: true, use_http_proxy: true }),
     )
     const db = new Database(path.join(directory, "data/feedback.db"))
     try {
@@ -137,6 +144,7 @@ test("tester search, MCP OAuth and the plugin store survive the API and stored c
         .get()
       expect(stored).not.toBeNull()
       expect(JSON.parse(stored!.Config).oauthRequired).toBe(true)
+      expect(JSON.parse(stored!.Config).use_http_proxy).toBe(true)
     } finally {
       db.close()
     }
@@ -144,13 +152,29 @@ test("tester search, MCP OAuth and the plugin store survive the API and stored c
       (
         await request(
           "/admin/mcp-store/oauth-server",
-          put({ ...entry, oauthRequired: false, headerNames: ["Authorization"] }),
+          put({ ...entry, oauthRequired: false, use_http_proxy: false, headerNames: ["Authorization"] }),
         )
       ).status,
     ).toBe(200)
     expect(await (await request("/mcp-store.json")).json()).toContainEqual(
-      expect.objectContaining({ name: entry.name, oauthRequired: false }),
+      expect.objectContaining({ name: entry.name, oauthRequired: false, use_http_proxy: false }),
     )
+    for (const use_http_proxy of [undefined, true, false]) {
+      expect(
+        (
+          await request(
+            "/admin/mcp/routing?channel=normal",
+            put({ type: "remote", url: "http://internal.example/mcp", use_http_proxy }),
+          )
+        ).status,
+      ).toBe(200)
+      expect(await (await request("/admin/mcp?channel=normal")).json()).toMatchObject({
+        routing: { use_http_proxy: use_http_proxy === true },
+      })
+      expect(await (await request("/provider-config.json")).json()).toMatchObject({
+        mcp: { routing: { use_http_proxy: use_http_proxy === true } },
+      })
+    }
     const plugin = { name: "team-tools", package: "@company/tools@1.2.3", description: "Team tools", enabled: true }
     expect((await request("/admin/plugin-store/team-tools", put(plugin))).status).toBe(200)
     expect(await (await request("/plugin-store.json")).json()).toEqual([

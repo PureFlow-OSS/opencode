@@ -93,6 +93,7 @@ export function migrateMcp(info: ConfigMCPV1.Info) {
   return {
     type: info.type,
     url: info.url,
+    use_http_proxy: info.use_http_proxy,
     headers: info.headers,
     oauth: info.oauth && {
       client_id: info.oauth.clientId,

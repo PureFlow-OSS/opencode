@@ -28,6 +28,10 @@
           <input name="description" [(ngModel)]="draft.description" placeholder="What this MCP offers to users" />
         </label>
         <label class="toggle full-width">
+          <input name="use_http_proxy" [(ngModel)]="draft.use_http_proxy" type="checkbox" />
+          <span><strong>Use proxy</strong><small>Use the configured proxy for this MCP and its OAuth requests. Off connects directly.</small></span>
+        </label>
+        <label class="toggle full-width">
           <input name="oauthRequired" [(ngModel)]="draft.oauthRequired" type="checkbox" />
           <span><strong>OAuth required</strong><small>Users sign in through the MCP server’s OAuth flow. Headers are optional.</small></span>
         </label>

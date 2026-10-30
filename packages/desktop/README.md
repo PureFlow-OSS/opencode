@@ -23,6 +23,8 @@ Packaged builds also accept `OpenCode.exe --print-logs` (or `OPENCODE_DESKTOP_CO
 
 MCP HTTP failure logs include the destination origin, selected `proxyOrigin`, whether `proxyCredentials` are configured, and the backend `runtime`. Proxy usernames/passwords are excluded from these annotations. These fields distinguish an endpoint authentication response from a tunnel failure through a different proxy selection.
 
+Remote MCPs have a **Use proxy** switch under Extensions. The configuration field is `use_http_proxy`; absent or `false` connects directly, including when proxy environment variables are present. Set it to `true` to use the central proxy settings, including their global disable switch and internal gateway bypass. The choice also applies to backend OAuth discovery, token exchange and refresh. The external browser continues to use its own network settings.
+
 ## Build
 
 For a local corporate Windows installer, run `script/package-desktop-electron-win.ps1` from the repository root. `OPENCODE_ELECTRON_OUTPUT_DIR` selects its output directory (relative to `packages/desktop`, or an absolute path); the default is `dist`. The same resolved directory receives `changelog.md`.

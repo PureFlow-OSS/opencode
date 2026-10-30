@@ -413,6 +413,9 @@ export const dict = {
   "settings.mcp.form.addHeader": "Add header",
   "settings.mcp.form.removeHeader": "Remove header",
   "settings.mcp.form.oauth": "OAuth",
+  "settings.mcp.form.proxy": "Use proxy",
+  "settings.mcp.form.proxyDescription":
+    "Use the configured proxy for this MCP and its OAuth requests. Off connects directly.",
   "settings.mcp.form.oauthDescription": "Use OAuth authentication for this remote MCP server",
   "settings.mcp.form.oauthClientId": "Client ID",
   "settings.mcp.form.oauthClientIdPlaceholder": "Optional — uses dynamic registration if empty",

@@ -17,7 +17,7 @@ await Effect.runPromise(
   Effect.gen(function* () {
     if (process.env.FIXTURE_METHOD === "mcp-rejected") {
       const entries: { message: unknown; annotations: unknown }[] = []
-      const send = yield* McpOAuth.loggedFetch({ server: "rejected-proxy-fixture" }).pipe(
+      const send = yield* McpOAuth.loggedFetch({ server: "rejected-proxy-fixture", use_http_proxy: true }).pipe(
         Effect.provideService(
           Logger.CurrentLoggers,
           new Set([
@@ -44,7 +44,7 @@ await Effect.runPromise(
       return
     }
     if (process.env.FIXTURE_METHOD === "mcp") {
-      const send = yield* McpOAuth.loggedFetch({ server: "https-proxy-fixture" })
+      const send = yield* McpOAuth.loggedFetch({ server: "https-proxy-fixture", use_http_proxy: true })
       if (!new URL(process.env.FIXTURE_PROXY!).username) {
         const challenge = yield* Effect.promise(() => send("https://mcp.hubspot.com/protected"))
         expect(challenge.status).toBe(401)
@@ -55,6 +55,7 @@ await Effect.runPromise(
           config: new ConfigMCP.Remote({
             type: "remote",
             url: "https://mcp.hubspot.com/mcp",
+            use_http_proxy: true,
             oauth: { auth_server_metadata_url: "https://oauth.hubspot.com/metadata" },
           }),
           fetchFn: send,

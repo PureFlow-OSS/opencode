@@ -84,6 +84,7 @@ story("embeds MCP management and the store in the native extensions tab", async 
     .getByRole("button", { name: "Add", exact: true })
     .click()
   await expect(page.getByRole("dialog").getByRole("switch", { name: "OAuth", exact: true })).toBeChecked()
+  await expect(page.getByRole("dialog").getByRole("switch", { name: "Use proxy", exact: true })).toBeChecked()
   await page.getByRole("dialog").getByRole("button", { name: "Cancel", exact: true }).click()
   await expect(page.getByRole("dialog")).toHaveCount(0)
 

@@ -160,6 +160,7 @@ export type ProviderSettings = {
 }
 
 export type McpConfig = {
+  use_http_proxy?: boolean
   type: "local" | "remote"
   enabled?: boolean
   timeout?: number
@@ -172,6 +173,7 @@ export type McpConfig = {
 }
 
 export type McpStoreItem = {
+  use_http_proxy?: boolean
   oauthRequired?: boolean
   name: string
   description?: string | null

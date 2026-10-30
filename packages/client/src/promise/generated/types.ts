@@ -271,6 +271,7 @@ export type McpStoreItem = {
   name: string
   description?: string
   url: string
+  use_http_proxy?: boolean
   lockedHeaderNames: Array<string>
   headerPlaceholder?: string
   oauthRequired?: boolean
@@ -804,6 +805,7 @@ export type McpManagedServer = {
     | {
         type: "remote"
         url: string
+        use_http_proxy?: boolean
         headers?: { [x: string]: string }
         oauth?:
           | {
@@ -2436,6 +2438,7 @@ export type ConfigEntry =
               | {
                   type: "remote"
                   url: string
+                  use_http_proxy?: boolean
                   headers?: { [x: string]: string }
                   oauth?:
                     | {
@@ -4089,6 +4092,7 @@ export type ExperimentalMcpAddInput = {
     | {
         readonly type: "remote"
         readonly url: string
+        readonly use_http_proxy?: boolean
         readonly headers?: { readonly [x: string]: string }
         readonly oauth?:
           | {
@@ -4777,6 +4781,7 @@ export type ExperimentalConfigUpdateInput = {
             | {
                 readonly type: "remote"
                 readonly url: string
+                readonly use_http_proxy?: boolean
                 readonly headers?: { readonly [x: string]: string }
                 readonly oauth?:
                   | {
