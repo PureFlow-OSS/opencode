@@ -1,216 +1,236 @@
 export * as HttpProxyWindows from "./http-proxy-windows.js"
 
-import { Option, Schema } from "effect"
-import { spawn } from "node:child_process"
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
+import { randomUUID } from "node:crypto"
+import { createServer, type Socket } from "node:net"
+import path from "node:path"
 import { Readable } from "node:stream"
 
-// Windows negotiates proxy credentials; request data stays on stdin, never in command arguments.
-const script = String.raw`
-$ErrorActionPreference = 'Stop'
-$stage = 'setup'
-try {
-[Console]::InputEncoding = New-Object Text.UTF8Encoding($false)
-Add-Type -AssemblyName System.Net.Http
-$data = [Console]::In.ReadToEnd() | ConvertFrom-Json
-$handler = New-Object System.Net.Http.HttpClientHandler
-$proxyUri = [Uri]$data.proxy
-$proxy = New-Object System.Net.WebProxy($proxyUri)
-$proxy.Credentials = [Net.CredentialCache]::DefaultNetworkCredentials
-if ($proxyUri.UserInfo) {
-  $parts = $proxyUri.UserInfo.Split(':', 2)
-  $password = ''
-  if ($parts.Length -gt 1) { $password = [Uri]::UnescapeDataString($parts[1]) }
-  $proxy.Credentials = New-Object Net.NetworkCredential([Uri]::UnescapeDataString($parts[0]), $password)
-}
-$handler.Proxy = $proxy
-$handler.UseProxy = $true
-$handler.AllowAutoRedirect = $data.redirect -eq 'follow'
-$handler.AutomaticDecompression = [Net.DecompressionMethods]::GZip -bor [Net.DecompressionMethods]::Deflate
-$client = New-Object System.Net.Http.HttpClient($handler)
-$client.Timeout = [Threading.Timeout]::InfiniteTimeSpan
-$message = New-Object System.Net.Http.HttpRequestMessage((New-Object System.Net.Http.HttpMethod($data.method)), $data.url)
-if ($null -ne $data.body) {
-  $message.Content = New-Object System.Net.Http.ByteArrayContent(,[Convert]::FromBase64String($data.body))
-}
-foreach ($header in $data.headers) {
-  if ($header[0] -in @('host', 'content-length', 'proxy-authorization', 'connection')) { continue }
-  if (!$message.Headers.TryAddWithoutValidation([string]$header[0], [string]$header[1]) -and $message.Content) {
-    [void]$message.Content.Headers.TryAddWithoutValidation([string]$header[0], [string]$header[1])
-  }
-}
-  $stage = 'request'
-  $response = $client.SendAsync($message, [Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
-  $headers = @()
-  foreach ($header in $response.Headers) { foreach ($value in $header.Value) { $headers += ,@($header.Key, $value) } }
-  foreach ($header in $response.Content.Headers) { foreach ($value in $header.Value) { $headers += ,@($header.Key, $value) } }
-  $metadata = @{ status = [int]$response.StatusCode; headers = $headers; url = $response.RequestMessage.RequestUri.AbsoluteUri }
-  $output = [Console]::OpenStandardOutput()
-  $line = [Text.Encoding]::UTF8.GetBytes(($metadata | ConvertTo-Json -Compress -Depth 8) + [char]10)
-  $output.Write($line, 0, $line.Length)
-  $output.Flush()
-  $stage = 'body'
-  $inputStream = $response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
-  $buffer = New-Object byte[] 8192
-  while (($count = $inputStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
-    $output.Write($buffer, 0, $count)
-    $output.Flush()
-  }
-  $output.Flush()
-} catch {
-  # Exception messages can contain URLs, headers or credentials. Export only typed diagnostic codes.
-  $errors = @()
-  $exception = $_.Exception
-  while ($exception -and $errors.Count -lt 8) {
-    $detail = @{ type = $exception.GetType().FullName; hresult = $exception.HResult }
-    if ($exception -is [Net.WebException]) { $detail.status = $exception.Status.ToString() }
-    if ($exception -is [Net.Sockets.SocketException]) { $detail.socket = $exception.SocketErrorCode.ToString() }
-    $errors += $detail
-    $exception = $exception.InnerException
-  }
-  [Console]::Error.WriteLine('OPENCODE_PROXY_ERROR ' + (@{ stage = $stage; errors = $errors } | ConvertTo-Json -Compress -Depth 8))
-  exit 1
-} finally {
-  if ($message) { $message.Dispose() }
-  if ($client) { $client.Dispose() }
-}
-`
+type Metadata = { status: number; headers: Headers; url: string }
 
-const metadata = Schema.decodeUnknownSync(
-  Schema.Struct({
-    status: Schema.Number,
-    headers: Schema.Array(Schema.Tuple([Schema.String, Schema.String])),
-    url: Schema.String,
-  }),
-)
-
-const diagnostic = Schema.decodeUnknownOption(
-  Schema.fromJsonString(
-    Schema.Struct({
-      stage: Schema.Literals(["setup", "request", "body"]),
-      errors: Schema.Array(
-        Schema.Struct({
-          type: Schema.String.check(Schema.isPattern(/^[\w.]+$/)),
-          hresult: Schema.Number,
-          status: Schema.optional(Schema.String.check(Schema.isPattern(/^\w+$/))),
-          socket: Schema.optional(Schema.String.check(Schema.isPattern(/^\w+$/))),
-        }),
-      ),
-    }),
-  ),
-)
-
+/** Windows curl uses Schannel and SSPI without executing PowerShell code under application-control policies. */
 export async function fetch(proxy: string, input: string | Request | URL, init?: RequestInit): Promise<Response> {
   const request = input instanceof Request ? new Request(input, init) : new Request(input.toString(), init)
   request.signal.throwIfAborted()
-  const body = request.body ? Buffer.from(await request.arrayBuffer()).toString("base64") : null
+  if (!URL.canParse(proxy) || !["http:", "https:"].includes(new URL(proxy).protocol))
+    throw new Error("Windows proxy transport requires a valid HTTP(S) proxy URL")
+  const url = new URL(proxy)
+  const credentials =
+    url.username || url.password ? `${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}` : ":"
+  url.username = ""
+  url.password = ""
+  const body = request.body
+    ? Buffer.from(await request.arrayBuffer())
+    : request.method === "POST"
+      ? Buffer.alloc(0)
+      : undefined
   request.signal.throwIfAborted()
-  const child = spawn(
-    "powershell.exe",
-    ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")],
-    {
-      windowsHide: true,
-      stdio: ["pipe", "pipe", "pipe"],
-    },
-  )
-  const stop = () => child.kill()
-  const state = { stderr: "", spawn: "" }
-  const exited = new Promise<number>((resolve) => {
-    child.once("error", (error) => {
-      if ("code" in error && typeof error.code === "string" && /^[A-Z_]+$/.test(error.code)) state.spawn = error.code
-      resolve(1)
+  const response = Promise.withResolvers<Metadata>()
+  const exited = Promise.withResolvers<number>()
+  const state: {
+    child?: ChildProcessWithoutNullStreams
+    cancel?: (reason?: unknown) => Promise<void>
+    url: string
+    pending: string
+    last?: Metadata
+    spawn?: string
+  } = {
+    url: request.url,
+    pending: "",
+  }
+  // Header and upload pipes keep credentials and binary bodies off disk and out of process arguments.
+  const headers = pipe((socket) => {
+    socket.on("data", (chunk: Buffer) => {
+      try {
+        state.pending += chunk.toString("latin1")
+        while (true) {
+          const end = state.pending.indexOf("\r\n\r\n")
+          if (end < 0) return
+          const lines = state.pending.slice(0, end).split("\r\n")
+          state.pending = state.pending.slice(end + 4)
+          const status = /^HTTP\/\S+ (\d{3})/.exec(lines.shift() ?? "")
+          if (!status) continue
+          const fields = new Headers()
+          for (const line of lines) {
+            const separator = line.indexOf(":")
+            if (separator > 0) fields.append(line.slice(0, separator), line.slice(separator + 1).trim())
+          }
+          const info = { status: Number(status[1]), headers: fields, url: state.url }
+          if (info.status < 200) continue
+          state.last = info
+          // A proxy challenge can precede an SSPI retry; expose it only if the transfer finishes there.
+          if (info.status === 407) continue
+          if ([301, 302, 303, 307, 308].includes(info.status)) {
+            if (request.redirect === "error") {
+              response.reject(new TypeError("Redirect encountered with redirect mode error"))
+              stop()
+              return
+            }
+            const location = fields.get("location")
+            if (request.redirect === "follow" && location) {
+              state.url = new URL(location, state.url).href
+              continue
+            }
+          }
+          // curl decompresses the stream, so these describe wire bytes rather than the returned body.
+          if (fields.has("content-encoding")) {
+            fields.delete("content-encoding")
+            fields.delete("content-length")
+          }
+          response.resolve(info)
+        }
+      } catch {
+        response.reject(new Error("Windows proxy transport received invalid response headers"))
+        stop()
+      }
     })
-    child.once("close", (code) => resolve(code ?? 1))
   })
-  child.stdin.on("error", stop)
-  child.stdin.end(
-    JSON.stringify({
-      proxy,
-      url: request.url,
-      method: request.method,
-      redirect: request.redirect,
-      headers: [...request.headers],
-      body,
-    }),
-  )
-  // Drain stderr, but retain only a bounded diagnostic frame. Raw shell output is never surfaced.
-  child.stderr.on("data", (chunk: Buffer) => {
-    if (state.stderr.length < 8192) state.stderr += chunk.toString("utf8").slice(0, 8192 - state.stderr.length)
-  })
-  const failure = async (message: string) => {
-    const code = await exited
-    const frame = state.stderr.split(/\r?\n/).find((line) => line.startsWith("OPENCODE_PROXY_ERROR "))
-    const detail = frame ? diagnostic(frame.slice("OPENCODE_PROXY_ERROR ".length)) : Option.none()
-    if (Option.isSome(detail)) {
-      const chain = detail.value.errors.map(
-        (error) => `${error.type} (${error.status ?? error.socket ?? error.hresult})`,
-      )
-      return new Error(`${message}: ${detail.value.stage}: ${chain.join(" -> ")}`)
-    }
-    return new Error(`${message} (PowerShell ${state.spawn || `exit ${code}`}; no structured diagnostic)`)
+  const upload = body ? pipe((socket) => socket.end(body)) : undefined
+  const pipes = upload ? [headers, upload] : [headers]
+  const stop = () => {
+    state.child?.kill()
+    for (const channel of pipes) channel.close()
   }
-  const reader = Readable.toWeb(child.stdout).getReader()
   const abort = () => {
+    response.reject(request.signal.reason)
     stop()
-    void reader.cancel(request.signal.reason).catch(() => {})
+    void state.cancel?.(request.signal.reason).catch(() => {})
   }
-  request.signal.addEventListener("abort", abort, { once: true })
   const finish = () => request.signal.removeEventListener("abort", abort)
   try {
-    const chunks: Uint8Array[] = []
-    while (true) {
-      const part = await reader.read()
-      request.signal.throwIfAborted()
-      if (part.done) throw await failure("Windows proxy transport failed before receiving response headers")
-      const newline = part.value.indexOf(10)
-      if (newline < 0) {
-        chunks.push(part.value)
-        continue
+    await Promise.all(pipes.map((channel) => channel.ready))
+    request.signal.throwIfAborted()
+    const child = spawn(
+      path.join(process.env.SystemRoot || "C:\\Windows", "System32", "curl.exe"),
+      ["-q", "--config", "-"],
+      {
+        windowsHide: true,
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    )
+    state.child = child
+    child.once("error", (error) => {
+      if ("code" in error && typeof error.code === "string" && /^[A-Z_]+$/.test(error.code)) state.spawn = error.code
+      exited.resolve(1)
+    })
+    child.once("close", (code) => exited.resolve(code ?? 1))
+    child.stdin.on("error", () => child.kill())
+    child.stderr.resume()
+    const reader = Readable.toWeb(child.stdout).getReader()
+    state.cancel = (reason) => reader.cancel(reason)
+    const failure = (code: number) => {
+      const reason: Record<number, string> = {
+        5: "ProxyNameResolutionFailure",
+        6: "NameResolutionFailure",
+        7: "ConnectFailure",
+        28: "Timeout",
+        35: "TLSHandshakeFailure",
+        56: "ProxyOrReceiveFailure",
+        60: "CertificateVerificationFailed",
+        67: "AuthenticationFailure",
+        97: "ProxyHandshakeFailure",
       }
-      chunks.push(part.value.subarray(0, newline))
-      const info = metadata(JSON.parse(Buffer.concat(chunks).toString("utf8")))
-      if (request.redirect === "error" && [301, 302, 303, 307, 308].includes(info.status))
-        throw new TypeError("Redirect encountered with redirect mode error")
-      const remaining = part.value.subarray(newline + 1)
-      const stream = new ReadableStream<Uint8Array>({
-        start(controller) {
-          if (remaining.length) controller.enqueue(remaining)
-        },
-        async pull(controller) {
-          try {
-            const next = await reader.read()
-            request.signal.throwIfAborted()
-            if (!next.done) return controller.enqueue(next.value)
-            const code = await exited
-            finish()
-            if (code) throw await failure("Windows proxy response stream failed")
-            controller.close()
-          } catch (error) {
-            finish()
-            stop()
-            controller.error(error)
-          }
-        },
-        async cancel() {
+      return new Error(
+        `Windows proxy transport failed (curl ${code}: ${state.spawn ?? reason[code] ?? "TransferFailure"})`,
+      )
+    }
+    void exited.promise.then((code) => {
+      for (const channel of pipes) channel.close()
+      if (code) return response.reject(failure(code))
+      if (state.last) return response.resolve(state.last)
+      response.reject(new Error("Windows proxy transport ended without response headers"))
+    })
+    request.signal.addEventListener("abort", abort, { once: true })
+    child.stdin.end(
+      [
+        "silent",
+        "no-buffer",
+        "compressed",
+        "proxy-anyauth",
+        "suppress-connect-headers",
+        `proto = "=http,https"`,
+        `proto-redir = "=http,https"`,
+        `noproxy = ""`,
+        `user-agent = ""`,
+        `proxy = ${quote(url.href)}`,
+        `proxy-user = ${quote(credentials)}`,
+        `url = ${quote(request.url)}`,
+        `dump-header = ${quote(headers.path)}`,
+        ...(request.method === "HEAD"
+          ? ["head"]
+          : ["GET", "POST"].includes(request.method)
+            ? []
+            : [`request = ${quote(request.method)}`]),
+        ...(request.redirect === "follow" ? ["location", "max-redirs = 20"] : []),
+        ...Array.from(request.headers).flatMap(([key, value]) =>
+          ["host", "content-length", "connection", "transfer-encoding", "proxy-authorization"].includes(key)
+            ? []
+            : [`header = ${quote(`${key}: ${value}`)}`],
+        ),
+        ...(upload ? [`data-binary = ${quote(`@${upload.path}`)}`] : []),
+        ...(upload && !request.headers.has("content-type") ? [`header = "Content-Type:"`] : []),
+      ].join("\n") + "\n",
+    )
+    if (request.signal.aborted) abort()
+    const info = await response.promise
+    request.signal.throwIfAborted()
+    const stream = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        try {
+          const next = await reader.read()
+          request.signal.throwIfAborted()
+          if (!next.done) return controller.enqueue(next.value)
+          const code = await exited.promise
+          finish()
+          if (code) throw failure(code)
+          controller.close()
+        } catch (error) {
           finish()
           stop()
-          await reader.cancel()
-        },
-      })
-      const empty = request.method === "HEAD" || [204, 205, 304].includes(info.status)
-      if (empty) {
-        await stream.cancel()
-      }
-      const response = new Response(empty ? null : stream, {
-        status: info.status,
-        headers: info.headers.map((item) => [...item]),
-      })
-      Object.defineProperties(response, { url: { value: info.url }, redirected: { value: info.url !== request.url } })
-      return response
-    }
+          controller.error(error)
+        }
+      },
+      async cancel() {
+        finish()
+        stop()
+        await reader.cancel()
+      },
+    })
+    const empty = request.method === "HEAD" || [204, 205, 304].includes(info.status)
+    if (empty) await stream.cancel()
+    const result = new Response(empty ? null : stream, { status: info.status, headers: info.headers })
+    Object.defineProperties(result, { url: { value: info.url }, redirected: { value: info.url !== request.url } })
+    return result
   } catch (error) {
     finish()
     stop()
-    await reader.cancel()
     throw error
+  }
+}
+
+function quote(value: string) {
+  return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"').replaceAll("\r", "\\r").replaceAll("\n", "\\n").replaceAll("\t", "\\t")}"`
+}
+
+function pipe(handle: (socket: Socket) => void) {
+  const name = `\\\\.\\pipe\\opencode-http-${randomUUID()}`
+  const sockets = new Set<Socket>()
+  const server = createServer((socket) => {
+    sockets.add(socket)
+    socket.on("error", () => {})
+    socket.once("close", () => sockets.delete(socket))
+    handle(socket)
+  })
+  const ready = new Promise<void>((resolve, reject) => {
+    server.once("error", reject)
+    server.listen(name, resolve)
+  })
+  return {
+    path: name,
+    ready,
+    close() {
+      for (const socket of sockets) socket.destroy()
+      if (server.listening) server.close()
+    },
   }
 }

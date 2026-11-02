@@ -2,6 +2,10 @@
 
 Release notes for OpenCode V2, newest first.
 
+## Unreleased
+
+- **Windows MCP and OAuth Proxy Fix**: Replaced the PowerShell proxy fallback with the Windows system curl transport. This works with application-control policies that restrict PowerShell to ConstrainedLanguage, retains Windows proxy authentication and certificate validation, and keeps credentials and request bodies in memory-only pipes.
+
 ## v2.2.2 — 2026-10-29
 
 ### Highlights

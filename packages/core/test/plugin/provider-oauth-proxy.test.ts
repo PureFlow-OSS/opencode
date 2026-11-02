@@ -39,7 +39,7 @@ verifyWindows(
     try {
       await expect(
         HttpProxyWindows.fetch(`http://127.0.0.1:${address.port}`, "https://mcp.invalid/private-secret"),
-      ).rejects.toThrow(/TrustFailure|AuthenticationException/)
+      ).rejects.toThrow(/CertificateVerificationFailed/)
       expect(tunnels).toContain("mcp.invalid:443")
     } finally {
       origin.stop(true)

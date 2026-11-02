@@ -1,8 +1,208 @@
 import { expect, test } from "bun:test"
 import { createServer } from "node:net"
+import path from "node:path"
 import { HttpProxyWindows } from "../src/http-proxy-windows.js"
 import { HttpProxy } from "../src/http-proxy.js"
 const verify = process.platform === "win32" ? test : test.skip
+
+verify(
+  "Windows transport works when its caller runs under ConstrainedLanguage",
+  async () => {
+    const proxy = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: () => new Response("unauthorized", { status: 401 }),
+    })
+    try {
+      const child = Bun.spawn(
+        [
+          "powershell.exe",
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          "$ExecutionContext.SessionState.LanguageMode='ConstrainedLanguage'; & $env:FIXTURE_BUN -e $env:FIXTURE_CODE",
+        ],
+        {
+          cwd: path.resolve(import.meta.dir, ".."),
+          env: {
+            ...process.env,
+            FIXTURE_BUN: process.execPath,
+            FIXTURE_PROXY: proxy.url.href,
+            FIXTURE_CODE: `import { HttpProxyWindows } from './src/http-proxy-windows.ts'; const response = await HttpProxyWindows.fetch(process.env.FIXTURE_PROXY, 'http://mcp.invalid'); console.log(response.status + ':' + await response.text());`,
+          },
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+      )
+      const [stdout, stderr, code] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ])
+      expect(stderr).toBe("")
+      expect(stdout.trim()).toBe("401:unauthorized")
+      expect(code).toBe(0)
+    } finally {
+      proxy.stop(true)
+    }
+  },
+  15000,
+)
+
+verify(
+  "Windows transport preserves binary bodies and quoted authorization headers",
+  async () => {
+    const body = Uint8Array.from({ length: 256 }, (_, index) => index)
+    const seen: Array<{ body: Uint8Array; authorization: string | null; type: string | null }> = []
+    const proxy = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      async fetch(request) {
+        seen.push({
+          body: new Uint8Array(await request.arrayBuffer()),
+          authorization: request.headers.get("authorization"),
+          type: request.headers.get("content-type"),
+        })
+        return new Response("ok")
+      },
+    })
+    try {
+      const response = await HttpProxyWindows.fetch(proxy.url.href, "http://mcp.invalid", {
+        method: "POST",
+        headers: { authorization: 'Bearer quote"backslash\\token' },
+        body,
+      })
+      expect(await response.text()).toBe("ok")
+      expect(seen).toEqual([{ body, authorization: 'Bearer quote"backslash\\token', type: null }])
+    } finally {
+      proxy.stop(true)
+    }
+  },
+  15000,
+)
+verify.each([302, 307])(
+  "Windows transport handles POST %s redirects and strips cross-origin authorization",
+  async (status) => {
+    const seen: Array<{ method: string; body: string; authorization: string | null }> = []
+    const proxy = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      async fetch(request) {
+        seen.push({
+          method: request.method,
+          body: await request.text(),
+          authorization: request.headers.get("authorization"),
+        })
+        if (new URL(request.url).pathname === "/start") return Response.redirect("http://other.invalid/end", status)
+        return new Response("redirected")
+      },
+    })
+    try {
+      const response = await HttpProxyWindows.fetch(proxy.url.href, "http://mcp.invalid/start", {
+        method: "POST",
+        headers: { authorization: "Bearer initial-only" },
+        body: "request body",
+      })
+      expect(await response.text()).toBe("redirected")
+      expect(response.url).toBe("http://other.invalid/end")
+      expect(response.redirected).toBe(true)
+      expect(seen).toEqual([
+        { method: "POST", body: "request body", authorization: "Bearer initial-only" },
+        { method: status === 302 ? "GET" : "POST", body: status === 302 ? "" : "request body", authorization: null },
+      ])
+    } finally {
+      proxy.stop(true)
+    }
+  },
+  15000,
+)
+
+verify.each(["HEAD", "GET"])(
+  "Windows transport returns empty %s responses",
+  async (method) => {
+    const proxy = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: () => new Response(null, { status: method === "HEAD" ? 200 : 204 }),
+    })
+    try {
+      const response = await HttpProxyWindows.fetch(proxy.url.href, "http://mcp.invalid", { method })
+      expect(response.status).toBe(method === "HEAD" ? 200 : 204)
+      expect(response.body).toBeNull()
+    } finally {
+      proxy.stop(true)
+    }
+  },
+  15000,
+)
+
+verify(
+  "Windows transport can abort before response headers arrive",
+  async () => {
+    const received = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const proxy = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      async fetch() {
+        received.resolve()
+        await release.promise
+        return new Response("late")
+      },
+    })
+    try {
+      const controller = new AbortController()
+      const pending = HttpProxyWindows.fetch(proxy.url.href, "http://mcp.invalid", { signal: controller.signal })
+      await received.promise
+      controller.abort(new Error("AbortError"))
+      await expect(pending).rejects.toThrow("AbortError")
+    } finally {
+      release.resolve()
+      proxy.stop(true)
+    }
+  },
+  15000,
+)
+
+verify.each(["manual", "error"] as const)(
+  "Windows transport respects redirect mode %s",
+  async (redirect) => {
+    const proxy = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.redirect("http://other.invalid") })
+    try {
+      const pending = HttpProxyWindows.fetch(proxy.url.href, "http://mcp.invalid", { redirect })
+      if (redirect === "error") return await expect(pending).rejects.toThrow("Redirect encountered")
+      const response = await pending
+      expect(response.status).toBe(302)
+      expect(response.redirected).toBe(false)
+      await response.body?.cancel()
+    } finally {
+      proxy.stop(true)
+    }
+  },
+  15000,
+)
+
+verify(
+  "Windows transport returns decompressed bytes with matching headers",
+  async () => {
+    const body = Bun.gzipSync("compressed response")
+    const proxy = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: () =>
+        new Response(body, { headers: { "content-encoding": "gzip", "content-length": String(body.length) } }),
+    })
+    try {
+      const response = await HttpProxyWindows.fetch(proxy.url.href, "http://mcp.invalid")
+      expect(await response.text()).toBe("compressed response")
+      expect(response.headers.has("content-encoding")).toBe(false)
+      expect(response.headers.has("content-length")).toBe(false)
+    } finally {
+      proxy.stop(true)
+    }
+  },
+  15000,
+)
 
 verify(
   "Windows proxy failures report connection codes without exposing request secrets",
@@ -19,8 +219,7 @@ verify(
     ).catch((error: unknown) => error)
     expect(error).toBeInstanceOf(Error)
     if (!(error instanceof Error)) throw new Error("Expected proxy failure")
-    expect(error.message).toContain("before receiving response headers: request:")
-    expect(error.message).toContain("ConnectionRefused")
+    expect(error.message).toContain("curl 7: ConnectFailure")
     expect(error.message).not.toContain("secret")
     expect(error.message).not.toContain("origin.invalid")
   },
@@ -35,8 +234,7 @@ verify(
     )
     expect(error).toBeInstanceOf(Error)
     if (!(error instanceof Error)) throw new Error("Expected proxy failure")
-    expect(error.message).toContain("before receiving response headers: setup:")
-    expect(error.message).toContain("UriFormatException")
+    expect(error.message).toContain("requires a valid HTTP(S) proxy URL")
     expect(error.message).not.toContain("invalid-secret")
   },
   15000,
