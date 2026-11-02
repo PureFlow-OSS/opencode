@@ -98,6 +98,38 @@ export const fetchDirect: typeof globalThis.fetch = Object.assign(
   { preconnect },
 )
 
+/** Retry a proxy-authentication rejection through Windows integrated authentication for OAuth/MCP requests. */
+export const fetchAuthenticated: typeof globalThis.fetch = Object.assign(
+  async (input: Parameters<typeof globalThis.fetch>[0], init?: Parameters<typeof globalThis.fetch>[1]) => {
+    const proxy = proxyFor(input instanceof Request ? input.url : input.toString())
+    if (process.platform !== "win32" || !process.versions.bun || !proxy) return fetch(input, init)
+    const original = input instanceof Request ? new Request(input, init) : new Request(input.toString(), init)
+    // OAuth forms and MCP JSON requests must remain replayable after CONNECT is rejected, before reaching the origin.
+    const body = original.body ? await original.arrayBuffer() : undefined
+    original.signal.throwIfAborted()
+    const options = {
+      ...init,
+      method: original.method,
+      headers: original.headers,
+      body,
+      signal: original.signal,
+      redirect: original.redirect,
+    }
+    try {
+      const response = await request(original.url, options, proxy)
+      if (response.status !== 407) return response
+      await response.body?.cancel()
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes("407") || !error.message.toLowerCase().includes("proxy"))
+        throw error
+    }
+    original.signal.throwIfAborted()
+    const { HttpProxyWindows } = await import("./http-proxy-windows.js")
+    return HttpProxyWindows.fetch(proxy, original.url, options)
+  },
+  { preconnect },
+)
+
 async function request(
   input: Parameters<typeof globalThis.fetch>[0],
   init?: Parameters<typeof globalThis.fetch>[1],

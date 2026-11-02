@@ -145,7 +145,12 @@ test.each([
       expect(code, stdout + stderr).toBe(0)
       expect(stdout).toContain("PROXY_FIXTURE_OK")
       expect(tunnels.length).toBeGreaterThan(0)
-      expect(tunnels.every((item) => item.authorization === authorization)).toBe(true)
+      expect(
+        tunnels.every(
+          (item) =>
+            item.authorization === authorization || (method === "mcp-rejected" && item.authorization === undefined),
+        ),
+      ).toBe(true)
       expect(requests.every((item) => item.proxy === null)).toBe(true)
       if (method === "mcp-rejected") {
         expect(requests).toHaveLength(0)

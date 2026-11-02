@@ -6,6 +6,8 @@ Release notes for OpenCode V2, newest first.
 
 ### Highlights
 
+- **Windows Proxy Authentication**: GPT OAuth and proxy-enabled MCP requests can retry HTTP 407 through Windows proxy authentication. Direct MCPs and internal gateway connections retain their bypass behavior.
+
 - **Paused Update Delivery**: Stopping a release stage now reports no available update instead of failing version checks with HTTP 503. Client-version metadata prevents downgrade offers, while installer delivery remains blocked.
 
 - **Per-MCP Proxy Switch**: Remote MCPs now connect directly by default. Enable "Use proxy" per server to use the central proxy settings for transport and backend OAuth requests. The setting is also available for managed MCPs and MCP Store entries in the updater admin UI.

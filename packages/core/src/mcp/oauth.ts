@@ -45,7 +45,10 @@ const base = (
   init: Parameters<FetchLike>[1],
   useProxy: boolean,
 ): ReturnType<FetchLike> =>
-  (useProxy ? HttpProxy.fetch : HttpProxy.fetchDirect)(input, { ...init, timeout: false } as BunFetchRequestInit)
+  (useProxy ? HttpProxy.fetchAuthenticated : HttpProxy.fetchDirect)(input, {
+    ...init,
+    timeout: false,
+  } as BunFetchRequestInit)
 const share = (pending: ReturnType<FetchLike>) => pending.then((response) => response.clone() as typeof response)
 
 const send = (

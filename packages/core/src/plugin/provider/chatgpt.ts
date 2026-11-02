@@ -469,7 +469,7 @@ export function verifyIDToken(
   return Effect.tryPromise({
     try: async () => {
       const { createRemoteJWKSet, customFetch, jwtVerify } = await import("jose")
-      const { payload } = await jwtVerify(token, createRemoteJWKSet(jwksURL, { [customFetch]: HttpProxy.fetch }), {
+      const { payload } = await jwtVerify(token, createRemoteJWKSet(jwksURL, { [customFetch]: HttpProxy.fetchAuthenticated }), {
         issuer,
         audience: clientID,
         algorithms: ["RS256"],
@@ -485,7 +485,7 @@ export function verifyIDToken(
 function request<A>(url: string, init: RequestInit) {
   return Effect.tryPromise({
     try: async (signal) => {
-      const response = await HttpProxy.fetch(url, { ...init, signal })
+      const response = await HttpProxy.fetchAuthenticated(url, { ...init, signal })
       if (!response.ok) throw new Error(`Request failed: ${response.status}`)
       return response.json() as Promise<A>
     },

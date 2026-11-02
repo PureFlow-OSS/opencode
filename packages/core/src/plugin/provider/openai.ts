@@ -160,7 +160,7 @@ function bind(server: Server, port: number) {
 function cancel(port: number) {
   return Effect.tryPromise({
     try: (signal) =>
-      HttpProxy.fetch(`http://localhost:${port}/cancel`, {
+      HttpProxy.fetchAuthenticated(`http://localhost:${port}/cancel`, {
         signal: AbortSignal.any([signal, AbortSignal.timeout(2000)]),
       }),
     catch: (cause) => cause,
@@ -198,7 +198,7 @@ const headless = (app: App.Info) =>
             while (true) {
               const response = yield* Effect.tryPromise({
                 try: (signal) =>
-                  HttpProxy.fetch(`${issuer}/api/accounts/deviceauth/token`, {
+                  HttpProxy.fetchAuthenticated(`${issuer}/api/accounts/deviceauth/token`, {
                     method: "POST",
                     headers: headers("application/json", app),
                     body: JSON.stringify({ device_auth_id: device.device_auth_id, user_code: device.user_code }),
@@ -374,7 +374,7 @@ function refresh(methodID: Integration.MethodID, value: Pick<Credential.OAuth, "
 function request<A>(url: string, init: RequestInit) {
   return Effect.tryPromise({
     try: async (signal) => {
-      const response = await HttpProxy.fetch(url, { ...init, signal })
+      const response = await HttpProxy.fetchAuthenticated(url, { ...init, signal })
       if (!response.ok) throw new Error(`Request failed: ${response.status}`)
       return response.json() as Promise<A>
     },
