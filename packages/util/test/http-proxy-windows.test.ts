@@ -1,7 +1,46 @@
 import { expect, test } from "bun:test"
+import { createServer } from "node:net"
 import { HttpProxyWindows } from "../src/http-proxy-windows.js"
 import { HttpProxy } from "../src/http-proxy.js"
 const verify = process.platform === "win32" ? test : test.skip
+
+verify(
+  "Windows proxy failures report connection codes without exposing request secrets",
+  async () => {
+    const server = createServer()
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+    const address = server.address()
+    if (!address || typeof address === "string") throw new Error("Expected a TCP address")
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+    const error = await HttpProxyWindows.fetch(
+      `http://proxy-secret:password-secret@127.0.0.1:${address.port}`,
+      "https://origin.invalid/private-secret?token=token-secret",
+      { headers: { Authorization: "Bearer bearer-secret" } },
+    ).catch((error: unknown) => error)
+    expect(error).toBeInstanceOf(Error)
+    if (!(error instanceof Error)) throw new Error("Expected proxy failure")
+    expect(error.message).toContain("before receiving response headers: request:")
+    expect(error.message).toContain("ConnectionRefused")
+    expect(error.message).not.toContain("secret")
+    expect(error.message).not.toContain("origin.invalid")
+  },
+  15000,
+)
+
+verify(
+  "Windows proxy setup failures include sanitized diagnostics",
+  async () => {
+    const error = await HttpProxyWindows.fetch("http://[invalid-secret", "https://origin.invalid").catch(
+      (error: unknown) => error,
+    )
+    expect(error).toBeInstanceOf(Error)
+    if (!(error instanceof Error)) throw new Error("Expected proxy failure")
+    expect(error.message).toContain("before receiving response headers: setup:")
+    expect(error.message).toContain("UriFormatException")
+    expect(error.message).not.toContain("invalid-secret")
+  },
+  15000,
+)
 
 verify(
   "OAuth fetch retries a proxy 407 through Windows with the original request intact",

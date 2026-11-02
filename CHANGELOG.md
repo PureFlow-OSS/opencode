@@ -6,7 +6,7 @@ Release notes for OpenCode V2, newest first.
 
 ### Highlights
 
-- **Windows Proxy Authentication**: GPT OAuth and proxy-enabled MCP requests can retry HTTP 407 through Windows proxy authentication. Direct MCPs and internal gateway connections retain their bypass behavior.
+- **Windows Proxy Authentication**: GPT OAuth and proxy-enabled MCP requests can retry HTTP 407 through Windows proxy authentication. Direct MCPs and internal gateway connections retain their bypass behavior. Native transport failures now report the failing phase and Windows exception codes without exposing URLs or credentials; TLS certificate verification remains enabled.
 
 - **Paused Update Delivery**: Stopping a release stage now reports no available update instead of failing version checks with HTTP 503. Client-version metadata prevents downgrade offers, while installer delivery remains blocked.
 

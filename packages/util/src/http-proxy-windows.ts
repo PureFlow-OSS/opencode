@@ -1,12 +1,14 @@
 export * as HttpProxyWindows from "./http-proxy-windows.js"
 
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 import { spawn } from "node:child_process"
 import { Readable } from "node:stream"
 
 // Windows negotiates proxy credentials; request data stays on stdin, never in command arguments.
 const script = String.raw`
 $ErrorActionPreference = 'Stop'
+$stage = 'setup'
+try {
 [Console]::InputEncoding = New-Object Text.UTF8Encoding($false)
 Add-Type -AssemblyName System.Net.Http
 $data = [Console]::In.ReadToEnd() | ConvertFrom-Json
@@ -36,7 +38,7 @@ foreach ($header in $data.headers) {
     [void]$message.Content.Headers.TryAddWithoutValidation([string]$header[0], [string]$header[1])
   }
 }
-try {
+  $stage = 'request'
   $response = $client.SendAsync($message, [Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
   $headers = @()
   foreach ($header in $response.Headers) { foreach ($value in $header.Value) { $headers += ,@($header.Key, $value) } }
@@ -46,6 +48,7 @@ try {
   $line = [Text.Encoding]::UTF8.GetBytes(($metadata | ConvertTo-Json -Compress -Depth 8) + [char]10)
   $output.Write($line, 0, $line.Length)
   $output.Flush()
+  $stage = 'body'
   $inputStream = $response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
   $buffer = New-Object byte[] 8192
   while (($count = $inputStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
@@ -54,11 +57,21 @@ try {
   }
   $output.Flush()
 } catch {
-  [Console]::Error.WriteLine('Windows proxy transport failed')
+  # Exception messages can contain URLs, headers or credentials. Export only typed diagnostic codes.
+  $errors = @()
+  $exception = $_.Exception
+  while ($exception -and $errors.Count -lt 8) {
+    $detail = @{ type = $exception.GetType().FullName; hresult = $exception.HResult }
+    if ($exception -is [Net.WebException]) { $detail.status = $exception.Status.ToString() }
+    if ($exception -is [Net.Sockets.SocketException]) { $detail.socket = $exception.SocketErrorCode.ToString() }
+    $errors += $detail
+    $exception = $exception.InnerException
+  }
+  [Console]::Error.WriteLine('OPENCODE_PROXY_ERROR ' + (@{ stage = $stage; errors = $errors } | ConvertTo-Json -Compress -Depth 8))
   exit 1
 } finally {
-  $message.Dispose()
-  $client.Dispose()
+  if ($message) { $message.Dispose() }
+  if ($client) { $client.Dispose() }
 }
 `
 
@@ -68,6 +81,22 @@ const metadata = Schema.decodeUnknownSync(
     headers: Schema.Array(Schema.Tuple([Schema.String, Schema.String])),
     url: Schema.String,
   }),
+)
+
+const diagnostic = Schema.decodeUnknownOption(
+  Schema.fromJsonString(
+    Schema.Struct({
+      stage: Schema.Literals(["setup", "request", "body"]),
+      errors: Schema.Array(
+        Schema.Struct({
+          type: Schema.String.check(Schema.isPattern(/^[\w.]+$/)),
+          hresult: Schema.Number,
+          status: Schema.optional(Schema.String.check(Schema.isPattern(/^\w+$/))),
+          socket: Schema.optional(Schema.String.check(Schema.isPattern(/^\w+$/))),
+        }),
+      ),
+    }),
+  ),
 )
 
 export async function fetch(proxy: string, input: string | Request | URL, init?: RequestInit): Promise<Response> {
@@ -84,8 +113,12 @@ export async function fetch(proxy: string, input: string | Request | URL, init?:
     },
   )
   const stop = () => child.kill()
+  const state = { stderr: "", spawn: "" }
   const exited = new Promise<number>((resolve) => {
-    child.once("error", () => resolve(1))
+    child.once("error", (error) => {
+      if ("code" in error && typeof error.code === "string" && /^[A-Z_]+$/.test(error.code)) state.spawn = error.code
+      resolve(1)
+    })
     child.once("close", (code) => resolve(code ?? 1))
   })
   child.stdin.on("error", stop)
@@ -99,8 +132,22 @@ export async function fetch(proxy: string, input: string | Request | URL, init?:
       body,
     }),
   )
-  // Always drain stderr so transport failures cannot fill the child process pipe.
-  child.stderr.resume()
+  // Drain stderr, but retain only a bounded diagnostic frame. Raw shell output is never surfaced.
+  child.stderr.on("data", (chunk: Buffer) => {
+    if (state.stderr.length < 8192) state.stderr += chunk.toString("utf8").slice(0, 8192 - state.stderr.length)
+  })
+  const failure = async (message: string) => {
+    const code = await exited
+    const frame = state.stderr.split(/\r?\n/).find((line) => line.startsWith("OPENCODE_PROXY_ERROR "))
+    const detail = frame ? diagnostic(frame.slice("OPENCODE_PROXY_ERROR ".length)) : Option.none()
+    if (Option.isSome(detail)) {
+      const chain = detail.value.errors.map(
+        (error) => `${error.type} (${error.status ?? error.socket ?? error.hresult})`,
+      )
+      return new Error(`${message}: ${detail.value.stage}: ${chain.join(" -> ")}`)
+    }
+    return new Error(`${message} (PowerShell ${state.spawn || `exit ${code}`}; no structured diagnostic)`)
+  }
   const reader = Readable.toWeb(child.stdout).getReader()
   const abort = () => {
     stop()
@@ -113,7 +160,7 @@ export async function fetch(proxy: string, input: string | Request | URL, init?:
     while (true) {
       const part = await reader.read()
       request.signal.throwIfAborted()
-      if (part.done) throw new Error("Windows proxy transport failed before receiving response headers")
+      if (part.done) throw await failure("Windows proxy transport failed before receiving response headers")
       const newline = part.value.indexOf(10)
       if (newline < 0) {
         chunks.push(part.value)
@@ -135,7 +182,7 @@ export async function fetch(proxy: string, input: string | Request | URL, init?:
             if (!next.done) return controller.enqueue(next.value)
             const code = await exited
             finish()
-            if (code) throw new Error("Windows proxy response stream failed")
+            if (code) throw await failure("Windows proxy response stream failed")
             controller.close()
           } catch (error) {
             finish()

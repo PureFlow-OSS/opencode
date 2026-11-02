@@ -1,8 +1,53 @@
 import { expect, test } from "bun:test"
+import { HttpProxyWindows } from "@opencode/util/http-proxy-windows"
 import { createServer } from "node:http"
 import { connect } from "node:net"
 import path from "node:path"
 import { exportJWK, generateKeyPair, SignJWT } from "jose"
+
+// Exercise the native Windows HTTPS tunnel without trusting a test certificate in the user's certificate store.
+const verifyWindows = process.platform === "win32" ? test : test.skip
+verifyWindows(
+  "Windows proxy transport reports TLS trust failures and keeps certificate verification enabled",
+  async () => {
+    const directory = path.resolve(import.meta.dir, "../fixture/proxy")
+    const origin = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      tls: { key: Bun.file(path.join(directory, "key.pem")), cert: Bun.file(path.join(directory, "cert.pem")) },
+      fetch: () => new Response("must not accept this certificate"),
+    })
+    const tunnels: string[] = []
+    const proxy = createServer((_request, response) => response.writeHead(405).end())
+    proxy.on("connect", (request, socket, head) => {
+      tunnels.push(request.url ?? "")
+      if (request.url !== "mcp.invalid:443") return socket.destroy()
+      const upstream = connect(origin.port!, "127.0.0.1", () => {
+        socket.write("HTTP/1.0 200 Connection Established\r\n\r\n")
+        upstream.write(head)
+        upstream.pipe(socket)
+        socket.pipe(upstream)
+      })
+      socket.on("error", () => upstream.destroy())
+      socket.on("close", () => upstream.destroy())
+      upstream.on("error", () => socket.destroy())
+      upstream.on("close", () => socket.destroy())
+    })
+    await new Promise<void>((resolve) => proxy.listen(0, "127.0.0.1", resolve))
+    const address = proxy.address()
+    if (!address || typeof address === "string") throw new Error("Proxy did not bind")
+    try {
+      await expect(
+        HttpProxyWindows.fetch(`http://127.0.0.1:${address.port}`, "https://mcp.invalid/private-secret"),
+      ).rejects.toThrow(/TrustFailure|AuthenticationException/)
+      expect(tunnels).toContain("mcp.invalid:443")
+    } finally {
+      origin.stop(true)
+      await new Promise<void>((resolve, reject) => proxy.close((error) => (error ? reject(error) : resolve())))
+    }
+  },
+  15000,
+)
 
 // All named external hosts terminate at this local TLS fixture. The child trusts only this
 // additional test certificate; TLS verification stays enabled and real credentials are never used.
