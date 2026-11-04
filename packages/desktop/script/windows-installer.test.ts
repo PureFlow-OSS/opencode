@@ -209,19 +209,16 @@ windows(
   120_000,
 )
 
-// Every channel used to install into one directory named after the package. Each channel now installs into
-// a directory named after its app ID and leaves the shared one without touching the other channels' files.
+// Corporate initialization forces its own destination; it must not delete an earlier shared or custom install.
+// corporate-installer.test.ts owns the fixed destination and command-line override contract.
 const directoryCases = [
   {
-    name: "a first install uses the app ID",
+    name: "a first install leaves an absent previous directory alone",
     from: "@opencodedesktop",
     shared: [],
-    expected: "ai.opencode.desktop",
-    left: undefined,
-    uninstallKept: true,
   },
   {
-    name: "leaving the shared directory keeps the other channels",
+    name: "a shared directory retains every channel",
     from: "@opencodedesktop",
     shared: [
       "OpenCode.exe",
@@ -230,30 +227,21 @@ const directoryCases = [
       "Uninstall OpenCode Beta.exe",
       "resources/app.asar",
     ],
-    expected: "ai.opencode.desktop",
-    left: ["OpenCode Beta.exe", "Uninstall OpenCode Beta.exe", "resources/app.asar"],
-    uninstallKept: false,
   },
   {
-    name: "the last channel removes the shared directory",
+    name: "a previous single channel is retained",
     from: "@opencodedesktop",
     shared: ["OpenCode.exe", "Uninstall OpenCode.exe", "resources/app.asar"],
-    expected: "ai.opencode.desktop",
-    left: undefined,
-    uninstallKept: false,
   },
   {
-    name: "an install elsewhere stays where it is",
+    name: "a custom directory is retained",
     from: "custom",
     shared: ["OpenCode.exe", "Uninstall OpenCode.exe"],
-    expected: "custom",
-    left: ["OpenCode.exe", "Uninstall OpenCode.exe"],
-    uninstallKept: true,
   },
 ]
 
 windows(
-  "installs each channel into a directory named after its app ID",
+  "preserves earlier installs when forcing the corporate destination",
   async () => {
     const installer = await harness()
     const registry = (args: string[]) => installer.run(["reg.exe", ...args, "/f"])
@@ -276,16 +264,16 @@ windows(
         await registry(["add", `HKCU\\${uninstallKey}`, "/v", "UninstallString", "/d", "uninstall"])
 
         expect((await installer.run([exe, `/D=${from}`])).code, item.name).toBe(0)
-        expect(await Bun.file(path.join(installer.dir, "instdir.txt")).text(), item.name).toBe(
-          path.join(root, item.expected),
-        )
+
         const left = (await readdir(from, { recursive: true, withFileTypes: true }).catch(() => undefined))
           ?.filter((entry) => entry.isFile())
           .map((entry) => path.relative(from, path.join(entry.parentPath, entry.name)).replaceAll("\\", "/"))
           .toSorted()
-        expect(left, item.name).toEqual(item.left)
+
+        expect(left, item.name).toEqual(item.shared.length ? item.shared.toSorted() : undefined)
+
         const query = await installer.run(["reg.exe", "query", `HKCU\\${uninstallKey}`, "/v", "UninstallString"])
-        expect(query.code === 0, item.name).toBe(item.uninstallKept)
+        expect(query.code, item.name).toBe(0)
       }
     } finally {
       await installer.run(["reg.exe", "delete", `HKCU\\${uninstallKey}`, "/f"])

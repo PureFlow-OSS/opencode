@@ -1,6 +1,6 @@
 # Projektplan und Einstieg für parallele Sessions
 
-Stand: **04.11.2026**, Quellbasis **`7cdb98b4ac`** plus nachfolgender Paketierungs-Fix, Branch **`feat/merge-upstream-v2.1.2`**.
+Stand: **04.11.2026**, Integrationsbasis **`06e156726e`** (`v2.2.2-ai.2`), aktiver Branch **`merge-upstream-225`**, Upstream **`9bbb8ce18c`** (`v2.2.5`).
 Dieses Dokument fasst den Corporate-Fork zusammen. Für eine Aufgabe zuerst die passende Zeile im Wegweiser lesen und nur die betroffenen Quellen prüfen. Quellcode, aktuelle Git-Diffs und paketbezogene `AGENTS.md` bleiben maßgeblich. Historische Testergebnisse sind keine Zusage für spätere Änderungen.
 
 ## 1. Arbeitsort zuerst klären
@@ -15,7 +15,7 @@ Vor Änderungen reichen zunächst `git branch --show-current`, `git status --sho
 
 **Release-Grenze:** `v2.2.2-ai.1` zeigt auf `aabe2d1ed4`. Der anschließend gepushte, vom Nutzer im Firmennetz bestätigte MCP-/ChatGPT-Login-Fix ist `c5ccfc30d4`; der folgende Inferenz-Fix ist `e40b5d41c1`. Beide sind **nicht in diesem Tag**. Veröffentlichte Tags unverändert lassen. Die Paketversion ist weiterhin `2.2.2`; ein Git-Tag allein erhöht weder Installer-Version noch Update-Angebot.
 
-**Neuer Release-Snapshot:** Nutzer beauftragt Commit und erneuten Tag. Dafür `v2.2.2-ai.2` auf den Paketierungs-Fix setzen und pushen; `v2.2.2-ai.1` bleibt unverändert. Der neue Snapshot enthält auch die oben genannten Proxy-Fixes und Keycloak-Verwaltung.
+**Gesicherter Release-Snapshot:** `v2.2.2-ai.2` wurde auf `06e156726e` gesetzt und veröffentlicht; `v2.2.2-ai.1` blieb unverändert. Der Snapshot enthält die Proxy-Fixes, Keycloak-Verwaltung und ZIP-Reparatur. Die nachfolgende 2.2.5-Integration erfolgt auf dem separaten Branch `merge-upstream-225`; der bisherige Release-Branch bleibt auf dem gesicherten Stand.
 
 ## 2. Architektur und gezielter Wegweiser
 
@@ -133,7 +133,7 @@ Authentifizierte Versions-/Feed-Abfrage ist durch `corporate.test.ts` abgedeckt.
 | P0 | Nächsten Corporate-Release einschließlich `e40b5d41c1` vorbereiten | Neue Release-Version/Tag bewusst gewählt; echte ChatGPT-Modellanfrage, Key-Zuordnung für Beta/AI Gilde/Normal und Installer auf Firmen-PC geprüft. Vorhandenen Tag nicht verschieben. Bei automatischem Update muss die neue App-Version größer als die installierte `2.2.2` sein. |
 | P1 | Updater-Identität gezielt prüfen, falls jemand falschen Kanal erhält | Aktiver AI-Factory-Key/Env vorhanden, erwarteter Header kommt an, `beta.Enabled`/Testerregeln/LiteLLM-Lookup stimmen; keine echten Schlüssel protokolliert. Ggf. JSON-only-Key-Fall gesondert unterstützen. |
 | P1 | Corporate-Regressionen vor Upstream-Merge dokumentieren | Providerfilter, versteckte Worker, Dokumente, Encoding, Proxy, Installer und Updatepfad haben gezielte aktuelle Nachweise; nicht nur „Merge konfliktfrei“. |
-| P2 | Upstream bis v2.2.5 integrieren | Konflikte manuell gelöst, Corporate-Verhalten erhalten, passende Paket-/UI-Tests und Typprüfungen grün; separater Release nach der gesicherten Basis. |
+| Erledigt (Quellstand) | Upstream v2.2.5 integriert | Separater Branch `merge-upstream-225`, manueller Konfliktabgleich und gezielte Regressionen; echter signierter 2.2.5-Installer und Firmen-Rollout bleiben eigene Schritte. |
 | P2 | Plugin-/rem-memory-Kompatibilität des Zielstands | Reales npm-Paket im tatsächlich gemergten Branch geprüft; Session-, Event-, Tool- und neue Artifact-Hooks korrekt. |
 | P2 | Dokument-Problemfälle nachtesten | Gemeldete große PPTX, XLSX-Summary und konfigurierte Vision-Worker funktionieren mit aktuellem Build; keine unbeabsichtigten externen Uploads. |
 | P2 | Zentrale Hilfsagenten-/Compaction-Vorgaben planen | Backend/Admin-UI unterstützen die gewünschten Felder; Prozentpuffer erst an Clients mit passendem Schema ausliefern. Drei Stufen und lokale Überschreibungen erhalten. |
@@ -146,6 +146,27 @@ Authentifizierte Versions-/Feed-Abfrage ist durch `corporate.test.ts` abgedeckt.
 - Bei `plugin/internal.ts` müssen unsere **DocumentTools und die neuen ArtifactTools beide erhalten bleiben**. Kein pauschales „theirs“ auf Corporate-Dateien.
 - Relevanter Nutzen: LiteLLM-Kontextfehler/Compaction, große MCP-stdio-Nachrichten, Reasoning-Fortsetzungen, schnellere lange Chats, persistente Terminals und experimentelle Artifacts.
 - Vorprüfung ist historisch: vor tatsächlichem Merge auf aktuellem HEAD wiederholen. Details lokal unter `artifacts/upstream-v2.1.2-review/v225-independent-review.md`; dieser ignorierte Ordner ist keine Voraussetzung für das Verständnis dieses Plans.
+
+### Tatsächliche Integration von v2.2.5 am 04.11.
+
+Auf Nutzerauftrag vollständigen offiziellen Tag `v2.2.5` vom Remote `anomalyco` geprüft und nach `06e156726e` auf `merge-upstream-225` gemergt. Acht Konfliktdateien: Changelog, Lockfile, Global-Sync-Konverter und Test, Timeline-Interaktion, interne Plugin-Registrierung, OpenCode-Tooltest und Electron-Builder-Konfiguration. Kein pauschales Ersetzen von Corporate-Dateien durch Upstream.
+
+| Corporate-Vertrag | Behandlung und Nachweis |
+| --- | --- |
+| AI Factory/OpenAI/Copilot, AI Factory zuerst; versteckte Worker | Provider-Policy, Reihenfolge, Managed Config und AI-Factory-Provider bleiben erhalten. Normalizer übernimmt Upstream-Release-Datum-/Reasoning-Erkennung und filtert weiterhin `enabled: false`. AI-Factory-, Managed-Config- und App-Modelltests grün. Der alte Array-Reihenfolgetest entfällt: DynamicProvider wird in Upstream jetzt nach externen SDK-Hooks geladen; tatsächliche Registrierung/Discovery und dynamische SDK-Auflösung werden durch Laufzeittests geprüft. |
+| MCP-/GPT-Proxy, interne Bypässe | `http-proxy.ts`, Windows-curl-Transport, gemeinsame authentifizierte Fetch-Schicht und OAuth-Pfade unverändert gegenüber dem gesicherten Tag. 28 Util-Proxytests sowie Core-Modell-/OAuth-/Websearch-Tests grün. `use_http_proxy` bleibt pro MCP opt-in; AI Factory bleibt intern direkt. |
+| PDF, Word/Excel/PPTX, Vision Recall und Summary | Lokale Extraktion und zentral konfigurierte Worker erhalten. Dokument-Worker von `LLM.request` auf Upstream-`ai.request` migriert. DocumentTools und ArtifactTools gemeinsam registriert. Neuer Laufzeittest erstellt ein Artifact und führt danach eine Dokument-Summary aus; Dokument-/AI-Factory-Tests zehnmal grün (130 Durchläufe). Versteckte Vision-/OCR-Worker und Modell-Ausgabelimit weiter geprüft. Keine gehostete AnyDoc-Übertragung ergänzt. |
+| ANSI/UTF-8 und Suchproxy | Encoding-erhaltende FileMutation-Schicht unverändert; Upstream-Edit-/Read-Hinweise ergänzen sie. File-Mutation-, Edit-, Websearch- und Proxytests grün. |
+| MCP-/Plugin-Store, OAuth-Defaults und aktive Sitzung | Schema, Store-Implementierungen, App-Dialoge und Updater-Backend einschließlich Keycloak unverändert. Browser-Komponententests bestätigen Proxy-Opt-in, OAuth-Felder, Store-Installation und Abfrage vor Unterbrechung einer aktiven Sitzung. Plugin-SDK-/Host-/Fehlerisolationsprüfungen grün. |
+| Ribbon und vollständige Datumsanzeige | `selectMessage` neben neuer PageUp/PageDown-Navigation erhalten. MessageNav-Anbindung und Datumsformat im Nachrichtentooltip behalten. Browserlauf mit gebauter Oberfläche bestätigt Ribbon-Hover und Sprung zu virtualisierten Nachrichten. |
+| Updater, Key für Kanalzuordnung, Changelog | Corporate-Updater und Admin-Backend unverändert, 89 Updater-/Terminaltests grün. Changelog-Browserfall erfolgreich. Beta → AI Gilde → Normal, Delivery-Stopp und Keycloak bleiben erhalten; kein Docker-Redeploy nötig. |
+| Windows-Start, Signierung und Paketierung | Corporate-Installerziel, CLI-/Update-Staging unter `C:/Entwicklung`, Fenster-Deduplizierung, Signierskript, ASAR-Filter, Output-Parameter und frische ZIP-Erstellung erhalten. Electron-Konflikt vereinigt Windows-Signer und neue macOS-Icon-Kopie. 32 Desktop-/Paketierungstests grün. Der frühere Test für Upstreams App-ID-Installationspfade prüft jetzt die Erhaltung früherer Installationsdateien; `corporate-installer.test.ts` bleibt Eigentümer des festen Zielpfads. |
+
+Neue Upstream-Funktionen bleiben enthalten, darunter Prozentpuffer für Compaction, größere MCP-stdio-Nachrichten, Reasoning-Korrekturen, persistente Terminals und opt-in Artifacts. Claude-Agent-Code ist integriert, wird durch unsere unveränderte Anbieterbeschränkung jedoch nicht als weiterer verbindbarer Anbieter angeboten.
+
+Prüfungen: Client mit `bun run generate` neu generiert. Frozen-Lockfile-Installation erfolgreich. Root-`bun run check`: 35 Tasks erfolgreich. Corporate-Core 113/113, betroffene Upstream-Core-Fälle 165/165, Plugin-Host/MCP 113 erfolgreich (1 Plattform-Skip), App-Unit 60/60, Client 260 erfolgreich (4 Plattform-Skips), Plugin-SDK 37/37, Browser-Komponenten 13/13 und gezielte gebaute App-E2E 11/11. MCP-/Plugin-Katalog sowie `config.corporate` im Client-API-Inventartest erhalten. Wiederholungen: Dokumente/AI Factory 130/130, Global-Sync-Normalizer 150/150, Corporate-Installer-Dateierhalt 10/10. Changed-Lint: null Probleme in 279 geänderten GUI-Dateien. Lokale Nachweise: `artifacts/upstream-v2.1.2-review/v225-*`. `git diff --check` meldet ausschließlich korrekt formatierte PDF-XRef-Zeilen einer byteidentisch aus Upstream übernommenen PDF-Testfixture; deren Bytes und Offsets nicht durch Whitespace-Formatierung beschädigen.
+
+**Testgrenzen:** Der breite unveränderte Upstream-Settings-E2E-Lauf ist keine grüne Gesamtsuite: Fixtures setzen unter anderem verbotene Console-/OpenRouter-Anbieter und native MCP-Zeilen ohne Corporate-Katalog voraus; `/api/mcp/catalog` fehlt im generischen Mock. Diese Annahmen dürfen nicht durch Lockerung der Corporate-Policy in Produktion erfüllt werden. Die Corporate-MCP-Verträge sind in `component-tests/mcp-settings.spec.ts` und `mcp-extensions.spec.ts` geprüft. Der Vite-Entwicklungsserver hatte zudem einen JSX-Scanfehler; deshalb UI-E2E gegen die gebaute Weboberfläche mit isoliertem Mock-Backend. Kein Live-Client und kein echter Firmendienst verwendet. Kein vollständiger CLI-/Desktop-Build, keine Installation, keine Tag-Verschiebung und kein Live-Update ausgeführt. Für den Rollout noch tatsächlich signiertes 2.2.5-Paket bauen und auf einem Firmen-PC prüfen.
 
 ## 5. Build, Betrieb und Tests
 
@@ -182,4 +203,4 @@ Backend-Neubau aktualisiert weder die ausgelieferte Admin-Weboberfläche noch de
 3. Nach Abschluss hier Status, Commit, Tests und offene Einschränkungen kurz aktualisieren. Bestätigte Implementierung, erzeugtes Build-Artefakt, Deployment und Nutzerbestätigung getrennt benennen.
 4. Keine Keys, Tokens, persönlichen Appsettings oder Rohlogs in Plan/Commits ablegen. Diagnosebeispiele verwenden ausschließlich Testwerte.
 
-Aktuelle Übergabe: Die laufende Firmen-CLI wurde per SHA256 der veralteten Upload-ZIP zugeordnet. ZIP erneuert, automatische ZIP-Erstellung im Windows-Wrapper ergänzt und geprüft; Nutzer bestätigt „ok gehtz so“ und beauftragt Commit sowie neuen Tag `v2.2.2-ai.2`. MCP-/ChatGPT-Login war bereits bestätigt. Upstream 2.2.5 bleibt geplant. Keycloak-/Updater-Code und beide Docker-Images sind veröffentlicht; lokaler HTTPS-Test nutzt `groups` mit exakt `/opencodeAdmin`. Kein Upstream-Merge und kein vollständiger Desktop-/CLI-Neubau für diese Paketierungsreparatur. Die Paketversion bleibt `2.2.2`.
+Aktuelle Übergabe: Gesicherter Corporate-Stand ist `v2.2.2-ai.2` (`06e156726e`). Vollständiger Upstream v2.2.5 ist auf `merge-upstream-225` integriert; Vertragsabgleich, erfolgreiche gezielte Regressionen und generische E2E-Fixture-Lücken stehen oben. Paket-Manifeste sind durch den Merge jetzt `2.2.5`, das vorhandene signierte Installer-/ZIP-Artefakt ist weiterhin `2.2.2`. Vor einem Rollout echten 2.2.5-Build mit aktuellem CLI-Inhalt erzeugen. Kein neuer veröffentlichter Release-Tag und keine Änderung an der laufenden App bzw. dem Updater-Container als Nebenwirkung dieses Merges.

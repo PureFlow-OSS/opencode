@@ -7,19 +7,19 @@ import { toSessionError } from "@opencode/core/session/to-session-error"
 import { Model } from "@opencode/core/model"
 import { Provider } from "@opencode/core/provider"
 import {
-  Media,
-  LLM,
+  ai,
   AIError,
   CompactionPart,
-  ProviderID,
   HttpContext,
   InvalidRequestError,
+  isContextOverflowFailure,
   LLMEvent,
+  Media,
   Message,
+  ProviderID,
   RateLimitError,
   TransportError,
   UnknownProviderError,
-  isContextOverflowFailure,
 } from "@opencode/ai/effect"
 import { LLMClient, RequestExecutor } from "@opencode/ai/route"
 import { compileRequest } from "@opencode/ai/testing"
@@ -82,7 +82,7 @@ it.effect("rejects native provider compaction rather than silently dropping repl
     })
     const resolved = yield* aisdk.model(model("@ai-sdk/openai"))
     const error = yield* compileRequest(
-      LLM.request({
+      ai.request({
         model: resolved,
         messages: [
           Message.assistant(
@@ -151,7 +151,7 @@ it.effect("uses canonical names and metadata without merging connection cache pa
     expect(resolved).toMatchObject({ id: "api-model", provider: "openai" })
     expect(resolved.route).toMatchObject({ provider: "openai", providerMetadataKey: "openai" })
     expect(resolved.route.model({ id: "another-model" })).toMatchObject({ provider: "openai" })
-    const prepared = yield* compileRequest(LLM.request({ model: resolved, prompt: "Hello" }))
+    const prepared = yield* compileRequest(ai.request({ model: resolved, prompt: "Hello" }))
     expect(prepared.body.providerOptions).toEqual({ openai: { reasoningEffort: "high" } })
   }),
 )
@@ -182,7 +182,7 @@ it.effect("projects request settings, headers, and body overlays", () =>
       body: { safety_setting: "strict" },
     })
     const prepared = yield* compileRequest(
-      LLM.request({
+      ai.request({
         model: resolved,
         prompt: "Hello",
         providerOptions: { safetySettings: [{ category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" }] },
@@ -291,7 +291,7 @@ it.effect("lowers chronological system updates to wrapped user messages", () =>
 
     const resolved = yield* aisdk.model(model("opaque-provider"))
     const prepared = yield* compileRequest(
-      LLM.request({
+      ai.request({
         model: resolved,
         system: "Initial instructions.",
         messages: [
@@ -330,7 +330,7 @@ it.effect("leaves max output tokens unset when the request omits them", () =>
       ...model("@openrouter/ai-sdk-provider"),
       limit: { context: 500_000, output: 500_000 },
     })
-    const prepared = yield* compileRequest(LLM.request({ model: resolved, prompt: "Hello" }))
+    const prepared = yield* compileRequest(ai.request({ model: resolved, prompt: "Hello" }))
 
     expect(prepared.body.maxOutputTokens).toBeUndefined()
   }),
@@ -349,7 +349,7 @@ it.effect("maps pro reasoning bodies to AI SDK provider options", () =>
       ...model("@ai-sdk/openai"),
       body: { reasoning: { mode: "pro" } },
     })
-    const prepared = yield* compileRequest(LLM.request({ model: resolved, prompt: "Hello" }))
+    const prepared = yield* compileRequest(ai.request({ model: resolved, prompt: "Hello" }))
 
     expect(body).toBeUndefined()
     expect(prepared.body.providerOptions).toEqual({
@@ -374,7 +374,7 @@ it.effect("maps package-specific AI SDK provider option keys", () =>
     ] as const
     for (const [packageName, key, settings] of cases) {
       const resolved = yield* aisdk.model(model(packageName, { reasoningEffort: "high" }))
-      const prepared = yield* compileRequest(LLM.request({ model: resolved, prompt: "Hello" }))
+      const prepared = yield* compileRequest(ai.request({ model: resolved, prompt: "Hello" }))
       expect(prepared.body.providerOptions).toEqual({ [key]: settings })
     }
   }),
@@ -388,13 +388,13 @@ it.effect("forces reasoning and projects both Azure AI SDK namespaces", () =>
     })
 
     const openai = yield* aisdk.model(model("@ai-sdk/openai", { reasoningEffort: "high" }))
-    const openaiPrepared = yield* compileRequest(LLM.request({ model: openai, prompt: "Hello" }))
+    const openaiPrepared = yield* compileRequest(ai.request({ model: openai, prompt: "Hello" }))
     expect(openaiPrepared.body.providerOptions).toEqual({
       openai: { reasoningEffort: "high", forceReasoning: true },
     })
 
     const azure = yield* aisdk.model(model("@ai-sdk/azure", { reasoningEffort: "high" }))
-    const azurePrepared = yield* compileRequest(LLM.request({ model: azure, prompt: "Hello" }))
+    const azurePrepared = yield* compileRequest(ai.request({ model: azure, prompt: "Hello" }))
     expect(azurePrepared.body.providerOptions).toEqual({
       openai: { reasoningEffort: "high", forceReasoning: true },
       azure: { reasoningEffort: "high", forceReasoning: true },
@@ -416,7 +416,7 @@ it.effect("routes AI Gateway model options by upstream prefix", () =>
       }),
       modelID: Model.ID.make("anthropic/claude-sonnet-5"),
     })
-    const anthropicPrepared = yield* compileRequest(LLM.request({ model: anthropic, prompt: "Hello" }))
+    const anthropicPrepared = yield* compileRequest(ai.request({ model: anthropic, prompt: "Hello" }))
     expect(anthropicPrepared.body.providerOptions).toEqual({
       gateway: { order: ["anthropic"] },
       anthropic: { thinking: { type: "adaptive" } },
@@ -426,7 +426,7 @@ it.effect("routes AI Gateway model options by upstream prefix", () =>
       ...model("@ai-sdk/gateway", { reasoningConfig: { type: "enabled" } }),
       modelID: Model.ID.make("amazon/nova-2-lite"),
     })
-    const bedrockPrepared = yield* compileRequest(LLM.request({ model: bedrock, prompt: "Hello" }))
+    const bedrockPrepared = yield* compileRequest(ai.request({ model: bedrock, prompt: "Hello" }))
     expect(bedrockPrepared.body.providerOptions).toEqual({
       bedrock: { reasoningConfig: { type: "enabled" } },
     })
@@ -436,7 +436,7 @@ it.effect("routes AI Gateway model options by upstream prefix", () =>
       modelID: Model.ID.make("openai/gpt-5.5"),
     })
     const openaiPrepared = yield* compileRequest(
-      LLM.request({ model: openai, prompt: "Hello", providerOptions: { textVerbosity: "low" } }),
+      ai.request({ model: openai, prompt: "Hello", providerOptions: { textVerbosity: "low" } }),
     )
     expect(openaiPrepared.body.providerOptions).toEqual({
       gateway: { order: ["openai"] },
@@ -447,7 +447,7 @@ it.effect("routes AI Gateway model options by upstream prefix", () =>
       ...model("@ai-sdk/gateway", { reasoningEffort: "high" }),
       modelID: Model.ID.make("deepseek/deepseek-v4"),
     })
-    const fallbackPrepared = yield* compileRequest(LLM.request({ model: fallback, prompt: "Hello" }))
+    const fallbackPrepared = yield* compileRequest(ai.request({ model: fallback, prompt: "Hello" }))
     expect(fallbackPrepared.body.providerOptions).toEqual({
       deepseek: { reasoningEffort: "high" },
     })
@@ -473,7 +473,7 @@ it.effect("closes the open AI SDK reasoning part when the next one starts", () =
     })
 
     const resolved = yield* aisdk.model(model("@ai-sdk/gateway"))
-    const response = yield* LLMClient.generate(LLM.request({ model: resolved, prompt: "Think" })).pipe(
+    const response = yield* LLMClient.generate(ai.request({ model: resolved, prompt: "Think" })).pipe(
       Effect.provide(client),
     )
 
@@ -515,7 +515,7 @@ it.effect("normalizes repeated, reopened, and overlapping AI SDK fragment bounda
     })
 
     const resolved = yield* aisdk.model(model("@ai-sdk/gateway"))
-    const response = yield* LLMClient.generate(LLM.request({ model: resolved, prompt: "Think" })).pipe(
+    const response = yield* LLMClient.generate(ai.request({ model: resolved, prompt: "Think" })).pipe(
       Effect.provide(client),
     )
 
@@ -548,7 +548,7 @@ it.effect("projects replay metadata onto AI SDK prompt parts", () =>
     const resolved = yield* aisdk.model(model("@ai-sdk/anthropic"))
     expect(resolved.route.providerMetadataKey).toBe("anthropic")
     const prepared = yield* compileRequest(
-      LLM.request({
+      ai.request({
         model: resolved,
         messages: [
           Message.assistant([
@@ -611,7 +611,7 @@ it.effect("normalizes file data across AI SDK prompt parts", () =>
     const resolved = yield* aisdk.model(model("opaque-provider"))
     const bytes = new Uint8Array([0, 1, 2, 3])
     const prepared = yield* compileRequest(
-      LLM.request({
+      ai.request({
         model: resolved,
         messages: [
           Message.user([
@@ -724,7 +724,7 @@ it.effect("does not treat SSE comment heartbeats as model progress", () =>
         fetch: customFetch,
       }),
     )
-    const result = yield* LLMClient.generate(LLM.request({ model: resolved, prompt: "Hello" })).pipe(
+    const result = yield* LLMClient.generate(ai.request({ model: resolved, prompt: "Hello" })).pipe(
       Effect.provide(client),
       Effect.result,
       Effect.ensuring(
@@ -781,7 +781,7 @@ it.effect("routes AI SDK requests and responses through HTTP hook middleware", (
       ),
     )
     const seen: string[] = []
-    const response = yield* LLMClient.generate(LLM.request({ model: resolved, prompt: "Hello" }), {
+    const response = yield* LLMClient.generate(ai.request({ model: resolved, prompt: "Hello" }), {
       http: (request, handler) =>
         Effect.gen(function* () {
           // Read the body twice the way session hooks do, to prove it is not a single-use stream.
@@ -826,7 +826,7 @@ it.effect("sends AI SDK requests directly when no HTTP hook middleware is attach
         { preconnect: fetch.preconnect },
       ),
     )
-    const response = yield* LLMClient.generate(LLM.request({ model: resolved, prompt: "Hello" })).pipe(
+    const response = yield* LLMClient.generate(ai.request({ model: resolved, prompt: "Hello" })).pipe(
       Effect.provide(client),
     )
     expect(bodies).toHaveLength(1)
@@ -860,7 +860,7 @@ it.effect("fails with a retryable transport error when response headers time out
         fetch: customFetch,
       }),
     )
-    const error = yield* LLMClient.generate(LLM.request({ model: resolved, prompt: "Hello" })).pipe(
+    const error = yield* LLMClient.generate(ai.request({ model: resolved, prompt: "Hello" })).pipe(
       Effect.provide(client),
       Effect.flip,
     )
@@ -892,7 +892,7 @@ it.effect("emits malformed AI SDK tool input without executing it", () =>
     })
 
     const resolved = yield* aisdk.model(model("test-ai-sdk"))
-    const response = yield* LLMClient.generate(LLM.request({ model: resolved, prompt: "Lookup" })).pipe(
+    const response = yield* LLMClient.generate(ai.request({ model: resolved, prompt: "Lookup" })).pipe(
       Effect.provide(client),
     )
 
@@ -930,7 +930,7 @@ it.effect("keeps malformed provider-executed AI SDK input terminal", () =>
     })
 
     const resolved = yield* aisdk.model(model("hosted-test-ai-sdk"))
-    const error = yield* LLMClient.generate(LLM.request({ model: resolved, prompt: "Search" })).pipe(
+    const error = yield* LLMClient.generate(ai.request({ model: resolved, prompt: "Search" })).pipe(
       Effect.provide(client),
       Effect.flip,
     )
@@ -958,7 +958,7 @@ const streamFailure = (failure: unknown, streamed = false) =>
       }
     })
     const resolved = yield* aisdk.model(model("test-ai-sdk"))
-    return yield* LLMClient.generate(LLM.request({ model: resolved, prompt: "Hello" })).pipe(
+    return yield* LLMClient.generate(ai.request({ model: resolved, prompt: "Hello" })).pipe(
       Effect.provide(client),
       Effect.flip,
     )

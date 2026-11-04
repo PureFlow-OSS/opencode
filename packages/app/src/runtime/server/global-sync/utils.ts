@@ -2,7 +2,6 @@ import type { AgentListOutput, ModelListOutput, ProviderListOutput } from "@open
 import type { Agent, Project, Provider, ProviderListResponse } from "@/runtime/server/types"
 import type { Project as CurrentProject } from "@opencode/client/promise"
 import { unwrap } from "solid-js/store"
-import { Predicate } from "effect"
 
 export { pathKey as directoryKey, type PathKey as DirectoryKey } from "@/workspaces/path-key"
 
@@ -11,32 +10,34 @@ const providerCatalogs = new WeakMap<
   WeakMap<ModelListOutput["data"], ProviderListResponse>
 >()
 
-export function normalizeAgentList(input: AgentListOutput["data"] | Agent[]): Agent[] {
-  return input.map((agent) => {
-    if (!("request" in agent)) return agent
+function isLegacyAgentList(input: AgentListOutput["data"] | Agent[]): input is Agent[] {
+  return input.every((agent) => !("request" in agent))
+}
 
-    return {
-      name: agent.id,
-      description: agent.description,
-      mode: agent.mode,
-      hidden: agent.hidden,
-      temperature: Predicate.isNumber(agent.request.settings.temperature)
-        ? agent.request.settings.temperature
-        : undefined,
-      topP: Predicate.isNumber(agent.request.settings.topP) ? agent.request.settings.topP : undefined,
-      color: agent.color,
-      permission: agent.permissions.map((rule) => ({
-        permission: rule.action,
-        pattern: rule.resource,
-        action: rule.effect,
-      })),
-      model: agent.model && { providerID: agent.model.providerID, modelID: agent.model.id },
-      variant: agent.model?.variant,
-      prompt: agent.system,
-      options: agent.request.settings,
-      steps: agent.steps,
-    }
-  })
+export function normalizeAgentList(input: AgentListOutput["data"] | Agent[]): Agent[] {
+  if (isLegacyAgentList(input)) return input
+
+  return input.map((agent) => ({
+    name: agent.id,
+    description: agent.description,
+    mode: agent.mode,
+    hidden: agent.hidden,
+    temperature: Number.isFinite(agent.request.settings.temperature)
+      ? Number(agent.request.settings.temperature)
+      : undefined,
+    topP: Number.isFinite(agent.request.settings.topP) ? Number(agent.request.settings.topP) : undefined,
+    color: agent.color,
+    permission: agent.permissions.map((rule) => ({
+      permission: rule.action,
+      pattern: rule.resource,
+      action: rule.effect,
+    })),
+    model: agent.model && { providerID: agent.model.providerID, modelID: agent.model.id },
+    variant: agent.model?.variant,
+    prompt: agent.system,
+    options: agent.request.settings,
+    steps: agent.steps,
+  }))
 }
 
 export function normalizeProviderList(
@@ -83,7 +84,11 @@ export function normalizeProviderList(
       family: model.family,
       capabilities: {
         temperature: false,
-        reasoning: false,
+        // Always-on reasoning models may expose no selectable variants yet still stream reasoning via reasoningField;
+        // a disabled-only `none` variant does not count as reasoning support.
+        reasoning:
+          model.compatibility?.reasoningField !== undefined ||
+          model.variants.some((variant) => variant.id !== "none"),
         attachment: model.capabilities.input.some((item) => item !== "text"),
         toolcall: model.capabilities.tools,
         input: {
@@ -114,7 +119,7 @@ export function normalizeProviderList(
       status: model.status,
       options: model.settings ?? {},
       headers: model.headers ?? {},
-      release_date: new Date(model.time.released).toISOString().slice(0, 10),
+      release_date: model.time.released === 0 ? "" : new Date(model.time.released).toISOString().slice(0, 10),
       variants: Object.fromEntries(model.variants.map((variant) => [variant.id, variant.settings ?? {}])),
     }
   }

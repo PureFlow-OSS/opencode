@@ -2,7 +2,7 @@ export * as DocumentTools from "./document.js"
 
 import { define } from "@opencode/plugin/effect/plugin"
 import type { SessionRequest } from "@opencode/plugin/effect/session"
-import { LanguageModel, LLM, LLMClient, Media, Message, ToolFailure, type ContentPart } from "@opencode/ai/effect"
+import { ai, LanguageModel, LLMClient, Media, Message, ToolFailure, type ContentPart } from "@opencode/ai/effect"
 import { Global } from "@opencode/util/global"
 import { Effect, Option, Schema } from "effect"
 import path from "node:path"
@@ -105,7 +105,7 @@ export const Plugin = define({
         })
         const response = yield* llm
           .generate(
-            LLM.request({
+            ai.request({
               model,
               http: { headers: request.headers },
               system: untrusted,

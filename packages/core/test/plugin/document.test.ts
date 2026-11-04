@@ -9,6 +9,7 @@ import { PluginHost } from "@opencode/core/plugin/host"
 import { PluginHooks } from "@opencode/core/plugin/hooks"
 import { AiFactoryPlugin } from "@opencode/core/plugin/provider/aifactory"
 import { DocumentTools } from "@opencode/core/tool/plugin/document"
+import { ArtifactTools } from "@opencode/core/tool/plugin/artifact"
 import { Tool } from "@opencode/core/tool"
 import { DocumentCache } from "@opencode/core/document/cache"
 import { Global } from "@opencode/util/global"
@@ -91,6 +92,7 @@ const setup = Effect.fn(function* (input: Effect.Success<ReturnType<typeof fixtu
       type: "document",
       info: decode({
         updater: input.server.url.origin,
+        experimental: { artifacts: true },
         aifactory_host: input.server.url.origin,
         providers: { aifactory: { settings: { apiKey: "document-test-key" } } },
         aifactory: {
@@ -148,6 +150,23 @@ const cacheText = Effect.fn(function* (sessionID: Tool.Context["sessionID"], tex
 })
 
 describe("document tools", () => {
+  it.effect("keeps document workers usable alongside enabled artifact tools", () =>
+    Effect.gen(function* () {
+      const input = yield* fixture(false)
+      const context = yield* setup(input)
+      yield* ArtifactTools.Plugin.effect(context.host)
+      const artifact = yield* context.run("execute", {
+        code: 'return await tools.opencode.artifact_create({ title: "Document review", files: { "index.html": "<h1>Review</h1>" } })',
+      })
+      expect(artifact.status).toBe("completed")
+      yield* cacheText(context.session.id, "## Sheet 1\nWork package 1")
+      const summary = yield* context.run("document_summary", {})
+      expect(summary.status).toBe("completed")
+      expect(input.requests).toHaveLength(1)
+      expect(JSON.stringify(summary.content)).toContain("A source-grounded summary")
+    }),
+  )
+
   for (const mode of ["reasoning-length", "empty"] as const) {
     it.effect(`distinguishes ${mode} summary responses without retrying or exposing reasoning`, () =>
       Effect.gen(function* () {

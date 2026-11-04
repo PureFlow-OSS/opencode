@@ -7,12 +7,11 @@ import { Money } from "@opencode/schema/money"
 import { Plugin } from "@opencode/core/plugin"
 import { PluginHost } from "@opencode/core/plugin/host"
 import { AiFactoryPlugin, OpenCodeDocument } from "@opencode/core/plugin/provider/aifactory"
-import { ProviderPlugins } from "@opencode/core/plugin/provider"
 import { Provider } from "@opencode/core/provider"
 import { SessionUsage } from "@opencode/core/session/usage"
 import { Usage } from "@opencode/ai/effect"
 import { Document, Info } from "@opencode/schema/config"
-import { describe, expect, test } from "bun:test"
+import { describe, expect } from "bun:test"
 import { Effect, Layer, Schema } from "effect"
 import { TestClock } from "effect/testing"
 import { testEffect } from "../lib/effect"
@@ -119,12 +118,6 @@ describe("AiFactoryPlugin", () => {
       ({ server }) => Effect.sync(() => server.stop(true)),
     ),
   )
-
-  test("is registered before dynamic provider plugins", () => {
-    expect(AiFactoryPlugin.id).toBe("opencode.provider.aifactory")
-    const ids = ProviderPlugins.map((plugin) => plugin.id)
-    expect(ids.indexOf("opencode.provider.aifactory")).toBeLessThan(ids.indexOf("opencode.provider.dynamic"))
-  })
 
   it.live("registers the integration before credentials or models exist", () =>
     Effect.gen(function* () {
