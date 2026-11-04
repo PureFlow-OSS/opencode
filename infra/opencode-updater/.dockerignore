@@ -1,5 +1,9 @@
 bin
 obj
+data
+.env
+.env.*
+*.env
 .vs
 admin-ui/node_modules
 admin-ui/.angular

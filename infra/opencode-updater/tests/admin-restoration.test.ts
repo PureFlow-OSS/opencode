@@ -3,9 +3,11 @@ import { Database } from "bun:sqlite"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { keycloak } from "./support/keycloak"
 
 test("tester search, MCP OAuth and the plugin store survive the API and stored configuration", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "opencode-admin-restoration-"))
+  const idp = await keycloak()
   const seen: string[] = []
   const queries: string[] = []
   let invalid = false
@@ -39,6 +41,7 @@ test("tester search, MCP OAuth and the plugin store survive the API and stored c
   await Bun.write(
     path.join(directory, "appsettings.json"),
     JSON.stringify({
+      AdminAuthentication: idp.configuration(base),
       Updater: { Version: "2.1.2" },
       UpdaterBeta: {
         Enabled: true,
@@ -67,11 +70,18 @@ test("tester search, MCP OAuth and the plugin store survive the API and stored c
       "--urls",
       base,
     ],
-    { cwd: directory, stdout: "pipe", stderr: "pipe" },
+    {
+      cwd: directory,
+      env: { ...process.env, DOTNET_ENVIRONMENT: "Testing", ASPNETCORE_ENVIRONMENT: "Testing" },
+      stdout: "pipe",
+      stderr: "pipe",
+    },
   )
   const stdout = new Response(server.stdout).text()
   const stderr = new Response(server.stderr).text()
-  const request = (route: string, init?: RequestInit) => fetch(base + "/opencode" + route, init)
+  const auth: { browser?: Awaited<ReturnType<typeof idp.login>> } = {}
+  const request = (route: string, init?: RequestInit) =>
+    auth.browser ? auth.browser.request(base + "/opencode" + route, init) : fetch(base + "/opencode" + route, init)
   const put = (body: object) => ({
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -88,6 +98,8 @@ test("tester search, MCP OAuth and the plugin store survive the API and stored c
       if (Date.now() > deadline) throw new Error("Isolated updater did not become ready")
       await Bun.sleep(25)
     }
+    auth.browser = await idp.login(base)
+    expect(auth.browser.session.status).toBe(200)
     const found = await request("/admin/testers/search?q=kLa")
     expect(found.status).toBe(200)
     expect(await found.json()).toEqual({ results: [{ userName: "Klaus", currentChannel: "beta" }] })
@@ -214,6 +226,7 @@ test("tester search, MCP OAuth and the plugin store survive the API and stored c
     server.kill()
     await server.exited
     gateway.stop(true)
+    idp.close()
     await rm(directory, { recursive: true, force: true })
   }
 }, 30000)

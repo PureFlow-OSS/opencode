@@ -4,6 +4,8 @@ Release notes for OpenCode V2, newest first.
 
 ## Unreleased
 
+- **Keycloak Admin Login**: The updater admin UI and admin API require the exact `group` claim `opencodeAdmin` from the RSH realm. Server-side sessions, CSRF protection, logout and RRZ-styled error pages are included. Local Docker testing supports trusted localhost HTTPS; update feeds and model configuration remain available to existing clients.
+
 - **Model Requests Through Windows Proxies**: The shared HTTP client now uses the Windows-authenticated fallback for model inference and streaming too. Signing in successfully no longer leaves the subsequent model request on the old proxy transport. Explicitly injected fetch clients and direct internal routes retain their existing behavior.
 
 - **Windows MCP and OAuth Proxy Fix**: Replaced the PowerShell proxy fallback with the Windows system curl transport. This works with application-control policies that restrict PowerShell to ConstrainedLanguage, retains Windows proxy authentication and certificate validation, and keeps credentials and request bodies in memory-only pipes.

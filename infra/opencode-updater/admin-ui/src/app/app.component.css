@@ -63,7 +63,10 @@ h1 {
   padding: 9px 18px;
   font-size: 12px;
   font-weight: 600;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .nav button:hover {
@@ -136,4 +139,14 @@ h1 {
     margin: 0 -16px 0;
     padding: 20px 16px 16px;
   }
+}
+.account {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.account form {
+  margin: 0;
 }

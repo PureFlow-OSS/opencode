@@ -1,0 +1,11 @@
+# Add to your existing Compose deployment. Existing images, volumes and Caddy labels remain in the base file.
+services:
+  opencode-updater:
+    environment:
+      AdminAuthentication__Authority: ${OPENCODE_ADMIN_AUTHORITY:-https://idp.rrz.co.at/realms/RSH}
+      AdminAuthentication__ClientId: ${OPENCODE_ADMIN_CLIENT_ID:-opencode-admin}
+      AdminAuthentication__ClientSecret: ${OPENCODE_ADMIN_CLIENT_SECRET:?Set the confidential Keycloak client secret}
+      AdminAuthentication__PublicOrigin: ${OPENCODE_ADMIN_PUBLIC_ORIGIN:-https://opencode-web.ai.local.programmierfabrik.at}
+      AdminAuthentication__GroupClaim: ${OPENCODE_ADMIN_GROUP_CLAIM:-group}
+      AdminAuthentication__RequiredGroup: ${OPENCODE_ADMIN_REQUIRED_GROUP:-opencodeAdmin}
+      AdminAuthentication__SessionMinutes: ${OPENCODE_ADMIN_SESSION_MINUTES:-30}

@@ -17,6 +17,7 @@ using System.Text.RegularExpressions;
 using Quartz;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddUpdaterAdminAuthentication();
 builder.WebHost.ConfigureKestrel(options =>
 {
   options.Limits.MaxRequestBodySize = null;
@@ -82,6 +83,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 var app = builder.Build();
 
 app.UseCors();
+app.UseUpdaterAdminAuthentication();
 
 app.Use(async (context, next) =>
 {

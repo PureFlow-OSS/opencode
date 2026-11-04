@@ -2,6 +2,149 @@
 
 Hardcoded route base: `opencode`
 
+## Keycloak login for administration
+
+The admin UI and **every** `/opencode/admin` endpoint require a Keycloak login. By default the exact
+claim **`group`** must contain **`opencodeAdmin`**. A string or an array of group names is accepted.
+Roles, a `groups` claim, different capitalization, and `/opencodeAdmin` do not grant access with
+those defaults. Claim name and exact required group can explicitly be configured as shown below.
+Public update feeds, AI Factory key-based rollout selection, provider configuration, changelog,
+and public MCP/plugin catalogs continue to work without a browser login.
+
+Configure this confidential OpenID Connect client in Keycloak:
+
+| Setting | Value |
+| --- | --- |
+| Realm | `RSH` |
+| Authority | `https://idp.rrz.co.at/realms/RSH` |
+| Client ID | `opencode-admin` |
+| Client authentication | On; store its secret only on the server |
+| Standard authorization code flow | On |
+| PKCE | `S256` |
+| Valid redirect URI | `https://opencode-web.ai.local.programmierfabrik.at/opencode/auth/signin-oidc` |
+| Valid post-logout redirect URI | `https://opencode-web.ai.local.programmierfabrik.at/opencode/auth/signout-callback-oidc` |
+| Group Membership mapper | Token claim name `group`; Full group path **Off**; Add to ID token **On** |
+
+Assign the group mapper to the client/dedicated default scope and add permitted administrators
+to `opencodeAdmin`. The authorization decision uses the validated ID token, not a frontend flag.
+Access/refresh tokens are not exposed to the SPA. Group changes take effect at the next login;
+the session expires no later than the ID token and the configured session limit (default 30 minutes).
+
+Backend environment settings (or the equivalent `AdminAuthentication` section in appsettings):
+
+```text
+AdminAuthentication__Authority=https://idp.rrz.co.at/realms/RSH
+AdminAuthentication__ClientId=opencode-admin
+AdminAuthentication__ClientSecret=<server-side secret>
+AdminAuthentication__PublicOrigin=https://opencode-web.ai.local.programmierfabrik.at
+AdminAuthentication__GroupClaim=group
+AdminAuthentication__RequiredGroup=opencodeAdmin
+```
+
+`PublicOrigin` must match the externally visible **admin UI** origin, without a path, query or
+credentials. It controls callback URLs behind Caddy/nginx without trusting arbitrary forwarded
+headers. Use the UI's same-origin `/opencode/` proxy for authentication and API requests.
+The existing public updater hostname need not change.
+
+`docker-compose.keycloak.yml` can be added to an existing Compose deployment. Set the private
+`OPENCODE_ADMIN_CLIENT_SECRET` and, if different, `OPENCODE_ADMIN_PUBLIC_ORIGIN` using the template
+`keycloak.env.example`. Rebuild/publish **both** backend and admin UI images before deployment.
+The overlay preserves the base Compose's Caddy labels and mounted data.
+
+All connection and authorization defaults in that overlay can optionally be overridden by the
+deployment's shell environment, `.env`, or `--env-file`:
+
+| Compose variable | Default |
+| --- | --- |
+| `OPENCODE_ADMIN_AUTHORITY` | `https://idp.rrz.co.at/realms/RSH` (complete realm URL) |
+| `OPENCODE_ADMIN_CLIENT_ID` | `opencode-admin` |
+| `OPENCODE_ADMIN_CLIENT_SECRET` | Required; no default |
+| `OPENCODE_ADMIN_PUBLIC_ORIGIN` | `https://opencode-web.ai.local.programmierfabrik.at` |
+| `OPENCODE_ADMIN_GROUP_CLAIM` | `group` |
+| `OPENCODE_ADMIN_REQUIRED_GROUP` | `opencodeAdmin` |
+| `OPENCODE_ADMIN_SESSION_MINUTES` | `30` (server clamps to 1–480 minutes, bounded by ID token expiry) |
+
+If the existing IdP mapper instead emits full group paths in `groups`, keep that mapping and set:
+
+```dotenv
+OPENCODE_ADMIN_GROUP_CLAIM=groups
+OPENCODE_ADMIN_REQUIRED_GROUP=/opencodeAdmin
+```
+
+The mapper must still include the claim in the **ID token**. The check remains exact: a nested path
+such as `/other/opencodeAdmin`, a value without the configured leading slash, and a different claim
+name do not grant access. These overrides are configured in the local private env file for the
+currently tested RSH mapping; deployment to another server needs the same explicit overrides.
+
+Omitted or empty optional variables use these defaults. These are runtime settings: recreate the
+backend with `docker compose ... up -d` after changes; an image rebuild is not needed. Alternatively,
+set the corresponding `AdminAuthentication__...` names directly in a custom Compose `environment`
+section. The local test overlay intentionally fixes the browser origin to `https://localhost` (port 443).
+
+Copy `keycloak.env.example` to a private file **outside the repository** and set
+`OPENCODE_ADMIN_CLIENT_SECRET` to **Clients → opencode-admin → Credentials → Client secret**.
+No manually generated bearer token is needed. Keep client authentication and the standard flow
+enabled. Start the server deployment with that file (the same environment file is needed on later
+Compose recreates):
+
+```sh
+docker compose --env-file /private/opencode-keycloak.env \
+  -f docker-compose.yml -f docker-compose.keycloak.yml up -d
+```
+
+### Local Docker test against the real IdP
+
+Add these additional exact addresses to the **same** Keycloak client; retain its production entries:
+
+- Valid redirect URI: `https://localhost/opencode/auth/signin-oidc`
+- Valid post-logout redirect URI: `https://localhost/opencode/auth/signout-callback-oidc`
+
+On the Windows development PC, prepare the local certificate and nginx configuration outside the
+repository, using the existing .NET localhost development certificate:
+
+```powershell
+$env:OPENCODE_ADMIN_TLS_DIR = ./scripts/prepare-local-keycloak-https.ps1
+```
+
+The helper does not modify the certificate trust store. If this machine has no trusted development
+certificate yet, trust the localhost development certificate using `dotnet dev-certs https --trust`
+before opening the local UI. Keep the exported private key outside the repo and mount it read-only.
+Set `OPENCODE_ADMIN_TLS_DIR` to the helper's output directory in the shell or private env file on
+subsequent Compose recreates. If the base nginx configuration changes, rerun the helper.
+
+With Compose 2.24.4 or newer (`!override` support), add the local overlay last:
+
+```sh
+docker compose --env-file /private/opencode-keycloak.env \
+  -f docker-compose.yml -f docker-compose.keycloak.yml \
+  -f docker-compose.keycloak-local.yml up -d --build
+```
+
+Open `https://localhost` using that exact hostname. Port 443 must be available on the host. The old
+`http://localhost:8081` and `https://localhost:8443` addresses redirect to this canonical HTTPS origin,
+preserving the request path and query. The local overlay binds both containers to `127.0.0.1`, uses Production mode,
+Secure cookies and HTTPS callbacks, and authenticates against the real HTTPS IdP. HTTP loopback
+authentication is disabled. **Do not use this local overlay on the server.** The server uses the
+public HTTPS admin origin and the production overlay only. An `Invalid parameter: redirect_uri` error
+means the selected browser origin's callback is not allowed by the Keycloak client.
+Do not leave relative entries such as `/*` with an empty Root URL in the client's allowed redirect
+list. Use the complete callback addresses above. A Web origin, if configured, is just
+`https://localhost`, without a path wildcard.
+
+Missing or invalid configuration **closes** administration (HTTP 503); it never enables anonymous
+admin access and does not prevent public client endpoints from starting. Sessions use HttpOnly
+cookies, HTTPS and same-origin CSRF tokens for writes, uploads and logout. The SPA redirects expired
+sessions to login; it does not automatically replay failed writes. Session protection keys persist
+in `/app/data/admin-auth-keys` inside the existing data volume; preserve that directory on restarts.
+
+Isolated automated HTTP tests explicitly use environment `Testing` and `AllowHttpLoopback: true` with loopback
+issuer and UI addresses. HTTP is never enabled by that switch in `Production`. Tests use an isolated
+OIDC provider with real RSA-signed tokens and PKCE; there is no authentication bypass for test mode.
+
+Browser support routes: `/opencode/auth/login`, `/session`, `/check`, `/logout` (POST + CSRF),
+`/forbidden`, `/error`, plus the OIDC callbacks above. Unauthenticated admin API requests return 401,
+insufficient privilege returns 403, and missing/invalid CSRF tokens return 400.
+
 ## Plugin Store
 
 Manage optional plugins in the admin UI's **Plugin Store** tab. Entries contain a unique name, an npm package (optionally pinned to a version or dist-tag), a description and a visibility switch. The store is shared across rollout channels, like the MCP Store.

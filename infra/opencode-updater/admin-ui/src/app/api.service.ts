@@ -1,5 +1,7 @@
 import { Injectable } from "@angular/core"
 
+export type AdminSession = { userName: string; csrfToken: string }
+
 export type PluginStoreItem = {
   name: string
   package: string
@@ -217,43 +219,77 @@ export type TesterSearchResponse = {
 
 @Injectable({ providedIn: "root" })
 export class ApiService {
+  private authentication?: Promise<AdminSession>
+
+  session() {
+    this.authentication ??= globalThis
+      .fetch("/opencode/auth/session", { cache: "no-store", credentials: "same-origin" })
+      .then((response) => this.authResponse(response))
+      .then((response) => this.readJson<AdminSession>(response))
+    return this.authentication
+  }
+
+  private authResponse(response: Response) {
+    if (response.status === 401) {
+      window.location.assign("/opencode/auth/login")
+      throw new Error("Bitte erneut anmelden.")
+    }
+    if (response.status === 403) {
+      window.location.assign("/opencode/auth/forbidden")
+      throw new Error("Keine Berechtigung für die Admin Console.")
+    }
+    if (response.status === 503) throw new Error("Die Administrator-Anmeldung ist noch nicht verfügbar.")
+    return response
+  }
+
+  private async request(url: string, init: RequestInit = {}) {
+    const session = await this.session()
+    const headers = new Headers(init.headers)
+    if (!["GET", "HEAD", "OPTIONS"].includes(init.method ?? "GET")) headers.set("X-OpenCode-CSRF", session.csrfToken)
+    return this.authResponse(await globalThis.fetch(url, { ...init, headers, credentials: "same-origin" }))
+  }
+
   async readJson<T>(response: Response) {
     if (!response.ok) throw new Error(await response.text())
     return response.json() as Promise<T>
   }
 
   async listReleases() {
-    return this.readJson<ReleaseRecord[]>(await fetch("/opencode/admin/releases", { cache: "no-store" }))
+    return this.readJson<ReleaseRecord[]>(await this.request("/opencode/admin/releases", { cache: "no-store" }))
   }
 
   async listReleaseStatus() {
-    return this.readJson<ReleaseStatus>(await fetch("/opencode/admin/releases/status", { cache: "no-store" }))
+    return this.readJson<ReleaseStatus>(await this.request("/opencode/admin/releases/status", { cache: "no-store" }))
   }
 
   async uploadRelease(payload: { archive: File; notes?: string }) {
     const form = new FormData()
     form.set("archive", payload.archive)
     if (payload.notes) form.set("notes", payload.notes)
-    return this.readJson<ReleaseRecord>(await fetch("/opencode/admin/releases/upload", { method: "POST", body: form }))
+    return this.readJson<ReleaseRecord>(
+      await this.request("/opencode/admin/releases/upload", { method: "POST", body: form }),
+    )
   }
 
   async promoteRelease(id: string) {
-    return this.readJson<ReleaseRecord>(await fetch(`/opencode/admin/releases/${id}/promote`, { method: "POST" }))
+    return this.readJson<ReleaseRecord>(
+      await this.request(`/opencode/admin/releases/${id}/promote`, { method: "POST" }),
+    )
   }
 
   async listTesters() {
-    return this.readJson<Testers>(await fetch("/opencode/admin/testers", { cache: "no-store" }))
+    return this.readJson<Testers>(await this.request("/opencode/admin/testers", { cache: "no-store" }))
   }
 
   async searchTesters(term: string) {
     return this.readJson<TesterSearchResponse>(
-      await fetch(`/opencode/admin/testers/search?q=${encodeURIComponent(term)}`, { cache: "no-store" }),
+      await this.request(`/opencode/admin/testers/search?q=${encodeURIComponent(term)}`, { cache: "no-store" }),
     )
   }
 
   async saveTesters(testers: Testers) {
     return this.readJson<Testers>(
-      await fetch("/opencode/admin/testers", {
+      await this.request("/opencode/admin/testers", {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(testers),
@@ -263,13 +299,13 @@ export class ApiService {
 
   async stopReleaseChannel(channel: ReleaseChannel) {
     return this.readJson<unknown>(
-      await fetch(`/opencode/admin/releases/${encodeURIComponent(channel)}/stop`, { method: "POST" }),
+      await this.request(`/opencode/admin/releases/${encodeURIComponent(channel)}/stop`, { method: "POST" }),
     )
   }
 
   async clearReleaseChannel(channel: ReleaseChannel) {
     return this.readJson<unknown>(
-      await fetch(`/opencode/admin/releases/${encodeURIComponent(channel)}/clear`, { method: "POST" }),
+      await this.request(`/opencode/admin/releases/${encodeURIComponent(channel)}/clear`, { method: "POST" }),
     )
   }
 
@@ -286,7 +322,7 @@ export class ApiService {
         attachments: string | null
         created_at: string
       }>
-    >(await fetch("/opencode/feedback", { cache: "no-store" }))
+    >(await this.request("/opencode/feedback", { cache: "no-store" }))
 
     return items.map((item) => ({
       id: String(item.id),
@@ -318,19 +354,19 @@ export class ApiService {
 
   async listModelCards(channel: ModelChannel = "normal") {
     return this.readJson<ModelCardsResponse>(
-      await fetch(`/opencode/admin/modelcards?channel=${channel}`, { cache: "no-store" }),
+      await this.request(`/opencode/admin/modelcards?channel=${channel}`, { cache: "no-store" }),
     )
   }
 
   async getModelLimitsReport(channel: ModelChannel) {
     return this.readJson<ModelLimitsReport>(
-      await fetch(`/opencode/admin/model-limits/report?channel=${channel}`, { cache: "no-store" }),
+      await this.request(`/opencode/admin/model-limits/report?channel=${channel}`, { cache: "no-store" }),
     )
   }
 
   async cleanupModelLimits(channel: ModelChannel, patterns: string[]) {
     return this.readJson<{ channel: string; removed: number; patterns: string[] }>(
-      await fetch(`/opencode/admin/model-limits/cleanup?channel=${channel}`, {
+      await this.request(`/opencode/admin/model-limits/cleanup?channel=${channel}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ patterns }),
@@ -340,13 +376,13 @@ export class ApiService {
 
   async syncModelCards() {
     return this.readJson<{ synced: boolean; source?: string | null; synced_at?: string | null; count: number }>(
-      await fetch("/opencode/admin/modelcards/sync", { method: "POST" }),
+      await this.request("/opencode/admin/modelcards/sync", { method: "POST" }),
     )
   }
 
   async saveModelSettings(model: string, channel: ModelChannel, settings: ModelSettings) {
     return this.readJson<ModelSettings>(
-      await fetch(`/opencode/admin/model-settings?channel=${channel}&model=${encodeURIComponent(model)}`, {
+      await this.request(`/opencode/admin/model-settings?channel=${channel}&model=${encodeURIComponent(model)}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(settings),
@@ -356,14 +392,17 @@ export class ApiService {
 
   async syncModelContext(model: string, channel: ModelChannel) {
     return this.readJson<{ context: number }>(
-      await fetch(`/opencode/admin/model-settings/sync-context?channel=${channel}&model=${encodeURIComponent(model)}`, {
-        method: "POST",
-      }),
+      await this.request(
+        `/opencode/admin/model-settings/sync-context?channel=${channel}&model=${encodeURIComponent(model)}`,
+        {
+          method: "POST",
+        },
+      ),
     )
   }
 
   async resetModelSettings(model: string, channel: ModelChannel) {
-    const response = await fetch(
+    const response = await this.request(
       `/opencode/admin/model-settings?channel=${channel}&model=${encodeURIComponent(model)}`,
       { method: "DELETE" },
     )
@@ -373,21 +412,24 @@ export class ApiService {
 
   async promoteModelSettings(model: string, channel: "ai-gilde" | "normal") {
     return this.readJson<ModelSettingsPromotionResult>(
-      await fetch(`/opencode/admin/model-settings/promote?model=${encodeURIComponent(model)}&channel=${channel}`, {
-        method: "POST",
-      }),
+      await this.request(
+        `/opencode/admin/model-settings/promote?model=${encodeURIComponent(model)}&channel=${channel}`,
+        {
+          method: "POST",
+        },
+      ),
     )
   }
 
   async getProviderSettings(channel: ModelChannel) {
     return this.readJson<ProviderSettings>(
-      await fetch(`/opencode/admin/provider-settings?channel=${channel}`, { cache: "no-store" }),
+      await this.request(`/opencode/admin/provider-settings?channel=${channel}`, { cache: "no-store" }),
     )
   }
 
   async saveProviderSettings(channel: ModelChannel, settings: ProviderSettings) {
     return this.readJson<ProviderSettings>(
-      await fetch(`/opencode/admin/provider-settings?channel=${channel}`, {
+      await this.request(`/opencode/admin/provider-settings?channel=${channel}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(settings),
@@ -396,12 +438,12 @@ export class ApiService {
   }
 
   async listMcps(channel: "normal" | "beta") {
-    return this.readJson<Record<string, McpConfig>>(await fetch(`/opencode/admin/mcp?channel=${channel}`))
+    return this.readJson<Record<string, McpConfig>>(await this.request(`/opencode/admin/mcp?channel=${channel}`))
   }
 
   async saveMcp(channel: "normal" | "beta", name: string, config: McpConfig) {
     return this.readJson<{ name: string; config: McpConfig }>(
-      await fetch(`/opencode/admin/mcp/${encodeURIComponent(name)}?channel=${channel}`, {
+      await this.request(`/opencode/admin/mcp/${encodeURIComponent(name)}?channel=${channel}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(config),
@@ -410,23 +452,23 @@ export class ApiService {
   }
 
   async deleteMcp(channel: "normal" | "beta", name: string) {
-    const response = await fetch(`/opencode/admin/mcp/${encodeURIComponent(name)}?channel=${channel}`, {
+    const response = await this.request(`/opencode/admin/mcp/${encodeURIComponent(name)}?channel=${channel}`, {
       method: "DELETE",
     })
     if (!response.ok) throw new Error(await response.text())
   }
 
   async listMcpStore() {
-    return this.readJson<McpStoreItem[]>(await fetch("/opencode/admin/mcp-store", { cache: "no-store" }))
+    return this.readJson<McpStoreItem[]>(await this.request("/opencode/admin/mcp-store", { cache: "no-store" }))
   }
 
   async listPluginStore() {
-    return this.readJson<PluginStoreItem[]>(await fetch("/opencode/admin/plugin-store", { cache: "no-store" }))
+    return this.readJson<PluginStoreItem[]>(await this.request("/opencode/admin/plugin-store", { cache: "no-store" }))
   }
 
   async savePluginStoreItem(name: string, item: PluginStoreItem) {
     return this.readJson<{ name: string }>(
-      await fetch(`/opencode/admin/plugin-store/${encodeURIComponent(name)}`, {
+      await this.request(`/opencode/admin/plugin-store/${encodeURIComponent(name)}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(item),
@@ -435,12 +477,14 @@ export class ApiService {
   }
 
   async deletePluginStoreItem(name: string) {
-    const response = await fetch(`/opencode/admin/plugin-store/${encodeURIComponent(name)}`, { method: "DELETE" })
+    const response = await this.request(`/opencode/admin/plugin-store/${encodeURIComponent(name)}`, {
+      method: "DELETE",
+    })
     if (!response.ok) throw new Error(await response.text())
   }
 
   async saveMcpStoreItem(name: string, item: Omit<McpStoreItem, "updatedAt">) {
-    const response = await fetch(`/opencode/admin/mcp-store/${encodeURIComponent(name)}`, {
+    const response = await this.request(`/opencode/admin/mcp-store/${encodeURIComponent(name)}`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(item),
@@ -450,7 +494,7 @@ export class ApiService {
   }
 
   async deleteMcpStoreItem(name: string) {
-    const response = await fetch(`/opencode/admin/mcp-store/${encodeURIComponent(name)}`, { method: "DELETE" })
+    const response = await this.request(`/opencode/admin/mcp-store/${encodeURIComponent(name)}`, { method: "DELETE" })
     if (!response.ok) throw new Error(await response.text())
   }
 }

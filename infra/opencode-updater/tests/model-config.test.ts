@@ -2,11 +2,13 @@ import { expect, test } from "bun:test"
 import { mkdtemp, rename, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { keycloak } from "./support/keycloak"
 
 // Compile-only prerequisite: dotnet build. The server runs against disposable data,
 // never the user's Docker container, configuration files, or LiteLLM credentials.
 test("promotes model policy through three independent configuration stages", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "opencode-model-config-"))
+  const idp = await keycloak()
   const gateway = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
@@ -37,6 +39,7 @@ test("promotes model policy through three independent configuration stages", asy
     document_vision_model: "vision-worker",
   }
   const config = (context: number) => ({
+    AdminAuthentication: idp.configuration(base),
     Updater: {
       Version: "2.1.3",
       PublicBaseUrl: base,
@@ -83,11 +86,18 @@ test("promotes model policy through three independent configuration stages", asy
       "--urls",
       base,
     ],
-    { cwd: directory, stdout: "pipe", stderr: "pipe" },
+    {
+      cwd: directory,
+      env: { ...process.env, DOTNET_ENVIRONMENT: "Testing", ASPNETCORE_ENVIRONMENT: "Testing" },
+      stdout: "pipe",
+      stderr: "pipe",
+    },
   )
   const stdout = new Response(server.stdout).text()
   const stderr = new Response(server.stderr).text()
-  const request = (route: string, init?: RequestInit) => fetch(base + "/opencode" + route, init)
+  const auth: { browser?: Awaited<ReturnType<typeof idp.login>> } = {}
+  const request = (route: string, init?: RequestInit) =>
+    auth.browser ? auth.browser.request(base + "/opencode" + route, init) : fetch(base + "/opencode" + route, init)
   try {
     const deadline = Date.now() + 20000
     const ready = async (): Promise<void> => {
@@ -103,6 +113,8 @@ test("promotes model policy through three independent configuration stages", asy
       return ready()
     }
     await ready()
+    auth.browser = await idp.login(base)
+    expect(auth.browser.session.status).toBe(200)
     const settings = (root: Awaited<ReturnType<typeof read>>) => root.Updater.ProviderConfig.aifactory
     for (const [key, context] of [
       ["", 60000],
@@ -226,6 +238,7 @@ test("promotes model policy through three independent configuration stages", asy
     server.kill()
     await server.exited
     gateway.stop(true)
+    idp.close()
     await rm(directory, { recursive: true, force: true })
   }
 }, 30000)

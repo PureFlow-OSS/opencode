@@ -3,10 +3,12 @@ import { Database } from "bun:sqlite"
 import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { keycloak } from "./support/keycloak"
 
 // Uses the compile-only dotnet artifact with disposable configuration, feeds and database.
 test("publishes durable staged releases without feedback and rolls back failed promotions", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "opencode-release-stages-"))
+  const idp = await keycloak()
   const gateway = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
@@ -30,6 +32,7 @@ test("publishes durable staged releases without feedback and rolls back failed p
   await seed(feed("ai-gilde"), "0.8.0")
   await seed("feed", "0.6.0")
   const settings = {
+    AdminAuthentication: idp.configuration(base),
     Updater: { Version: "0.6.0", PublicBaseUrl: base },
     UpdaterBeta: {
       Enabled: true,
@@ -65,7 +68,7 @@ foreach ($version in @('1.0.0','1.0.1','1.0.2')) {
   })
   expect(await zip.exited).toBe(0)
   const start = () => {
-    const process = Bun.spawn(
+    const child = Bun.spawn(
       [
         "dotnet",
         path.resolve(import.meta.dir, "../bin/Debug/net10.0/OpenCode.UpdaterServer.dll"),
@@ -74,12 +77,19 @@ foreach ($version in @('1.0.0','1.0.1','1.0.2')) {
         "--urls",
         base,
       ],
-      { cwd: directory, stdout: "pipe", stderr: "pipe" },
+      {
+        cwd: directory,
+        env: { ...process.env, DOTNET_ENVIRONMENT: "Testing", ASPNETCORE_ENVIRONMENT: "Testing" },
+        stdout: "pipe",
+        stderr: "pipe",
+      },
     )
-    return { process, stdout: new Response(process.stdout).text(), stderr: new Response(process.stderr).text() }
+    return { process: child, stdout: new Response(child.stdout).text(), stderr: new Response(child.stderr).text() }
   }
   let server = start()
-  const request = (route: string, init?: RequestInit) => fetch(base + "/opencode" + route, init)
+  const auth: { browser?: Awaited<ReturnType<typeof idp.login>> } = {}
+  const request = (route: string, init?: RequestInit) =>
+    auth.browser ? auth.browser.request(base + "/opencode" + route, init) : fetch(base + "/opencode" + route, init)
   const headers = (channel: string) => ({
     "X-OpenCode-AiFactory-Api-Key": channel === "beta" ? "beta-key" : channel === "ai-gilde" ? "gilde-key" : "",
   })
@@ -105,6 +115,8 @@ foreach ($version in @('1.0.0','1.0.1','1.0.2')) {
   }
   try {
     await ready()
+    auth.browser = await idp.login(base)
+    expect(auth.browser.session.status).toBe(200)
     expect(await file(`${feed("beta")}/installer.exe`).text()).toBe("installer-0.9.0")
     expect(await file(`${feed("ai-gilde")}/installer.exe`).text()).toBe("installer-0.8.0")
     expect(await file(`${feed("normal")}/installer.exe`).text()).toBe("installer-0.6.0")
@@ -235,6 +247,7 @@ foreach ($version in @('1.0.0','1.0.1','1.0.2')) {
     server.process.kill()
     await server.process.exited
     gateway.stop(true)
+    idp.close()
     await rm(directory, { recursive: true, force: true })
   }
 }, 30000)
