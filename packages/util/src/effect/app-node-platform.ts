@@ -19,7 +19,7 @@ export const httpClient = makeGlobalNode({
           Effect.provideService(
             effect,
             FetchHttpClient.Fetch,
-            current === globalThis.fetch ? HttpProxy.fetch : current,
+            current === globalThis.fetch ? HttpProxy.fetchAuthenticated : current,
           ),
         ),
       ),

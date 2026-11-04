@@ -98,13 +98,13 @@ export const fetchDirect: typeof globalThis.fetch = Object.assign(
   { preconnect },
 )
 
-/** Retry a proxy-authentication rejection through Windows integrated authentication for OAuth/MCP requests. */
+/** Retry a proxy-authentication rejection through Windows authentication for model, OAuth and MCP requests. */
 export const fetchAuthenticated: typeof globalThis.fetch = Object.assign(
   async (input: Parameters<typeof globalThis.fetch>[0], init?: Parameters<typeof globalThis.fetch>[1]) => {
     const proxy = proxyFor(input instanceof Request ? input.url : input.toString())
     if (process.platform !== "win32" || !process.versions.bun || !proxy) return fetch(input, init)
     const original = input instanceof Request ? new Request(input, init) : new Request(input.toString(), init)
-    // OAuth forms and MCP JSON requests must remain replayable after CONNECT is rejected, before reaching the origin.
+    // Preserve encoded model bodies, OAuth forms and MCP JSON after CONNECT is rejected before reaching the origin.
     const body = original.body ? await original.arrayBuffer() : undefined
     original.signal.throwIfAborted()
     const options = {
