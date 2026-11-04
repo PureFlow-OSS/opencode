@@ -80,6 +80,8 @@ try {
     throw "The configured Windows installer was not produced in $outputDirectory. Check the loaded electron-builder configuration."
   }
   Copy-Item -LiteralPath (Join-Path $desktopDirectory "../../CHANGELOG.md") -Destination (Join-Path $outputDirectory "changelog.md") -Force
+  $archivePath = Join-Path $outputDirectory ((Split-Path -Path $outputDirectory -Leaf) + '.zip')
+  Invoke-Bun @('script/package-corporate-release.ts', '--assets', $outputDirectory, '--output', $archivePath)
 
   Write-Host "Packaged Windows desktop output in $outputDirectory"
 }

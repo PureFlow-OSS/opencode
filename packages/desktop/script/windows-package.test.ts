@@ -110,7 +110,7 @@ console.log("RESULT=" + JSON.stringify({
 )
 
 test.skipIf(process.platform !== "win32")(
-  "the real Windows wrapper sends the same resolved output to packaging and changelog copying",
+  "the Windows wrapper refreshes the updater ZIP with the current installer and changelog in the selected output",
   async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "opencode-package-output-"))
 
@@ -139,13 +139,25 @@ test.skipIf(process.platform !== "win32")(
         path.join(commands, "runner.mjs"),
         `
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 const raw = process.argv.slice(2);
 const args = raw.slice(raw.indexOf("run") + 1);
 appendFileSync(process.env.FIXTURE_LOG, JSON.stringify({ args, output: process.env.OPENCODE_ELECTRON_OUTPUT_DIR }) + "\\n");
 if (args[0] === "package:win" && process.env.FIXTURE_ARTIFACT !== "missing") {
   mkdirSync(process.env.OPENCODE_ELECTRON_OUTPUT_DIR, { recursive: true });
-  writeFileSync(path.join(process.env.OPENCODE_ELECTRON_OUTPUT_DIR, "opencode-desktop-win-x64.exe"), "Fixture, never executed");
+  const installer = "Fixture, never executed";
+  writeFileSync(path.join(process.env.OPENCODE_ELECTRON_OUTPUT_DIR, "opencode-desktop-win-x64.exe"), installer);
+  writeFileSync(path.join(process.env.OPENCODE_ELECTRON_OUTPUT_DIR, "latest.yml"), "version: 2.2.2\\nsha512: " + createHash("sha512").update(installer).digest("base64") + "\\n");
+  writeFileSync(path.join(process.env.OPENCODE_ELECTRON_OUTPUT_DIR, "opencode-desktop-win-x64.exe.blockmap"), "Fixture blockmap");
+}
+if (args[0] === "script/package-corporate-release.ts") {
+  const { packageCorporateRelease } = await import(${JSON.stringify(path.resolve(import.meta.dir, "package-corporate-release.ts"))});
+  await packageCorporateRelease({
+    assets: args[args.indexOf("--assets") + 1],
+    output: args[args.indexOf("--output") + 1],
+    version: process.env.OPENCODE_VERSION,
+  });
 }
 `,
       )
@@ -170,6 +182,9 @@ Write-Output ('ENV=' + (@{ output = $env:OPENCODE_ELECTRON_OUTPUT_DIR; target = 
       for (const input of cases) {
         const log = path.join(root, "calls.jsonl")
         await Bun.write(log, "")
+        await mkdir(input.output, { recursive: true })
+        const archive = path.join(input.output, path.basename(input.output) + ".zip")
+        await Bun.write(archive, "Stale release archive from an earlier build")
 
         const child = Bun.spawn(["pwsh", "-NoLogo", "-NoProfile", "-File", harness], {
           env: {
@@ -205,17 +220,42 @@ Write-Output ('ENV=' + (@{ output = $env:OPENCODE_ELECTRON_OUTPUT_DIR; target = 
         expect(calls).toEqual([
           { args: ["build"], output: input.output },
           { args: ["package:win"], output: input.output },
+          ...(input.missing ? [] : [{
+            args: ["script/package-corporate-release.ts", "--assets", input.output, "--output", archive],
+            output: input.output,
+          }]),
         ])
 
         if (input.missing) {
           expect(code).not.toBe(0)
           expect(stderr).toContain("The configured Windows installer was not produced")
           expect(await Bun.file(path.join(input.output, "changelog.md")).exists()).toBe(false)
+          expect(await Bun.file(archive).text()).toBe("Stale release archive from an earlier build")
           continue
         }
 
         expect(code, stdout + stderr).toBe(0)
         expect(await Bun.file(path.join(input.output, "changelog.md")).text()).toBe("# Packaging fixture\n")
+
+        const { ZipReader, Uint8ArrayReader, TextWriter } = await import("@zip.js/zip.js")
+        const reader = new ZipReader(new Uint8ArrayReader(new Uint8Array(await Bun.file(archive).arrayBuffer())))
+
+        try {
+          const entries = await reader.getEntries()
+          expect(entries.map((entry) => entry.filename).sort()).toEqual([
+            "changelog.md",
+            "latest.yml",
+            "opencode-desktop-win-x64.exe",
+            "opencode-desktop-win-x64.exe.blockmap",
+          ])
+          const installer = entries.find((entry) => entry.filename === "opencode-desktop-win-x64.exe")
+          expect(installer).toBeDefined()
+
+          if (!installer || installer.directory) throw new Error("Installer missing from updater ZIP")
+          expect(await installer.getData(new TextWriter())).toBe("Fixture, never executed")
+        } finally {
+          await reader.close()
+        }
 
         const restored = Schema.decodeUnknownSync(
           Schema.fromJsonString(Schema.Struct({ output: Schema.NullOr(Schema.String), target: Schema.String })),

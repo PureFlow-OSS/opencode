@@ -12,10 +12,14 @@ describe("corporate release packaging", () => {
 
     try {
       const installer = "opencode-desktop-win-x64.exe"
-      await writeFile(path.join(root, installer), "signed fixture")
+      await writeFile(path.join(root, installer), "previous installer ".repeat(1000))
       await writeFile(path.join(root, "changelog.md"), "# Changes\nGoal and chat bubbles")
       const output = path.join(root, "release.zip")
       await packageCorporateRelease({ assets: root, output, version: "2.2.2" })
+      const previousSize = (await Bun.file(output).stat()).size
+      await writeFile(path.join(root, installer), "signed fixture")
+      await packageCorporateRelease({ assets: root, output, version: "2.2.2" })
+      expect((await Bun.file(output).stat()).size).toBeLessThan(previousSize)
       const zip = new ZipReader(new BlobReader(Bun.file(output)))
       const entries = await zip.getEntries()
       expect(entries.map((entry) => entry.filename)).toEqual(["latest.yml", installer, "changelog.md"])

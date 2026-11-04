@@ -1,7 +1,9 @@
 #!/usr/bin/env bun
-import { stat } from "node:fs/promises"
-import { createReadStream } from "node:fs"
-import { createHash } from "node:crypto"
+import { rename, rm, stat } from "node:fs/promises"
+import { createReadStream, createWriteStream } from "node:fs"
+import { createHash, randomUUID } from "node:crypto"
+import { Readable } from "node:stream"
+import { pipeline } from "node:stream/promises"
 import path from "node:path"
 
 import { BlobReader, BlobWriter, TextReader, ZipReader, ZipWriter } from "@zip.js/zip.js"
@@ -79,15 +81,21 @@ export async function packageCorporateRelease(options: {
   for (const file of files) await zip.add(path.basename(file), new BlobReader(Bun.file(file)))
   await zip.add("changelog.md", new TextReader(changelog))
 
-  await Bun.write(output, await zip.close())
+  const temporary = output + "." + randomUUID() + ".tmp"
 
-  const verify = new ZipReader(new BlobReader(Bun.file(output)))
-  const entries = await verify.getEntries()
-  await verify.close()
-  const expected = files.length + metadata.length + 1
+  try {
+    await pipeline(Readable.fromWeb((await zip.close()).stream()), createWriteStream(temporary, { flags: "wx" }))
+    const verify = new ZipReader(new BlobReader(Bun.file(temporary)))
+    const entries = await verify.getEntries().finally(() => verify.close())
 
-  if (entries.length !== expected) throw new Error("Corporate release ZIP entry count does not match")
-  console.log("packaged " + entries.length + " corporate entries for " + options.version)
+    if (entries.length !== files.length + metadata.length + 1)
+      throw new Error("Corporate release ZIP entry count does not match")
+    // Replace the previous upload only after the new archive is complete and readable.
+    await rename(temporary, output)
+    console.log("packaged " + entries.length + " corporate entries for " + options.version)
+  } finally {
+    await rm(temporary, { force: true })
+  }
 }
 
 // The new release pipeline publishes signed installers rather than split electron-builder YAML artifacts.
