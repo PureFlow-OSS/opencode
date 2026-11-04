@@ -1,6 +1,7 @@
 - After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. Do not edit generated client files directly.
 - Keep runtime dependencies directed from Schema to Core and Protocol, then from Core and Protocol to Server. Client runtime code may depend on Schema and Protocol but never Core or Server; `sdk` composes Client, Core, and Server.
 - This repository does not use Changesets. Do not add `.changeset` files; follow the existing release workflow instead.
+- For this corporate fork, read [PROJECT_PLAN.md](./PROJECT_PLAN.md) before a broad project scan. It records the active worktree, architecture entrypoints, confirmed fixes, release boundaries, and pending work. Verify its branch/commit against the checkout before applying it; keep its handoff status current after related work.
 - The default branch is `dev`. Base branches and worktrees on `origin/dev`, target PRs at `dev`, and diff against `origin/dev` unless told otherwise.
 
 ## Live TUI Testing
