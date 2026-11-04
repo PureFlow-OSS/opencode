@@ -162,7 +162,8 @@ it.live("rejects incompatible daemons without replacing or killing them", () =>
   Effect.gen(function* () {
     const { root, directory } = yield* temporaryRuntime()
     const existing = yield* Effect.acquireRelease(
-      Effect.sync(() => spawn("sleep", ["30"])),
+      // Keep a real fixture process alive through its stdin pipe on Windows as well as Unix.
+      Effect.sync(() => spawn(process.execPath, ["-e", "process.stdin.resume()"])),
       (child) =>
         Effect.promise(async () => {
           if (child.exitCode !== null || child.signalCode !== null) return

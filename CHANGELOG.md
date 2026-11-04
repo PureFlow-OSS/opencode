@@ -6,6 +6,8 @@ Release notes for OpenCode V2, newest first.
 
 - **Corporate Upstream 2.2.5 Integration**: Preserved the enterprise providers, Windows proxy authentication, document workers, stores, updater and Windows packaging while integrating upstream 2.2.5. Document workers use the updated AI API and remain available alongside opt-in artifact tools.
 
+- **Windows Persistent Terminals**: The packaged terminal helper is extracted beside the staged CLI under the approved executable directory instead of the user cache.
+
 - **Fresh Windows Update Archives**: Windows packaging now refreshes the upload ZIP with the current signed installer, matching SHA512 metadata, blockmap and changelog. The previous archive is replaced only after the new ZIP is complete and readable.
 
 - **Keycloak Admin Login**: The updater admin UI and admin API require the exact `group` claim `opencodeAdmin` from the RSH realm. Server-side sessions, CSRF protection, logout and RRZ-styled error pages are included. Local Docker testing supports trusted localhost HTTPS; update feeds and model configuration remain available to existing clients.
