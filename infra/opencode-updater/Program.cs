@@ -598,7 +598,7 @@ app.MapGet("/opencode/admin/provider-settings", async (
   if (UpdaterChannelInfo.TryParse(channel) is not { } selectedChannel)
     return Results.BadRequest(new { error = "channel must be normal, beta, or ai-gilde" });
   var config = await configStore.LoadUpdaterOptionsAsync(selectedChannel, context.RequestAborted);
-  return Results.Json(new ProviderSettingsRequest { Model = config.ProviderConfig.Model, SmallModel = config.ProviderConfig.SmallModel });
+  return Results.Json(ProviderDefaults.Read(config.ProviderConfig));
 });
 
 app.MapPut("/opencode/admin/provider-settings", async (
@@ -608,8 +608,8 @@ app.MapPut("/opencode/admin/provider-settings", async (
   HttpContext context
 ) =>
 {
-  if (string.IsNullOrWhiteSpace(settings.Model) || string.IsNullOrWhiteSpace(settings.SmallModel))
-    return Results.BadRequest(new { error = "Model and small model are required" });
+  if (ProviderDefaults.Validate(settings) is { } error)
+    return Results.BadRequest(new { error });
   if (UpdaterChannelInfo.TryParse(channel) is not { } selectedChannel)
     return Results.BadRequest(new { error = "channel must be normal, beta, or ai-gilde" });
   return Results.Json(await configStore.SaveProviderSettingsAsync(
@@ -765,6 +765,9 @@ app.MapGet("/opencode/provider-config.json", async (HttpRequest request, Updater
   var rollout = await rolloutResolver.ResolveAsync(request, request.HttpContext.RequestAborted);
   var config = ApplyReasoningSettings(rollout.Options.ProviderConfig);
   config.Mcp = await mcps.ApplyAsync(config.Mcp, UpdaterChannelName(rollout.Channel), request.HttpContext.RequestAborted);
+  ProviderDefaults.FilterForClient(config, request);
+  request.HttpContext.Response.Headers.CacheControl = "private, no-store";
+  request.HttpContext.Response.Headers.Vary = $"X-OpenCode-AiFactory-Api-Key, {ProviderDefaults.CapabilityHeader}";
   return Results.Json(config);
 });
 
@@ -1690,6 +1693,14 @@ sealed class MotdOptions
 
 sealed class ProviderConfigOptions
 {
+  [JsonPropertyName("agents")]
+  [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+  public Dictionary<string, ProviderAgentOptions>? Agents { get; set; }
+
+  [JsonPropertyName("compaction")]
+  [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+  public ProviderCompactionOptions? Compaction { get; set; }
+
   [JsonPropertyName("model")]
   public string? Model { get; set; }
 
@@ -1824,6 +1835,22 @@ sealed class ModelSettingsRequest
 
 sealed class ProviderSettingsRequest
 {
+  [JsonPropertyName("title_model")]
+  public string? TitleModel { get; set; }
+
+  [JsonPropertyName("compaction_model")]
+  public string? CompactionModel { get; set; }
+
+  [JsonPropertyName("compaction_auto")]
+  public bool? CompactionAuto { get; set; }
+
+  [JsonPropertyName("compaction_buffer")]
+  [JsonConverter(typeof(CompactionBufferConverter))]
+  public string? CompactionBuffer { get; set; }
+
+  [JsonPropertyName("compaction_keep_tokens")]
+  public int? CompactionKeepTokens { get; set; }
+
   [JsonPropertyName("model")]
   public string? Model { get; set; }
 
@@ -1904,6 +1931,7 @@ sealed class UpdaterConfigStore(IWebHostEnvironment environment)
       var provider = GetObject(GetObject(root, "Updater"), "ProviderConfig");
       provider["model"] = settings.Model?.Trim();
       provider["small_model"] = settings.SmallModel?.Trim();
+      ProviderDefaults.Apply(provider, settings);
       await SaveAsync(root, channel, cancellationToken);
       return settings;
     }

@@ -159,6 +159,11 @@ export type ModelSettings = {
 export type ProviderSettings = {
   model?: string | null
   small_model?: string | null
+  title_model?: string | null
+  compaction_model?: string | null
+  compaction_auto?: boolean | null
+  compaction_buffer?: string | number | null
+  compaction_keep_tokens?: number | null
 }
 
 export type McpConfig = {

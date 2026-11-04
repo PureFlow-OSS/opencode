@@ -104,14 +104,24 @@ Authentifizierte Versions-/Feed-Abfrage ist durch `corporate.test.ts` abgedeckt.
 - Plugin Store ist implementiert: Admin verwaltet optionale npm-Pakete, App installiert sie unter Extensions → Plugins. Persistenz über `UpdaterPluginStore` in der vorhandenen SQLite-Datenbank. Nicht mit dem MCP-Katalog zusammenwerfen.
 - `rem-memory@2.0.1` wurde als Paketbeispiel besprochen. Tests eines Ports im älteren Checkout sind kein Kompatibilitätsbeweis für unseren Branch oder einen künftigen 2.2.5-Merge.
 
-### Hilfsagenten und Compaction zentral konfigurieren: Prüfung vom 04.11.
+### Hilfsagenten und Compaction zentral konfigurieren
+
+**Implementiert auf Nutzerauftrag nach dem 2.2.5-Merge:** Im Updater-Admin unter Model Status gibt es optionale Vorgaben für Titel-Modell, Compaction-Modell, automatische Verdichtung (Client-Vorgabe/Ja/Nein), Puffer (Tokens oder Prozent) und beibehaltene Tokens. Auswahl aus dem Modellkatalog speichert `aifactory/...`; IDs mit Slash wie `mistralai/...` bleiben vollständig. Beta, AI Gilde und Normal sind unabhängig. Leere Felder entfernen die Vorgaben, `false` und `0` bleiben erhalten. Bestehende Modellregeln und andere Agent-Eigenschaften in der Datei werden nicht gelöscht. Globale Modell-/Small-Model-Vorgaben können ebenfalls leer bleiben. Kein Live-Appsettings geändert und keine Vorgaben automatisch für alle Nutzer aktiviert.
+
+Backend: `ProviderDefaults.cs`, bestehende `/opencode/admin/provider-settings`-GET/PUT und `UpdaterConfigStore.SaveProviderSettingsAsync`. Native JSON-Struktur unter `agents.title.model`, `agents.compaction.model`, `compaction.auto/buffer/keep.tokens`; Prozentwerte bleiben Strings, Tokenzahlen werden als JSON-Zahlen ausgegeben. PUT ersetzt die optionalen Formularwerte; ein API-Aufruf ohne diese Felder entfernt sie. Ungültige Modellreferenzen, Prozentwerte und negative Tokens scheitern vor dem Schreiben. Admin-Authentifizierung/CSRF unverändert.
+
+Kompatibilität: `ConfigManaged.readProviderConfig` sendet `X-OpenCode-Config-Capabilities: agent-compaction-defaults-v1`, ohne API-Key/Header zu verlieren oder den bisherigen Fetch-Trigger zu verändern. Nur unterstützende Clients bekommen die neuen Felder; ältere Clients bzw. ein curl ohne diesen Header bekommen weiter die bisherige Provider-Konfiguration. Kanalwahl über AI-Factory-Key bleibt erhalten. Lokale Konfiguration gewinnt weiterhin; tatsächlicher Config-Ladetest bestätigt zentralen Prozentpuffer und explizites Titel-Modell trotz `small_model`, danach lokale Überschreibung ohne Dateimutation. Ein neuer 2.2.5-Client-Build sowie Deployment des geänderten Updaters sind erforderlich. In diesem Auftrag kein neuer Desktop-Installer und kein Live-Container-Neustart.
+
+Prüfungen: .NET-Build ohne Warnungen/Fehler, Angular-Build erfolgreich. Backend mit echtem isoliertem Keycloak-Testflow: fünf Auth-/Admin-/Konfigurationsfälle, 217 Assertions grün; Stage-/Default-/Legacy-HTTP-Vertrag außerdem zehnmal erfolgreich (980 Assertions vor der ergänzten Reset-Null-Prüfung). Core Managed-/Security-/Agent-/Compaction-Prüfungen zehnmal grün: 450 Durchläufe/1700 Assertions. Core-Typprüfung über 1880 Dateien und gezielter Lint grün. Gebaute Angular-Oberfläche mit isolierter Browser-Fixture geprüft: Auswahl, getrennte Kanäle, korrekte Modellpräfixe, Validierung, `false`/`0`, Zurücksetzen, CSRF und Desktop-/Mobilansicht ohne Überlauf. Nachweise lokal `artifacts/upstream-v2.1.2-review/provider-defaults-*`.
+
+Historische Machbarkeitsprüfung vor der Umsetzung:
 
 - Lokal unterstützt 2.2.2 bereits `agents.title.model`, `agents.compaction.model`, `compaction.auto`, `compaction.keep.tokens` und einen numerischen `compaction.buffer`. `auto: true` und `keep.tokens: 15000` sind bereits die Core-Standardwerte.
 - **`buffer: "30%"` ist im aktuellen 2.2.2-Schema nicht gültig.** Der verglichene Upstream-v2.2.5-Stand unterstützt Prozentwerte; dafür ist ein neuer Client bzw. ein gezielter Backport nötig.
 - Unser Provider-Präfix ist `aifactory/`, nicht das im Vorschlag genannte `rrz/`; Modell-ID zusätzlich gegen den tatsächlichen Katalog prüfen.
 - `config.ts` übernimmt die zentrale Provider-Konfiguration bereits als Config-Dokument vor den lokalen Einträgen. Der Client braucht daher für bereits unterstützte Agent-/Compaction-Felder keinen neuen generellen Merge-Mechanismus; lokale Einstellungen können Vorgaben überschreiben.
 - Backend-`ProviderConfigOptions` liefert bisher nur `model`, `small_model`, `aifactory` und `mcp`. Für zentrale Agent-/Compaction-Felder müssen Backend-Datentypen/Persistenz sowie Admin-UI erweitert werden. `small_model` lässt sich schon zentral setzen und wird in `config/normalize.ts` auf den Title-Agenten abgebildet, nicht auf den Compaction-Agenten.
-- Die Nutzerfrage war eine Prüfung der Machbarkeit. Noch keine persönlichen `opencode.json`-Dateien oder globalen Agent-/Compaction-Vorgaben geändert und nichts ausgerollt.
+- Zu diesem früheren Prüfzeitpunkt war noch nichts implementiert. Die inzwischen umgesetzte Funktion steht oben; persönliche `opencode.json`-Dateien und Live-Konfigurationen bleiben unverändert.
 
 ## 4. Priorisierte nächste Arbeit
 
@@ -136,7 +146,7 @@ Authentifizierte Versions-/Feed-Abfrage ist durch `corporate.test.ts` abgedeckt.
 | Erledigt (Quellstand) | Upstream v2.2.5 integriert | Separater Branch `merge-upstream-225`, manueller Konfliktabgleich und gezielte Regressionen; echter signierter 2.2.5-Installer und Firmen-Rollout bleiben eigene Schritte. |
 | P2 | Plugin-/rem-memory-Kompatibilität des Zielstands | Reales npm-Paket im tatsächlich gemergten Branch geprüft; Session-, Event-, Tool- und neue Artifact-Hooks korrekt. |
 | P2 | Dokument-Problemfälle nachtesten | Gemeldete große PPTX, XLSX-Summary und konfigurierte Vision-Worker funktionieren mit aktuellem Build; keine unbeabsichtigten externen Uploads. |
-| P2 | Zentrale Hilfsagenten-/Compaction-Vorgaben planen | Backend/Admin-UI unterstützen die gewünschten Felder; Prozentpuffer erst an Clients mit passendem Schema ausliefern. Drei Stufen und lokale Überschreibungen erhalten. |
+| Erledigt (Quellstand) | Zentrale Hilfsagenten-/Compaction-Vorgaben | Backend/Admin-UI und Client-Capability implementiert und geprüft; Deployment und neuer unterstützender Client-Build stehen noch aus. |
 | Bei Bedarf | Legacy-Tauri-Updates, Installer-CLI-Registrierung, SQLite-Abhängigkeiten | Jeweils eigener Nachweis. Authenticode oder SHA512 sind keine Tauri-Updater-Signatur. CLI-Registrierung nicht ohne Prüfung wieder aktivieren; alten NU1903-Status bei Dependency-Arbeit neu prüfen. |
 
 ### Bekannte Vorprüfung zu v2.2.5

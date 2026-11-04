@@ -25,6 +25,30 @@ test("central configuration caches successful responses separately for each API 
   }
 })
 
+test("advertises agent and percentage compaction support without losing request headers", async () => {
+  const headers: Headers[] = []
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: (request) => {
+      headers.push(request.headers)
+      return Response.json({ agents: { compaction: { model: "aifactory/glm-5.3-flash" } }, compaction: { buffer: "30%" } })
+    },
+  })
+
+  try {
+    const result = await ConfigManaged.readProviderConfig(Bun.fetch, {
+      headers: { "X-OpenCode-AiFactory-Api-Key": "fixture-key", "X-Fixture": "retained" },
+    }, { updater: server.url.toString() })
+    expect(result.compaction).toEqual({ buffer: "30%" })
+    expect(headers[0].get("X-OpenCode-Config-Capabilities")).toBe("agent-compaction-defaults-v1")
+    expect(headers[0].get("X-OpenCode-AiFactory-Api-Key")).toBe("fixture-key")
+    expect(headers[0].get("X-Fixture")).toBe("retained")
+  } finally {
+    server.stop(true)
+  }
+})
+
 test("failed configuration requests are retried and wrapped payloads are accepted", async () => {
   const attempts = { count: 0 }
   const server = Bun.serve({

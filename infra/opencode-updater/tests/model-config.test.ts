@@ -46,6 +46,8 @@ test("promotes model policy through three independent configuration stages", asy
       ProviderConfig: {
         model: "aifactory/default-model",
         small_model: "aifactory/small-model",
+        agents: { title: { model: "aifactory/initial-title", description: "Preserved agent setting" } },
+        compaction: { auto: true, buffer: "15%", keep: { tokens: 15000 } },
         aifactory: {
           model_limits: [
             { ...policy, context },
@@ -131,6 +133,85 @@ test("promotes model policy through three independent configuration stages", asy
     }
     expect((await request("/admin/provider-settings")).status).toBe(200)
     expect((await request("/admin/provider-settings?channel=stable")).status).toBe(200)
+    const defaults = [
+      { channel: "beta", file: "appsettings.beta.json", key: "beta-key", buffer: "30%", auto: true, keep: 15000 },
+      { channel: "ai-gilde", file: "appsettings.ai-gilde.json", key: "gilde-key", buffer: 20000, auto: false, keep: 0 },
+      { channel: "normal", file: "appsettings.json", key: "", buffer: "12.5%", auto: true, keep: 12000 },
+    ] as const
+    for (const row of defaults) {
+      const saved = await request(`/admin/provider-settings?channel=${row.channel}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "aifactory/default-model",
+          small_model: "aifactory/small-model",
+          title_model: `aifactory/${row.channel}-title`,
+          compaction_model: "aifactory/glm-5.3-flash",
+          compaction_auto: row.auto,
+          compaction_buffer: row.buffer,
+          compaction_keep_tokens: row.keep,
+        }),
+      })
+      expect(saved.status, await saved.text()).toBe(200)
+      const stored = (await read(row.file)).Updater.ProviderConfig
+      expect(stored.agents.title).toEqual({
+        model: `aifactory/${row.channel}-title`,
+        description: "Preserved agent setting",
+      })
+      expect(stored.agents.compaction.model).toBe("aifactory/glm-5.3-flash")
+      expect(stored.compaction).toEqual({ auto: row.auto, buffer: row.buffer, keep: { tokens: row.keep } })
+      const admin = await (await request(`/admin/provider-settings?channel=${row.channel}`)).json()
+      expect(admin.title_model).toBe(`aifactory/${row.channel}-title`)
+      expect(admin.compaction_buffer).toBe(row.buffer)
+      const headers = { "X-OpenCode-AiFactory-Api-Key": row.key }
+      const legacy = await (await request("/provider-config.json", { headers })).json()
+      expect(legacy.agents).toBeUndefined()
+      expect(legacy.compaction).toBeUndefined()
+      expect(legacy.model).toBe("aifactory/default-model")
+      const current = await request("/provider-config.json", {
+        headers: { ...headers, "X-OpenCode-Config-Capabilities": "other, agent-compaction-defaults-v1" },
+      })
+      const config = await current.json()
+      expect(config.agents.title.model).toBe(`aifactory/${row.channel}-title`)
+      expect(config.compaction).toEqual(stored.compaction)
+      expect(current.headers.get("vary")).toContain("X-OpenCode-Config-Capabilities")
+      expect(current.headers.get("cache-control")).toContain("no-store")
+    }
+    const beforeInvalid = await read("appsettings.beta.json")
+    for (const patch of [
+      { compaction_buffer: "100%" },
+      { compaction_buffer: "0%" },
+      { compaction_buffer: -1 },
+      { compaction_buffer: 1.5 },
+      { compaction_buffer: { tokens: 10 } },
+      { compaction_keep_tokens: -1 },
+      { title_model: "rrz/glm-5.3-flash" },
+      { compaction_model: "aifactory/" },
+    ]) {
+      const invalid = await request("/admin/provider-settings?channel=beta", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      })
+      expect(invalid.status, JSON.stringify(patch)).toBe(400)
+      expect(await read("appsettings.beta.json")).toEqual(beforeInvalid)
+    }
+    const reset = await request("/admin/provider-settings?channel=beta", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "aifactory/default-model", small_model: "aifactory/small-model" }),
+    })
+    expect(reset.status).toBe(200)
+    const cleared = (await read("appsettings.beta.json")).Updater.ProviderConfig
+    expect(cleared.agents.title).toEqual({ description: "Preserved agent setting" })
+    expect(cleared.agents.compaction).toBeUndefined()
+    expect(cleared.compaction).toBeUndefined()
+    const resetConfig = await (await request("/provider-config.json", {
+      headers: { "X-OpenCode-AiFactory-Api-Key": "beta-key", "X-OpenCode-Config-Capabilities": "agent-compaction-defaults-v1" },
+    })).json()
+    expect(resetConfig.agents.title.model).toBeUndefined()
+    expect(resetConfig.compaction).toBeUndefined()
+    expect((await read("appsettings.ai-gilde.json")).Updater.ProviderConfig.compaction.auto).toBe(false)
     const originalNormal = await read("appsettings.json")
     const promoted = await request("/admin/model-settings/promote?model=test-model&channel=ai-gilde", {
       method: "POST",

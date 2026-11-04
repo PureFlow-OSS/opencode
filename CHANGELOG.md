@@ -4,6 +4,8 @@ Release notes for OpenCode V2, newest first.
 
 ## Unreleased
 
+- **Central Helper and Compaction Defaults**: Configure title/compaction models, automatic compaction, token or percentage buffers and retained tokens per updater channel. AI Factory model IDs are selected from the catalog; local overrides retain priority. Capability negotiation keeps older clients on their previous provider configuration.
+
 - **Corporate Upstream 2.2.5 Integration**: Preserved the enterprise providers, Windows proxy authentication, document workers, stores, updater and Windows packaging while integrating upstream 2.2.5. Document workers use the updated AI API and remain available alongside opt-in artifact tools.
 
 - **Windows Persistent Terminals**: The packaged terminal helper is extracted beside the staged CLI under the approved executable directory instead of the user cache.

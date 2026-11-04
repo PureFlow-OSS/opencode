@@ -72,7 +72,9 @@ export async function readProviderConfig(
   const key = new Headers(init.headers).get(PROVIDER_CONFIG_AIFACTORY_API_KEY_HEADER) ?? ""
   const cached = cache.get(`${url}|${key}`)
   if (cached && !options?.refresh && cached.until > Date.now()) return cached.payload
-  const payload = await fetchFn(url, { ...init, signal: AbortSignal.timeout(3000) })
+  const headers = new Headers(init.headers)
+  headers.set("X-OpenCode-Config-Capabilities", "agent-compaction-defaults-v1")
+  const payload = await fetchFn(url, { ...init, headers, signal: AbortSignal.timeout(3000) })
     .then(async (response) => (response.ok ? providerConfigPayload(await response.json()) : undefined))
     .catch(() => undefined)
   if (payload === undefined) return cached?.payload ?? {}

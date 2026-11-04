@@ -16,7 +16,7 @@ import { ChannelPickerComponent } from "./channel-picker.component"
           <p>Änderungen werden direkt in die gewählte Konfigurationsdatei gespeichert.</p>
         </div>
         <div class="header-actions">
-          <app-channel-picker [channel]="channel()" [allowAiGilde]="true" [disabled]="!!promoting()" (channelChange)="setChannel($event)" />
+          <app-channel-picker [channel]="channel()" [allowAiGilde]="true" [disabled]="!!promoting() || savingProvider()" (channelChange)="setChannel($event)" />
           <button type="button" class="secondary" (click)="syncModels()" [disabled]="syncingModels()">{{ syncingModels() ? 'Refreshing…' : 'Fetch models from LiteLLM' }}</button>
           <div class="count-pill">Models: {{ models().length }}</div>
         </div>
@@ -27,26 +27,69 @@ import { ChannelPickerComponent } from "./channel-picker.component"
       @if (success()) {
         <div class="success-state">{{ success() }}</div>
       }
-      <form class="global-settings" (ngSubmit)="saveProviderSettings()">
+      <form class="global-settings" #providerForm="ngForm" (ngSubmit)="providerForm.valid && saveProviderSettings()">
         <div>
           <h3>Globale Modellvorgaben</h3>
           <p>Diese Modelle gelten für alle OpenCode-Clients des gewählten Kanals, sofern keine lokale Konfiguration sie überschreibt.</p>
         </div>
         <label>Model
-          <select [ngModel]="providerDraft().model" (ngModelChange)="setProviderModel('model', $event)" name="providerModel" required>
+          <select [ngModel]="providerDraft().model ?? null" (ngModelChange)="setProviderModel('model', $event)" name="providerModel">
+            <option [ngValue]="null">Keine zentrale Vorgabe</option>
             @for (model of models(); track model.model) {
               <option [value]="model.model">{{ model.model }}</option>
             }
           </select>
         </label>
         <label>Small model
-          <select [ngModel]="providerDraft().small_model" (ngModelChange)="setProviderModel('small_model', $event)" name="providerSmallModel" required>
+          <select [ngModel]="providerDraft().small_model ?? null" (ngModelChange)="setProviderModel('small_model', $event)" name="providerSmallModel">
+            <option [ngValue]="null">Keine zentrale Vorgabe</option>
             @for (model of models(); track model.model) {
               <option [value]="model.model">{{ model.model }}</option>
             }
           </select>
         </label>
-        <button type="submit" [disabled]="savingProvider() || models().length === 0">{{ savingProvider() ? 'Saving…' : 'Save global models' }}</button>
+        <button type="submit" [disabled]="savingProvider() || providerSettings.isPending() || providerSettings.isError() || providerForm.invalid">{{ savingProvider() ? 'Saving…' : 'Vorgaben speichern' }}</button>
+        <fieldset class="agent-defaults">
+          <legend>Hilfsagenten und Kontextverdichtung</legend>
+          <p>Optionale Vorgaben für diesen Kanal. Leere Felder setzen keine zusätzliche Vorgabe; lokale Einstellungen haben Vorrang. Die Übernahme benötigt einen unterstützenden Client ab unserem aktuellen 2.2.5-Build.</p>
+          <div class="agent-default-fields">
+            <label><span id="title-model-label">Titel-Modell</span>
+              <select aria-labelledby="title-model-label" [ngModel]="providerDraft().title_model ?? null" (ngModelChange)="setProviderModel('title_model', $event)" name="titleModel">
+                <option [ngValue]="null">Keine zentrale Vorgabe</option>
+                @if (providerDraft().title_model && !hasAgentModel(providerDraft().title_model)) {
+                  <option [value]="providerDraft().title_model">{{ providerDraft().title_model }} (nicht im Katalog)</option>
+                }
+                @for (model of models(); track model.model) {
+                  <option [value]="agentModel(model.model)">{{ model.model }}</option>
+                }
+              </select>
+            </label>
+            <label><span id="compaction-model-label">Compaction-Modell</span>
+              <select aria-labelledby="compaction-model-label" [ngModel]="providerDraft().compaction_model ?? null" (ngModelChange)="setProviderModel('compaction_model', $event)" name="compactionModel">
+                <option [ngValue]="null">Keine zentrale Vorgabe</option>
+                @if (providerDraft().compaction_model && !hasAgentModel(providerDraft().compaction_model)) {
+                  <option [value]="providerDraft().compaction_model">{{ providerDraft().compaction_model }} (nicht im Katalog)</option>
+                }
+                @for (model of models(); track model.model) {
+                  <option [value]="agentModel(model.model)">{{ model.model }}</option>
+                }
+              </select>
+            </label>
+            <label><span id="compaction-auto-label">Automatisch verdichten</span>
+              <select aria-labelledby="compaction-auto-label" [ngModel]="providerDraft().compaction_auto ?? null" (ngModelChange)="setCompactionAuto($event)" name="compactionAuto">
+                <option [ngValue]="null">Client-Vorgabe</option>
+                <option [ngValue]="true">Ja</option>
+                <option [ngValue]="false">Nein</option>
+              </select>
+            </label>
+            <label>Puffer (Tokens oder Prozent)
+              <input type="text" [ngModel]="providerDraft().compaction_buffer" (ngModelChange)="setCompactionBuffer($event)" name="compactionBuffer" placeholder="z. B. 30% oder 20000" pattern="(?:[1-9][0-9]?(?:\\.[0-9]+)?%|[0-9]+)" />
+            </label>
+            <label>Beibehaltene Tokens
+              <input type="number" min="0" step="1" [ngModel]="providerDraft().compaction_keep_tokens" (ngModelChange)="setCompactionKeepTokens($event)" name="compactionKeepTokens" placeholder="Client-Vorgabe" />
+            </label>
+          </div>
+        </fieldset>
       </form>
       <section class="cleanup-block">
         <div class="header-row">
@@ -219,7 +262,7 @@ export class ModelStatusPanelComponent {
   }
 
   setChannel(channel: "beta" | "ai-gilde" | "normal") {
-    if (this.promoting()) return
+    if (this.promoting() || this.savingProvider()) return
     if (this.channel() === channel) return
     this.channel.set(channel)
     this.editing.set(null)
@@ -309,8 +352,28 @@ export class ModelStatusPanelComponent {
     }
   }
 
-  setProviderModel(key: "model" | "small_model", value: string) {
+  agentModel(model: string) {
+    return model.startsWith("aifactory/") ? model : `aifactory/${model}`
+  }
+
+  hasAgentModel(model: string | null | undefined) {
+    return this.models().some((item) => this.agentModel(item.model) === model)
+  }
+
+  setProviderModel(key: "model" | "small_model" | "title_model" | "compaction_model", value: string | null) {
     this.providerDraft.update((settings) => ({ ...settings, [key]: value }))
+  }
+
+  setCompactionAuto(value: boolean | null) {
+    this.providerDraft.update((settings) => ({ ...settings, compaction_auto: value }))
+  }
+
+  setCompactionBuffer(value: string) {
+    this.providerDraft.update((settings) => ({ ...settings, compaction_buffer: value.trim() || null }))
+  }
+
+  setCompactionKeepTokens(value: number | null) {
+    this.providerDraft.update((settings) => ({ ...settings, compaction_keep_tokens: value }))
   }
 
   async saveProviderSettings() {
@@ -320,7 +383,7 @@ export class ModelStatusPanelComponent {
     try {
       await this.api.saveProviderSettings(this.channel(), this.providerDraft())
       await this.providerSettings.refetch()
-      this.success.set(`Saved global models to ${this.configFile()}`)
+      this.success.set(`Vorgaben in ${this.configFile()} gespeichert`)
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : "Could not save global model settings")
     } finally {

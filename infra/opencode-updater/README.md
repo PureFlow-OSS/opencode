@@ -770,6 +770,32 @@ Optional env overrides:
 - `Updater__ProviderConfig__aifactory__model_limits__0__pattern`
 - `Updater__ProviderConfig__aifactory__model_limits__0__context`
 
+## Optional agent and compaction defaults
+
+Under **Model Status → Globale Modellvorgaben → Hilfsagenten und Kontextverdichtung**, each channel independently configures the title model, compaction model, automatic compaction, free context buffer and retained tokens. Models are selected from the AI Factory catalog and saved as `aifactory/<model-id>`, including model IDs that contain another slash. Empty fields remove the central override. Explicit `false` and `0` remain meaningful values.
+
+The existing authenticated `GET`/`PUT /opencode/admin/provider-settings?channel=beta|ai-gilde|normal` accepts `title_model`, `compaction_model`, `compaction_auto`, `compaction_buffer` and `compaction_keep_tokens` alongside `model` and `small_model`. PUT replaces these optional defaults; omitted/null helper fields clear them. Other settings in the channel file, including model policy and additional agent properties, are preserved. Model-policy promotion does not implicitly promote channel-wide defaults.
+
+The generated `provider-config.json` uses OpenCode's native shape:
+
+```json
+{
+  "agents": {
+    "title": { "model": "aifactory/glm-5.3-flash" },
+    "compaction": { "model": "aifactory/glm-5.3-flash" }
+  },
+  "compaction": {
+    "auto": true,
+    "buffer": "30%",
+    "keep": { "tokens": 15000 }
+  }
+}
+```
+
+Token buffers are JSON integers; percentages are strings from `1%` up to but excluding `100%`, including decimals such as `12.5%`. Local configuration still takes precedence over the central document. The settings do not alter the chat's selected model.
+
+**Client compatibility:** Our updated 2.2.5 client advertises `X-OpenCode-Config-Capabilities: agent-compaction-defaults-v1` while fetching central configuration. Only these requests receive `agents` and `compaction`; older clients and ordinary curl/browser requests receive the previous provider document. This avoids invalidating older clients' strict schemas. The AI Factory key still selects Beta/AI Gilde/Normal as before, and responses are private/non-cacheable. Both the updated updater and a newly built supporting client are required; changing a release version alone does not enable the feature.
+
 ## Local fake feed
 
 Build Electron package first, then:
