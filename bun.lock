@@ -82,6 +82,7 @@
         "effect": "catalog:",
         "fuzzysort": "catalog:",
         "qr-scanner": "1.4.2",
+        "remeda": "catalog:",
         "solid-js": "catalog:",
       },
       "devDependencies": {
