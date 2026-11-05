@@ -9,6 +9,7 @@ import { WebSearchFirecrawl } from "@opencode/core/plugin/websearch/firecrawl"
 import { WebSearchParallel } from "@opencode/core/plugin/websearch/parallel"
 import { WebSearchTavily } from "@opencode/core/plugin/websearch/tavily"
 import { WebSearchTinyFish } from "@opencode/core/plugin/websearch/tinyfish"
+import { HttpProxy } from "@opencode/util/http-proxy"
 import { host, integrationHost, webSearchHost } from "./host"
 import {
   requests,
@@ -145,6 +146,27 @@ describe("built-in web search providers", () => {
           },
         },
       ])
+    }),
+  )
+
+  it.effect("uses the shared HTTP client for keyless Exa with a configured proxy", () =>
+    Effect.gen(function* () {
+      yield* Effect.acquireRelease(
+        Effect.sync(() => HttpProxy.configure({ use_http_proxy: true, http_proxy: "http://127.0.0.1:1" })),
+        () => Effect.sync(() => HttpProxy.configure({})),
+      )
+      const integrations = yield* Integration.Service
+      const websearch = yield* WebSearch.Service
+      yield* WebSearchExa.Plugin.effect(
+        host({ integration: integrationHost(integrations), websearch: webSearchHost(websearch) }),
+      )
+
+      const result = yield* websearch.query({ query: "test" })
+      expect(result.providerID).toBe(WebSearch.ID.make("exa"))
+      expect(result.results[0]?.url).toBe("https://effect.website")
+      expect(requests).toHaveLength(1)
+      expect(requests[0]?.url).toBe(WebSearchExa.endpoint)
+      expect(requests[0]?.headers.authorization).toBeUndefined()
     }),
   )
 

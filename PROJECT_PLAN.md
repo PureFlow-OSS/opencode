@@ -1,13 +1,14 @@
 # Projektplan und Einstieg für parallele Sessions
 
-Stand: **04.11.2026**, Quellbasis **`7cdb98b4ac`** plus nachfolgender Paketierungs-Fix, Branch **`feat/merge-upstream-v2.1.2`**.
+Stand: **05.11.2026**, Basis des Exa-Backports **`06e156726e`** (`v2.2.2-ai.2`), Branch **`feat/merge-upstream-v2.1.2`**.
 Dieses Dokument fasst den Corporate-Fork zusammen. Für eine Aufgabe zuerst die passende Zeile im Wegweiser lesen und nur die betroffenen Quellen prüfen. Quellcode, aktuelle Git-Diffs und paketbezogene `AGENTS.md` bleiben maßgeblich. Historische Testergebnisse sind keine Zusage für spätere Änderungen.
 
 ## 1. Arbeitsort zuerst klären
 
 | Ort | Bedeutung |
 | --- | --- |
-| `C:/Users/Klaus/.codex/worktrees/merge-upstream/opencode` | Arbeitsstand dieser Session; hier liegen dieser Plan und die aktuellen Corporate-Fixes. |
+| `C:/Users/Klaus/.codex/worktrees/websearch-222/opencode` | Isolierter Worktree für den Exa-Backport auf `feat/merge-upstream-v2.1.2`; Paketversion bleibt `2.2.2`. |
+| `C:/Users/Klaus/.codex/worktrees/merge-upstream/opencode` | Separater Integrationsstand `merge-upstream-225`; enthält Upstream 2.2.5 und den ursprünglichen Exa-Fix `98cdc17f06`. |
 | `C:/Users/Klaus/Desktop/PFH/opencode` | Anderer Checkout: `feat/merge-upstream-dev-v18`, mit uncommitteten Änderungen anderer Arbeit. Nicht mit unserem Stand gleichsetzen oder dessen Änderungen pauschal übernehmen. |
 | `C:/Users/Klaus/.codex/worktrees/bf02/opencode` | Separater Worktree; dessen Updater-Compose und Konfigurations-Bind-Mounts wurden für die lokale Docker-Umgebung verwendet. |
 
@@ -177,9 +178,17 @@ Backend-Neubau aktualisiert weder die ausgelieferte Admin-Weboberfläche noch de
 
 ## 6. Zusammenarbeit und Pflege
 
+### Websuche: verbliebener PowerShell-Pfad (05.11.2026)
+
+- Nutzer meldet generisches `Unable to search the web for …` im 2.2.2-Client. Exa ist im Code weiterhin Default, auch für AI Factory; der öffentliche MCP-Endpunkt unterstützt Suche ohne eigenen API-Key. Die Meldung beweist keinen fehlenden Key.
+- In `src/plugin/websearch/mcp.ts` verwendeten Exa und Parallel bei Windows-Proxy weiterhin einen separaten `EncodedCommand`-/`Invoke-WebRequest`-Pfad. Dieser war beim MCP-/OAuth-/Modellanfragen-Fix nicht ersetzt worden und scheitert unter ConstrainedLanguage. Entfernt: Suchanbieter verwenden denselben injizierbaren HTTP-Client wie andere Anfragen, inklusive nativem Windows-curl-Fallback nach 407, Timeout und begrenztem Response-Body. AI-Factory-Bypass bleibt unverändert.
+- Regression: Der neue Exa-Test mit konfiguriertem Proxy scheitert am unveränderten alten Code mit `PowerShell proxy request failed` und besteht nach dem Fix. Websearch-/Provider-/Proxy-Suites zehnmal: **500 Tests, 1.770 Assertions, grün**. Weitere Modell-/Netzwerk-/Provider-Prüfung: **22 Tests grün**. Util-Proxy inkl. ConstrainedLanguage, Windows-Authentifizierung und internem Bypass: **28 Tests grün**. Echte öffentliche Exa-Suche ohne API-Key liefert lokal Ergebnisse; das ist kein Nachweis eines Firmen-PC-Rollouts.
+- Ursprünglicher Fix `98cdc17f06` auf `merge-upstream-225`, jetzt gezielt nach `feat/merge-upstream-v2.1.2` zurückportiert. Die fünf Code-/Testdateien werden unverändert übernommen; Upstream-2.2.5-Funktionen bleiben im separaten Integrationsbranch. Bestehende 2.2.2-Binaries enthalten den Fix noch nicht: Client und CLI müssen neu gebaut werden; ein Backend-/Konfigurationsupdate genügt nicht. Kein Desktop-/CLI-Build und kein Container-Neustart als Nebenwirkung.
+- Frischer 2.2.2-Worktree: ebenfalls **500 Suchtests / 1.770 Assertions** und **28 Util-Proxytests** grün. Zusätzlich **19 Dokument-/Modell-/Netzwerktests** grün. Die anfängliche Core-Typprüfung deckte fehlende Manifest-/Lockfile-Einträge für bereits verwendete PDF-Bibliotheken auf. `@napi-rs/canvas@1.0.7` und `pdfjs-dist@6.2.108` aus dem ursprünglichen Dokumenten-Commit `4bac2bc811` wiederhergestellt; keine Versionsaktualisierung. Danach Core-Typprüfung über **1.812 Dateien** erfolgreich. Diese zwei Abhängigkeiten fehlen auch im separaten 2.2.5-Manifest und müssen dort vor einem sauberen Release-Build ebenfalls wiederhergestellt werden.
+
 1. Pro Session Arbeitsbereich, Branch und Ausgangscommit notieren. Bei Überschneidung von Dateien zuerst koordinieren; fremde uncommittete Änderungen erhalten.
 2. Vor großem Scan den Wegweiser nutzen. Nur Aussagen neu prüfen, die die aktuelle Aufgabe oder ein neuer Diff betreffen.
 3. Nach Abschluss hier Status, Commit, Tests und offene Einschränkungen kurz aktualisieren. Bestätigte Implementierung, erzeugtes Build-Artefakt, Deployment und Nutzerbestätigung getrennt benennen.
 4. Keine Keys, Tokens, persönlichen Appsettings oder Rohlogs in Plan/Commits ablegen. Diagnosebeispiele verwenden ausschließlich Testwerte.
 
-Aktuelle Übergabe: Die laufende Firmen-CLI wurde per SHA256 der veralteten Upload-ZIP zugeordnet. ZIP erneuert, automatische ZIP-Erstellung im Windows-Wrapper ergänzt und geprüft; Nutzer bestätigt „ok gehtz so“ und beauftragt Commit sowie neuen Tag `v2.2.2-ai.2`. MCP-/ChatGPT-Login war bereits bestätigt. Upstream 2.2.5 bleibt geplant. Keycloak-/Updater-Code und beide Docker-Images sind veröffentlicht; lokaler HTTPS-Test nutzt `groups` mit exakt `/opencodeAdmin`. Kein Upstream-Merge und kein vollständiger Desktop-/CLI-Neubau für diese Paketierungsreparatur. Die Paketversion bleibt `2.2.2`.
+Aktuelle Übergabe: Exa-/Parallel-Websearch-Fix aus `98cdc17f06` gezielt auf den 2.2.2-Release-Branch zurückportiert. Die Paketversion bleibt `2.2.2`, veröffentlichte Tags bleiben unverändert. Vor Auslieferung aus diesem Branch einen aktuellen Desktop-Build inklusive CLI erzeugen; ein Git-Push allein aktualisiert keine vorhandenen Installer. Die vollständige Upstream-2.2.5-Integration bleibt separat auf `merge-upstream-225`. Die zuvor bestätigten Proxy-, Keycloak- und ZIP-Fixes der Basis `06e156726e` bleiben enthalten.

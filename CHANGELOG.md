@@ -4,6 +4,10 @@ Release notes for OpenCode V2, newest first.
 
 ## Unreleased
 
+- **Exa Search Through Windows Proxies**: Removed the separate PowerShell transport from Exa and Parallel web search. Search now uses the shared HTTP client and Windows proxy authentication, including on PCs with restricted PowerShell. Exa remains the default for AI Factory and supports keyless search.
+
+- **Reproducible PDF Dependencies**: Restored the existing PDF.js and native canvas versions to the package manifest and lockfile so clean installations include the PDF extraction and rendering libraries.
+
 - **Fresh Windows Update Archives**: Windows packaging now refreshes the upload ZIP with the current signed installer, matching SHA512 metadata, blockmap and changelog. The previous archive is replaced only after the new ZIP is complete and readable.
 
 - **Keycloak Admin Login**: The updater admin UI and admin API require the exact `group` claim `opencodeAdmin` from the RSH realm. Server-side sessions, CSRF protection, logout and RRZ-styled error pages are included. Local Docker testing supports trusted localhost HTTPS; update feeds and model configuration remain available to existing clients.

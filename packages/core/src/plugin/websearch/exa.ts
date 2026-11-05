@@ -3,8 +3,6 @@ export * as WebSearchExa from "./exa.js"
 import { define } from "@opencode/plugin/effect/plugin"
 import { Effect, Schema, Scope } from "effect"
 import { HttpClient } from "effect/http"
-import { AppProcess } from "@opencode/util/process"
-import { HttpProxy } from "@opencode/util/http-proxy"
 import { WebSearchMcp } from "./mcp.js"
 
 export const endpoint = "https://mcp.exa.ai/mcp"
@@ -24,11 +22,10 @@ const McpOutput = Schema.Struct({
   ),
 })
 
-export const Plugin = define<HttpClient.HttpClient | AppProcess.Service | Scope.Scope>({
+export const Plugin = define<HttpClient.HttpClient | Scope.Scope>({
   id: "opencode.websearch.exa",
   effect: Effect.fn("WebSearchExa.Plugin")(function* (ctx) {
     const http = yield* HttpClient.HttpClient
-    const processes = yield* AppProcess.Service
     yield* ctx.integration.transform((editor) => {
       editor.update("exa", (integration) => (integration.name = "Exa"))
       editor.method.update({
@@ -50,15 +47,12 @@ export const Plugin = define<HttpClient.HttpClient | AppProcess.Service | Scope.
             const credential = connection ? yield* ctx.integration.connection.resolve(connection) : undefined
             const url = new URL(endpoint)
             if (credential?.type === "key") url.searchParams.set("exaApiKey", credential.key)
-            const proxy = HttpProxy.proxyFor(url)
             const result = yield* WebSearchMcp.call(
               http,
               url.toString(),
               "web_search_exa",
               { input: McpInput, output: McpOutput },
               { query: input.query, numResults: 8 },
-              {},
-              { proxy, process: processes.run },
             )
             const content = result?.content.find((item) => item.text)
             return content ? parseResults(content.text) : []
