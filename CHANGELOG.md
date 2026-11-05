@@ -4,6 +4,8 @@ Release notes for OpenCode V2, newest first.
 
 ## Unreleased
 
+- **Exa Search Through Windows Proxies**: Removed the separate PowerShell transport from Exa and Parallel web search. Search now uses the shared HTTP client and Windows proxy authentication, including on PCs with restricted PowerShell. Exa remains the default for AI Factory and supports keyless search.
+
 - **Central Helper and Compaction Defaults**: Configure title/compaction models, automatic compaction, token or percentage buffers and retained tokens per updater channel. AI Factory model IDs are selected from the catalog; local overrides retain priority. Capability negotiation keeps older clients on their previous provider configuration.
 
 - **Corporate Upstream 2.2.5 Integration**: Preserved the enterprise providers, Windows proxy authentication, document workers, stores, updater and Windows packaging while integrating upstream 2.2.5. Document workers use the updated AI API and remain available alongside opt-in artifact tools.

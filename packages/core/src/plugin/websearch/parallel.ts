@@ -4,8 +4,6 @@ import { define } from "@opencode/plugin/effect/plugin"
 import { Effect, Schema, Scope } from "effect"
 import { HttpClient } from "effect/http"
 import { WebSearch } from "@opencode/schema/websearch"
-import { AppProcess } from "@opencode/util/process"
-import { HttpProxy } from "@opencode/util/http-proxy"
 import { App } from "../../app.js"
 import { WebSearchMcp } from "./mcp.js"
 
@@ -52,11 +50,10 @@ const McpOutput = Schema.Struct({
   structuredContent: SearchResponse,
 })
 
-export const Plugin = define<HttpClient.HttpClient | AppProcess.Service | Scope.Scope>({
+export const Plugin = define<HttpClient.HttpClient | Scope.Scope>({
   id: "opencode.websearch.parallel",
   effect: Effect.fn("WebSearchParallel.Plugin")(function* (ctx) {
     const http = yield* HttpClient.HttpClient
-    const processes = yield* AppProcess.Service
     yield* ctx.integration.transform((editor) => {
       editor.update("parallel", (integration) => (integration.name = "Parallel"))
       editor.method.update({
@@ -76,7 +73,6 @@ export const Plugin = define<HttpClient.HttpClient | AppProcess.Service | Scope.
           Effect.gen(function* () {
             const connection = yield* ctx.integration.connection.active("parallel")
             const credential = connection ? yield* ctx.integration.connection.resolve(connection) : undefined
-            const proxy = HttpProxy.proxyFor(endpoint)
             const result = yield* WebSearchMcp.call(
               http,
               endpoint,
@@ -92,7 +88,6 @@ export const Plugin = define<HttpClient.HttpClient | AppProcess.Service | Scope.
                 "User-Agent": App.useragent(ctx.app),
                 ...(credential?.type === "key" ? { Authorization: `Bearer ${credential.key}` } : {}),
               },
-              { proxy, process: processes.run },
             )
             return (
               result?.structuredContent.results.map((item) => {

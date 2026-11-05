@@ -214,6 +214,13 @@ Backend-Neubau aktualisiert weder die ausgelieferte Admin-Weboberfläche noch de
 
 ## 6. Zusammenarbeit und Pflege
 
+### Websuche: verbliebener PowerShell-Pfad (05.11.2026)
+
+- Nutzer meldet generisches `Unable to search the web for …` im 2.2.2-Client. Exa ist im Code weiterhin Default, auch für AI Factory; der öffentliche MCP-Endpunkt unterstützt Suche ohne eigenen API-Key. Die Meldung beweist keinen fehlenden Key.
+- In `src/plugin/websearch/mcp.ts` verwendeten Exa und Parallel bei Windows-Proxy weiterhin einen separaten `EncodedCommand`-/`Invoke-WebRequest`-Pfad. Dieser war beim MCP-/OAuth-/Modellanfragen-Fix nicht ersetzt worden und scheitert unter ConstrainedLanguage. Entfernt: Suchanbieter verwenden denselben injizierbaren HTTP-Client wie andere Anfragen, inklusive nativem Windows-curl-Fallback nach 407, Timeout und begrenztem Response-Body. AI-Factory-Bypass bleibt unverändert.
+- Regression: Der neue Exa-Test mit konfiguriertem Proxy scheitert am unveränderten alten Code mit `PowerShell proxy request failed` und besteht nach dem Fix. Websearch-/Provider-/Proxy-Suites zehnmal: **500 Tests, 1.770 Assertions, grün**. Weitere Modell-/Netzwerk-/Provider-Prüfung: **22 Tests grün**. Util-Proxy inkl. ConstrainedLanguage, Windows-Authentifizierung und internem Bypass: **28 Tests grün**. Echte öffentliche Exa-Suche ohne API-Key liefert lokal Ergebnisse; das ist kein Nachweis eines Firmen-PC-Rollouts.
+- Änderung im Arbeitsbranch `merge-upstream-225`. Bestehende 2.2.2-Binaries enthalten sie noch nicht: Client und CLI müssen neu gebaut werden; ein Backend-/Konfigurationsupdate genügt nicht. Kein Desktop-/CLI-Build und kein Container-Neustart als Nebenwirkung.
+
 1. Pro Session Arbeitsbereich, Branch und Ausgangscommit notieren. Bei Überschneidung von Dateien zuerst koordinieren; fremde uncommittete Änderungen erhalten.
 2. Vor großem Scan den Wegweiser nutzen. Nur Aussagen neu prüfen, die die aktuelle Aufgabe oder ein neuer Diff betreffen.
 3. Nach Abschluss hier Status, Commit, Tests und offene Einschränkungen kurz aktualisieren. Bestätigte Implementierung, erzeugtes Build-Artefakt, Deployment und Nutzerbestätigung getrennt benennen.
