@@ -1,13 +1,13 @@
 # Projektplan und Einstieg für parallele Sessions
 
-Stand: **05.11.2026**, Basis des Exa-Backports **`06e156726e`** (`v2.2.2-ai.2`), Branch **`feat/merge-upstream-v2.1.2`**.
+Stand: **06.11.2026**, Basis des Sichtbarkeitsfixes **`27ed81a26c`**, Release-Snapshot **`06e156726e`** (`v2.2.2-ai.2`), Branch **`feat/merge-upstream-v2.1.2`**.
 Dieses Dokument fasst den Corporate-Fork zusammen. Für eine Aufgabe zuerst die passende Zeile im Wegweiser lesen und nur die betroffenen Quellen prüfen. Quellcode, aktuelle Git-Diffs und paketbezogene `AGENTS.md` bleiben maßgeblich. Historische Testergebnisse sind keine Zusage für spätere Änderungen.
 
 ## 1. Arbeitsort zuerst klären
 
 | Ort | Bedeutung |
 | --- | --- |
-| `C:/Users/Klaus/.codex/worktrees/websearch-222/opencode` | Isolierter Worktree für den Exa-Backport auf `feat/merge-upstream-v2.1.2`; Paketversion bleibt `2.2.2`. |
+| `C:/Users/Klaus/.codex/worktrees/websearch-222/opencode` | Isolierter Worktree für Exa- und Modellsichtbarkeits-Backports auf `feat/merge-upstream-v2.1.2`; Paketversion bleibt `2.2.2`. |
 | `C:/Users/Klaus/.codex/worktrees/merge-upstream/opencode` | Separater Integrationsstand `merge-upstream-225`; enthält Upstream 2.2.5 und den ursprünglichen Exa-Fix `98cdc17f06`. |
 | `C:/Users/Klaus/Desktop/PFH/opencode` | Anderer Checkout: `feat/merge-upstream-dev-v18`, mit uncommitteten Änderungen anderer Arbeit. Nicht mit unserem Stand gleichsetzen oder dessen Änderungen pauschal übernehmen. |
 | `C:/Users/Klaus/.codex/worktrees/bf02/opencode` | Separater Worktree; dessen Updater-Compose und Konfigurations-Bind-Mounts wurden für die lokale Docker-Umgebung verwendet. |
@@ -187,9 +187,15 @@ Backend-Neubau aktualisiert weder die ausgelieferte Admin-Weboberfläche noch de
 - Frischer 2.2.2-Worktree: ebenfalls **500 Suchtests / 1.770 Assertions** und **28 Util-Proxytests** grün. Zusätzlich **19 Dokument-/Modell-/Netzwerktests** grün. Die anfängliche Core-Typprüfung deckte fehlende Manifest-/Lockfile-Einträge für bereits verwendete PDF-Bibliotheken auf. `@napi-rs/canvas@1.0.7` und `pdfjs-dist@6.2.108` aus dem ursprünglichen Dokumenten-Commit `4bac2bc811` wiederhergestellt; keine Versionsaktualisierung. Danach Core-Typprüfung über **1.812 Dateien** erfolgreich. Diese zwei Abhängigkeiten fehlen auch im separaten 2.2.5-Manifest und müssen dort vor einem sauberen Release-Build ebenfalls wiederhergestellt werden.
 - Die vollständige Prüfung des frischen Worktrees fand außerdem die bereits importierte, aber im App-Manifest fehlende MCP-Abhängigkeit `remeda`; als bestehende Katalogversion ergänzt. Beim Windows-Checkout wurden Git-Symlinks zunächst als Textdateien materialisiert (`core.symlinks=false`); die unveränderten, im Index als `120000` markierten Dateien wurden im eigenen Worktree mit `git -c core.symlinks=true checkout-index --force -- <Pfade>` korrekt wiederhergestellt. Keine Änderung an diesen getrackten Dateien nötig; vor einem neuen Windows-Build auf echte Symlinks achten.
 
+### Modellsichtbarkeit und Kanalvorgaben (06.11.2026)
+
+- Nutzer meldet nach einem Update falsche Modellauswahl und ausgeblendetes GLM-Flash. Laut Nutzer fehlten im AI-Gilde-Kanal `model` und `small_model`; die Vorgaben wurden durch den Nutzer korrigiert. Kanal-ProviderConfig ist unabhängig, fehlende Modellvorgaben erben nicht automatisch Normal. Ohne gültige Vorgabe fällt die Auswahl auf zuletzt verwendete bzw. verfügbare Modelle zurück. Gespeicherte Sitzungs- oder Agenten-Auswahl und lokale Konfiguration haben weiterhin Vorrang; vorhandene Chats gegebenenfalls manuell auf GLM-Flash stellen. `small_model` wird in V2 zur Titel-Agent-Vorgabe migriert.
+- Zusätzlicher 2.2.2-Clientfehler: `normalizeProviderList` wandelte Core-Releasezeit `0` in `1970-01-01` um. Die Modellauswahl wertet das als altes Datum statt unbekannt und kann die Modelle ausblenden. Aus `merge-upstream-225` gezielt übernommen: `0` wird als leerer Datumswert weitergegeben. Echte Release-Daten, explizites lokales Ausblenden und zentral deaktivierte Modelle behalten ihr Verhalten.
+- Bestehenden Katalog-Test um unbekannte und echte Release-Daten erweitert, einschließlich deaktivierter und veralteter Modelle. Test ohne Fix reproduziert den 1970-Fehler, mit Fix zehn Wiederholungen: **140 Tests / 240 Assertions grün**. App-Typprüfung über **1.909 Dateien** und `lint:changed HEAD` ohne Fehler. Kein Installer-/CLI-Build, keine Änderung an produktiven Konfigurationen oder veröffentlichten Tags.
+
 1. Pro Session Arbeitsbereich, Branch und Ausgangscommit notieren. Bei Überschneidung von Dateien zuerst koordinieren; fremde uncommittete Änderungen erhalten.
 2. Vor großem Scan den Wegweiser nutzen. Nur Aussagen neu prüfen, die die aktuelle Aufgabe oder ein neuer Diff betreffen.
 3. Nach Abschluss hier Status, Commit, Tests und offene Einschränkungen kurz aktualisieren. Bestätigte Implementierung, erzeugtes Build-Artefakt, Deployment und Nutzerbestätigung getrennt benennen.
 4. Keine Keys, Tokens, persönlichen Appsettings oder Rohlogs in Plan/Commits ablegen. Diagnosebeispiele verwenden ausschließlich Testwerte.
 
-Aktuelle Übergabe: Exa-/Parallel-Websearch-Fix aus `98cdc17f06` gezielt auf den 2.2.2-Release-Branch zurückportiert. Die Paketversion bleibt `2.2.2`, veröffentlichte Tags bleiben unverändert. Vor Auslieferung aus diesem Branch einen aktuellen Desktop-Build inklusive CLI erzeugen; ein Git-Push allein aktualisiert keine vorhandenen Installer. Die vollständige Upstream-2.2.5-Integration bleibt separat auf `merge-upstream-225`. Die zuvor bestätigten Proxy-, Keycloak- und ZIP-Fixes der Basis `06e156726e` bleiben enthalten.
+Aktuelle Übergabe: Exa-/Parallel-Websearch-Fix ist bis `27ed81a26c` veröffentlicht; zusätzlich Modellsichtbarkeitsfix für unbekannte Release-Daten gezielt nach 2.2.2 übernommen. Die Paketversion bleibt `2.2.2`, veröffentlichte Tags bleiben unverändert. Vor Auslieferung aus diesem Branch einen aktuellen Desktop-Build inklusive CLI erzeugen; ein Git-Push allein aktualisiert keine vorhandenen Installer. Bereits installierte 2.2.2-Clients erhalten bei unveränderter Versionsnummer kein neues automatisches Update-Angebot. Die vollständige Upstream-2.2.5-Integration bleibt separat auf `merge-upstream-225`. Die zuvor bestätigten Proxy-, Keycloak- und ZIP-Fixes der Basis `06e156726e` bleiben enthalten.

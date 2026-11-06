@@ -41,7 +41,10 @@ describe("normalizeAgentList", () => {
 })
 
 describe("normalizeProviderList", () => {
-  test("groups current models into the app provider catalog", () => {
+  test.each([
+    { released: 0, release_date: "" },
+    { released: Date.UTC(2026, 8, 1), release_date: "2026-09-01" },
+  ])("groups models with release time $released into the app provider catalog", (row) => {
     // SAFETY: these fixtures provide every provider and model field consumed by normalizeProviderList.
     const result = normalizeProviderList(
       // SAFETY: these controlled fixtures set every field read by the catalog normalizer; unrelated API fields are omitted.
@@ -67,7 +70,7 @@ describe("normalizeProviderList", () => {
           name: "GPT-5",
           capabilities: { tools: true, input: ["text", "image"], output: ["text"] },
           variants: [{ id: "high" }],
-          time: { released: 1 },
+          time: { released: row.released },
           cost: [{ input: 1, output: 2, cache: { read: 0.1, write: 0.2 } }],
           status: "active",
           enabled: true,
@@ -97,6 +100,7 @@ describe("normalizeProviderList", () => {
     expect(result.all.get("openai")?.models["gpt-5"]).toMatchObject({
       id: "gpt-5",
       providerID: "openai",
+      release_date: row.release_date,
       capabilities: { toolcall: true, attachment: true },
       cost: { input: 1, output: 2 },
       variants: { high: {} },

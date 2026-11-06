@@ -4,6 +4,8 @@ Release notes for OpenCode V2, newest first.
 
 ## Unreleased
 
+- **AI Factory Model Visibility**: Models without a release date are no longer treated as January 1970 and hidden from the model picker. Explicit visibility preferences and centrally disabled models retain their existing behavior.
+
 - **Exa Search Through Windows Proxies**: Removed the separate PowerShell transport from Exa and Parallel web search. Search now uses the shared HTTP client and Windows proxy authentication, including on PCs with restricted PowerShell. Exa remains the default for AI Factory and supports keyless search.
 
 - **Reproducible PDF Dependencies**: Restored the existing PDF.js and native canvas versions to the package manifest and lockfile so clean installations include the PDF extraction and rendering libraries.
