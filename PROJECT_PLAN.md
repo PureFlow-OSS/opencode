@@ -1,22 +1,22 @@
 # Projektplan und Einstieg für parallele Sessions
 
-Stand: **06.11.2026**, Basis des Sichtbarkeitsfixes **`27ed81a26c`**, Release-Snapshot **`06e156726e`** (`v2.2.2-ai.2`), Branch **`feat/merge-upstream-v2.1.2`**.
+Stand: **06.11.2026**, Hotfix-Version **`2.2.3`**, Funktionsbasis **`96b8422646`**, Release-Snapshot **`06e156726e`** (`v2.2.2-ai.2`), Branch **`feat/merge-upstream-v2.1.2`**.
 Dieses Dokument fasst den Corporate-Fork zusammen. Für eine Aufgabe zuerst die passende Zeile im Wegweiser lesen und nur die betroffenen Quellen prüfen. Quellcode, aktuelle Git-Diffs und paketbezogene `AGENTS.md` bleiben maßgeblich. Historische Testergebnisse sind keine Zusage für spätere Änderungen.
 
 ## 1. Arbeitsort zuerst klären
 
 | Ort | Bedeutung |
 | --- | --- |
-| `C:/Users/Klaus/.codex/worktrees/websearch-222/opencode` | Isolierter Worktree für Exa- und Modellsichtbarkeits-Backports auf `feat/merge-upstream-v2.1.2`; Paketversion bleibt `2.2.2`. |
+| `C:/Users/Klaus/.codex/worktrees/websearch-222/opencode` | Isolierter Hotfix-Worktree auf `feat/merge-upstream-v2.1.2`; Paketversion jetzt `2.2.3` auf Basis von 2.2.2 mit Exa- und Modellsichtbarkeits-Fixes. |
 | `C:/Users/Klaus/.codex/worktrees/merge-upstream/opencode` | Separater Integrationsstand `merge-upstream-225`; enthält Upstream 2.2.5 und den ursprünglichen Exa-Fix `98cdc17f06`. |
 | `C:/Users/Klaus/Desktop/PFH/opencode` | Anderer Checkout: `feat/merge-upstream-dev-v18`, mit uncommitteten Änderungen anderer Arbeit. Nicht mit unserem Stand gleichsetzen oder dessen Änderungen pauschal übernehmen. |
 | `C:/Users/Klaus/.codex/worktrees/bf02/opencode` | Separater Worktree; dessen Updater-Compose und Konfigurations-Bind-Mounts wurden für die lokale Docker-Umgebung verwendet. |
 
 Vor Änderungen reichen zunächst `git branch --show-current`, `git status --short` und `git log -3 --oneline`. Keine fremden Änderungen zurücksetzen, bereinigen oder mitcommitten. Bei anderem Checkout diesen Plan über seinen absoluten Pfad lesen, statt Änderungen unbemerkt im falschen Branch fortzuführen.
 
-**Release-Grenze:** `v2.2.2-ai.1` zeigt auf `aabe2d1ed4`. Der anschließend gepushte, vom Nutzer im Firmennetz bestätigte MCP-/ChatGPT-Login-Fix ist `c5ccfc30d4`; der folgende Inferenz-Fix ist `e40b5d41c1`. Beide sind **nicht in diesem Tag**. Veröffentlichte Tags unverändert lassen. Die Paketversion ist weiterhin `2.2.2`; ein Git-Tag allein erhöht weder Installer-Version noch Update-Angebot.
+**Release-Grenze:** `v2.2.2-ai.1` zeigt auf `aabe2d1ed4`. Der anschließend gepushte, vom Nutzer im Firmennetz bestätigte MCP-/ChatGPT-Login-Fix ist `c5ccfc30d4`; der folgende Inferenz-Fix ist `e40b5d41c1`. Beide sind **nicht in diesem Tag**. Veröffentlichte Tags unverändert lassen. Der aktuelle Hotfix-Quellstand verwendet `2.2.3`; ein Git-Tag allein erhöht weder Installer-Version noch Update-Angebot.
 
-**Neuer Release-Snapshot:** Nutzer beauftragt Commit und erneuten Tag. Dafür `v2.2.2-ai.2` auf den Paketierungs-Fix setzen und pushen; `v2.2.2-ai.1` bleibt unverändert. Der neue Snapshot enthält auch die oben genannten Proxy-Fixes und Keycloak-Verwaltung.
+**Gesicherter Release-Snapshot:** `v2.2.2-ai.2` wurde auf `06e156726e` veröffentlicht, einschließlich der Proxy-Fixes und Keycloak-Verwaltung. Beide vorhandenen 2.2.2-Tags unverändert lassen. Für die 2.2.3-Versionsvorbereitung wurde kein neuer Tag angelegt.
 
 ## 2. Architektur und gezielter Wegweiser
 
@@ -198,4 +198,4 @@ Backend-Neubau aktualisiert weder die ausgelieferte Admin-Weboberfläche noch de
 3. Nach Abschluss hier Status, Commit, Tests und offene Einschränkungen kurz aktualisieren. Bestätigte Implementierung, erzeugtes Build-Artefakt, Deployment und Nutzerbestätigung getrennt benennen.
 4. Keine Keys, Tokens, persönlichen Appsettings oder Rohlogs in Plan/Commits ablegen. Diagnosebeispiele verwenden ausschließlich Testwerte.
 
-Aktuelle Übergabe: Exa-/Parallel-Websearch-Fix ist bis `27ed81a26c` veröffentlicht; zusätzlich Modellsichtbarkeitsfix für unbekannte Release-Daten gezielt nach 2.2.2 übernommen. Die Paketversion bleibt `2.2.2`, veröffentlichte Tags bleiben unverändert. Vor Auslieferung aus diesem Branch einen aktuellen Desktop-Build inklusive CLI erzeugen; ein Git-Push allein aktualisiert keine vorhandenen Installer. Bereits installierte 2.2.2-Clients erhalten bei unveränderter Versionsnummer kein neues automatisches Update-Angebot. Die vollständige Upstream-2.2.5-Integration bleibt separat auf `merge-upstream-225`. Die zuvor bestätigten Proxy-, Keycloak- und ZIP-Fixes der Basis `06e156726e` bleiben enthalten.
+Aktuelle Übergabe: Exa-/Parallel-Websearch-Fix und Modellsichtbarkeitsfix für unbekannte Release-Daten sind auf diesem Branch enthalten. Auf Nutzerwunsch alle 35 gemeinsam versionierten Paket-Manifeste von 2.2.2 auf **2.2.3** angehoben, damit bestehende 2.2.2-Clients den nächsten echten Build als Update erkennen. Das separat versionierte Process-Daemon-Paket bleibt unverändert. Changelog-Einträge dem 2.2.3-Hotfix zugeordnet; kein Tag, Build, Signieren oder Feed-Upload ausgeführt. Geprüft: Frozen-Lockfile-Installation ohne Lockfile-Änderung, Desktop-/CLI-/Root-/Buildscript-/Installer-Version 2.2.3, Semver-Vergleich größer als 2.2.2, sechs vorhandene Paketierungsprüfungen mit 65 Assertions erfolgreich. Vor Auslieferung aus diesem Branch einen aktuellen Desktop-Build inklusive CLI erzeugen. Der Windows-Wrapper übernimmt ohne explizites `OPENCODE_VERSION` die Desktop-Paketversion und prüft die CLI-Version. Für den Neubau `OPENCODE_ELECTRON_OUTPUT_DIR=dist-v2.2.3-ai-signed` verwenden und keinen alten `OPENCODE_CLI_DIST` vorgeben. Die vollständige Upstream-2.2.5-Integration bleibt separat auf `merge-upstream-225`; bestehende veröffentlichte Tags bleiben unverändert.
