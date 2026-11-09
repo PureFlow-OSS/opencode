@@ -4,8 +4,26 @@
       <p class="panel-kicker">Rollout groups</p>
       <h2>Testers</h2>
       <p>Search LiteLLM key names and assign each user to one rollout channel.</p>
+      <p class="version-note">Zuletzt beim Update-Check gemeldete Version pro Nutzer. Bei mehreren PCs wird die letzte Meldung angezeigt.</p>
     </div>
+    <button type="button" class="secondary" [disabled]="versionsQuery.isFetching()" (click)="versionsQuery.refetch()">{{ versionsQuery.isFetching() ? 'Aktualisieren…' : 'Versionen aktualisieren' }}</button>
   </header>
+
+  <ng-template #versionReport let-user let-channel="channel">
+    <span class="version-report">
+      @if (versionsQuery.isPending()) { <span class="last-seen">Versionsmeldung wird geladen…</span> }
+      @else if (versionsQuery.isError() && !versionsQuery.data()) { <span class="last-seen">Versionsmeldung unbekannt</span> }
+      @else if (report(user); as report) {
+        <span>Gemeldet: <strong>{{ report.version }}</strong></span>
+        <span class="last-seen">Letzter Check: {{ formatDateTime(report.lastSeenAt) }}</span>
+        @if (target(channel)?.version; as targetVersion) {
+          <span class="version-status" [class.current]="matches(report.version, targetVersion)">{{ matches(report.version, targetVersion) ? 'Entspricht Kanalversion' : 'Abweichende Version' }}</span>
+        } @else { <span class="last-seen">Kein Release im Kanal</span> }
+      } @else {
+        <span class="last-seen">Noch keine Versionsmeldung</span>
+      }
+    </span>
+  </ng-template>
 
   <form class="tester-search" (submit)="search($event)">
     <input
@@ -50,13 +68,14 @@
       <div class="section-title">
         <strong>Beta testers</strong>
         <span>First stage for testing new releases.</span>
+        <span>Kanalversion: {{ target('beta')?.version || (versionsQuery.isSuccess() ? 'Kein Release' : 'Unbekannt') }}{{ target('beta')?.stopped ? ' · Verteilung pausiert' : '' }}</span>
       </div>
       <label>
         Users
         <ul class="tester-list">
           @for (user of betaUsers(); track user) {
             <li>
-              <span>{{ user }}</span>
+              <div class="tester-identity"><strong>{{ user }}</strong><ng-container [ngTemplateOutlet]="versionReport" [ngTemplateOutletContext]="{ $implicit: user, channel: 'beta' }" /></div>
               <button
                 type="button"
                 class="remove"
@@ -70,19 +89,23 @@
           }
         </ul>
       </label>
+      @for (entry of reportedUsers('beta'); track entry.userName) {
+        <div class="reported-tester"><strong>{{ entry.userName }}</strong><span class="last-seen">Weitere Testermeldung · zuletzt im Beta-Kanal</span><ng-container [ngTemplateOutlet]="versionReport" [ngTemplateOutletContext]="{ $implicit: entry.userName, channel: 'beta' }" /></div>
+      }
     </section>
 
     <section class="tester-section">
       <div class="section-title">
         <strong>AI-Gilde</strong>
         <span>Second stage, after beta testing and before normal rollout.</span>
+        <span>Kanalversion: {{ target('ai-gilde')?.version || (versionsQuery.isSuccess() ? 'Kein Release' : 'Unbekannt') }}{{ target('ai-gilde')?.stopped ? ' · Verteilung pausiert' : '' }}</span>
       </div>
       <label>
         Users
         <ul class="tester-list">
           @for (user of aiGildeUsers(); track user) {
             <li>
-              <span>{{ user }}</span>
+              <div class="tester-identity"><strong>{{ user }}</strong><ng-container [ngTemplateOutlet]="versionReport" [ngTemplateOutletContext]="{ $implicit: user, channel: 'ai-gilde' }" /></div>
               <button
                 type="button"
                 class="remove"
@@ -96,10 +119,14 @@
           }
         </ul>
       </label>
+      @for (entry of reportedUsers('ai-gilde'); track entry.userName) {
+        <div class="reported-tester"><strong>{{ entry.userName }}</strong><span class="last-seen">Weitere Testermeldung · zuletzt im AI-Gilde-Kanal</span><ng-container [ngTemplateOutlet]="versionReport" [ngTemplateOutletContext]="{ $implicit: entry.userName, channel: 'ai-gilde' }" /></div>
+      }
     </section>
   </div>
 
   @if (testersQuery.isPending()) { <p class="message" role="status">Loading tester lists…</p> }
+  @if (versionsQuery.isError()) { <p class="message error" role="alert">Versionsmeldungen konnten nicht geladen werden.</p> }
   @if (testersQuery.isError()) { <p class="message error" role="alert">Tester lists unavailable.</p> }
   @if (error()) { <p class="message error" role="alert">{{ error() }}</p> }
   @if (status()) { <p class="message" role="status">{{ status() }}</p> }

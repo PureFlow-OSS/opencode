@@ -1,6 +1,6 @@
 # Projektplan und Einstieg für parallele Sessions
 
-Stand: **04.11.2026**, Integrationsbasis **`06e156726e`** (`v2.2.2-ai.2`), aktiver Branch **`merge-upstream-225`**, Upstream **`9bbb8ce18c`** (`v2.2.5`).
+Stand: **09.11.2026**, Integrationsbasis **`06e156726e`** (`v2.2.2-ai.2`), aktiver Branch **`merge-upstream-225`**, Upstream **`9bbb8ce18c`** (`v2.2.5`), Tester-Versionsübersicht aus **`037aa1a915`** übernommen.
 Dieses Dokument fasst den Corporate-Fork zusammen. Für eine Aufgabe zuerst die passende Zeile im Wegweiser lesen und nur die betroffenen Quellen prüfen. Quellcode, aktuelle Git-Diffs und paketbezogene `AGENTS.md` bleiben maßgeblich. Historische Testergebnisse sind keine Zusage für spätere Änderungen.
 
 ## 1. Arbeitsort zuerst klären
@@ -13,9 +13,11 @@ Dieses Dokument fasst den Corporate-Fork zusammen. Für eine Aufgabe zuerst die 
 
 Vor Änderungen reichen zunächst `git branch --show-current`, `git status --short` und `git log -3 --oneline`. Keine fremden Änderungen zurücksetzen, bereinigen oder mitcommitten. Bei anderem Checkout diesen Plan über seinen absoluten Pfad lesen, statt Änderungen unbemerkt im falschen Branch fortzuführen.
 
-**Release-Grenze:** `v2.2.2-ai.1` zeigt auf `aabe2d1ed4`. Der anschließend gepushte, vom Nutzer im Firmennetz bestätigte MCP-/ChatGPT-Login-Fix ist `c5ccfc30d4`; der folgende Inferenz-Fix ist `e40b5d41c1`. Beide sind **nicht in diesem Tag**. Veröffentlichte Tags unverändert lassen. Die Paketversion ist weiterhin `2.2.2`; ein Git-Tag allein erhöht weder Installer-Version noch Update-Angebot.
+**Release-Grenze:** `v2.2.2-ai.1` zeigt auf `aabe2d1ed4`. Der anschließend gepushte, vom Nutzer im Firmennetz bestätigte MCP-/ChatGPT-Login-Fix ist `c5ccfc30d4`; der folgende Inferenz-Fix ist `e40b5d41c1`. Beide sind **nicht in diesem Tag**. Veröffentlichte Tags unverändert lassen. Dieser Integrationsbranch verwendet `2.2.5`; der separate Hotfix-Branch verwendet `2.2.3`. Ein Git-Tag allein erhöht weder Installer-Version noch Update-Angebot.
 
-**Gesicherter Release-Snapshot:** `v2.2.2-ai.2` wurde auf `06e156726e` gesetzt und veröffentlicht; `v2.2.2-ai.1` blieb unverändert. Der Snapshot enthält die Proxy-Fixes, Keycloak-Verwaltung und ZIP-Reparatur. Die nachfolgende 2.2.5-Integration erfolgt auf dem separaten Branch `merge-upstream-225`; der bisherige Release-Branch bleibt auf dem gesicherten Stand.
+**Gesicherter Release-Snapshot:** `v2.2.2-ai.2` wurde auf `06e156726e` gesetzt und veröffentlicht; `v2.2.2-ai.1` blieb unverändert. Der Snapshot enthält die Proxy-Fixes, Keycloak-Verwaltung und ZIP-Reparatur. Die 2.2.5-Integration liegt auf dem separaten Branch `merge-upstream-225`; der bisherige Release-Branch wurde inzwischen zum 2.2.3-Hotfix weiterentwickelt.
+
+**Nachfolgende Arbeiten:** Der Hotfix-Branch `feat/merge-upstream-v2.1.2` liegt unter `C:/Users/Klaus/.codex/worktrees/websearch-222/opencode`, hat Paketversion 2.2.3 und enthält Exa-/Sichtbarkeitsfix, Manifestkorrekturen und Tester-Versionsübersicht. Hier werden die Versionsübersicht aus `037aa1a915` und die fehlenden Abhängigkeitseinträge für bestehende PDF-/MCP-Imports übernommen; Paketversion bleibt 2.2.5. Der Sichtbarkeitsfix und der Exa-Fix waren hier bereits vorhanden.
 
 ## 2. Architektur und gezielter Wegweiser
 
@@ -28,6 +30,7 @@ Abhängigkeiten: Schema → Core/Protocol → Server. Client-Laufzeit darf Schem
 | Windows-Paketierung und Signierung | `packages/desktop/electron-builder.config.ts`, `packages/desktop/script/`, `script/package-desktop-electron-win.ps1`, `script/sign-windows.ps1` |
 | Installationspfad, optionale CLI-Registrierung | `packages/desktop/resources/windows/installer.nsh`, `packages/desktop/script/corporate-installer.test.ts` |
 | Updater-Backend und Rollout | `infra/opencode-updater/Program.cs`, `infra/opencode-updater/README.md` |
+| Versionsmeldungen der Tester | `infra/opencode-updater/ClientVersions.cs`, `UpdaterRolloutResolver`, `/version` und `/admin/testers/versions`; Admin-UI `testers-panel.component.*` |
 | Admin-Weboberfläche | `infra/opencode-updater/admin-ui/src/app/`; MCP-, MCP-Store-, Plugin-Store- und Modellstatus-Panels getrennt betrachten |
 | Managed Config und Kanalwahl für Modelle | `packages/core/src/config/managed.ts`, `packages/core/src/config.ts`, `packages/core/src/plugin/provider/aifactory.ts` |
 | Modellauswahl und Einstellungen | `packages/app/src/providers/models/`, `packages/app/src/settings/`; Anbieter-/Sichtbarkeitsregeln auch auf Core-Seite prüfen |
@@ -214,6 +217,14 @@ Backend-Neubau aktualisiert weder die ausgelieferte Admin-Weboberfläche noch de
 
 ## 6. Zusammenarbeit und Pflege
 
+### Tester-Versionsübersicht nach 2.2.5 übernommen (09.11.2026)
+
+- Quelle `037aa1a915` aus dem Hotfix-Branch. Neue Tabelle `UpdaterClientVersions` in bestehender `data/feedback.db`: Nutzername, zuletzt beim Update-Check gemeldete Version, Kanal und UTC-Zeit. Nur authentifiziert zugeordnete Beta-/AI-Gilde-Tester; keine Keys/IPs/Gerätekennungen, keine Sammlung normaler Nutzer und keine vollständige Versionshistorie. Bei mehreren PCs pro Name gewinnt die letzte Meldung. SQLite-Warten für optionales Reporting auf eine Sekunde begrenzt; Fehler verhindern keine Update-Checks.
+- Keycloak-geschütztes `/opencode/admin/testers/versions`; Testers-Tab mit Kanalvergleich, fehlenden Meldungen, letztem Check, Pause, weiteren Gruppentester-Beobachtungen und automatischem/manuellem Refresh. Bestehende Clients senden schon `X-OpenCode-Version` und brauchen kein Update. Erst nach Deployment von Backend und Admin-UI treffen neue Meldungen ein.
+- Die bestehenden 2.2.5-Anpassungen bleiben erhalten: zentrale Titel-/Compaction-Vorgaben pro Kanal mit Client-Capability-Filter, prozentualer Puffer, Windows-Terminalhelfer neben der freigegebenen CLI und gemeinsame Exa-/Windows-Proxy-Schicht. Kein Desktop-/CLI-Build, Docker-Neustart, Feed-Upload oder Tag als Nebenwirkung.
+- Beim frischen 2.2.2-Checkout gefundene fehlende Manifesteinträge ebenfalls wiederhergestellt: Core `@napi-rs/canvas@1.0.7` / `pdfjs-dist@6.2.108`, App `remeda` aus dem vorhandenen Katalog. Bestehende Versionen, keine Bibliotheksaktualisierung. Damit hängt der nächste saubere 2.2.5-Build nicht mehr von lokal übrig gebliebenen Paketen ab.
+- Validierung im 2.2.5-Branch: .NET-Build 0 Warnungen/Fehler; neuer echter Backend-Test zehnmal / 250 Assertions grün, vier weitere Backend-Suites einschließlich kanalweiser Titel-/Compaction-Vorgaben / 313 Assertions grün. PDF-/Office-/Dokumenten-Tests 12 Fälle / 67 Assertions grün. Angular-Build und beide isolierten Browserprüfungen grün: Tester-Versionsübersicht sowie bestehende zentrale Modellvorgaben mit Prozentpuffer, false/0, Reset, CSRF, Kanaltrennung und Mobilansicht.
+
 ### Websuche: verbliebener PowerShell-Pfad (05.11.2026)
 
 - Nutzer meldet generisches `Unable to search the web for …` im 2.2.2-Client. Exa ist im Code weiterhin Default, auch für AI Factory; der öffentliche MCP-Endpunkt unterstützt Suche ohne eigenen API-Key. Die Meldung beweist keinen fehlenden Key.
@@ -226,4 +237,4 @@ Backend-Neubau aktualisiert weder die ausgelieferte Admin-Weboberfläche noch de
 3. Nach Abschluss hier Status, Commit, Tests und offene Einschränkungen kurz aktualisieren. Bestätigte Implementierung, erzeugtes Build-Artefakt, Deployment und Nutzerbestätigung getrennt benennen.
 4. Keine Keys, Tokens, persönlichen Appsettings oder Rohlogs in Plan/Commits ablegen. Diagnosebeispiele verwenden ausschließlich Testwerte.
 
-Aktuelle Übergabe: Gesicherter Corporate-Stand ist `v2.2.2-ai.2` (`06e156726e`). Vollständiger Upstream v2.2.5 ist auf `merge-upstream-225` integriert; Vertragsabgleich, erfolgreiche gezielte Regressionen und generische E2E-Fixture-Lücken stehen oben. Paket-Manifeste sind durch den Merge jetzt `2.2.5`, das vorhandene signierte Installer-/ZIP-Artefakt ist weiterhin `2.2.2`. Vor einem Rollout echten 2.2.5-Build mit aktuellem CLI-Inhalt erzeugen. Kein neuer veröffentlichter Release-Tag und keine Änderung an der laufenden App bzw. dem Updater-Container als Nebenwirkung dieses Merges.
+Aktuelle Übergabe: Vollständiger Upstream v2.2.5 und zentrale Helper-/Compaction-Vorgaben sind auf `merge-upstream-225` integriert; jetzt zusätzlich Tester-Versionsübersicht aus dem separaten 2.2.3-Hotfix-Branch und fehlende PDF-/MCP-Abhängigkeitseinträge übernommen. Die Paket-Manifeste dieses Branches bleiben `2.2.5`. Vertragsabgleich, gezielte Regressionen und generische E2E-Fixture-Lücken stehen oben. Vor einem Desktop-Rollout echten 2.2.5-Build mit aktuellem CLI-Inhalt erzeugen; für die Testerübersicht reichen neue Backend-/Admin-UI-Images, bestehende Clients brauchen dafür keinen Neubau. Kein neuer Release-Tag, signierter Installer, Docker-Neustart oder produktiver Dateneingriff in diesem Arbeitsschritt.

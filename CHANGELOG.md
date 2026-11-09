@@ -4,6 +4,8 @@ Release notes for OpenCode V2, newest first.
 
 ## Unreleased
 
+- **Tester Version Overview**: The updater records tester versions reported during update checks and displays the last report, check time and comparison with the published channel version in the Testers tab. Existing clients are supported; normal users are not tracked yet.
+
 - **Exa Search Through Windows Proxies**: Removed the separate PowerShell transport from Exa and Parallel web search. Search now uses the shared HTTP client and Windows proxy authentication, including on PCs with restricted PowerShell. Exa remains the default for AI Factory and supports keyless search.
 
 - **Central Helper and Compaction Defaults**: Configure title/compaction models, automatic compaction, token or percentage buffers and retained tokens per updater channel. AI Factory model IDs are selected from the catalog; local overrides retain priority. Capability negotiation keeps older clients on their previous provider configuration.

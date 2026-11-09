@@ -1,4 +1,13 @@
 .testers-card { min-height: auto; }
+.version-note { font-size: 13px; color: var(--color-text-muted); }
+.tester-identity, .version-report, .reported-tester { display: grid; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.version-report { font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: normal; }
+.last-seen { color: var(--color-text-muted); font-size: 12px; }
+.version-status { color: #8a5500; font-weight: 600; }
+.version-status.current { color: #185e40; }
+.reported-tester { padding: 10px 12px; border-top: 1px solid var(--rrz-blue-soft); }
+.panel-header { flex-wrap: wrap; }
+.tester-search input { min-width: 0; }
 .panel-header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; }
 .panel-header h2 { margin-bottom: 8px; }
 .panel-kicker { margin: 0 0 8px !important; color: var(--rrz-blue) !important; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
