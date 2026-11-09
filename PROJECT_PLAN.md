@@ -179,6 +179,12 @@ Backend-Neubau aktualisiert weder die ausgelieferte Admin-Weboberfläche noch de
 
 ## 6. Zusammenarbeit und Pflege
 
+### Vollständige AI-Factory-Modellgruppe (09.11.2026)
+
+- `packages/app/src/providers/models/select-dialog.tsx`: `withSections` hält die sichtbare AI-Factory-Gruppe vollständig an erster Stelle. Zuletzt verwendete AI-Factory-Modelle und Favoriten werden nicht mehr aus der Anbietergruppe entfernt. Andere Anbieter behalten ihre Schnellzugriffe; diese sind jetzt auf tatsächlich sichtbare Modelle begrenzt.
+- Isolierte Corporate-Story im vorhandenen Model-Selector plus Komponenten-Regression für gemischte Anbieter, Favoriten, Recent, versteckten Worker, Suche und erneutes Öffnen. Kein Desktop-/CLI-Build oder Neustart; die Änderung benötigt einen neuen Client-Build.
+- Vor dem Fix reproduziert; nach dem Fix zehn Browser-Wiederholungen grün. App-Typprüfung über 1.910 Dateien und Changed-Lint ohne Fehler. Gleiche Korrektur wird in `merge-upstream-225` übernommen.
+
 ### Versionsübersicht für Tester (09.11.2026)
 
 - Bestehende 2.2.2-/2.2.3-Electron-Clients schicken `X-OpenCode-Version` und AI-Factory-Key bei `/version` und `/url`. Nur `/version` wird zur Speicherung verwendet. Tester-Identität aus dem vorhandenen erfolgreichen LiteLLM-Kanal-Lookup wiederverwendet, keine zusätzliche externe Anfrage pro Check. Keine Speicherung für Normal-Kanal, fehlenden/ungültigen Versionswert oder nicht auflösbare Identität.

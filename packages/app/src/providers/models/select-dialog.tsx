@@ -547,25 +547,28 @@ function createProviderLabels(all: () => ModelItem[]) {
 
 type ModelGroup = { category: string; items: ModelItem[]; title?: string }
 
-// Favorites and recent models lead the list until a search narrows it. As in the TUI, they then leave their provider
-// group, so no model is listed twice.
+// AI Factory stays complete and first. Other providers can use shortcut sections without listing a model twice.
 function withSections(input: {
   groups: ModelGroup[]
   favorites: ModelItem[]
   recent: ModelItem[]
   titles: { favorite: string; recent: string }
 }): ModelGroup[] {
-  const favorites = new Set(input.favorites.map(modelKey))
+  const groups = input.groups.filter((group) => group.category !== "aifactory")
+  const available = new Set(groups.flatMap((group) => group.items.map(modelKey)))
+  const favoriteItems = input.favorites.filter((item) => available.has(modelKey(item)))
+  const favorites = new Set(favoriteItems.map(modelKey))
 
-  const recent = input.recent.filter((item) => !favorites.has(modelKey(item)))
+  const recent = input.recent.filter((item) => available.has(modelKey(item)) && !favorites.has(modelKey(item)))
   const listed = new Set([...favorites, ...recent.map(modelKey)])
 
   return [
-    ...(input.favorites.length > 0
-      ? [{ category: "favorite", title: input.titles.favorite, items: input.favorites }]
+    ...input.groups.filter((group) => group.category === "aifactory"),
+    ...(favoriteItems.length > 0
+      ? [{ category: "favorite", title: input.titles.favorite, items: favoriteItems }]
       : []),
     ...(recent.length > 0 ? [{ category: "recent", title: input.titles.recent, items: recent }] : []),
-    ...input.groups.flatMap((group) => {
+    ...groups.flatMap((group) => {
       const items = group.items.filter((item) => !listed.has(modelKey(item)))
 
       return items.length > 0 ? [{ ...group, items }] : []
