@@ -1,12 +1,14 @@
 import { Component, effect, inject, signal } from "@angular/core"
 import { FormsModule } from "@angular/forms"
+import { NgTemplateOutlet } from "@angular/common"
 import { injectMutation, injectQuery, injectQueryClient } from "@tanstack/angular-query-experimental"
 import { ApiService, TesterSearchEntry, Testers } from "./api.service"
+import { formatDateTime } from "./format-date"
 
 @Component({
   selector: "app-testers-panel",
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, NgTemplateOutlet],
   templateUrl: "./testers-panel.component.html",
   styleUrl: "./testers-panel.component.css",
 })
@@ -17,6 +19,33 @@ export class TestersPanelComponent {
     queryKey: ["testers"],
     queryFn: () => this.api.listTesters(),
   }))
+  readonly versionsQuery = injectQuery(() => ({
+    queryKey: ["tester-versions"],
+    queryFn: () => this.api.testerVersions(),
+    refetchInterval: 30_000,
+  }))
+  readonly formatDateTime = formatDateTime
+
+  report(user: string) {
+    return this.versionsQuery.data()?.clients.find((entry) => entry.userName.toLowerCase() === user.toLowerCase())
+  }
+
+  target(channel: "beta" | "ai-gilde") {
+    return this.versionsQuery.data()?.channels.find((entry) => entry.channel === channel)
+  }
+
+  matches(version: string, target: string) {
+    return version.split("+")[0] === target.split("+")[0]
+  }
+
+  reportedUsers(channel: "beta" | "ai-gilde") {
+    const assigned = [...this.betaUsers(), ...this.aiGildeUsers()].map((user) => user.toLowerCase())
+    return (
+      this.versionsQuery
+        .data()
+        ?.clients.filter((entry) => entry.channel === channel && !assigned.includes(entry.userName.toLowerCase())) ?? []
+    )
+  }
   readonly saveMutation = injectMutation(() => ({
     mutationFn: (payload: Testers) => this.api.saveTesters(payload),
   }))

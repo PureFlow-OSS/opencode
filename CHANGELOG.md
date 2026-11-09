@@ -4,6 +4,8 @@ Release notes for OpenCode V2, newest first.
 
 ## Unreleased
 
+- **Tester Version Overview**: The updater records tester versions reported during update checks and displays the last report, check time and comparison with the published channel version in the Testers tab. Existing clients are supported; normal users are not tracked yet.
+
 ## v2.2.3 — 2026-11-06
 
 - **AI Factory Model Visibility**: Models without a release date are no longer treated as January 1970 and hidden from the model picker. Explicit visibility preferences and centrally disabled models retain their existing behavior.

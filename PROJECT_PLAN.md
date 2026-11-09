@@ -1,6 +1,6 @@
 # Projektplan und Einstieg für parallele Sessions
 
-Stand: **06.11.2026**, Hotfix-Version **`2.2.3`**, Funktionsbasis **`96b8422646`**, Release-Snapshot **`06e156726e`** (`v2.2.2-ai.2`), Branch **`feat/merge-upstream-v2.1.2`**.
+Stand: **09.11.2026**, Hotfix-Version **`2.2.3`**, Basis der Updater-Versionsübersicht **`1019f3d64c`**, Release-Snapshot **`06e156726e`** (`v2.2.2-ai.2`), Branch **`feat/merge-upstream-v2.1.2`**.
 Dieses Dokument fasst den Corporate-Fork zusammen. Für eine Aufgabe zuerst die passende Zeile im Wegweiser lesen und nur die betroffenen Quellen prüfen. Quellcode, aktuelle Git-Diffs und paketbezogene `AGENTS.md` bleiben maßgeblich. Historische Testergebnisse sind keine Zusage für spätere Änderungen.
 
 ## 1. Arbeitsort zuerst klären
@@ -29,6 +29,7 @@ Abhängigkeiten: Schema → Core/Protocol → Server. Client-Laufzeit darf Schem
 | Windows-Paketierung und Signierung | `packages/desktop/electron-builder.config.ts`, `packages/desktop/script/`, `script/package-desktop-electron-win.ps1`, `script/sign-windows.ps1` |
 | Installationspfad, optionale CLI-Registrierung | `packages/desktop/resources/windows/installer.nsh`, `packages/desktop/script/corporate-installer.test.ts` |
 | Updater-Backend und Rollout | `infra/opencode-updater/Program.cs`, `infra/opencode-updater/README.md` |
+| Versionsmeldungen der Tester | Backend `ClientVersions.cs`, `/opencode/version` und `UpdaterRolloutResolver` in `Program.cs`; Admin-UI `testers-panel.component.*`, API `/opencode/admin/testers/versions` |
 | Admin-Weboberfläche | `infra/opencode-updater/admin-ui/src/app/`; MCP-, MCP-Store-, Plugin-Store- und Modellstatus-Panels getrennt betrachten |
 | Managed Config und Kanalwahl für Modelle | `packages/core/src/config/managed.ts`, `packages/core/src/config.ts`, `packages/core/src/plugin/provider/aifactory.ts` |
 | Modellauswahl und Einstellungen | `packages/app/src/providers/models/`, `packages/app/src/settings/`; Anbieter-/Sichtbarkeitsregeln auch auf Core-Seite prüfen |
@@ -177,6 +178,14 @@ Lokales Compose-Projekt zuletzt `opencode-updater`, Dienste `opencode-updater` (
 Backend-Neubau aktualisiert weder die ausgelieferte Admin-Weboberfläche noch den Desktop. Volumes, `/app/data/feedback.db`, Release-Dateien und Appsettings-Mounts erhalten. Andere Compose-Projekte nicht stoppen. Frühere automatische Ablehnung eines Backend-Neustarts wurde nicht umgangen; aktuelle Aktionen brauchen ihre eigene Autorisierung aus dem Auftrag.
 
 ## 6. Zusammenarbeit und Pflege
+
+### Versionsübersicht für Tester (09.11.2026)
+
+- Bestehende 2.2.2-/2.2.3-Electron-Clients schicken `X-OpenCode-Version` und AI-Factory-Key bei `/version` und `/url`. Nur `/version` wird zur Speicherung verwendet. Tester-Identität aus dem vorhandenen erfolgreichen LiteLLM-Kanal-Lookup wiederverwendet, keine zusätzliche externe Anfrage pro Check. Keine Speicherung für Normal-Kanal, fehlenden/ungültigen Versionswert oder nicht auflösbare Identität.
+- Neue Tabelle `UpdaterClientVersions` in bestehender `data/feedback.db`: Name, letzte gemeldete Version, Kanal, UTC-Zeit. Keine Keys/IPs/Gerätekennungen; eine letzte Beobachtung pro Nutzer, keine Installationsbestätigung und keine vollständige Versionshistorie. Normale Nutzer bleiben für spätere Erweiterung vorgesehen, aktuell nicht erfasst. Auch bei Delivery-Stopp werden Meldungen gespeichert; Speicherfehler verhindern keine Update-Checks.
+- Keycloak-geschütztes `GET /opencode/admin/testers/versions`; Testers-Tab zeigt Meldung, letztes Datum, Vergleich zur veröffentlichten Kanalversion und Pause an. Unbekannt ist explizit unbekannt. Gruppentester und alte zusätzliche Testermeldungen werden gesondert als letzte Beobachtungen angezeigt. Automatische Aktualisierung alle 30 Sekunden, manueller Refresh; bestehende Plus/Minus-Suche bleibt erhalten.
+- .NET-Build 0 Fehler/Warnungen, Angular-Build erfolgreich. Echter isolierter Backend-Vertragstest zehnmal: 10 Fälle / 250 Assertions grün (inklusive Auth, normalen/ungültigen Anfragen, Gruppen, Upsert, Pause und SQLite-Fehler). Schreibwarten auf SQLite auf eine Sekunde begrenzt und mit echtem konkurrierendem Schreib-Lock geprüft. Weitere vier Backend-Suites: 251 Assertions grün. Gebaute Angular-UI mit isolierten Testdaten auf Desktop/Mobil geprüft: Status, Datum, unbekannte Meldung, gruppierte Beobachtung, Refresh, Entfernen und kein horizontaler Überlauf.
+- Quellstand im Branch `feat/merge-upstream-v2.1.2`, Desktop-Version bleibt 2.2.3. Für Aktivierung Backend **und** Admin-UI neu ausliefern; kein Docker-Rebuild/-Neustart oder produktiver Dateneingriff als Nebenwirkung. Beobachtungen beginnen erst mit neuen Update-Checks nach Deployment. Die Erweiterung ist noch nicht nach `merge-upstream-225` übernommen.
 
 ### Websuche: verbliebener PowerShell-Pfad (05.11.2026)
 

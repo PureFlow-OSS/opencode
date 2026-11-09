@@ -41,6 +41,7 @@ builder.Services.AddSingleton<FeedOperationGate>();
 builder.Services.AddSingleton<UpdaterChannelStateStore>();
 builder.Services.AddSingleton<UpdaterVersionResolver>();
 builder.Services.AddSingleton<UpdaterRolloutResolver>();
+builder.Services.AddSingleton<ClientVersionStore>();
 builder.Services.AddSingleton<ModelCardStore>();
 builder.Services.AddSingleton<McpConfigStore>();
 builder.Services.AddSingleton<McpStoreStore>();
@@ -285,6 +286,19 @@ app.MapGet("/opencode/admin/testers", async (UpdaterConfigStore configStore, Can
     aiGildeGroups = beta.AiGildeGroups,
   });
 });
+
+app.MapGet("/opencode/admin/testers/versions", async (
+  ClientVersionStore versions, LocalFeed feed, UpdaterChannelStateStore state, CancellationToken cancellationToken
+) => Results.Json(new
+{
+  clients = await versions.ListAsync(cancellationToken),
+  channels = new[] { UpdaterChannel.Beta, UpdaterChannel.AiGilde }.Select(channel => new
+  {
+    channel = UpdaterChannelInfo.Name(channel),
+    version = feed.TryReadVersionFromLatestYml(channel),
+    stopped = state.IsStopped(channel),
+  }),
+}));
 
 app.MapGet("/opencode/admin/testers/search", async (
   HttpRequest request,
@@ -710,6 +724,7 @@ app.MapGet("/", () => Results.Redirect("/opencode/version"));
 app.MapGet("/opencode/version", async (HttpRequest request, UpdaterRolloutResolver rolloutResolver) =>
 {
   var rollout = await rolloutResolver.ResolveAsync(request, request.HttpContext.RequestAborted);
+  await rolloutResolver.RecordClientVersionAsync(request, rollout, UpdateClientVersion(request), request.HttpContext.RequestAborted);
   if (await request.HttpContext.RequestServices.GetRequiredService<UpdaterChannelStateStore>().IsStoppedAsync(rollout.Channel))
   {
     MarkDeliveryStopped(request.HttpContext.Response);
@@ -1126,6 +1141,13 @@ static async Task EnsureAdminTablesAsync(DbConnection connection, IWebHostEnviro
       Name TEXT PRIMARY KEY NOT NULL,
       Value INTEGER NOT NULL,
       UpdatedAt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS UpdaterClientVersions (
+      UserName TEXT PRIMARY KEY COLLATE NOCASE NOT NULL,
+      Version TEXT NOT NULL,
+      Channel TEXT NOT NULL,
+      LastSeenAt TEXT NOT NULL
     );
     """;
   await command.ExecuteNonQueryAsync();
@@ -2563,7 +2585,9 @@ sealed class UpdaterRolloutResolver(
   UpdaterChannelStateStore channelState,
   IHttpClientFactory clientFactory,
   IMemoryCache cache,
-  UpdaterConfigStore configStore
+  UpdaterConfigStore configStore,
+  ClientVersionStore versions,
+  ILogger<UpdaterRolloutResolver> logger
 )
 {
   public async Task<UpdaterRollout> ResolveAsync(HttpRequest request, CancellationToken cancellationToken)
@@ -2636,6 +2660,9 @@ sealed class UpdaterRolloutResolver(
       var users = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
       CollectGroupCandidates(document.RootElement, groups);
       CollectUserCandidates(document.RootElement, users);
+      var userName = beta.Users.Concat(beta.AiGildeUsers).FirstOrDefault(users.Contains)
+        ?? ClientUserName(document.RootElement);
+      if (!string.IsNullOrWhiteSpace(userName)) cache.Set($"client-user:{ComputeHash(key)}", userName, TimeSpan.FromMinutes(5));
       var channel =
         MatchesGroups(beta.Groups, groups) || MatchesUsers(beta.Users, users) ? UpdaterChannel.Beta :
         MatchesGroups(beta.AiGildeGroups, groups) || MatchesUsers(beta.AiGildeUsers, users) ? UpdaterChannel.AiGilde :
@@ -2648,6 +2675,43 @@ sealed class UpdaterRolloutResolver(
       cache.Set(cacheKey, UpdaterChannel.Normal, TimeSpan.FromMinutes(1));
       return UpdaterChannel.Normal;
     }
+  }
+
+  public async Task RecordClientVersionAsync(HttpRequest request, UpdaterRollout rollout, string? version, CancellationToken cancellationToken)
+  {
+    if (rollout.Channel == UpdaterChannel.Normal || version is null || version.Length > 128) return;
+    try
+    {
+      var beta = await configStore.LoadBetaOptionsAsync(cancellationToken);
+      var key = request.Headers[beta.HeaderName].FirstOrDefault()?.Trim();
+      if (string.IsNullOrWhiteSpace(key)) return;
+      if (!cache.TryGetValue($"client-user:{ComputeHash(key)}", out string? userName) || string.IsNullOrWhiteSpace(userName)) return;
+      await versions.RecordAsync(userName, version, rollout.Channel, cancellationToken);
+    }
+    catch (Exception error) when (error is not OperationCanceledException)
+    {
+      // Optional reporting must never prevent an update check or expose the API key in logs.
+      logger.LogWarning("Client version reporting unavailable ({ErrorType})", error.GetType().Name);
+    }
+  }
+
+  static string? ClientUserName(JsonElement value)
+  {
+    if (value.ValueKind == JsonValueKind.Object)
+    {
+      foreach (var field in new[] { "key_alias", "key_name", "username", "user_name", "display_name", "user" })
+        if (value.TryGetProperty(field, out var name) && name.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(name.GetString()))
+        {
+          var text = name.GetString()!.Trim();
+          return field == "key_alias" ? text.Split(" - ", 2, StringSplitOptions.TrimEntries)[0] : text;
+        }
+      foreach (var property in value.EnumerateObject())
+        if (ClientUserName(property.Value) is { } name) return name;
+    }
+    if (value.ValueKind == JsonValueKind.Array)
+      foreach (var item in value.EnumerateArray())
+        if (ClientUserName(item) is { } name) return name;
+    return null;
   }
 
   static bool HasBetaRules(UpdaterBetaOptions beta)
