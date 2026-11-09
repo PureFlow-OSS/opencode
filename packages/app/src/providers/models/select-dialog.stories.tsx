@@ -49,21 +49,32 @@ const models = [
   },
 ]
 
-function SelectorStory(props: { favorite?: boolean }) {
+const factory = ["glm-5.3-flash", "glm-5.3", "qwen3.8-27b-fp8", "hidden-worker"].map((id) => ({
+  ...chatgpt,
+  id,
+  name: id,
+  providerID: "aifactory",
+  api: { ...chatgpt.api, id },
+  provider: { ...chatgpt.provider, id: "aifactory", name: "RRZ AI Factory" },
+}))
+
+function SelectorStory(props: { favorite?: boolean; corporate?: boolean }) {
   const dialog = useDialog()
+  const entries = props.corporate ? [...models, ...factory] : models
 
   const [store, setStore] = createStore<{ current: string; favorite: string[]; variant?: string }>({
-    current: models[0].id,
-    favorite: props.favorite ? [models[1].id] : [],
+    current: props.corporate ? factory[0].id : models[0].id,
+    favorite: props.corporate ? [factory[1].id] : props.favorite ? [models[1].id] : [],
   })
 
-  const find = (id: string) => models.find((model) => model.id === id)
+  const find = (id: string) => entries.find((model) => model.id === id)
 
   const selection = {
     ready: Object.assign(() => true, { promise: undefined }),
-    key: () => ({ providerID: "openai", modelID: store.current }),
+    key: () => ({ providerID: find(store.current)!.providerID, modelID: store.current }),
     current: () => find(store.current),
-    recent: () => [find(store.current)].filter((model) => !!model),
+    recent: () =>
+      props.corporate ? [models[0], factory[0], factory[1], factory[3]] : [find(store.current)].filter((model) => !!model),
     favorite: {
       list: () => store.favorite.flatMap((id) => find(id) ?? []),
       toggle: (key: { modelID: string }) =>
@@ -71,10 +82,10 @@ function SelectorStory(props: { favorite?: boolean }) {
           ids.includes(key.modelID) ? ids.filter((id) => id !== key.modelID) : [key.modelID, ...ids],
         ),
     },
-    list: () => models,
+    list: () => entries,
     cycle() {},
     set: (key: { modelID: string } | undefined) => key && setStore("current", key.modelID),
-    visible: () => true,
+    visible: (key: { modelID: string }) => key.modelID !== "hidden-worker",
     setVisibility() {},
     variant: {
       configured: () => undefined,
@@ -107,3 +118,5 @@ export default {
 export const Dialog = { render: () => <SelectorStory /> }
 
 export const Favorites = { render: () => <SelectorStory favorite /> }
+
+export const Corporate = { render: () => <SelectorStory corporate /> }

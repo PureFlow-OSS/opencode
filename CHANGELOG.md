@@ -4,6 +4,8 @@ Release notes for OpenCode V2, newest first.
 
 ## Unreleased
 
+- **AI Factory Model Groups**: AI Factory stays first and lists all visible models, including favorites and recently used models. Shortcut sections no longer remove them from their provider group or restore hidden models.
+
 - **Tester Version Overview**: The updater records tester versions reported during update checks and displays the last report, check time and comparison with the published channel version in the Testers tab. Existing clients are supported; normal users are not tracked yet.
 
 - **Exa Search Through Windows Proxies**: Removed the separate PowerShell transport from Exa and Parallel web search. Search now uses the shared HTTP client and Windows proxy authentication, including on PCs with restricted PowerShell. Exa remains the default for AI Factory and supports keyless search.

@@ -217,6 +217,12 @@ Backend-Neubau aktualisiert weder die ausgelieferte Admin-Weboberfläche noch de
 
 ## 6. Zusammenarbeit und Pflege
 
+### Vollständige AI-Factory-Modellgruppe (09.11.2026)
+
+- Aus dem 2.2.3-Hotfix übernommen: `packages/app/src/providers/models/select-dialog.tsx` hält in `withSections` die sichtbare AI-Factory-Gruppe vollständig an erster Stelle. Recent/Favoriten entziehen ihr keine Modelle mehr; Schnellzugriffe anderer Anbieter sind auf sichtbare Modelle begrenzt.
+- Corporate-Story und Komponenten-Regression prüfen gemischte Anbieter, Favoriten, Recent, versteckten Worker, Suche und erneutes Öffnen. Kein Desktop-/CLI-Build oder Neustart; die Änderung benötigt einen neuen Client-Build.
+- Regression im alten Code reproduziert; auf beiden Branches je zehn Browser-Wiederholungen grün. App-Typprüfung hier über 1.916 Dateien erfolgreich; Screenshot der echten Komponente geprüft. Hotfix-Commit `21cf701ba1` auf `feat/merge-upstream-v2.1.2` bereits gepusht.
+
 ### Tester-Versionsübersicht nach 2.2.5 übernommen (09.11.2026)
 
 - Quelle `037aa1a915` aus dem Hotfix-Branch. Neue Tabelle `UpdaterClientVersions` in bestehender `data/feedback.db`: Nutzername, zuletzt beim Update-Check gemeldete Version, Kanal und UTC-Zeit. Nur authentifiziert zugeordnete Beta-/AI-Gilde-Tester; keine Keys/IPs/Gerätekennungen, keine Sammlung normaler Nutzer und keine vollständige Versionshistorie. Bei mehreren PCs pro Name gewinnt die letzte Meldung. SQLite-Warten für optionales Reporting auf eine Sekunde begrenzt; Fehler verhindern keine Update-Checks.
