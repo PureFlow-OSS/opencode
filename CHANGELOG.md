@@ -4,7 +4,7 @@ Release notes for OpenCode V2, newest first.
 
 ## Unreleased
 
-- **Tester Version Overview**: The updater records tester versions reported during update checks and displays the last report, check time and comparison with the published channel version in the Testers tab. Existing clients are supported; normal users are not tracked yet.
+- **Client Version Overview**: The updater's Client-Versionen tab shows the last version reported per identified user across Normal, Beta and AI-Gilde, with search and comparison against the published channel version. Existing clients are supported, and the Testers tab retains its rollout view.
 
 ## v2.2.3 — 2026-11-06
 

@@ -24,6 +24,7 @@
             Plugin Store
           </button>
           <button type="button" [class.active]="page === 'testers'" (click)="show('testers')">Testers</button>
+          <button type="button" [class.active]="page === 'client-versions'" (click)="show('client-versions')">Client-Versionen</button>
         </nav>
       </div>
     </section>
@@ -55,6 +56,10 @@
     } @else if (page === "testers") {
       <section class="single">
         <app-testers-panel />
+      </section>
+    } @else if (page === "client-versions") {
+      <section class="single">
+        <app-client-versions-panel />
       </section>
     } @else {
       <section class="single">

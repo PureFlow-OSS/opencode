@@ -291,7 +291,7 @@ app.MapGet("/opencode/admin/testers/versions", async (
   ClientVersionStore versions, LocalFeed feed, UpdaterChannelStateStore state, CancellationToken cancellationToken
 ) => Results.Json(new
 {
-  clients = await versions.ListAsync(cancellationToken),
+  clients = (await versions.ListAsync(cancellationToken)).Where(report => report.Channel != "normal"),
   channels = new[] { UpdaterChannel.Beta, UpdaterChannel.AiGilde }.Select(channel => new
   {
     channel = UpdaterChannelInfo.Name(channel),
@@ -299,6 +299,23 @@ app.MapGet("/opencode/admin/testers/versions", async (
     stopped = state.IsStopped(channel),
   }),
 }));
+
+app.MapGet("/opencode/admin/client-versions", async (
+  HttpResponse response, ClientVersionStore versions, LocalFeed feed, UpdaterChannelStateStore state, CancellationToken cancellationToken
+) =>
+{
+  response.Headers.CacheControl = "no-store";
+  return Results.Json(new
+  {
+    clients = await versions.ListAsync(cancellationToken),
+    channels = new[] { UpdaterChannel.Normal, UpdaterChannel.Beta, UpdaterChannel.AiGilde }.Select(channel => new
+    {
+      channel = UpdaterChannelInfo.Name(channel),
+      version = feed.TryReadVersionFromLatestYml(channel),
+      stopped = state.IsStopped(channel),
+    }),
+  });
+});
 
 app.MapGet("/opencode/admin/testers/search", async (
   HttpRequest request,
@@ -2679,13 +2696,22 @@ sealed class UpdaterRolloutResolver(
 
   public async Task RecordClientVersionAsync(HttpRequest request, UpdaterRollout rollout, string? version, CancellationToken cancellationToken)
   {
-    if (rollout.Channel == UpdaterChannel.Normal || version is null || version.Length > 128) return;
+    if (version is null || version.Length > 128) return;
     try
     {
       var beta = await configStore.LoadBetaOptionsAsync(cancellationToken);
       var key = request.Headers[beta.HeaderName].FirstOrDefault()?.Trim();
-      if (string.IsNullOrWhiteSpace(key)) return;
-      if (!cache.TryGetValue($"client-user:{ComputeHash(key)}", out string? userName) || string.IsNullOrWhiteSpace(userName)) return;
+      if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(beta.LiteLLM.BaseUrl)) return;
+      var identityKey = $"client-user:{ComputeHash(key)}";
+      if (!cache.TryGetValue(identityKey, out string? userName))
+      {
+        // Normal delivery can skip tester classification when no rollout rules are active.
+        using var lookup = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        lookup.CancelAfter(TimeSpan.FromSeconds(2));
+        await ResolveChannelAsync(key, beta, lookup.Token);
+        cache.TryGetValue(identityKey, out userName);
+      }
+      if (string.IsNullOrWhiteSpace(userName)) return;
       await versions.RecordAsync(userName, version, rollout.Channel, cancellationToken);
     }
     catch (Exception error) when (error is not OperationCanceledException)

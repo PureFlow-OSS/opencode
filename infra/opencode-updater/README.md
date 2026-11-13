@@ -2,7 +2,12 @@
 
 Hardcoded route base: `opencode`
 
-## Tester version observations
+## Client version observations
+
+The **Client-Versionen** admin tab shows the last reported version, channel, published channel
+version and check time for users across Normal, Beta and AI-Gilde. Search by user, version or
+channel. Only users whose AI Factory key was resolved by LiteLLM during a version check appear.
+The view refreshes every 30 seconds and can also be refreshed manually.
 
 The **Testers** tab shows the last client version reported by each tester, the last check time,
 and whether it matches the published version of their Beta or AI-Gilde channel. Paused delivery
@@ -10,9 +15,9 @@ is shown separately. Without a report, the version is unknown; a download is nev
 a successful installation. The view refreshes every 30 seconds and has a manual refresh button.
 
 Existing Electron clients already send `X-OpenCode-Version` and the AI Factory key to
-`/opencode/version`; no client update is required. The backend resolves the tester through the
-existing LiteLLM lookup and records only authenticated Beta/AI-Gilde observations. Group-based
-testers appear under additional observations. Standard-channel users are not recorded yet.
+`/opencode/version`; no client update is required. The backend resolves users through the
+existing LiteLLM lookup, including for Normal delivery when tester rules are disabled. Group-based
+testers appear under additional observations in the Testers tab.
 
 `UpdaterClientVersions` in the existing persistent `/app/data/feedback.db` stores one latest
 observation per resolved user: name, version, channel and UTC timestamp. No API key, IP address
@@ -20,10 +25,9 @@ or device identifier is stored. With multiple PCs/keys for the same name, the la
 observation wins; this is not a per-device inventory or a complete version history. The table
 is created automatically without changing existing records. Reporting failures do not fail update checks.
 
-`GET /opencode/admin/testers/versions` is protected by the same Keycloak admin policy as the other
+`GET /opencode/admin/client-versions` and `GET /opencode/admin/testers/versions` are protected by the same Keycloak admin policy as the other
 admin endpoints. Deploy both backend and admin UI to enable the feature; observations start
-with checks received after deployment. The storage shape can later also support ordinary users,
-but collecting their versions is deliberately not enabled by this change.
+with checks received after deployment.
 
 ## Keycloak login for administration
 

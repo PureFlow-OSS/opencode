@@ -208,10 +208,11 @@ export type Testers = {
   aiGildeGroups: string[]
 }
 
-export type TesterVersions = {
-  clients: { userName: string; version: string; channel: "beta" | "ai-gilde"; lastSeenAt: string }[]
-  channels: { channel: "beta" | "ai-gilde"; version?: string | null; stopped: boolean }[]
+export type ClientVersions<Channel extends string = "normal" | "beta" | "ai-gilde"> = {
+  clients: { userName: string; version: string; channel: Channel; lastSeenAt: string }[]
+  channels: { channel: Channel; version?: string | null; stopped: boolean }[]
 }
+export type TesterVersions = ClientVersions<"beta" | "ai-gilde">
 
 export type TesterSearchEntry = {
   userName: string
@@ -284,6 +285,10 @@ export class ApiService {
 
   async listTesters() {
     return this.readJson<Testers>(await this.request("/opencode/admin/testers", { cache: "no-store" }))
+  }
+
+  async clientVersions() {
+    return this.readJson<ClientVersions>(await this.request("/opencode/admin/client-versions", { cache: "no-store" }))
   }
 
   async testerVersions() {

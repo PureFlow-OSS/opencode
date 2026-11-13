@@ -6,9 +6,10 @@ import { McpPanelComponent } from "./mcp-panel.component"
 import { McpStorePanelComponent } from "./mcp-store-panel.component"
 import { PluginStorePanelComponent } from "./plugin-store-panel.component"
 import { TestersPanelComponent } from "./testers-panel.component"
+import { ClientVersionsPanelComponent } from "./client-versions-panel.component"
 import { ApiService, type AdminSession } from "./api.service"
 
-type Page = "upload" | "releases" | "model-status" | "mcp" | "mcp-store" | "plugin-store" | "testers"
+type Page = "upload" | "releases" | "model-status" | "mcp" | "mcp-store" | "plugin-store" | "testers" | "client-versions"
 
 @Component({
   selector: "app-root",
@@ -21,6 +22,7 @@ type Page = "upload" | "releases" | "model-status" | "mcp" | "mcp-store" | "plug
     McpStorePanelComponent,
     PluginStorePanelComponent,
     TestersPanelComponent,
+    ClientVersionsPanelComponent,
   ],
   templateUrl: "./app.component.html",
   styleUrl: "./app.component.css",

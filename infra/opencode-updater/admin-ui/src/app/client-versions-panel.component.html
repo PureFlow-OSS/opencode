@@ -1,0 +1,42 @@
+<article class="card">
+  <p class="eyebrow">Rollout</p>
+  <h2>Client-Versionen</h2>
+  <p>Die zuletzt beim Update-Check gemeldete Version pro Nutzer. Bei mehreren PCs zählt die letzte Meldung.</p>
+  <div class="controls">
+    <label>
+      Nutzer, Version oder Kanal suchen
+      <input #filter type="search" [value]="search()" (input)="search.set(filter.value)" />
+    </label>
+    <button type="button" [disabled]="query.isFetching()" (click)="query.refetch()">Aktualisieren</button>
+  </div>
+  @if (query.isError()) {
+    <p role="alert">Die Versionsmeldungen konnten nicht geladen werden.</p>
+  } @else if (query.isPending()) {
+    <p role="status">Versionsmeldungen werden geladen …</p>
+  } @else if (rows().length) {
+    <div class="results">
+      <table aria-label="Zuletzt gemeldete Client-Versionen">
+        <thead>
+          <tr><th>Nutzer</th><th>Gemeldete Version</th><th>Kanal</th><th>Kanalversion</th><th>Letzte Prüfung</th></tr>
+        </thead>
+        <tbody>
+          @for (row of rows(); track row.userName) {
+            <tr>
+              <th scope="row">{{ row.userName }}</th>
+              <td>{{ row.version }}</td>
+              <td>{{ labels[row.channel] }} @if (row.target?.stopped) { (pausiert) }</td>
+              <td>
+                @if (row.target?.version; as version) {
+                  {{ version }} · {{ matches(row.version, version) ? "Entspricht Kanalversion" : "Abweichende Version" }}
+                } @else { Unbekannt }
+              </td>
+              <td><time [attr.datetime]="row.lastSeenAt">{{ formatDateTime(row.lastSeenAt) }}</time></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <p role="status">{{ search().trim() ? "Keine passenden Meldungen." : "Noch keine Versionsmeldungen." }}</p>
+  }
+</article>

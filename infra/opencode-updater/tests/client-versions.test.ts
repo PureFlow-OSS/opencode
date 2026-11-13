@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { keycloak } from "./support/keycloak"
 
-test("records only authenticated tester version observations and keeps update checks available", async () => {
+test("records authenticated client versions in all channels and keeps update checks available", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "opencode-client-versions-"))
   const idp = await keycloak()
   const gateway = Bun.serve({
@@ -23,7 +23,7 @@ test("records only authenticated tester version observations and keeps update ch
                 ? "Bob"
                 : key === "group-key"
                   ? "Charlie - workstation"
-                  : "Normal user",
+                  : key === "no-rules-key" ? "No rules user" : "Normal user",
           groups: key === "group-key" ? ["beta-team"] : [],
         },
       })
@@ -100,6 +100,7 @@ test("records only authenticated tester version observations and keeps update ch
       await Bun.sleep(25)
     }
     expect((await fetch(base + "/opencode/admin/testers/versions", { redirect: "manual" })).status).toBe(401)
+    expect((await fetch(base + "/opencode/admin/client-versions", { redirect: "manual" })).status).toBe(401)
     const browser = await idp.login(base)
     const reports = async () => (await browser.request(base + "/opencode/admin/testers/versions")).json()
     expect((await reports()).clients).toEqual([])
@@ -116,6 +117,14 @@ test("records only authenticated tester version observations and keeps update ch
       expect((await check(key, version)).status).toBe(200)
     const first = await reports()
     expect(first.clients).toHaveLength(3)
+    const inventory = await browser.request(base + "/opencode/admin/client-versions")
+    expect(inventory.headers.get("cache-control")).toBe("no-store")
+    const all = await inventory.json()
+    expect(all.clients).toHaveLength(4)
+    expect(all.clients).toContainEqual(expect.objectContaining({
+      userName: "Normal user", channel: "normal", version: "2.2.2",
+    }))
+    expect(all.channels).toContainEqual({ channel: "normal", stopped: false })
     expect(first.clients).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ userName: "Alice", channel: "beta", version: "2.2.2" }),
@@ -147,6 +156,19 @@ test("records only authenticated tester version observations and keeps update ch
       expect((await browser.request(base + "/opencode/admin/releases/beta/stop", { method: "POST" })).status).toBe(200)
       expect(await (await check("beta-key", "2.2.2")).text()).toBe("2.2.2")
       expect((await reports()).channels).toContainEqual({ channel: "beta", version: "2.2.3", stopped: true })
+      await Bun.write(
+        path.join(directory, "appsettings.beta.json"),
+        JSON.stringify({
+          UpdaterBeta: {
+            Enabled: false,
+            LiteLLM: { BaseUrl: gateway.url.origin, ApiKey: "management-key", KeyInfoPath: "key/info" },
+          },
+        }),
+      )
+      expect(await (await check("no-rules-key", "2.2.3")).text()).toBe("2.2.2")
+      expect((await (await browser.request(base + "/opencode/admin/client-versions")).json()).clients).toContainEqual(
+        expect.objectContaining({ userName: "No rules user", channel: "normal", version: "2.2.3" }),
+      )
       db.exec("DROP TABLE UpdaterClientVersions")
       expect(await (await check("beta-key", "2.2.2")).text()).toBe("2.2.2")
     } finally {
